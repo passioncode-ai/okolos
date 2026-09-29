@@ -1,0 +1,50 @@
+# Handoff 2026-09-29 — переезд в passioncode-ai и стратегия экосистемы
+
+**Цель.** Перенести Okolos в организацию `passioncode-ai` и проработать, как
+переупаковать его в экосистемное решение безопасности: движок, самостоятельный
+агент, интеграция с Fabric Inbox и Fabric, защита от инъекций в почте и при
+браузинге агентами.
+
+## Сделано
+
+| Что | Квитанция |
+|---|---|
+| Репозиторий перенесён в `passioncode-ai/okolos`, публичный; старый адрес редиректит | `gh api repos/passioncode-ai/okolos` → `public` |
+| Команда `contributors` получила `push` | `gh api orgs/passioncode-ai/teams/contributors/repos` → `okolos write` |
+| Адреса в `SECURITY.md`, `package.json`, `tools/ingest.mjs` и `docs/README.md`; `AGENTS.md` и `@AGENTS.md` в `CLAUDE.md` (org-index RULES §8) | `25308af` |
+| Фид в дереве догнал агента — v41 | `dddc9e9` |
+| Хук `pre-push` падал на lint, typecheck и build с 2026-09-13: pnpm 12.4.1 из Homebrew отвергает `pnpm -s <script>` (код 2). Заменено на `pnpm -s run`, тест не даёт сокращению вернуться | `13126b8`, `tools/ci.test.ts` |
+| Канарейка `pnpm access` получила таймаут 60 с: при load 130 она шла 7.8 с | `4bca516`, `tools/script-names.test.ts` |
+| `main` переведён fast-forward на `4bca516` после зелёных восьми гейтов pre-push | `git ls-remote origin refs/heads/main` |
+| Строка `okolos` в `org-index/repositories.json`, README перегенерирован | `passioncode-ai/org-index@4a0b9e0`; `check_index.py` → 0 находок |
+| Стратегия-предложение | [docs/strategy/2026-09-29-ecosystem.md](../strategy/2026-09-29-ecosystem.md) |
+
+## Открыто
+
+- **Токен Cloudflare агента фида недействителен.** В `/tmp/okolos-feed.log`
+  записано `Invalid access token [code: 9109]` на `wrangler d1 execute`. Прод
+  отдаёт старый фид, агент собирает свежий только локально (B-133). Нужен
+  человек: новый токен с правами на D1.
+- **Агент фида пишет только в рабочую копию.** `feeds/phishing.json` в основном
+  checkout снова изменён после коммита v41. Это выход агента, а не чужая работа.
+  В дерево его кладут коммитом, как `5241cb6`.
+- **Firefox id `okolos@ssheleg.dev`** оставлен сознательно — это личность
+  дополнения в AMO (`AGENTS.md`).
+- **CI остался на push и PR**, а не на ночном батче организации. Репозиторий
+  публичный, минуты не под лимитом (`AGENTS.md`). Если оператор решит иначе —
+  перевести на расписание по `org-index/docs/CI-BATCHING.md`.
+- **Лицензия.** AGPL-3.0 не описана в RULES §9. Решение — §8.1 стратегии.
+- Четыре решения из §8 стратегии не приняты.
+
+## Проверки, которые реально прогнаны
+
+- `pre-push`: lint, typecheck, build, unit (2631 тест), ux, brand, i18n, package — все `ok` на `4bca516`.
+- `python3 docs/ux/lint.py` — ok.
+- `org-index`: `python3 scripts/check_index.py` → `15 repositories, 0 finding(s)`,
+  `python3 -m unittest discover -s tests` → `OK`.
+
+## Следующая задача
+
+Получить от оператора ответы на §8 стратегии и записать их как ADR-0014 и дальше.
+Параллельно — Ф0 из §6: новый Cloudflare-токен для агента фида, затем проверка,
+что `GET /feeds/phishing` на воркере отдаёт версию из дерева.
