@@ -87,7 +87,9 @@ describe('every script can actually be run by name', () => {
     expect(output, 'pnpm answered as if `access` were a missing script').not.toMatch(
       /Missing script|command not found/,
     )
-  })
+    // A real pnpm start-up, not a pure function: at load average 130 it took 7.8 s
+    // (2026-09-29) and the 5 s default failed the push on a clean tree.
+  }, 60_000)
 
   it('keeps the accessible forms of the access registry', () => {
     // Both halves are needed and neither is the other: `--check` refuses, the bare
