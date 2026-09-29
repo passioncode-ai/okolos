@@ -7,7 +7,7 @@
   "description": "Browser security for the age of AI agents — local-first, verifiable.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ssheleg/okolos.git"
+    "url": "git+https://github.com/passioncode-ai/okolos.git"
   },
   "packageManager": "pnpm@11.10.0",
   "engines": {

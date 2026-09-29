@@ -6,7 +6,7 @@ Okolos — продукт про безопасность, поэтому док
 ## Куда писать
 
 **Приватно:** [Security Advisory на
-GitHub](https://github.com/ssheleg/okolos/security/advisories/new). Это
+GitHub](https://github.com/passioncode-ai/okolos/security/advisories/new). Это
 единственный канал, который не публикует содержание до исправления.
 
 Не заводите публичный issue для уязвимости. Если сомневаетесь, дыра это или

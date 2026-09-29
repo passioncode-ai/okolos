@@ -280,7 +280,7 @@ export function buildSnapshot({ hosts, version, updatedAt, limit = RULE_LIMIT })
 async function fetchSource({ name, url }) {
   const response = await fetch(url, {
     redirect: 'follow',
-    headers: { 'user-agent': 'okolos-feed-ingest (+https://github.com/ssheleg/okolos)' },
+    headers: { 'user-agent': 'okolos-feed-ingest (+https://github.com/passioncode-ai/okolos)' },
     signal: AbortSignal.timeout(30_000),
   })
   if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`)
