@@ -224,7 +224,8 @@ namespaced-имя перехватить нельзя; одиночные сло
 
 | Где | Что | Режим |
 |---|---|---|
-| `~/.okolos/cloudflare.env` | токен, id аккаунта, id базы D1, адрес воркера | `0600` |
+| слот `okolos/prod/CLOUDFLARE_API_TOKEN` в хранилище Project Observatory | токен публикации фида: D1 Write на один аккаунт. Выпускается `cloudflare.py issue --preset d1-edit --account <slug> --vault okolos/prod/CLOUDFLARE_API_TOKEN`, агент берёт его через `use_secret.py`, если Observatory стоит на машине | хранилище |
+| `~/.okolos/cloudflare.env` | токен (запасной путь без Observatory), id аккаунта, id базы D1, адрес воркера | `0600` |
 | `~/.okolos/tools.env` | `GEMINI_API_KEY` для семантики графа | `0600` |
 | `~/.okolos/feed-signing-key.pem` | приватная половина Ed25519 | `0600`, каталог `0700` |
 

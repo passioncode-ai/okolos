@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { discover, runnerPrefix, xml } from './feed-agent-credential.mjs'
 
 /**
  * Installs the feed-refresh agent on this machine, or prints what it would do.
@@ -30,14 +31,22 @@ const dryRun = process.argv.includes('--dry-run')
 const uninstall = process.argv.includes('--uninstall')
 
 /** The plist launchd will read: the placeholder replaced by this checkout. */
-export function rendered(repo = root, template = readFileSync(source, 'utf8')) {
+export function rendered(repo = root, template = readFileSync(source, 'utf8'), runner = '') {
   if (!template.includes('REPO_PATH')) {
     // The template is the only place the path is templated. If the marker is
     // gone, this script would write a plist pointing at somebody else's machine
     // and launchd would fail silently every twelve hours.
     throw new Error(`${source} no longer contains REPO_PATH — refusing to guess`)
   }
-  return template.replaceAll('REPO_PATH', repo)
+  if (!template.includes('CREDENTIAL_RUNNER')) {
+    throw new Error(`${source} no longer contains CREDENTIAL_RUNNER — refusing to guess`)
+  }
+  // The runner is the Observatory's door to the vault slot, or nothing. Empty
+  // collapses to the old command; a present one prefixes it, so the token the
+  // vault holds is the one wrangler sees (tools/feed-agent-credential.mjs).
+  return template
+    .replaceAll('REPO_PATH', repo)
+    .replaceAll('CREDENTIAL_RUNNER ', runner ? `${xml(runner)} ` : '')
 }
 
 if (uninstall) {
@@ -54,7 +63,7 @@ if (uninstall) {
   process.exit(0)
 }
 
-const plist = rendered()
+const plist = rendered(root, readFileSync(source, 'utf8'), runnerPrefix(discover()))
 
 if (dryRun) {
   console.log(plist)

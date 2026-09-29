@@ -36,7 +36,7 @@
   <array>
     <string>/bin/sh</string>
     <string>-lc</string>
-    <string>cd REPO_PATH &amp;&amp; pnpm feed:refresh</string>
+    <string>cd REPO_PATH &amp;&amp; CREDENTIAL_RUNNER pnpm feed:refresh</string>
   </array>
 
   <!--
