@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "description": "Stage 1 of the AI Shield: turns hidden-text candidates into verdicts. Pure — no DOM, no clock, no network.",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "build": "tsc -b" },

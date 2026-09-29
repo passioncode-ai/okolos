@@ -154,7 +154,7 @@ python3 -c "import json;print(len(json.load(open('apps/extension/_locales/ru/mes
 
 ## Открытость
 
-- Лицензия — AGPL-3.0-only (см. `LICENSE` и `package.json` каждого пакета).
+- Лицензия — две по назначению: движок (`packages/contracts`, `packages/core-*`) — Apache-2.0, продукт (расширение, воркер, агент) — AGPL-3.0-only. Карта — `LICENSING.md`, решение — ADR-0014, держит `tools/licensing.test.ts`.
 - Сторонние данные и их условия — `docs/licences.md`, проверяется
   `tools/licensing.test.ts`.
 - Публичный ключ проверки списков вкомпилирован в расширение; приватная половина

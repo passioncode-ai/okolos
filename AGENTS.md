@@ -29,9 +29,11 @@ fails when a script is missing from it.
 - **User-facing behaviour starts in [docs/ux/scenarios.md](docs/ux/scenarios.md)**, and
   `python3 docs/ux/lint.py` must pass after any UX change.
 - **Decisions** are [docs/adr/](docs/adr/); a record naming a missing file fails the build.
-- **Licence is AGPL-3.0**, unlike the organisation's source-available tools. Do not
-  describe other repositories' licences from here, and do not relicense without a
-  decision record.
+- **Two licences, split by purpose** ([LICENSING.md](LICENSING.md), ADR-0014): the
+  engine (`packages/contracts`, `packages/core-*`, `corpora/`) is Apache-2.0,
+  everything else AGPL-3.0-only. An engine package never imports a product package;
+  `tools/licensing.test.ts` refuses it. A new package under `core-*` is Apache by
+  that rule, so it must stay pure. Contributions go under [CLA.md](CLA.md).
 - **Firefox add-on id `okolos@ssheleg.dev` stays** after the move to this organisation:
   it is the extension's identity on addons.mozilla.org, not a repository address.
 - **Hosted CI runs on push and PR** here, like the public engine: the repository is

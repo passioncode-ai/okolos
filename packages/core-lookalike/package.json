@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0 AND MPL-2.0",
   "description": "Punycode, confusables and typosquats. Pure — no network, no browser.",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "build": "tsc -b" }

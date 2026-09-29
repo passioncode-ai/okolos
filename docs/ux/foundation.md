@@ -396,7 +396,8 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 
 ## Monetization
 
-- **Model:** none — free and open source (AGPL-3.0). No paid tier, no
+- **Model:** none — free and open source (engine Apache-2.0, product AGPL-3.0,
+  ADR-0014). Free for individuals and organisations alike. No paid tier, no
   billing, no upsell surfaces, no paywalled features. Decided 2026-08-04.
   Consequence: no paywall/trial/dunning flows exist downstream, and any
   future monetisation is a foundation change, not a feature.

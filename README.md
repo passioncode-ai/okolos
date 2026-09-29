@@ -71,6 +71,13 @@ Phishing Army. Infostealer intelligence from Hudson Rock's community API.
 
 ## Licence
 
-[AGPL-3.0](LICENSE) — including the Cloudflare Worker. A hosted service built
-on this code must publish its source. For a product whose central claim is
-"you can verify this", closed forks would defeat the point.
+Free for anyone — yourself or your whole organisation; no subscription, no paid
+tier. Two licences, split by purpose ([LICENSING.md](LICENSING.md), ADR-0014):
+
+- **The engine** — `packages/contracts` and every `packages/core-*` — is
+  **Apache-2.0**, so it can be embedded in a mail client, an agent or your own
+  product.
+- **The product** is [AGPL-3.0](LICENSE) — the extension, including the
+  Cloudflare Worker, and the local agent. A hosted service built on this code
+  must publish its source. For a product whose central claim is "you can verify
+  this", closed forks would defeat the point.

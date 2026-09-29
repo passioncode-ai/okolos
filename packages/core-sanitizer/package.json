@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "description": "Decides which nodes to neutralise. Pure — the DOM work lives in the content script.",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "build": "tsc -b" },

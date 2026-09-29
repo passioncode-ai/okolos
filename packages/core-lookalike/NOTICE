@@ -1,0 +1,14 @@
+Okolos engine — @okolos/core-lookalike
+Copyright 2026 Siarhei Sheleh
+
+Part of the Okolos engine, developed by PassionCode.ai:
+https://github.com/passioncode-ai/okolos
+
+`src/suffixes.json` holds a selection of rules from the Public Suffix List
+(https://publicsuffix.org/list/), which is licensed under the Mozilla Public
+License 2.0 (https://mozilla.org/MPL/2.0/). That file stays under MPL-2.0; the
+rest of this package is under Apache-2.0.
+
+The confusable-character table in `src/confusables.ts` is a hand-picked subset
+of mappings that also appear in Unicode's confusables data (UTS #39,
+https://www.unicode.org/reports/tr39/).
