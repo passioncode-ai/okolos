@@ -213,12 +213,23 @@ describe('the pre-push hook exists and runs the gates', () => {
      * one pnpm start-up per gate rather than two.
      */
     const body = commandsInHook(readFileSync(hook, 'utf8'))
-    expect(body, 'no run lines parsed out of the hook').toContain('pnpm -s lint')
+    expect(body, 'no run lines parsed out of the hook').toContain('pnpm -s run lint')
     for (const step of gateSteps()) {
       const resolved = scripts[step] ?? ''
       const ran = body.includes(step) || (resolved !== '' && shares(body, resolved))
       expect(ran, `the hook does not run the "${step}" gate`).toBe(true)
     }
+  })
+
+  it('names scripts with `run`, which every pnpm major accepts', () => {
+    /**
+     * pnpm 12 rejects the shorthand `pnpm -s lint` with a usage error before it
+     * delegates to the `packageManager` version, so a machine whose PATH resolved
+     * pnpm 12 turned lint, typecheck and build red on every push from 2026-09-13
+     * without a line of code changing. `pnpm -s run lint` works on 11 and 12.
+     */
+    const body = commandsInHook(readFileSync(hook, 'utf8'))
+    expect(body).not.toMatch(/pnpm -s (?!run )[\w:]+/)
   })
 
   it('refuses rather than warns', () => {

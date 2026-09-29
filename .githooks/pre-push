@@ -34,14 +34,14 @@ run() {
     fi
 }
 
-run lint      'pnpm -s lint'
-run typecheck 'pnpm -s typecheck'
+run lint      'pnpm -s run lint'
+run typecheck 'pnpm -s run typecheck'
 # Before the unit step, not after it: part of that suite reads `dist/` — the
 # bundle scanners — so without a build they scan whatever was lying around.
 # That is how three defects reproduced against a stale emit minutes after the
 # source was green (B-36).
-run build     'pnpm -s build'
-run unit      'pnpm -s test'
+run build     'pnpm -s run build'
+run unit      'pnpm -s run test'
 run ux        'python3 docs/ux/lint.py'
 run brand     'node tools/brand-gate.mjs'
 run i18n      'node tools/i18n-sweep.mjs'
