@@ -114,7 +114,7 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 | 5 | Daily use | Browses; a page carries a hidden instruction | in-page banner | 4 | Needs to know *where* it hid and whether the agent already read it | Show the concealed text, its hiding technique, and whether it was neutralised |
 | 6 | Agent action | Asks the sidebar to summarise / act | agent surface + our stop-gate | 3 | Cannot tell whether the agent saw the clean or dirty page | Sanitise before read; require confirmation for sensitive actions |
 | 7 | Trust check | Asks "what did you send?" | self-audit panel | 4 | Every vendor claims privacy; nobody proves it | Outbound log with payload detail, matching a real network trace |
-| 8 | After | Recommends it / contributes | GitHub | 5 | — | AGPL + open corpora make contribution the natural next step |
+| 8 | After | Recommends it / contributes | GitHub | 5 | — | Public source + open corpora make contribution the natural next step |
 
 ### JRN-02: P-01 — my credentials leaked (JTBD-04)
 | # | Stage | User action | Touchpoint | Emotion (1-5) | Pain | Opportunity |
@@ -396,8 +396,9 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 
 ## Monetization
 
-- **Model:** none — free and open source (engine Apache-2.0, product AGPL-3.0,
-  ADR-0014). Free for individuals and organisations alike. No paid tier, no
+- **Model:** none — free, source-available (PolyForm Noncommercial or Internal
+  Use, ADR-0015). Free for individuals and for a company's internal use; commercial
+  redistribution by separate licence. No paid tier, no
   billing, no upsell surfaces, no paywalled features. Decided 2026-08-04.
   Consequence: no paywall/trial/dunning flows exist downstream, and any
   future monetisation is a foundation change, not a feature.

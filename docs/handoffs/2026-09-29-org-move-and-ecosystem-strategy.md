@@ -57,7 +57,7 @@
 | Выпущен токен в `okolos/prod/CLOUDFLARE_API_TOKEN`, проверен листингом D1 новым значением | вывод `cloudflare.py issue`, журнал хранилища |
 | Мёртвый токен шёл из окружения launchd и перекрывал `~/.okolos/cloudflare.env`; агент фида теперь запускается через `use_secret.py` | `tools/feed-agent-credential.mjs`, `c8a5df0` |
 | Прод отдаёт свежий фид: v42 опубликован вручную, v43 — самим агентом, `last exit code = 0` | `/tmp/okolos-feed.log`: `published phishing v43` |
-| Лицензии: движок — Apache-2.0, продукт — AGPL-3.0, CLA организации | [ADR-0014](../adr/0014-the-engine-is-permissive-the-product-is-copyleft.md), [LICENSING.md](../../LICENSING.md), `tools/licensing.test.ts` |
+| Лицензии: сначала Apache-2.0/AGPL (ADR-0014), затем в тот же день — схема организации | см. ниже |
 | Правило «креденшлы — сначала через Observatory» записано в глобальные инструкции оператора | `~/.claude/CLAUDE.md` (не в репозитории) |
 
 **Открыто:**
@@ -72,3 +72,19 @@
 
 **Следующая задача:** бриф Ф1 — `@okolos/engine` и корпуса почты и ответов
 инструментов — в `docs/superpowers/briefs/`.
+
+## Лицензия — схема организации (ADR-0015)
+
+Оператор уточнил цель: людям и организациям бесплатно без согласия,
+коммерческое использование — по согласованию через contact@passioncode.ai.
+Okolos переведён на выражение `PolyForm-Noncommercial-1.0.0 OR
+LicenseRef-PolyForm-Internal-Use-1.0.0` — тот же `LICENSE` и `CLA.md`, что у
+Observatory. [ADR-0015](../adr/0015-okolos-takes-the-organisations-licence.md)
+заменяет ADR-0014; коммиты до `5a8e490` остаются под AGPL/Apache, это записано в
+`LICENSE`. Держит `tools/licensing.test.ts`: оба текста, выражение во всех 24
+манифестах, запрет «open source» в поверхностях, разрешительные зависимости.
+
+**Замечено у соседей, не менялось:**
+- `fabric-inbox` — Apache-2.0 (наследие шаблона Cloudflare);
+- у `fabric` нет `LICENSE` вовсе;
+- у `project-observatory-contract` MIT — по правилу §9, это нормально.

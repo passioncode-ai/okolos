@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "AGPL-3.0-only",
+  "license": "PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0",
   "description": "The message catalogue and the resolver that reads it. Pure — the locale comes from the host, never from a global.",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "build": "tsc -b" }

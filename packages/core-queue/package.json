@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "Apache-2.0",
+  "license": "PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0",
   "description": "Turns everything found into at most three next actions, and says what changed. Pure.",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "build": "tsc -b" },

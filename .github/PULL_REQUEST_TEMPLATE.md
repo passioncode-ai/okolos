@@ -4,7 +4,7 @@
 
 - [ ] `pnpm gates` (the pre-push hook runs the same chain)
 - [ ] `python3 docs/ux/lint.py` after any change to user-facing behaviour
-- [ ] Engine packages (`packages/contracts`, `packages/core-*`) import no product package — `tools/licensing.test.ts`
+- [ ] A new `package.json` carries the organisation's licence expression — `tools/licensing.test.ts`
 
 No credential values, local paths or personal data in code, tests, fixtures or this description.
 

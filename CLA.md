@@ -1,8 +1,7 @@
 # Contributor License Agreement
 
 This agreement lets PassionCode.ai accept your contribution and keep offering the
-software under its open-source licenses (Apache-2.0 for the engine, AGPL-3.0 for the
-product, see LICENSING.md) and under other license terms.
+software under its source-available licenses and under separate commercial licenses.
 It is between you and Siarhei Sheleh (the "Maintainer").
 
 By opening a pull request or otherwise submitting a contribution to a PassionCode.ai

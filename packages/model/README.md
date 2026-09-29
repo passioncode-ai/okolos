@@ -17,4 +17,4 @@ its verdicts disagree with themselves.
 The ONNX session that consumes these bytes is a thin adapter and lives
 elsewhere (REQ-37). Which weights to ship is not a code decision — see the
 brief's human steps: the obvious candidate is licence-gated, and gated weights
-cannot sit in a public AGPL repository.
+cannot sit in a public repository.

@@ -71,13 +71,12 @@ Phishing Army. Infostealer intelligence from Hudson Rock's community API.
 
 ## Licence
 
-Free for anyone — yourself or your whole organisation; no subscription, no paid
-tier. Two licences, split by purpose ([LICENSING.md](LICENSING.md), ADR-0014):
-
-- **The engine** — `packages/contracts` and every `packages/core-*` — is
-  **Apache-2.0**, so it can be embedded in a mail client, an agent or your own
-  product.
-- **The product** is [AGPL-3.0](LICENSE) — the extension, including the
-  Cloudflare Worker, and the local agent. A hosted service built on this code
-  must publish its source. For a product whose central claim is "you can verify
-  this", closed forks would defeat the point.
+Source-available under PolyForm Noncommercial or Internal Use; commercial licence on request.
+Individuals and noncommercial organisations may use, change and share it for noncommercial
+purposes; any company may use and change it — including the Cloudflare Worker — for its own
+internal operations. Distributing it commercially, or building it into a product or service
+provided to others, needs a separate commercial licence from <contact@passioncode.ai>. The
+terms are in [LICENSE](LICENSE), what they mean in practice in [LICENSING.md](LICENSING.md);
+contributions are accepted under the [CLA](CLA.md). Commits up to and including `5a8e490`
+were released under AGPL-3.0 (the engine, in the last of them, under Apache-2.0), and those
+commits remain available under those licences.

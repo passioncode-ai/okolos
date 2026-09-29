@@ -72,7 +72,8 @@ Okolos ищет такой текст на странице, обезврежи�
 
 Что уходит с устройства и почему: https://okolos-proxy.sergeysheleg4.workers.dev/privacy
 
-Исходный код открыт под AGPL-3.0.
+Исходный код открыт. Бесплатно для людей и компаний; коммерческое
+использование — по договорённости: contact@passioncode.ai.
 ```
 
 ### en
@@ -126,7 +127,8 @@ looked for on any page. The answer to that is not a promise but a screen.
 
 What leaves the device and why: https://okolos-proxy.sergeysheleg4.workers.dev/privacy
 
-Source is open under AGPL-3.0.
+The source is public. Free for people and companies; commercial use by
+agreement: contact@passioncode.ai.
 ```
 
 ## Категория и языки

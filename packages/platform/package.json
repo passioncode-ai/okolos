@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "AGPL-3.0-only",
+  "license": "PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0",
   "description": "The only place that knows a browser exists. Chrome and Firefox differences stop here.",
   "exports": {
     ".": "./src/index.ts"

@@ -154,7 +154,7 @@ python3 -c "import json;print(len(json.load(open('apps/extension/_locales/ru/mes
 
 ## Открытость
 
-- Лицензия — две по назначению: движок (`packages/contracts`, `packages/core-*`) — Apache-2.0, продукт (расширение, воркер, агент) — AGPL-3.0-only. Карта — `LICENSING.md`, решение — ADR-0014, держит `tools/licensing.test.ts`.
+- Лицензия — как у всех публичных инструментов PassionCode.ai: `PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0`. Код открыт для чтения и изменения (source-available — это не OSI-лицензия), бесплатно для людей и для внутреннего использования в компаниях; коммерческое использование — по отдельной лицензии, contact@passioncode.ai. Карта — `LICENSING.md`, решение — ADR-0015, держит `tools/licensing.test.ts`.
 - Сторонние данные и их условия — `docs/licences.md`, проверяется
   `tools/licensing.test.ts`.
 - Публичный ключ проверки списков вкомпилирован в расширение; приватная половина

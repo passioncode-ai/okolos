@@ -18,19 +18,86 @@ import { directoriesIn, filesUnder } from './tree.mjs'
 const root = process.cwd()
 const read = (p: string): string => readFileSync(path.join(root, p), 'utf8')
 
+/**
+ * ADR-0015 — the organisation's licence, the same as every public PassionCode.ai
+ * tool: free for people and for a company's internal use, commercial use by a
+ * separate licence. It replaced the AGPL/Apache split of ADR-0014 the same day.
+ */
+const EXPRESSION = 'PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0'
+/** The one file in the tree that keeps its source's licence (Public Suffix List). */
+const MANIFEST_LICENCE: Record<string, string> = {
+  'packages/core-lookalike': `(${EXPRESSION}) AND MPL-2.0`,
+}
+
 describe('licence', () => {
-  it('ships the AGPL text, not just the name', () => {
-    expect(existsSync(path.join(root, 'LICENSE'))).toBe(true)
-    expect(read('LICENSE')).toContain('GNU AFFERO GENERAL PUBLIC LICENSE')
+  it("ships the organisation's licence: both PolyForm texts, the address, the history", () => {
+    const text = read('LICENSE')
+    expect(text).toContain('# PolyForm Noncommercial License 1.0.0')
+    expect(text).toContain('# PolyForm Internal Use License 1.0.0')
+    expect(text).toContain('This software is source-available, not open source.')
+    expect(text).toContain('contact@passioncode.ai')
+    expect(text).toContain('Required Notice: Copyright (c) 2026 Siarhei Sheleh (https://passioncode.ai)')
+    // A relicence does not reach back: what was published under AGPL stays AGPL.
+    expect(text).toMatch(/up to and including 5a8e490[\s\S]{0,200}AGPL-3\.0-only/)
+    expect(text).not.toContain('GNU AFFERO GENERAL PUBLIC LICENSE')
   })
 
-  it('declares the same licence in the manifest of the workspace', () => {
-    const pkg = JSON.parse(read('package.json')) as { license: string }
-    expect(pkg.license).toBe('AGPL-3.0-only')
+  it('declares the expression in every manifest', () => {
+    const manifests = [
+      '.',
+      ...directoriesIn(path.join(root, 'packages')).map((d) => `packages/${d}`),
+      ...directoriesIn(path.join(root, 'apps')).map((d) => `apps/${d}`),
+    ]
+    expect(manifests.length).toBeGreaterThan(20)
+    for (const dir of manifests) {
+      const { license } = JSON.parse(read(`${dir}/package.json`)) as { license: string }
+      expect(license, `${dir}/package.json`).toBe(MANIFEST_LICENCE[dir] ?? EXPRESSION)
+    }
   })
 
-  it('covers the worker too — a hosted fork must publish its source', () => {
-    expect(read('README.md')).toMatch(/AGPL-3\.0[\s\S]{0,200}Worker/i)
+  it('names the MPL file that keeps its own licence', () => {
+    expect(existsSync(path.join(root, 'packages/core-lookalike/src/suffixes.json'))).toBe(true)
+    expect(read('packages/core-lookalike/NOTICE')).toMatch(/suffixes\.json[\s\S]*MPL-2\.0/)
+  })
+
+  it('publishes the map, the CLA and the decision', () => {
+    expect(read('LICENSING.md')).toContain(EXPRESSION)
+    expect(read('LICENSING.md')).toContain('docs/adr/0015-okolos-takes-the-organisations-licence.md')
+    expect(existsSync(path.join(root, 'docs/adr/0015-okolos-takes-the-organisations-licence.md'))).toBe(true)
+    expect(read('CLA.md').startsWith('# Contributor License Agreement\n')).toBe(true)
+    expect(read('README.md')).toMatch(/PolyForm Noncommercial or Internal Use[\s\S]{0,400}contact@passioncode\.ai/)
+  })
+
+  /**
+   * The organisation's rule (org-index RULES §9): never call these tools open
+   * source. One stale "Source is open under AGPL-3.0" in the store listing is a
+   * public claim about terms the product no longer has.
+   */
+  it('never calls itself open source, AGPL or Apache in what a user or a store reads', () => {
+    const surfaces = [
+      'README.md',
+      'SECURITY.md',
+      'AGENTS.md',
+      'docs/store/listing.md',
+      'docs/brand/facts.md',
+      'apps/proxy/src/router.ts',
+      ...directoriesIn(path.join(root, 'apps/extension/_locales')).map(
+        (l) => `apps/extension/_locales/${l}/messages.json`,
+      ),
+    ]
+    // The history sentence is true and required: it names the old terms of old commits.
+    const withoutHistory = (text: string): string =>
+      text.replace(/Commits up to and including `?5a8e490[\s\S]*?remain available under those licen[cs]es\./g, '')
+    expect(withoutHistory(read('README.md'))).not.toContain('5a8e490')
+    // The negation stays allowed; the claim does not.
+    expect('This software is source-available, not open source.').not.toMatch(/(?<!(?:not|call it)\s+)\bopen[ -]source\b/i)
+    expect('Okolos is open source.').toMatch(/(?<!(?:not|call it)\s+)\bopen[ -]source\b/i)
+    for (const file of surfaces) {
+      const text = withoutHistory(read(file))
+      expect(text, `${file} calls Okolos open source`).not.toMatch(/(?<!(?:not|call it)\s+)\bopen[ -]source\b|опенсорс/i)
+      expect(text, `${file} names the AGPL as current terms`).not.toMatch(/(?:under|под) AGPL|AGPL-3\.0-only"/i)
+      expect(text, `${file} names Apache as current terms`).not.toMatch(/(?:under|под) Apache/i)
+    }
   })
 })
 
@@ -119,12 +186,6 @@ describe('the licences of what this project consumes', () => {
     '0BSD',
     'CC0-1.0',
     'Unlicense',
-    'AGPL-3.0-only',
-    'AGPL-3.0-or-later',
-    'GPL-3.0-only',
-    'GPL-3.0-or-later',
-    'LGPL-3.0-only',
-    'LGPL-3.0-or-later',
   ])
 
   /** Every non-workspace production dependency, with the manifest that asks for it. */
@@ -150,7 +211,7 @@ describe('the licences of what this project consumes', () => {
     expect(shipped().length).toBeGreaterThan(0)
   })
 
-  it('every shipped dependency carries a licence compatible with AGPL-3.0', () => {
+  it('every shipped dependency carries a permissive licence', () => {
     for (const { name, from } of shipped()) {
       const manifest = createRequire(import.meta.url).resolve(`${name}/package.json`, {
         paths: [path.dirname(path.join(root, from))],
@@ -159,7 +220,7 @@ describe('the licences of what this project consumes', () => {
       expect(license, `${name} (from ${from}) declares no licence at all`).toBeTruthy()
       expect(
         COMPATIBLE.has(license as string),
-        `${name} (from ${from}) is ${license}, which is not on the AGPL-compatible list`,
+        `${name} (from ${from}) is ${license}: a copyleft dependency would make PolyForm terms undistributable`,
       ).toBe(true)
     }
   })
@@ -209,7 +270,7 @@ describe('the weights policy is written down and still true', () => {
 
   it('states the rule rather than a preference', () => {
     const text = read('docs/licences.md')
-    expect(text).toMatch(/AGPL-3\.0/)
+    expect(text).toMatch(/PolyForm/)
     expect(text).toContain('Apache-2.0')
     // The exclusion is the operative half: it is what a future contributor
     // would otherwise re-litigate.
@@ -233,122 +294,3 @@ describe('the weights policy is written down and still true', () => {
   })
 })
 
-/**
- * ADR-0014 — the engine is permissive, the product is copyleft.
- *
- * `packages/contracts` and every `packages/core-*` are Apache-2.0 so they can be
- * embedded where AGPL cannot go: a mail client's Worker, someone else's agent.
- * Everything else stays AGPL-3.0-only. The split is only real while the engine
- * never reaches into the product — one import of `@okolos/ui` from a core
- * package and the "Apache" label on it becomes a lie nobody would notice.
- */
-const ENGINE_LICENCE: Record<string, string> = { 'core-lookalike': 'Apache-2.0 AND MPL-2.0' }
-const packages = directoriesIn(path.join(root, 'packages'))
-const engine = packages.filter((name) => name === 'contracts' || name.startsWith('core-'))
-const product = packages.filter((name) => !engine.includes(name))
-const licenceOf = (dir: string): string =>
-  (JSON.parse(read(`${dir}/package.json`)) as { license: string }).license
-
-/** Every `@okolos/<name>` and every relative specifier a source file imports. */
-export function importsOf(source: string): string[] {
-  const found: string[] = []
-  const pattern = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"]([^'"]+)['"]/g
-  for (const match of source.matchAll(pattern)) found.push(match[1] as string)
-  return found
-}
-
-/** Why an engine file's import is refused, or null when it is allowed. */
-export function refusal(file: string, specifier: string, packageDir: string): string | null {
-  const scoped = /^@okolos\/([a-z0-9-]+)/.exec(specifier)
-  if (scoped) {
-    const target = scoped[1] as string
-    return engine.includes(target) ? null : `imports @okolos/${target}, which is AGPL`
-  }
-  if (specifier.startsWith('.')) {
-    const resolved = path.resolve(path.dirname(file), specifier)
-    // The corpora are Apache-2.0 too: the engine's tests measure against them.
-    if (resolved.startsWith(path.join(root, 'corpora') + path.sep)) return null
-    return resolved.startsWith(packageDir + path.sep) ? null : `reaches outside its package: ${specifier}`
-  }
-  return null
-}
-
-describe('the licence map (ADR-0014)', () => {
-  it('finds an engine and a product, or the map proves nothing', () => {
-    expect(engine).toContain('core-injection')
-    expect(engine).toContain('contracts')
-    expect(product).toContain('ui')
-  })
-
-  it('declares Apache-2.0 on every engine package, with its text and its NOTICE', () => {
-    for (const name of engine) {
-      const dir = `packages/${name}`
-      expect(licenceOf(dir), `${dir}/package.json`).toBe(ENGINE_LICENCE[name] ?? 'Apache-2.0')
-      expect(read(`${dir}/LICENSE`), `${dir}/LICENSE`).toContain('Apache License')
-      expect(read(`${dir}/LICENSE`), `${dir}/LICENSE`).toContain('Version 2.0, January 2004')
-      expect(read(`${dir}/NOTICE`), `${dir}/NOTICE`).toContain('Copyright 2026 Siarhei Sheleh')
-    }
-  })
-
-  it('names the MPL file that keeps its own licence inside the engine', () => {
-    expect(existsSync(path.join(root, 'packages/core-lookalike/src/suffixes.json'))).toBe(true)
-    expect(read('packages/core-lookalike/NOTICE')).toMatch(/suffixes\.json[\s\S]*MPL-2\.0/)
-  })
-
-  it('keeps every product package and every app on AGPL-3.0-only', () => {
-    for (const name of product) expect(licenceOf(`packages/${name}`), name).toBe('AGPL-3.0-only')
-    for (const name of directoriesIn(path.join(root, 'apps'))) {
-      expect(licenceOf(`apps/${name}`), `apps/${name}`).toBe('AGPL-3.0-only')
-    }
-  })
-
-  it('lets an engine package depend only on the engine', () => {
-    for (const name of engine) {
-      const manifest = JSON.parse(read(`packages/${name}/package.json`)) as {
-        dependencies?: Record<string, string>
-        peerDependencies?: Record<string, string>
-      }
-      const outside = Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies })
-        .filter((dep) => dep.startsWith('@okolos/'))
-        .filter((dep) => !engine.includes(dep.slice('@okolos/'.length)))
-      expect(outside, `${name} depends on the product`).toEqual([])
-    }
-  })
-
-  it('refuses a planted import, so the sweep below can fail', () => {
-    const dir = path.join(root, 'packages/core-injection')
-    const file = path.join(dir, 'src/planted.ts')
-    expect(importsOf(`import { x } from '@okolos/ui'\nconst y = await import("./z")`)).toEqual([
-      '@okolos/ui',
-      './z',
-    ])
-    expect(refusal(file, '@okolos/ui', dir)).toMatch(/AGPL/)
-    expect(refusal(file, '../../ui/src/index', dir)).toMatch(/outside/)
-    expect(refusal(file, '@okolos/contracts', dir)).toBeNull()
-    expect(refusal(file, './signals', dir)).toBeNull()
-    expect(refusal(file, '../../../corpora/injections/positives.json', dir)).toBeNull()
-  })
-
-  it('imports nothing from the product in any engine source file', () => {
-    let read_ = 0
-    for (const name of engine) {
-      const dir = path.join(root, 'packages', name)
-      for (const file of filesUnder(dir, '.ts')) {
-        read_ += 1
-        for (const specifier of importsOf(readFileSync(file, 'utf8'))) {
-          const why = refusal(file, specifier, dir)
-          expect(why, `${path.relative(root, file)} ${why}`).toBeNull()
-        }
-      }
-    }
-    expect(read_, 'no engine source was read').toBeGreaterThan(20)
-  })
-
-  it('puts the corpora under the engine licence, and publishes the map', () => {
-    expect(read('corpora/LICENSE')).toContain('Apache License')
-    const map = read('LICENSING.md')
-    expect(map).toContain('docs/adr/0014-the-engine-is-permissive-the-product-is-copyleft.md')
-    expect(existsSync(path.join(root, 'docs/adr/0014-the-engine-is-permissive-the-product-is-copyleft.md'))).toBe(true)
-    expect(existsSync(path.join(root, 'CLA.md'))).toBe(true)
-  })
-})
