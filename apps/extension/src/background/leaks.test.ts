@@ -89,12 +89,12 @@ describe('a source that fails mid-flight', () => {
 describe('what the audit log records', () => {
   it('names the purpose and shows the address only in part', async () => {
     const { deps: d, audit } = deps(async () => new Response(JSON.stringify({ stealers: [] })))
-    await lookupLeaks('sergey@example.test', [CAVALIER], d)
+    await lookupLeaks('user@example.test', [CAVALIER], d)
 
     expect(audit).toHaveLength(1)
     expect(audit[0]).toMatchObject({ purpose: 'leak-lookup', outcome: 'sent' })
-    expect(audit[0]?.payloadShape).toBe('email:s***@example.test')
-    expect(audit[0]?.payloadShape).not.toContain('sergey')
+    expect(audit[0]?.payloadShape).toBe('email:u***@example.test')
+    expect(audit[0]?.payloadShape).not.toContain('user')
   })
 })
 

@@ -85,8 +85,8 @@ Free-trial убран, окно возврата ~3 дня → основной 
 — управление `contentSettings` для notifications + чёрный список доменов.
 
 ### 2.5 Identity (самая ценная фича)
-- **Monitoring List**: источники — email (`sergeysheleg4@gm…`) и телефон
-  (`+447822020740`), кнопка «Add Source» (можно добавлять ещё).
+- **Monitoring List**: источники — email и телефон
+  оператора (значения удалены из публичной копии), кнопка «Add Source» (можно добавлять ещё).
 - Таблица утечек: `BREACH NAME | DATE PUBLISHED | COMPROMISED DATA` c тегами
   (`EMAIL`, `PASSWORD`, `FULL NAME`, `IP ADDRESS`). Пагинация — 6 страниц.
 - Названия источников: реальные бренды (Trello, Twitter/X, Jefit, Euro-PvP.Ru) и

@@ -294,7 +294,7 @@ describe('downloads', () => {
 
     const seen: string[] = []
     platform.downloads.onCreated((item) => seen.push(item.filename))
-    held.fire?.({ id: 1, url: 'https://x.test/a', filename: '/Users/me/Downloads/setup.exe' })
+    held.fire?.({ id: 1, url: 'https://x.test/a', filename: '/Users/example/Downloads/setup.exe' })
     expect(seen).toEqual(['setup.exe'])
   })
 

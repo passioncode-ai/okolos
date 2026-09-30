@@ -127,7 +127,7 @@ describe('who the sender says they are', () => {
    */
   it('names a watched brand in the display name whose domain is not that brand', () => {
     const outcome = checkSenderIdentity(
-      message(['From: "PayPal Service" <billing@secure-notice.top>']),
+      message(['From: "PayPal Service" <billing@secure-notice.test>']),
       deps,
     )
     expect(codes(outcome)).toContain('mailSenderBrandMismatch')
@@ -156,11 +156,11 @@ describe('who the sender says they are', () => {
 
   it('carries both halves as facts, so the reader can compare them', () => {
     const outcome = checkSenderIdentity(
-      message(['From: "PayPal Service" <billing@secure-notice.top>']),
+      message(['From: "PayPal Service" <billing@secure-notice.test>']),
       deps,
     )
     const facts = signals(outcome)[0]?.facts ?? []
-    expect(facts.map((f) => f.value)).toEqual(['PayPal Service', 'secure-notice.top'])
+    expect(facts.map((f) => f.value)).toEqual(['PayPal Service', 'secure-notice.test'])
   })
 })
 
