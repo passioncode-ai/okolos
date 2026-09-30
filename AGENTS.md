@@ -1,5 +1,10 @@
 # okolos — working in this repository
 
+Read this file and the organization's
+[CONTRIBUTING.md](https://github.com/passioncode-ai/.github/blob/main/CONTRIBUTING.md) before the
+first edit: that guide holds the names, how a change lands, the code region markers and the
+security contact; this file adds the rules of this repository and wins where the two differ.
+
 **Role.** Okolos, the security product of PassionCode.ai: a browser extension that finds
 instructions hidden for an AI agent on a page, checks links, downloads, extensions and
 leaked passwords, and does it locally.
@@ -13,7 +18,7 @@ Where this file is stricter, this file wins.
 | What | Command |
 |---|---|
 | Install (also sets `core.hooksPath` to `.githooks`) | `pnpm install` |
-| Unit tests and the docs/runbook gates | `pnpm test` |
+| Unit tests and the docs/runbook gates; two of them read `dist/`, so on a fresh clone run `pnpm build` first | `pnpm build && pnpm test` |
 | Everything the pre-push hook runs | `pnpm gates` |
 | End-to-end, Chromium / Firefox | `pnpm test:e2e` / `pnpm test:e2e:firefox` |
 

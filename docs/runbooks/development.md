@@ -35,7 +35,7 @@ pnpm exec playwright install chromium firefox
 
 ```bash
 pnpm test:watch        # то, что крутится в соседнем окне
-pnpm test              # весь юнит-прогон, секунды
+pnpm test              # весь юнит-прогон, секунды; читает dist/ — на свежем клоне сначала pnpm build
 pnpm typecheck         # tsc -b по проектам + отдельный проект для тестов
 pnpm lint              # eslint по всему дереву
 pnpm build             # dist/chrome и dist/firefox
