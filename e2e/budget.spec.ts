@@ -45,9 +45,34 @@ test('a small page is scanned well inside the budget', async ({ context }) => {
   await p.goto('https://fixture.test/')
   await expectSurface(p, 'okolos-banner', context)
 
+  /**
+   * **"Inside the budget" is asserted on the budget, not on the runner's clock (B-124).**
+   *
+   * This used to be `duration < 20`, and it went red on CI four times with no change to the
+   * collector — 21.1 ms (`32458216028`), 21.5 ms (`36578539762`), 20.6 ms (`36691414937`),
+   * 30.6 ms (`36765955109`, a licence-only change) — while the same page measures a few
+   * milliseconds locally. `okolos:collect` is a wall-clock measure, and twenty milliseconds on
+   * a shared runner under load is a fact about the runner. The large page below dropped its
+   * clock for the same reason (B-112); this is the same move.
+   *
+   * What the budget actually is since B-110: a **node** ceiling, with the 500 ms hang guard
+   * behind it. So a small page is inside the budget exactly when its walk was **not** cut
+   * short — the product says so itself by not marking `okolos:scan-partial` — and the
+   * duration is held to the hang guard it is the ceiling for. The number is still recorded,
+   * as an annotation on the report: the bench reports, it does not gate (B-49).
+   */
   const duration = await collectDuration(p)
-  expect(duration).toBeGreaterThanOrEqual(0)
-  expect(duration).toBeLessThan(20)
+  // A missing measurement returns -1, which would sail under any ceiling.
+  expect(duration, 'no collect measurement was recorded').toBeGreaterThanOrEqual(0)
+  const partial = await p.evaluate(
+    () => performance.getEntriesByName('okolos:scan-partial').length,
+  )
+  expect(partial, 'a 200-row page was cut short: it did not fit the node budget').toBe(0)
+  expect(duration).toBeLessThan(500)
+  test.info().annotations.push({
+    type: 'okolos:collect',
+    description: `${duration.toFixed(1)} ms for a 200-row page`,
+  })
 })
 
 test('a large page is cut short, and says so on the warning', async ({ context }) => {
