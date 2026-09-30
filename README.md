@@ -58,10 +58,37 @@ Full vector coverage: [docs/coverage-matrix.md](docs/coverage-matrix.md).
 | [docs/ux/](docs/ux/) | The UX chain: personas → jobs → journeys → stories → flows → screens → scenarios |
 | [docs/competitors.md](docs/competitors.md) | What people buy competitors for, praise, and complain about |
 
-## Building
+## Quick start for a new teammate
 
-Not yet buildable — the skeleton lands with module M0. Toolchain: pnpm
-workspaces, TypeScript, Vitest, Playwright, Wrangler.
+**Install.** Nothing is published yet: no Chrome Web Store or Firefox Add-ons listing, no
+GitHub release. Build it and load the unpacked extension:
+
+```bash
+corepack enable && pnpm install     # Node and pnpm; also installs the pre-push hook
+pnpm build                          # apps/extension/dist/chrome and apps/extension/dist/firefox
+pnpm package                        # the store zips, checked, in apps/extension/dist/release/
+```
+
+Chrome: `chrome://extensions` → Developer mode → **Load unpacked** →
+`apps/extension/dist/chrome`. Firefox: `about:debugging` → This Firefox → **Load Temporary
+Add-on** → `apps/extension/dist/firefox/manifest.json`.
+
+**Configure.** The extension needs no account and no key. The email leak check asks Have I
+Been Pwned only with an HIBP API key (from haveibeenpwned.com, paid); without one that source
+says no key is configured and Hudson Rock answers alone. Maintainers only: signing the
+blocklist feed reads `OKOLOS_FEED_KEY` ([feed signing](docs/runbooks/feed-signing.md)), and
+deploying the Worker reads `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `OKOLOS_D1_ID` and
+the Worker secret `APPEALS_TOKEN` ([Worker deploy](docs/runbooks/worker-deploy.md)). Ask the
+maintainers for access; values never go in the repository.
+
+**MCP.** Okolos neither exposes nor uses an MCP server.
+
+**Develop.** `pnpm gates` is the gate (lint, typecheck, build, tests, UX and brand checks,
+package check); `pnpm test` alone reads `dist/`, so build first. Browser tests are
+`pnpm test:e2e` and `pnpm test:e2e:firefox`. Start with [AGENTS.md](AGENTS.md), then the
+[development runbook](docs/runbooks/development.md): the extension is `apps/extension/`, the
+detectors and shared logic are the `packages/`, and the Worker that serves the signed feed is
+`apps/proxy/`.
 
 ## Data sources and attribution
 
