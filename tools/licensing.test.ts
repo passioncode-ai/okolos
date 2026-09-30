@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { readFileSync, existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
@@ -19,27 +20,47 @@ const root = process.cwd()
 const read = (p: string): string => readFileSync(path.join(root, p), 'utf8')
 
 /**
- * ADR-0015 — the organisation's licence, the same as every public PassionCode.ai
- * tool: free for people and for a company's internal use, commercial use by a
- * separate licence. It replaced the AGPL/Apache split of ADR-0014 the same day.
+ * ADR-0016 — the organisation's licence (Fabric ADR-0092): open source under the
+ * AGPL-3.0, or a commercial licence from PassionCode.ai. It replaced the PolyForm
+ * terms of ADR-0015, which had replaced the AGPL/Apache split of ADR-0014.
  */
-const EXPRESSION = 'PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0'
+const EXPRESSION = 'AGPL-3.0-only OR LicenseRef-PassionCode-Commercial'
+/**
+ * The unmodified AGPL-3.0 text from gnu.org, as the organisation's knowledge base ships
+ * it (fabric-workspace `knowledge/templates/LICENSE-AGPL-3.0.txt`). A hash, not a
+ * `toContain`: one edited clause is a different licence that still contains the title.
+ */
+const AGPL_SHA256 = '0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0'
 /** The one file in the tree that keeps its source's licence (Public Suffix List). */
 const MANIFEST_LICENCE: Record<string, string> = {
   'packages/core-lookalike': `(${EXPRESSION}) AND MPL-2.0`,
 }
+/**
+ * The history sentences are true and required: they name the old terms of old commits.
+ * They are the only place those terms may appear on a surface.
+ */
+const HISTORY: Record<string, RegExp> = {
+  'README.md': /Versions before this licence were released[\s\S]*?remain available under those licen[cs]es\./g,
+}
+const withoutHistory = (file: string, text: string): string =>
+  HISTORY[file] ? text.replace(HISTORY[file], '') : text
 
 describe('licence', () => {
-  it("ships the organisation's licence: both PolyForm texts, the address, the history", () => {
-    const text = read('LICENSE')
-    expect(text).toContain('# PolyForm Noncommercial License 1.0.0')
-    expect(text).toContain('# PolyForm Internal Use License 1.0.0')
-    expect(text).toContain('This software is source-available, not open source.')
-    expect(text).toContain('contact@passioncode.ai')
-    expect(text).toContain('Required Notice: Copyright (c) 2026 Siarhei Sheleh (https://passioncode.ai)')
-    // A relicence does not reach back: what was published under AGPL stays AGPL.
-    expect(text).toMatch(/up to and including 5a8e490[\s\S]{0,200}AGPL-3\.0-only/)
-    expect(text).not.toContain('GNU AFFERO GENERAL PUBLIC LICENSE')
+  it('ships the AGPL text and the commercial offer', () => {
+    const digest = createHash('sha256').update(readFileSync(path.join(root, 'LICENSE'))).digest('hex')
+    expect(digest, 'LICENSE is not the unmodified AGPL-3.0 text').toBe(AGPL_SHA256)
+    const offer = read('COMMERCIAL-LICENSE.md')
+    expect(offer).toContain(EXPRESSION)
+    expect(offer).toContain('contact@passioncode.ai')
+    expect(offer).toContain('Copyright (c) 2026 Siarhei Sheleh')
+  })
+
+  it('keeps the history: a relicence does not reach back', () => {
+    const map = read('LICENSING.md')
+    expect(map).toMatch(/up to and\s+including `5a8e490`[\s\S]{0,200}AGPL-3\.0-only/)
+    expect(map).toMatch(/up to and\s+including `a43ef65`[\s\S]{0,200}PolyForm-Noncommercial-1\.0\.0/)
+    // The README names the same history once, so stripping it below means something.
+    expect(read('README.md').match(HISTORY['README.md']!)?.length).toBe(1)
   })
 
   it('declares the expression in every manifest', () => {
@@ -62,18 +83,19 @@ describe('licence', () => {
 
   it('publishes the map, the CLA and the decision', () => {
     expect(read('LICENSING.md')).toContain(EXPRESSION)
-    expect(read('LICENSING.md')).toContain('docs/adr/0015-okolos-takes-the-organisations-licence.md')
-    expect(existsSync(path.join(root, 'docs/adr/0015-okolos-takes-the-organisations-licence.md'))).toBe(true)
+    expect(read('LICENSING.md')).toContain('docs/adr/0016-okolos-returns-to-agpl-with-a-commercial-licence.md')
+    expect(existsSync(path.join(root, 'docs/adr/0016-okolos-returns-to-agpl-with-a-commercial-licence.md'))).toBe(true)
     expect(read('CLA.md').startsWith('# Contributor License Agreement\n')).toBe(true)
-    expect(read('README.md')).toMatch(/PolyForm Noncommercial or Internal Use[\s\S]{0,400}contact@passioncode\.ai/)
+    expect(read('README.md')).toMatch(/^## License$/m)
+    expect(read('README.md')).toMatch(/GNU AGPL-3\.0[\s\S]{0,400}contact@passioncode\.ai/)
   })
 
   /**
-   * The organisation's rule (org-index RULES §9): never call these tools open
-   * source. One stale "Source is open under AGPL-3.0" in the store listing is a
-   * public claim about terms the product no longer has.
+   * One stale "source-available under PolyForm" in the store listing is a public claim
+   * about terms the product no longer has — and so is "not open source", which was
+   * true yesterday and is false now.
    */
-  it('never calls itself open source, AGPL or Apache in what a user or a store reads', () => {
+  it('never presents the old terms as current in what a user or a store reads', () => {
     const surfaces = [
       'README.md',
       'SECURITY.md',
@@ -85,18 +107,16 @@ describe('licence', () => {
         (l) => `apps/extension/_locales/${l}/messages.json`,
       ),
     ]
-    // The history sentence is true and required: it names the old terms of old commits.
-    const withoutHistory = (text: string): string =>
-      text.replace(/Commits up to and including `?5a8e490[\s\S]*?remain available under those licen[cs]es\./g, '')
-    expect(withoutHistory(read('README.md'))).not.toContain('5a8e490')
-    // The negation stays allowed; the claim does not.
-    expect('This software is source-available, not open source.').not.toMatch(/(?<!(?:not|call it)\s+)\bopen[ -]source\b/i)
-    expect('Okolos is open source.').toMatch(/(?<!(?:not|call it)\s+)\bopen[ -]source\b/i)
+    const oldTerms = /polyform|source[- ]available/i
+    const denial = /not open[ -]source|не open source|не опенсорс|не OSI/i
+    // The patterns catch what they are for, and leave the new wording alone.
+    expect('Source-available under PolyForm Noncommercial.').toMatch(oldTerms)
+    expect('This software is source-available, not open source.').toMatch(denial)
+    expect('Open source under the GNU AGPL-3.0.').not.toMatch(oldTerms)
     for (const file of surfaces) {
-      const text = withoutHistory(read(file))
-      expect(text, `${file} calls Okolos open source`).not.toMatch(/(?<!(?:not|call it)\s+)\bopen[ -]source\b|опенсорс/i)
-      expect(text, `${file} names the AGPL as current terms`).not.toMatch(/(?:under|под) AGPL|AGPL-3\.0-only"/i)
-      expect(text, `${file} names Apache as current terms`).not.toMatch(/(?:under|под) Apache/i)
+      const text = withoutHistory(file, read(file))
+      expect(text, `${file} presents the old terms as current`).not.toMatch(oldTerms)
+      expect(text, `${file} denies that Okolos is open source`).not.toMatch(denial)
     }
   })
 })
@@ -220,7 +240,7 @@ describe('the licences of what this project consumes', () => {
       expect(license, `${name} (from ${from}) declares no licence at all`).toBeTruthy()
       expect(
         COMPATIBLE.has(license as string),
-        `${name} (from ${from}) is ${license}: a copyleft dependency would make PolyForm terms undistributable`,
+        `${name} (from ${from}) is ${license}: a copyleft dependency under other terms could make the AGPL work undistributable`,
       ).toBe(true)
     }
   })
@@ -270,7 +290,7 @@ describe('the weights policy is written down and still true', () => {
 
   it('states the rule rather than a preference', () => {
     const text = read('docs/licences.md')
-    expect(text).toMatch(/PolyForm/)
+    expect(text).toMatch(/AGPL/)
     expect(text).toContain('Apache-2.0')
     // The exclusion is the operative half: it is what a future contributor
     // would otherwise re-litigate.

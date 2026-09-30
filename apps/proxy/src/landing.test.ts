@@ -56,8 +56,8 @@ describe('the landing page a stranger and a crawler both read', () => {
     const data = JSON.parse(block) as { '@type': string; name: string; license: string }
     expect(data['@type']).toBe('SoftwareApplication')
     expect(data.name).toBe('Okolos')
-    // The organisation's terms (LICENSING.md, ADR-0015), not the AGPL it replaced.
-    expect(data.license).toContain('polyformproject.org/licenses/noncommercial')
+    // The organisation's terms (LICENSING.md, ADR-0016), not the PolyForm they replaced.
+    expect(data.license).toBe('https://www.gnu.org/licenses/agpl-3.0.html')
   })
 
   it('runs nothing to say what it says', async () => {

@@ -14,7 +14,7 @@
 | Сценарии | **43**, из них **38 реализованы**; шесть заведены 2026-09-11 под локальную проверку почты и стоят `draft` — [scenarios.md](ux/scenarios.md). Число здесь держит гейт `tools/docs.test.ts` через [brand/facts.md](brand/facts.md), а не память |
 | Тесты | `pnpm test` (unit + гейты), `pnpm test:e2e` (Chromium), `pnpm test:e2e:firefox` — счётчики намеренно не выписаны здесь: они устаревают следующим коммитом |
 | Код | 20 пакетов, 3 приложения — карта ниже |
-| Репозиторий | `passioncode-ai/okolos` (публичный, PolyForm Noncommercial / Internal Use — ADR-0015; перенесён из `ssheleg/okolos` 2026-09-29, старый адрес редиректит) |
+| Репозиторий | `passioncode-ai/okolos` (публичный, GNU AGPL-3.0 или коммерческая лицензия — ADR-0016; перенесён из `ssheleg/okolos` 2026-09-29, старый адрес редиректит) |
 | Ждёт человека | 2 шага: аккаунт Chrome Web Store и `pnpm feed:agent` — без второго `pnpm package:check` отказывает, и с 2026-08-21 отказывает и `.githooks/pre-push` |
 
 **REQ-37 закрыт решением, а не отложен.** Политика по весам принята и записана
