@@ -10,7 +10,10 @@
   "guardedFiles": [
     "docs/adr/*.md",
     "docs/open-questions.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "docs/backlog-sources.json",
+    "docs/backlog.md",
+    "docs/superpowers/backlog.md"
   ],
   "claimTags": {},
   "gates": [

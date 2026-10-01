@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "repository": "https://github.com/passioncode-ai/okolos",
+  "sources": [
+    {
+      "path": "docs/backlog.md",
+      "goal": "reliable-work",
+      "kind": "tasks",
+      "format": "table",
+      "idColumn": "ID",
+      "titleColumn": "Item",
+      "statusColumn": "Status"
+    },
+    {
+      "path": "docs/superpowers/backlog.md",
+      "goal": "reliable-work",
+      "kind": "context"
+    }
+  ]
+}

@@ -72,6 +72,17 @@ every org member); the shared rules live in the knowledge base
 Where this file is stricter, this file wins. A change to this repository's role, dependencies or
 test command updates its row in `org-index/repositories.json` in the same change.
 
+## Shared backlog
+
+[docs/backlog-sources.json](docs/backlog-sources.json) declares this repository's canonical
+local task sources and their vision goals. The [common backlog contract](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/backlog.md)
+owns aggregation; [the workspace backlog](https://wiki.passioncode.ai/backlog) is a derived view.
+Edit a task only in its canonical source under an agent-sync lease, retain stable IDs and
+closure receipts, and declare any new source in the manifest. Do not edit generated task
+status in the workspace or copy another repository's task into a second editable row.
+Land the source change, then run `node scripts/workspace.mjs sync` from a Fabric checkout
+(or use the scheduled sync); check the published source commit before calling it current.
+
 ## After work
 
 In the same run: update this repository's docs with the change; if a cross-repository fact changed

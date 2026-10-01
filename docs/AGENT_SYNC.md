@@ -1,4 +1,4 @@
-<!-- agent-sync:generated source=okolos@471b0bc cfg=6b6af8564117 at=2026-09-30T23:50:33Z — regenerate with `agent_sync.py setup`, do not hand-edit -->
+<!-- agent-sync:generated source=okolos@dc7a2c7 cfg=71af14b9f985 at=2026-10-01T15:52:11Z — regenerate with `agent_sync.py setup`, do not hand-edit -->
 
 # How documentation and coordination work in okolos
 
@@ -30,6 +30,9 @@ None declared here. Ids live in the parent repository; reserve them there.
 - `docs/adr/*.md`
 - `docs/open-questions.md`
 - `CHANGELOG.md`
+- `docs/backlog-sources.json`
+- `docs/backlog.md`
+- `docs/superpowers/backlog.md`
 
 ### Gates run before a change is considered done
 
