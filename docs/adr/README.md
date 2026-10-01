@@ -23,4 +23,5 @@
 | [0012](0012-one-signal-is-a-suspicion.md) | Один сигнал — подозрение, два — вердикт | `packages/core-injection/src/stage1.test.ts`, `chars.test.ts`, `corpora/injections/negatives.json` |
 | [0013](0013-a-finding-crosses-contexts-by-being-asked-for.md) | Находка переходит между контекстами тем, что её спрашивают | `tools/crossing-contexts.test.ts`, `e2e/scn-031`, `scn-034`, `scn-035`, `scn-036`, `tools/firefox-e2e.mjs` |
 | [0014](0014-the-engine-is-permissive-the-product-is-copyleft.md) | ~~Движок — Apache-2.0, продукт — AGPL-3.0~~ — заменено ADR-0015 | — |
-| [0015](0015-okolos-takes-the-organisations-licence.md) | Okolos — под лицензией организации: PolyForm Noncommercial или Internal Use, коммерческая по запросу | `tools/licensing.test.ts`, `apps/proxy/src/landing.test.ts` |
+| [0015](0015-okolos-takes-the-organisations-licence.md) | ~~Okolos — под лицензией организации: PolyForm Noncommercial или Internal Use, коммерческая по запросу~~ — заменено ADR-0016 | — |
+| [0016](0016-okolos-returns-to-agpl-with-a-commercial-licence.md) | Okolos returns to the AGPL-3.0, with a commercial licence (Fabric ADR-0092) | `tools/licensing.test.ts`, `apps/proxy/src/landing.test.ts` |

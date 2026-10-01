@@ -396,9 +396,9 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 
 ## Monetization
 
-- **Model:** none — free, source-available (PolyForm Noncommercial or Internal
-  Use, ADR-0015). Free for individuals and for a company's internal use; commercial
-  redistribution by separate licence. No paid tier, no
+- **Model:** none — free and open source under the GNU AGPL-3.0, with a
+  commercial licence for use outside the AGPL's terms (ADR-0016; PolyForm under
+  ADR-0015 before 2026-09-30). No paid tier, no
   billing, no upsell surfaces, no paywalled features. Decided 2026-08-04.
   Consequence: no paywall/trial/dunning flows exist downstream, and any
   future monetisation is a foundation change, not a feature.

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0",
+  "license": "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "description": "The thin backend: signed feeds, model files, domain status and appeals.",
   "scripts": { "build": "tsc -b" },
   "dependencies": { "@okolos/core-feeds": "workspace:*" }

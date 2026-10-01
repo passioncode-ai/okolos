@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "(PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0) AND MPL-2.0",
+  "license": "(AGPL-3.0-only OR LicenseRef-PassionCode-Commercial) AND MPL-2.0",
   "description": "Punycode, confusables and typosquats. Pure — no network, no browser.",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "build": "tsc -b" }
