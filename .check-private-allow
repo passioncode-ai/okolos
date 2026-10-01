@@ -1,0 +1,10 @@
+# Reviewed synthetic findings for org-index scripts/check_private.py (fingerprint = rule:file:sha256(match)[:16]).
+# The Firefox add-on id (a Gecko id, not a mailbox; kept on purpose, see AGENTS.md) and public sender addresses used as phishing-detection fixtures.
+# Reviewed 2026-10-01. A denylist term (P1) can never be listed here.
+P2:AGENTS.md:99c1d5572fba9b61
+P2:apps/extension/manifest.firefox.json:99c1d5572fba9b61
+P2:docs/handoffs/2026-09-29-org-move-and-ecosystem-strategy.md:99c1d5572fba9b61
+P2:packages/core-mail/src/sender.test.ts:2092897e61c2795c
+P2:packages/core-mail/src/sender.test.ts:61f6b668590d6b6b
+P2:packages/core-mail/src/sender.test.ts:d795d4e39ec1a3b2
+P2:tools/firefox-e2e.mjs:99c1d5572fba9b61
