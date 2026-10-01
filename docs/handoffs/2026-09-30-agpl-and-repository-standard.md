@@ -5,8 +5,8 @@
 `AGPL-3.0-only OR LicenseRef-PassionCode-Commercial`. No behaviour change: only the licence, its
 statements and the checks that hold them.
 
-**Base.** `origin/main` at `a43ef65` — the last commit released under PolyForm. Branch
-`agent/standard-agpl`.
+**Base.** `origin/main` at `0557023` — the last commit released under PolyForm (the branch was
+written on `a43ef65` and rebased on 2026-10-01, see below). Branch `agent/standard-agpl`.
 
 ## Done
 
@@ -14,7 +14,7 @@ statements and the checks that hold them.
 |---|---|
 | `LICENSE` is the unmodified AGPL-3.0 text (the knowledge-base template, SHA-256 `0d96a4ff…abcb0`); `COMMERCIAL-LICENSE.md` is the template; `CLA.md` already was | root |
 | The decision for this repository, superseding ADR-0015 | [ADR-0016](../adr/0016-okolos-returns-to-agpl-with-a-commercial-licence.md); ADR-0015's status line and the ADR index |
-| History kept: AGPL-3.0-only (Apache-2.0 for the engine and `corpora/` in the last of them) up to `5a8e490`; PolyForm after it up to `a43ef65` | [LICENSING.md](../../LICENSING.md) → Earlier versions, `README.md` → License |
+| History kept: AGPL-3.0-only (Apache-2.0 for the engine and `corpora/` in the last of them) up to `5a8e490`; PolyForm after it up to `0557023` | [LICENSING.md](../../LICENSING.md) → Earlier versions, `README.md` → License |
 | Third-party terms unchanged: Public Suffix List selection (MPL-2.0, `packages/core-lookalike/NOTICE`), OpenPhish, HIBP (CC BY 4.0) | `LICENSING.md` → Third-party material |
 | 24 `package.json` files carry the expression (`core-lookalike`: `(…) AND MPL-2.0`) | `tools/licensing.test.ts` |
 | `tools/licensing.test.ts` rewritten: LICENSE hashed against the AGPL text, the commercial offer, both histories, no surface presenting PolyForm/"source-available" as current or denying "open source" | same file |
@@ -40,6 +40,18 @@ Planted defects, each watched failing and then reverted (control: 29 of 29 pass)
 4. `packages/ui/package.json` back to PolyForm → "declares the expression in every manifest" fails;
 5. the landing `license` URL back to PolyForm → the landing test and the surfaces test fail;
 6. the PolyForm history removed from `LICENSING.md` → "keeps the history" fails.
+
+## Finished 2026-10-01 — rebase and the red check
+
+- **Rebased** onto `origin/main` at `0557023`, over #4 (private data removed from the tree) and #5;
+  no conflict. Two commits landed under PolyForm after `a43ef65`, so the last PolyForm commit named
+  in `LICENSING.md`, `README.md`, ADR-0016 and `tools/licensing.test.ts` moved to `0557023`.
+- **The one red check, `e2e (chromium)`, was not this change:** `e2e/budget.spec.ts` asserted a
+  20 ms wall-clock ceiling and read 30.6 ms on the runner (run `36765955109`). It was backlog
+  B-124 and had failed on `main` before; fixed on its own in #5 (the test now holds the node
+  budget and the 500 ms hang guard; the planted `maxNodes: 100` is caught).
+- org-index `check_format.py --offline --repo okolos` → only F12 (agent-sync, installed by a
+  separate change); `check_private.py` → the same seven findings `main` already has, none added.
 
 ## Open
 

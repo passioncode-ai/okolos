@@ -30,7 +30,7 @@ which allows sublicensing under any terms.
 
 - **History is kept.** Commits up to and including `5a8e490` stay under AGPL-3.0-only (Apache-2.0
   for the engine and `corpora/` in the last of them); commits after it up to and including
-  `a43ef65` stay under PolyForm Noncommercial or Internal Use. [LICENSING.md](../../LICENSING.md)
+  `0557023` stay under PolyForm Noncommercial or Internal Use. [LICENSING.md](../../LICENSING.md)
   says so.
 - **Third-party material keeps its own terms**, unchanged from ADR-0015: the Public Suffix List
   selection under MPL-2.0 (`packages/core-lookalike` declares

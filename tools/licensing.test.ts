@@ -58,7 +58,7 @@ describe('licence', () => {
   it('keeps the history: a relicence does not reach back', () => {
     const map = read('LICENSING.md')
     expect(map).toMatch(/up to and\s+including `5a8e490`[\s\S]{0,200}AGPL-3\.0-only/)
-    expect(map).toMatch(/up to and\s+including `a43ef65`[\s\S]{0,200}PolyForm-Noncommercial-1\.0\.0/)
+    expect(map).toMatch(/up to and\s+including `0557023`[\s\S]{0,200}PolyForm-Noncommercial-1\.0\.0/)
     // The README names the same history once, so stripping it below means something.
     expect(read('README.md').match(HISTORY['README.md']!)?.length).toBe(1)
   })

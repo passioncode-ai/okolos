@@ -102,7 +102,7 @@ Phishing Army. Infostealer intelligence from Hudson Rock's community API.
 Open source under the [GNU AGPL-3.0](LICENSE). A [commercial license](COMMERCIAL-LICENSE.md) is
 available for use that does not meet the AGPL's terms — contact@passioncode.ai.
 Versions before this licence were released under PolyForm Noncommercial or Internal Use: commits
-after `5a8e490` up to and including `a43ef65`. Commits up to and including `5a8e490` were
+after `5a8e490` up to and including `0557023`. Commits up to and including `5a8e490` were
 released under AGPL-3.0-only (the engine and `corpora/`, in the last of them, under Apache-2.0).
 Those commits remain available under those licences. What this means in practice, and the
 third-party material that keeps its own terms (the Public Suffix List selection, MPL-2.0), is in

@@ -31,7 +31,7 @@ The summary is not the licence; the texts in [LICENSE](LICENSE) and
 Nothing has been released yet; the terms below are those of the commits. Commits up to and
 including `5a8e490` (2026-09-29) were released under AGPL-3.0-only, and in the last of them the
 engine packages (`packages/contracts`, `packages/core-*`) and `corpora/` under Apache-2.0. Commits
-after `5a8e490` up to and including `a43ef65` (2026-09-29 to 2026-09-30) were released under
+after `5a8e490` up to and including `0557023` (2026-09-29 to 2026-10-01) were released under
 `PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0` (ADR-0015). Those commits
 remain available under those licences; everything after them is under the terms above.
 
