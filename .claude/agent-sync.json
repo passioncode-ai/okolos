@@ -1,0 +1,27 @@
+{
+  "backend": "fs",
+  "leaseBackend": "git",
+  "leaseRemote": "origin",
+  "integrationBranch": "main",
+  "leaseTtlSeconds": 2700,
+  "renewIntervalSeconds": 300,
+  "gated": true,
+  "idRegisters": {},
+  "guardedFiles": [
+    "docs/adr/*.md",
+    "docs/open-questions.md",
+    "CHANGELOG.md"
+  ],
+  "claimTags": {},
+  "gates": [
+    "pnpm gates"
+  ],
+  "mirror": {
+    "enabled": false,
+    "sources": []
+  },
+  "mergeLog": {
+    "file": "docs/MERGES.md",
+    "retentionDays": 7
+  }
+}

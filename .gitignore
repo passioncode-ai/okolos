@@ -30,8 +30,11 @@ apps/proxy/wrangler.generated.toml
 # `.claude/settings.json` holds permission grants — including one that lets the
 # worker be deployed without asking. Committed, that grant travels to every
 # clone and applies to whoever opens the repository next. It is a decision about
-# this machine and this operator, so it stays on this machine.
-.claude/
+# this machine and this operator, so it stays on this machine. The one exception is
+# `.claude/agent-sync.json`: the coordination config every contributor's agent must
+# read the same way (fabric-workspace knowledge/repository-standard.md, F12).
+.claude/*
+!.claude/agent-sync.json
 !.env.example
 *.pem
 *.key
@@ -44,3 +47,7 @@ keys/
 !.vscode/extensions.json
 apps/extension/dist/
 apps/extension/.tsc/
+
+# agent-sync: local state and the credentials file are never committed
+.env.agent-sync
+.agent-sync/
