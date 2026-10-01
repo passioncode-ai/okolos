@@ -4,7 +4,7 @@
 hidden on a web page for your AI assistant, strips them before the assistant
 reads them, checks the links and files you open, watches your extensions for
 permission changes, and tells you when your passwords leak — with everything
-computed on your device.
+computed on your device. Okolos is a product of [PassionCode.ai](https://passioncode.ai/).
 
 > Status: **pre-alpha, in active construction.** No release yet. The design,
 > UX chain and evidence base are complete and public; code is being built

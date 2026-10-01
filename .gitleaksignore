@@ -1,0 +1,4 @@
+# gitleaks false positives, each reviewed 2026-10-01: synthetic test fixtures, never a live value.
+packages/core-credential/src/sha1.test.ts:generic-api-key:29
+packages/storage/src/export.test.ts:generic-api-key:95
+packages/storage/src/export.test.ts:generic-api-key:96
