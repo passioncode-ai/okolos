@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "license": "PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0",
+  "license": "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "description": "Stage 1 of the AI Shield: turns hidden-text candidates into verdicts. Pure — no DOM, no clock, no network.",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "build": "tsc -b" },
