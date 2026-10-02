@@ -10,4 +10,4 @@ No credential values, local paths or personal data in code, tests, fixtures or t
 
 ## Contributor License Agreement
 
-- [ ] I agree to [CLA.md](https://github.com/passioncode-ai/okolos/blob/main/CLA.md) for every contribution in this pull request.
+Opening this pull request means you agree to the repository's `CLA.md` for this contribution. Nothing to tick.
