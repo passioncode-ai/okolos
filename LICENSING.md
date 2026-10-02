@@ -50,6 +50,6 @@ The name "Okolos" and its logo are not licensed by either licence.
 
 Contributions are accepted under [CLA.md](CLA.md), the agreement every PassionCode.ai repository
 uses: you keep your copyright and let the maintainer offer your contribution under these and
-commercial terms. Tick the box in the pull request template.
+commercial terms. Opening a pull request is the agreement; there is nothing to tick.
 
 Copyright (c) 2026 Siarhei Sheleh. Commercial licences and questions: contact@passioncode.ai.
