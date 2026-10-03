@@ -63,6 +63,40 @@ fails when a script is missing from it.
   public, so its minutes are not under the organisation's spending cap. The local
   `pnpm gates` is still the gate.
 
+## Lifecycle
+
+What runs on a machine because of Okolos, under the organisation's
+[lifecycle contract](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/lifecycle.md)
+(LC-09). There is no port, no native-messaging host, no login item and no per-session (MCP)
+server; `apps/mail-cli` is an on-demand CLI and `apps/proxy` is a remote Cloudflare Worker.
+
+| What | Who starts it | Cadence | With no window | Who stops it | Idle budget |
+|---|---|---|---|---|---|
+| launchd agent **`app.okolos.feed`** (`gui/<uid>`, plist from `tools/launchd/app.okolos.feed.plist`) | a person, once: `pnpm feed:agent` (machine holding the signing key, ADR-0002) | `StartInterval` 43200 s + `RunAtLoad`; a login run ends as "skipped" when the served feed is under 11 h old | the whole job is background: `Nice 5`, `ProcessType Background`, no `KeepAlive` | its own exit; watchdog 30 min kills the run's process groups; removed by `node tools/install-feed-agent.mjs --uninstall [--purge]` (deletes the plist, verifies with `launchctl print`) | 0 processes and 0 RSS between runs; a run is about a minute, twice a day |
+| a run's children: `git fetch`/`checkout`, `pnpm install --filter @okolos/proxy` (only when the lockfile moved), `node tools/ingest.mjs`, the secret runner → `node tools/publish-feed.mjs` → `pnpm exec wrangler` | `tools/feed-job.mjs`, each in its own process group | per run | — | deadline per child (git 90 s, install 10 min, ingest 3 min, publish 6 min), then SIGTERM → SIGKILL to the group | none left after the run (`tools/feed/bounded.test.ts`) |
+| MV3 service worker (Chrome) / event page (Firefox) | the browser, on a listened event | alarms `okolos:feeds` 6 h, `okolos:retention` 24 h, `okolos:inventory` 24 h — created only when missing | wakes on messages, alarms, downloads and top-level http(s) navigations (memory write only) | the browser, after ~30 s idle; no timer outlives a wake | per wake: three alarm checks and timestamp reads; per day: ≤ 4 feed pulls, 2 sweeps, 1 extension review, 0 rule rebuilds without a change (`apps/extension/src/background/wake.test.ts`) |
+| content script and MAIN-world page watcher | the browser, per http(s) page and frame | event-driven, paced rescans | — | the page's lifetime | no work while the page is unchanged |
+
+Files the feed agent writes — all outside the working tree, all bounded (LC-12): state in
+`~/.okolos/state/` (`feeds/phishing.json`, `feed-status.json`, `feed.lock`); logs in
+`~/Library/Logs/Okolos/` (`feed.log`, 5 × 5 MB, mode 0600; `feed.launchd.log`, capped at start;
+`wrangler/`, pruned by wrangler after 30 days); its own checkout `~/.okolos/agent-checkout`
+(a worktree at origin/main); private `$TMPDIR/okolos-feed-*` directories removed in `finally`,
+older ones swept at the next start. The run's record — `outcome`, `stage`, `exit`, `version`,
+`entries`, `consecutiveFailures`, `lastPublished` — is what a host reads: alert at two failures in
+a row or when `lastPublished.at` is older than 26 h. Decision: [ADR-0017](docs/adr/0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md).
+
+**Build retention (LC-15).** Release archives go to `apps/extension/dist/release/`, and
+`pnpm package` keeps the current and the previous one per browser itself
+(`tools/release-prune.mjs`, `tools/release-prune.test.ts`). Build output that is not a release —
+`apps/extension/dist/{chrome,firefox}` and the `*-e2e` builds beside them, `apps/extension/.tsc`,
+`packages/*/dist`, `test-results/`, `playwright-report/`, `node_modules/.vite` — is capped at
+**500 MB** in total (`du -sch` over those paths); an agent that built and passed the cap runs
+`rm -rf apps/extension/dist/chrome* apps/extension/dist/firefox* apps/extension/.tsc packages/*/dist test-results playwright-report node_modules/.vite`
+before ending its run. It leaves `dist/release/` and every `node_modules` alone, and
+`pnpm build` restores what a gate needs. (Not `git clean -X` with pathspecs: measured
+2026-10-03, its dry run would remove the whole `node_modules` tree.)
+
 ## Organisation
 
 This repository is one of the `passioncode-ai` repositories. **The org map and onboarding live in

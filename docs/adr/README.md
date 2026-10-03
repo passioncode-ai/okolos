@@ -25,3 +25,4 @@
 | [0014](0014-the-engine-is-permissive-the-product-is-copyleft.md) | ~~Движок — Apache-2.0, продукт — AGPL-3.0~~ — заменено ADR-0015 | — |
 | [0015](0015-okolos-takes-the-organisations-licence.md) | ~~Okolos — под лицензией организации: PolyForm Noncommercial или Internal Use, коммерческая по запросу~~ — заменено ADR-0016 | — |
 | [0016](0016-okolos-returns-to-agpl-with-a-commercial-licence.md) | Okolos returns to the AGPL-3.0, with a commercial licence (Fabric ADR-0092) | `tools/licensing.test.ts`, `apps/proxy/src/landing.test.ts` |
+| [0017](0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md) | The feed agent publishes from a pinned checkout and counts from what is served (lifecycle LC-02/03/12/14) | `tools/feed-job.test.ts`, `tools/publish-feed.test.ts`, `tools/ingest.test.ts` |

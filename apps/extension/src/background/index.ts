@@ -5,7 +5,9 @@ import { buildRules, matchUrl, type FeedSnapshot,
 } from '@okolos/core-feeds'
 import { createOnnxRuntime, MODEL } from '@okolos/model'
 import {
+  INVENTORY_INTERVAL_MS,
   LAST_FEED_KEY,
+  LAST_INVENTORY_KEY,
   LAST_SWEEP_KEY,
   createModelCache,
   dueForFeed,
@@ -34,6 +36,7 @@ import {
 import { CAVALIER, hibp, lookupLeaks } from './leaks.js'
 import { checkSubmittedPassword } from './password.js'
 import { createInferenceHost } from './inference.js'
+import { ensureRules, runIfDue, WAKE_ALARMS, type DueStore } from './wake.js'
 
 /**
  * The background context holds no state between wake-ups.
@@ -87,9 +90,11 @@ export const MARK_VERDICT_IN = 'okolos:verdict:start'
 export const MARK_VERDICT_OUT = 'okolos:verdict:end'
 export const MEASURE_VERDICT = 'okolos:verdict'
 
-const FEED_ALARM = 'okolos:feeds'
-const RETENTION_ALARM = 'okolos:retention'
-const INVENTORY_ALARM = 'okolos:inventory'
+// One list of alarms, shared with the wake budget test (wake.ts, wake.test.ts).
+const [FEED, RETENTION, INVENTORY] = WAKE_ALARMS
+const FEED_ALARM = FEED.name
+const RETENTION_ALARM = RETENTION.name
+const INVENTORY_ALARM = INVENTORY.name
 
 platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSender) => {
   switch (message.type) {
@@ -323,10 +328,16 @@ platform.runtime.onInstalled(() => {
 const PHISHING_FEED = 'phishing'
 const INTERSTITIAL = '/interstitial.html'
 
-/** What the interstitial asks about. Lost on worker teardown, which is fine:
- * the page asks again on load, and a missing answer is shown as unknown rather
- * than guessed. */
-let lastBlock: { url: string; feed: string | null; entryDate: string | null } | null = null
+/**
+ * The last top-level web navigation — the one the interstitial asks about. Lost on
+ * worker teardown, which is fine: the page asks again on load, and a missing answer
+ * is shown as unknown rather than guessed.
+ *
+ * Only the URL is kept here. Matching it against the feed used to happen on every
+ * navigation, reading the whole feed from IndexedDB for pages that were never
+ * blocked; it now happens when the interstitial asks (LC-08).
+ */
+let lastNavigation: string | null = null
 
 async function currentFeed(): Promise<FeedSnapshot | null> {
   try {
@@ -340,16 +351,25 @@ async function currentFeed(): Promise<FeedSnapshot | null> {
   }
 }
 
-export async function refreshBlockRules(): Promise<{ installed: number; dropped: number }> {
+/** The rules the stored feed and the user's exceptions call for, or null without a feed. */
+async function expectedRuleSet(): Promise<{ feed: FeedSnapshot; set: ReturnType<typeof buildRules> } | null> {
   const feed = await currentFeed()
-  if (!feed) return { installed: 0, dropped: 0 }
+  if (!feed) return null
 
   const db = await openDb()
   const exceptions = (await db.getAll('exceptions'))
     .filter((row) => row.scope === 'domain')
     .map((row) => row.ref)
 
-  const set = buildRules(feed, exceptions, INTERSTITIAL)
+  return { feed, set: buildRules(feed, exceptions, INTERSTITIAL) }
+}
+
+export async function refreshBlockRules(): Promise<{ installed: number; dropped: number }> {
+  const expected = await expectedRuleSet()
+  if (!expected) return { installed: 0, dropped: 0 }
+  const { feed, set } = expected
+  const db = await openDb()
+
   await platform.blocking.replaceRules(set.rules)
 
   if (set.dropped > 0) {
@@ -376,15 +396,17 @@ async function blockContext(): Promise<{
   entryDate: string | null
   feedAgeDays: number | null
 } | null> {
-  if (!lastBlock) return null
+  if (!lastNavigation) return null
+  const url = lastNavigation
   const feed = await currentFeed()
+  const match = feed ? matchUrl(url, feed) : null
   const ageDays = feed
     ? Math.floor((Date.now() - Date.parse(feed.updatedAt)) / 86_400_000)
     : null
   return {
-    url: lastBlock.url,
-    feed: lastBlock.feed,
-    entryDate: lastBlock.entryDate,
+    url,
+    feed: match?.feed ?? null,
+    entryDate: match?.updatedAt?.slice(0, 10) ?? null,
     feedAgeDays: Number.isFinite(ageDays) ? ageDays : null,
   }
 }
@@ -1075,19 +1097,30 @@ async function addTrusted(payload: { domain: string }): Promise<{ ok: true }> {
 }
 
 platform.blocking.onBlocked((url) => {
-  void (async () => {
-    const feed = await currentFeed()
-    const match = feed ? matchUrl(url, feed) : null
-    lastBlock = {
-      url,
-      feed: match?.feed ?? null,
-      entryDate: match?.updatedAt?.slice(0, 10) ?? null,
-    }
-  })()
+  lastNavigation = url
 })
 
-void refreshBlockRules().catch(() => undefined)
-void reviewExtensions()
+/**
+ * The rules persist in the browser across restarts and updates, and every change
+ * this extension makes rebuilds them on the spot (a feed accepted, a site trusted or
+ * revoked). So they are checked — counted, not rebuilt — only at the moments the
+ * browser could have lost them: start, install, update. They used to be rebuilt,
+ * remove-all and add-all, on every wake-up (LC-08).
+ */
+async function ensureBlockRules(): Promise<void> {
+  try {
+    await ensureRules({
+      installed: () => platform.blocking.ruleCount(),
+      expected: async () => (await expectedRuleSet())?.set.rules.length ?? null,
+      rebuild: () => refreshBlockRules(),
+    })
+  } catch (cause) {
+    console.warn('okolos: could not check the blocking rules', cause)
+  }
+}
+platform.runtime.onBrowserStart(() => {
+  void ensureBlockRules()
+})
 
 /**
  * Downloads are judged as they are created — the only moment the bytes have not
@@ -1176,7 +1209,35 @@ async function reviewExtensions(): Promise<void> {
   }
 }
 
-void platform.alarms.create(INVENTORY_ALARM, 60 * 24)
+/** The `settings` store as a due-check's memory. */
+async function settingsDueStore(): Promise<DueStore> {
+  const db = await openDb()
+  return {
+    get: async (key) => {
+      const row = await db.get('settings', key)
+      return typeof row?.value === 'string' ? row.value : null
+    },
+    put: async (key, iso) => {
+      await db.put('settings', { key, value: iso })
+    },
+  }
+}
+
+/**
+ * The daily review, owed by a timestamp rather than by the alarm alone — the alarm
+ * was reset by every wake-up before it could fire, and the review itself ran at the
+ * top of this file on every wake (LC-08).
+ */
+async function reviewIfDue(): Promise<void> {
+  try {
+    await runIfDue(await settingsDueStore(), LAST_INVENTORY_KEY, INVENTORY_INTERVAL_MS, Date.now(), reviewExtensions)
+  } catch (cause) {
+    console.warn('okolos: could not decide whether the extension review is owed', cause)
+  }
+}
+
+void reviewIfDue()
+void platform.alarms.create(INVENTORY_ALARM, INVENTORY.periodInMinutes)
 /**
  * Retention runs at start as well as on the alarm, and the start is the one
  * that can be relied on.
@@ -1311,17 +1372,17 @@ async function pullFeed(): Promise<void> {
  * page, so an unconditional pull at start *is* a pull per page.
  */
 void pullFeed()
-void platform.alarms.create(FEED_ALARM, 60 * 6)
+void platform.alarms.create(FEED_ALARM, FEED.periodInMinutes)
 
 void sweepIfDue()
-void platform.alarms.create(RETENTION_ALARM, 60 * 24)
+void platform.alarms.create(RETENTION_ALARM, RETENTION.periodInMinutes)
 platform.alarms.onFired((name) => {
   if (name === FEED_ALARM) {
     void pullFeed()
     return
   }
   if (name === INVENTORY_ALARM) {
-    void reviewExtensions()
+    void reviewIfDue()
     return
   }
   if (name !== RETENTION_ALARM) return

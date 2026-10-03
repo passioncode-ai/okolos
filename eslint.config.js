@@ -151,6 +151,9 @@ export default tseslint.config(
         // source that stopped answering, so the timeout signal belongs beside it.
         AbortSignal: 'readonly',
         setTimeout: 'readonly',
+        // A deadline that is not cleared keeps a finished process alive, and a
+        // bounded child (tools/feed/bounded.mjs) clears two.
+        clearTimeout: 'readonly',
         document: 'readonly',
         window: 'readonly',
         Buffer: 'readonly',

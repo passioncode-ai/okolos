@@ -279,6 +279,40 @@ describe('retention is not left to an alarm that may never fire', () => {
   })
 })
 
+describe('a wake-up does only what is owed (LC-08)', () => {
+  /**
+   * The background runs on import and cannot be loaded in isolation, so its wiring is
+   * held by source checks; the behaviour behind each call is counted on a fake clock in
+   * apps/extension/src/background/wake.test.ts. Before this, every wake-up rebuilt every
+   * blocking rule and listed every installed extension at the top of the file.
+   */
+  const background = readFileSync(
+    path.join(root, 'apps/extension/src/background/index.ts'),
+    'utf8',
+  )
+
+  it('does not rebuild the blocking rules at module scope', () => {
+    expect(background).not.toMatch(/^void refreshBlockRules\(\)/m)
+  })
+
+  it('does not review the extension inventory at module scope, only when a day has passed', () => {
+    expect(background).not.toMatch(/^void reviewExtensions\(\)/m)
+    expect(background).toMatch(/^void reviewIfDue\(\)$/m)
+    expect(background).toContain('LAST_INVENTORY_KEY')
+  })
+
+  it('repairs the rules on browser start and install, through a count check', () => {
+    expect(background).toMatch(/onBrowserStart\(\(\) => \{\s*void ensureBlockRules\(\)/)
+    expect(background).toContain('ensureRules(')
+  })
+
+  it('reads the feed when the interstitial asks, not on every navigation', () => {
+    const handler = /platform\.blocking\.onBlocked\(([\s\S]*?)\n\}\)/.exec(background)?.[1] ?? ''
+    expect(handler, 'the navigation handler').not.toBe('')
+    expect(handler).not.toContain('currentFeed')
+  })
+})
+
 describe('silence is not an empty list', () => {
   /**
    * `send()` resolves to the handler's answer, and a handler that never ran

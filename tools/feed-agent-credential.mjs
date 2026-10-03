@@ -21,23 +21,16 @@ export function quote(word) {
 }
 
 /**
- * The words that go before `pnpm feed:refresh`, or '' when there is no door.
- * Pure: everything it needs is passed in, so the rendering is testable without
- * this machine.
+ * The secret runner as an argv — the words the feed job puts in front of the
+ * publish step, and only that step — or null when there is no door. Pure:
+ * everything it needs is passed in, so the rendering is testable without this
+ * machine. It used to be a shell prefix wrapped around the whole refresh, which
+ * handed the token to the ingest and to every tool the run started (F2).
  */
-export function runnerPrefix(door) {
-  if (!door) return ''
+export function runnerArgv(door) {
+  if (!door) return null
   const { python, root } = door
-  return [
-    quote(python),
-    quote(`${root}/tools/use_secret.py`),
-    'run',
-    '--env',
-    SLOT.env,
-    SLOT.project,
-    SLOT.name,
-    '--',
-  ].join(' ')
+  return [python, `${root}/tools/use_secret.py`, 'run', '--env', SLOT.env, SLOT.project, SLOT.name, '--']
 }
 
 /** Escapes what an XML <string> cannot hold as-is. */

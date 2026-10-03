@@ -103,6 +103,25 @@ export function dueForSweep(lastSweptAt: string | null | undefined, nowMs: numbe
   return dueAgain(lastSweptAt, nowMs, SWEEP_INTERVAL_MS)
 }
 
+/**
+ * How long the extension inventory may go unreviewed: a day.
+ *
+ * What it looks for is an extension that changed while nobody was watching, and that
+ * does not need checking on every wake-up. It used to run at the top of the
+ * background, so `management.getAll()` and a diff against every snapshot ran each
+ * time a page messaged the worker, while the daily alarm meant to carry it was reset
+ * before it could fire (LC-08).
+ */
+export const INVENTORY_INTERVAL_MS = 24 * 60 * 60 * 1000
+
+/** Where the last inventory review is recorded — the attempt, like the feed's. */
+export const LAST_INVENTORY_KEY = 'inventory:lastReviewedAt'
+
+/** Whether an inventory review is owed. The same four cases, by construction. */
+export function dueForInventory(lastReviewedAt: string | null | undefined, nowMs: number): boolean {
+  return dueAgain(lastReviewedAt, nowMs, INVENTORY_INTERVAL_MS)
+}
+
 /** Whether a feed pull is owed. The same four cases, by construction. */
 export function dueForFeed(lastAttemptedAt: string | null | undefined, nowMs: number): boolean {
   return dueAgain(lastAttemptedAt, nowMs, FEED_INTERVAL_MS)

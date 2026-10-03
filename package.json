@@ -38,8 +38,9 @@
     "access:check": "node tools/access.mjs --check",
     "i18n:sweep": "node tools/i18n-sweep.mjs",
     "feed:ingest": "node tools/ingest.mjs",
-    "feed:refresh": "node tools/ingest.mjs && node tools/publish-feed.mjs feeds/phishing.json",
-    "feed:agent": "node tools/install-feed-agent.mjs"
+    "feed:refresh": "node tools/feed-job.mjs",
+    "feed:agent": "node tools/install-feed-agent.mjs",
+    "feed:snapshot": "node tools/feed-snapshot.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",

@@ -10,6 +10,7 @@ import {
   FEED_REFRESH_HOURS,
   feedAgeDays,
   feedTooOld,
+  freshestFeed,
 } from './feed-age.mjs'
 
 /**
@@ -120,20 +121,33 @@ describe('where the ceiling comes from, and where the gate lives', () => {
      * `OKOLOS_SKIP_GATES=1`. B-26 was that lesson costing a day.
      */
     const release = readFileSync(path.join(root, 'tools/package.mjs'), 'utf8')
-    expect(release).toContain('feedTooOld()')
+    expect(release).toContain('feedTooOld(Date.now(), shipped)')
+    expect(release).toContain('freshestFeed()')
     expect(release, 'the refusal must stop the release, not warn beside it').toMatch(
       /die\(stale\)/,
     )
   })
 
   it('names the feed the extension actually downloads', () => {
-    // A gate on a file nobody ships is a gate about nothing.
-    const publish = readFileSync(path.join(root, 'tools/publish-feed.mjs'), 'utf8')
-    const refresh = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) as {
+    // A gate on a file nobody ships is a gate about nothing. The agent writes its
+    // state outside the tree (F1); the committed snapshot is refreshed from it by
+    // `pnpm feed:snapshot`, and the gate reads whichever of the two is newer.
+    const scripts = (JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) as {
       scripts: Record<string, string>
-    }
-    expect(refresh.scripts['feed:refresh']).toContain(FEED_PATH)
-    expect(publish.length, 'the publisher exists').toBeGreaterThan(0)
+    }).scripts
+    expect(scripts['feed:refresh']).toContain('tools/feed-job.mjs')
+    expect(scripts['feed:snapshot']).toContain('tools/feed-snapshot.mjs')
+    expect(FEED_PATH).toBe('feeds/phishing.json')
+  })
+
+  it('reads the newer of the committed snapshot and the agent’s state', () => {
+    // The agent no longer rewrites the tracked file, so on the publishing machine
+    // the state file is the fresh one; on CI only the snapshot exists.
+    const old = feedAged(FEED_MAX_AGE_DAYS + 5)
+    const fresh = feedAged(1)
+    expect(freshestFeed([old.file, fresh.file])).toBe(fresh.file)
+    expect(freshestFeed([old.file, path.join(os.tmpdir(), 'okolos-no-such-feed.json')])).toBe(old.file)
+    expect(feedTooOld(fresh.now, freshestFeed([old.file, fresh.file]))).toBeNull()
   })
 })
 
@@ -150,20 +164,20 @@ describe('the agent that stops this being a thing anyone remembers', () => {
     expect(plist()).toMatch(/<key>RunAtLoad<\/key>\s*<true\/>/)
   })
 
-  it('keeps the repository path a placeholder, because an absolute path is right once', () => {
+  it('keeps the checkout path a placeholder, because an absolute path is right once', () => {
     /**
      * A committed absolute path is correct on exactly one machine and silently
      * wrong everywhere else — launchd would fail every twelve hours with nothing
      * on any screen. The installer fills it in and writes the copy launchd reads.
      */
-    expect(plist()).toContain('REPO_PATH')
+    expect(plist()).toContain('{{CHECKOUT}}')
     expect(plist()).not.toMatch(/\/Users\/[a-z]/)
   })
 
-  it('is loaded by one command, and the file says which', () => {
-    // The human step this reduces: `launchctl bootstrap`, and nothing else.
-    expect(plist()).toContain('launchctl bootstrap')
-    expect(plist()).toContain('launchctl bootout')
+  it('is installed by one command, and the file says which', () => {
+    // The human step this reduces: one command, which also creates the agent's
+    // checkout and refuses to re-enable an agent the operator disabled.
+    expect(plist()).toContain('pnpm feed:agent')
   })
 
   it('does not keep itself alive, because it is a task that finishes', () => {

@@ -18,10 +18,13 @@ export {
 export {
   dueAgain,
   dueForFeed,
+  dueForInventory,
   dueForSweep,
   pruneExpired,
   FEED_INTERVAL_MS,
+  INVENTORY_INTERVAL_MS,
   LAST_FEED_KEY,
+  LAST_INVENTORY_KEY,
   LAST_SWEEP_KEY,
   SWEEP_INTERVAL_MS,
 } from './retention.js'

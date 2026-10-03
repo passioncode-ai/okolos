@@ -28,7 +28,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 import { filesUnder } from './tree.mjs'
-import { FEED_MAX_AGE_DAYS, FEED_PATH, feedAgeDays, feedTooOld } from './feed-age.mjs'
+import { pruneReleases, RELEASES_KEPT } from './release-prune.mjs'
+import { FEED_MAX_AGE_DAYS, feedAgeDays, feedTooOld, freshestFeed } from './feed-age.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
 const dist = path.join(root, 'apps/extension/dist')
@@ -89,9 +90,11 @@ function referencedPaths(manifest) {
  */
 console.log('\n── the blocklist, which is the thing this product blocks with')
 {
-  const stale = feedTooOld()
+  // The newer of the committed snapshot and the agent's published state (F1).
+  const shipped = freshestFeed()
+  const stale = feedTooOld(Date.now(), shipped)
   if (stale) die(stale)
-  ok(`${FEED_PATH} is ${feedAgeDays().toFixed(1)} days old, within ${FEED_MAX_AGE_DAYS}`)
+  ok(`${shipped} is ${feedAgeDays(Date.now(), shipped).toFixed(1)} days old, within ${FEED_MAX_AGE_DAYS}`)
 }
 
 console.log('\n── build, so the archive is of something this command made')
@@ -102,7 +105,7 @@ console.log('\n── build, so the archive is of something this command made')
 // the build step runs first and every target is already there.
 const built = TARGETS.every((target) => existsSync(path.join(dist, target)))
 if (!checkOnly || !built) {
-  execFileSync('pnpm', ['build'], { cwd: root, stdio: 'inherit' })
+  execFileSync('pnpm', ['build'], { cwd: root, stdio: 'inherit', timeout: 10 * 60_000 })
 }
 
 for (const target of TARGETS) {
@@ -186,13 +189,18 @@ for (const target of TARGETS) {
   // `-X` drops the extra attributes that make two archives of identical bytes
   // differ; the store cares about none of them and a reviewer diffing two
   // releases does.
-  execFileSync('zip', ['-q', '-r', '-X', archive, '.'], { cwd: dir })
+  execFileSync('zip', ['-q', '-r', '-X', archive, '.'], { cwd: dir, timeout: 120_000 })
 
   const bytes = statSync(archive).size
   const digest = createHash('sha256').update(readFileSync(archive)).digest('hex')
   console.log(`\n   ${path.relative(root, archive)}`)
   console.log(`   ${bytes.toLocaleString('en-US')} bytes`)
   console.log(`   sha256 ${digest}`)
+
+  // LC-15: the current release and the one before it, nothing older.
+  for (const name of pruneReleases(out)) {
+    console.log(`   pruned ${name} (keeping the newest ${RELEASES_KEPT} per browser)`)
+  }
 }
 
 console.log(

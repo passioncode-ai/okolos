@@ -7,3 +7,6 @@ allowBuilds:
   esbuild: true
   # geckodriver downloads the WebDriver binary Firefox e2e needs (REQ-34).
   geckodriver: true
+  # wrangler (apps/proxy, pinned for the feed publish) pulls in workerd, whose install
+  # script only validates the local-dev runtime. `d1 execute --remote` never starts it.
+  workerd: false

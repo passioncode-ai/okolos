@@ -7,19 +7,15 @@
   CI is precisely the trade that decision refused. That makes the schedule a
   human step by construction, and this file is what reduces it to one command:
 
-      launchctl bootstrap gui/$(id -u) tools/launchd/app.okolos.feed.plist
+      pnpm feed:agent      # write this plist and load it
 
-  To check it is alive, and to see the last exit status:
+  The same script takes a status flag (loaded? last run? last exit?) and an
+  uninstall flag, optionally with purge — see docs/runbooks/feed-signing.md.
 
-      launchctl print gui/$(id -u)/app.okolos.feed | grep -E 'state|last exit'
-
-  To take it away:
-
-      launchctl bootout gui/$(id -u)/app.okolos.feed
-
-  REPO_PATH below is a placeholder on purpose: an absolute path committed to a
-  repository is right on exactly one machine, and wrong silently everywhere else.
-  `tools/install-feed-agent.mjs` fills it in and writes the copy launchd reads.
+  The double-brace words below are placeholders on purpose: an absolute path
+  committed to a repository is right on exactly one machine, and wrong silently
+  everywhere else. The installer fills them in and writes the copy launchd reads,
+  and refuses a template that lost one.
 -->
 <plist version="1.0">
 <dict>
@@ -27,43 +23,65 @@
   <string>app.okolos.feed</string>
 
   <!--
-    Through a login shell: `pnpm` arrives from a version manager on most
-    machines, and launchd's own environment has almost nothing in it. `cd` first
-    because the script resolves the repository from its own location and the
-    working directory is otherwise `/`.
+    From the agent's own checkout, never a developer's clone: production publishes
+    run only from origin/main, and the job fast-forwards that checkout itself
+    (tools/feed-job.mjs, F2). Through a login shell because `node` and `pnpm`
+    arrive from a version manager on most machines and launchd's own environment
+    has almost nothing in it; measured 2026-10-03 at 0.02 s.
+
+    Agent mode is if-stale plus follow: a run whose served feed is younger than
+    its interval records "skipped" and ends, so a login is not a publish.
   -->
   <key>ProgramArguments</key>
   <array>
     <string>/bin/sh</string>
     <string>-lc</string>
-    <string>cd REPO_PATH &amp;&amp; CREDENTIAL_RUNNER pnpm feed:refresh</string>
+    <string>cd {{CHECKOUT}} &amp;&amp; exec node tools/feed-job.mjs --agent</string>
   </array>
+
+  <!--
+    The secret runner is not on the command line: the job puts it in front of the
+    publish step alone, so the Cloudflare token never reaches the ingest, git or
+    pnpm. It is a JSON argv (paths only, no secret), empty when this machine has no
+    vault. Wrangler's telemetry is off for everything the job starts.
+  -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>OKOLOS_SECRET_RUNNER</key>
+    <string>{{RUNNER}}</string>
+    <key>WRANGLER_SEND_METRICS</key>
+    <string>false</string>
+  </dict>
 
   <!--
     43200 seconds is twelve hours, which is the source's own cycle as recorded in
     ADR-0010. launchd runs a missed StartInterval as soon as it can after a wake,
     which is the behaviour this wants: a laptop that was closed overnight
-    refreshes on opening rather than waiting for the next slot.
+    refreshes on opening rather than waiting for the next slot. A run is bounded
+    by the job's own watchdog (thirty minutes), so launchd never skips a slot
+    behind a hung one.
   -->
   <key>StartInterval</key>
   <integer>43200</integer>
 
   <!--
     And once at load, so installing the agent refreshes the feed instead of
-    promising to in twelve hours.
+    promising to in twelve hours. At every later login the same run finds the
+    served feed fresh and ends.
   -->
   <key>RunAtLoad</key>
   <true/>
 
   <!--
     Not `KeepAlive`: this is a task that finishes, and keeping it alive would
-    restart it in a loop. A failed run is reported by its exit status and by the
-    log below, and the next interval tries again.
+    restart it in a loop. The job writes its own rotated, owner-only log and a
+    status record next to its state; launchd's streams catch only what happens
+    before the job's log is open, and the job caps that file too.
   -->
   <key>StandardOutPath</key>
-  <string>/tmp/okolos-feed.log</string>
+  <string>{{LOG_DIR}}/feed.launchd.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/okolos-feed.log</string>
+  <string>{{LOG_DIR}}/feed.launchd.log</string>
 
   <!--
     Nice, because a blocklist refresh is never the most important thing the

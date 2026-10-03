@@ -2,8 +2,16 @@
 /**
  * Building the blocklist from public sources, and refusing to build a dangerous one.
  *
- *   node tools/ingest.mjs                 # fetch, build, write feeds/phishing.json
+ *   node tools/ingest.mjs                 # fetch, build, write ~/.okolos/state/feeds/phishing.json
+ *   node tools/ingest.mjs --out FILE      # write somewhere else
  *   node tools/ingest.mjs --dry-run       # build and print, write nothing
+ *
+ * The output lives outside the git working tree, and the version comes from the
+ * served feed (F1): `version = max(served, local, seed) + 1`. It used to be read
+ * from the tracked `feeds/phishing.json`, so any routine `git checkout -- .` took
+ * the counter backwards and the next run published a version every extension
+ * refuses as a replay. The tracked file is now a committed snapshot — a seed and a
+ * reference — refreshed with `pnpm feed:snapshot`, never by the agent.
  *
  * The feed shipped to production until now held four `.test` domains. The
  * mechanism worked and protected nobody, which is a worse position than an
@@ -40,9 +48,12 @@
  * the feed's own version number would announce the shrinkage as an update. So a
  * failed fetch stops the run.
  */
-import { readFileSync, writeFileSync } from 'node:fs'
-
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+
+import { acquireLock } from './feed/lock.mjs'
+import { feedPaths } from './feed/paths.mjs'
+import { DEFAULT_WORKER, nextVersion, readServed } from './feed/served.mjs'
 
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -277,8 +288,8 @@ export function buildSnapshot({ hosts, version, updatedAt, limit = RULE_LIMIT })
   }
 }
 
-async function fetchSource({ name, url }) {
-  const response = await fetch(url, {
+async function fetchSource({ name, url }, fetchImpl = fetch) {
+  const response = await fetchImpl(url, {
     redirect: 'follow',
     headers: { 'user-agent': 'okolos-feed-ingest (+https://github.com/passioncode-ai/okolos)' },
     signal: AbortSignal.timeout(30_000),
@@ -289,27 +300,65 @@ async function fetchSource({ name, url }) {
   return text
 }
 
-async function main() {
-  const dryRun = process.argv.includes('--dry-run')
-  const out = path.join(root, 'feeds/phishing.json')
+/** Where a run writes when nobody says otherwise: the agent's state, outside the tree. */
+export function defaultOut() {
+  return feedPaths().feed
+}
 
-  let previous = { update: { body: { version: 0 } } }
+/** The committed snapshot, read as a lower bound for the version on a new machine. */
+const SEED = path.join(root, 'feeds/phishing.json')
+
+/** A feed file's version and entry count, or null when there is no readable file. */
+function readLocal(file) {
+  if (!file) return null
+  let parsed
   try {
-    previous = JSON.parse((await import('node:fs')).readFileSync(out, 'utf8'))
+    parsed = JSON.parse(readFileSync(file, 'utf8'))
   } catch {
-    // No previous feed is a first run, not a failure.
+    return null
   }
-  const previousVersion = previous?.update?.body?.version ?? previous?.body?.version ?? 0
+  const body = parsed?.update?.body ?? parsed?.body
+  return {
+    version: Number.isSafeInteger(body?.version) ? body.version : 0,
+    count: Array.isArray(body?.entries) ? body.entries.length : 0,
+  }
+}
+
+/**
+ * Fetches, guards, versions and writes one snapshot. Returns the update.
+ *
+ * Every dependency is passed in so the version rule can be tested against a
+ * planted stale file without a network: `fetchImpl` answers both the source and
+ * the worker, `out` is where the snapshot goes, `seed` the committed lower bound.
+ */
+export async function ingest({
+  out = defaultOut(),
+  seed = SEED,
+  base = process.env.OKOLOS_WORKER_URL ?? DEFAULT_WORKER,
+  fetchImpl = fetch,
+  dryRun = false,
+  now = () => new Date(),
+  log = console.log,
+} = {}) {
+  // The served feed first: without its version the next one cannot be chosen
+  // safely, and a source fetched for nothing is a request wasted.
+  const served = await readServed({ base, fetchImpl })
+  const local = readLocal(out)
+  const committed = readLocal(seed)
+  log(
+    `served: ${served.state === 'served' ? `v${served.version}, ${served.count} entries` : 'nothing yet'}; ` +
+      `local: ${local ? `v${local.version}` : 'none'}; seed: ${committed ? `v${committed.version}` : 'none'}`,
+  )
 
   const all = []
   for (const source of SOURCES) {
     // Not caught. A source that failed must not produce a shorter list: the
     // version would rise, the entries would fall, and every host that dropped
     // out would be silently unblocked by what announces itself as an update.
-    const text = await fetchSource(source)
+    const text = await fetchSource(source, fetchImpl)
     const hosts = hostsFrom(text)
     if (hosts.length === 0) throw new Error(`${source.name}: parsed to zero hosts`)
-    console.log(`${source.name}: ${hosts.length} hosts`)
+    log(`${source.name}: ${hosts.length} hosts`)
     all.push(...hosts)
   }
 
@@ -318,30 +367,58 @@ async function main() {
     // Printed, always. A guard that drops hosts in silence is indistinguishable
     // from a feed that never listed them, and the day this list starts refusing
     // twenty a run is the day the source changed shape.
-    console.log(`refused ${refused.length} host(s):`)
-    for (const { host, why } of refused) console.log(`  ${host} — ${why}`)
+    log(`refused ${refused.length} host(s):`)
+    for (const { host, why } of refused) log(`  ${host} — ${why}`)
   }
 
   const { update, dropped } = buildSnapshot({
     hosts: kept,
-    version: previousVersion + 1,
-    updatedAt: new Date().toISOString(),
+    version: nextVersion({
+      served: served.state === 'served' ? served.version : null,
+      local: [local?.version ?? 0, committed?.version ?? 0],
+    }),
+    updatedAt: now().toISOString(),
   })
-  if (dropped > 0) console.log(`over the ${RULE_LIMIT} ceiling: ${dropped} entries left out`)
+  if (dropped > 0) log(`over the ${RULE_LIMIT} ceiling: ${dropped} entries left out`)
 
-  console.log(`version ${update.body.version}: ${update.body.entries.length} entries`)
+  log(`version ${update.body.version}: ${update.body.entries.length} entries`)
 
   // After the build and before the write: the numbers to compare only exist here.
-  const previousCount = previous?.update?.body?.entries?.length ?? previous?.body?.entries?.length ?? 0
+  // Against what users hold — the served list — when there is one; a local file
+  // can be missing or stale, and the served list is what a shrink would unblock.
+  const previousCount = served.state === 'served' ? served.count : (local?.count ?? committed?.count ?? 0)
   const shrink = shrankTooFar(previousCount, update.body.entries.length)
   if (shrink) throw new Error(shrink)
 
   if (dryRun) {
-    console.log('--dry-run: nothing written')
-    return
+    log('--dry-run: nothing written')
+    return update
   }
-  writeFileSync(out, `${JSON.stringify(update, null, 2)}\n`)
-  console.log(`wrote ${path.relative(root, out)} — sign and publish with tools/publish-feed.mjs`)
+  // Whole or not at all: a half-written feed is a feed the next run cannot read
+  // its version from.
+  mkdirSync(path.dirname(out), { recursive: true, mode: 0o700 })
+  const temporary = `${out}.${process.pid}.tmp`
+  writeFileSync(temporary, `${JSON.stringify(update, null, 2)}\n`, { mode: 0o600 })
+  renameSync(temporary, out)
+  log(`wrote ${out} — sign and publish with tools/publish-feed.mjs`)
+  return update
+}
+
+function argument(name) {
+  const index = process.argv.indexOf(name)
+  return index === -1 ? undefined : process.argv[index + 1]
+}
+
+async function main() {
+  const paths = feedPaths()
+  // One run at a time across every entry point (LC-03); a child of the feed job
+  // passes the job's token through and is let in.
+  const lock = acquireLock(paths.lock, { inherited: process.env.OKOLOS_FEED_LOCK })
+  try {
+    await ingest({ out: argument('--out') ?? paths.feed, dryRun: process.argv.includes('--dry-run') })
+  } finally {
+    lock.release()
+  }
 }
 
 if (import.meta.filename === process.argv[1]) {
