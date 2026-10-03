@@ -705,3 +705,106 @@ describe('the deadline helper, now that two callers share it', () => {
     ).rejects.toThrow('the source refused')
   })
 })
+
+describe('alarms survive a worker that wakes all day (LC-08)', () => {
+  /**
+   * `alarms.create` replaces an alarm of the same name, and the background asks for
+   * its three alarms at the top of the file — so every wake-up reset every timer, and
+   * the daily inventory alarm on a browser in daily use never fired at all. Creating
+   * only what is missing is what lets a twenty-four-hour alarm reach twenty-four hours.
+   */
+  it('creates an alarm that does not exist yet', async () => {
+    const create = vi.fn()
+    const platform = createPlatform('chrome', fakeApi({
+      alarms: { create, get: async () => undefined },
+    }))
+    await platform.alarms.create('okolos:inventory', 1440)
+    expect(create).toHaveBeenCalledWith('okolos:inventory', { periodInMinutes: 1440 })
+  })
+
+  it('leaves a running alarm alone, so its countdown is not reset by a wake-up', async () => {
+    const create = vi.fn()
+    const platform = createPlatform('chrome', fakeApi({
+      alarms: {
+        create,
+        get: async (name: string) => ({ name, periodInMinutes: 1440, scheduledTime: 0 }),
+      },
+    }))
+    for (let wake = 0; wake < 50; wake += 1) await platform.alarms.create('okolos:inventory', 1440)
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('re-creates an alarm whose period changed, so an update can still move a schedule', async () => {
+    const create = vi.fn()
+    const platform = createPlatform('chrome', fakeApi({
+      alarms: {
+        create,
+        get: async (name: string) => ({ name, periodInMinutes: 60, scheduledTime: 0 }),
+      },
+    }))
+    await platform.alarms.create('okolos:feeds', 360)
+    expect(create).toHaveBeenCalledWith('okolos:feeds', { periodInMinutes: 360 })
+  })
+
+  it('creates anyway where the browser cannot say what exists, rather than never', async () => {
+    const create = vi.fn()
+    const platform = createPlatform('firefox', fakeApi({ alarms: { create } }))
+    await platform.alarms.create('okolos:retention', 1440)
+    expect(create).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('the rules can be counted without being rebuilt', () => {
+  it('counts what is installed', async () => {
+    const platform = createPlatform('chrome', fakeApi({
+      declarativeNetRequest: {
+        getDynamicRules: async () => [{ id: 1 }, { id: 2 }, { id: 3 }],
+        updateDynamicRules: vi.fn(),
+      },
+    }))
+    expect(await platform.blocking.ruleCount()).toBe(3)
+  })
+
+  it('answers zero where the browser has no such API', async () => {
+    const platform = createPlatform('firefox', fakeApi())
+    expect(await platform.blocking.ruleCount()).toBe(0)
+  })
+})
+
+describe('the moments the rules may need repair', () => {
+  it('fires on browser start and on every install reason, not only a fresh install', () => {
+    const startup: Array<() => void> = []
+    const installed: Array<(details: { reason: string }) => void> = []
+    const platform = createPlatform('chrome', fakeApi({
+      runtime: {
+        onStartup: { addListener: (cb: () => void) => startup.push(cb) },
+        onInstalled: { addListener: (cb: (details: { reason: string }) => void) => installed.push(cb) },
+      },
+    }))
+
+    let fired = 0
+    platform.runtime.onBrowserStart(() => {
+      fired += 1
+    })
+    startup.forEach((cb) => cb())
+    for (const reason of ['install', 'update', 'chrome_update']) installed.forEach((cb) => cb({ reason }))
+    expect(fired).toBe(4)
+  })
+})
+
+describe('the navigation listener wakes the worker for web pages only', () => {
+  it('registers with an http(s) filter, so extension and browser pages do not wake it', () => {
+    let filter: unknown
+    const platform = createPlatform('chrome', fakeApi({
+      webNavigation: {
+        onBeforeNavigate: {
+          addListener: (_cb, given) => {
+            filter = given
+          },
+        },
+      },
+    }))
+    platform.blocking.onBlocked(() => undefined)
+    expect(filter).toEqual({ url: [{ schemes: ['http', 'https'] }] })
+  })
+})

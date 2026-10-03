@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import {
   FEED_INTERVAL_MS,
+  INVENTORY_INTERVAL_MS,
+  LAST_INVENTORY_KEY,
   SWEEP_INTERVAL_MS,
   dueAgain,
   dueForFeed,
+  dueForInventory,
   dueForSweep,
   pruneExpired,
 } from './retention.js'
@@ -265,5 +268,29 @@ describe('one due-check, used by both periodic jobs', () => {
     // would have had to be wrong for one of them.
     expect(dueForFeed(ago(7 * HOUR), now)).toBe(true)
     expect(dueForSweep(ago(7 * HOUR), now)).toBe(false)
+  })
+})
+
+describe('deciding whether the extension inventory is owed (LC-08)', () => {
+  /**
+   * The comment above `reviewExtensions` promised a daily review and the call sat at
+   * the top of the background, so `management.getAll()` ran on every wake-up — and
+   * the daily alarm that was meant to carry it was reset before it could fire.
+   */
+  const NOW = Date.parse('2026-10-03T12:00:00.000Z')
+  const ago = (ms: number) => new Date(NOW - ms).toISOString()
+
+  it('is a day, kept under its own key', () => {
+    expect(INVENTORY_INTERVAL_MS).toBe(24 * 60 * 60 * 1000)
+    expect(LAST_INVENTORY_KEY).toBe('inventory:lastReviewedAt')
+  })
+
+  it('is owed when it never ran, and not again an hour later', () => {
+    expect(dueForInventory(null, NOW)).toBe(true)
+    expect(dueForInventory(ago(60 * 60 * 1000), NOW)).toBe(false)
+  })
+
+  it('is owed once a day has passed', () => {
+    expect(dueForInventory(ago(INVENTORY_INTERVAL_MS), NOW)).toBe(true)
   })
 })

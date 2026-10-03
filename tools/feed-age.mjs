@@ -1,6 +1,8 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { feedPaths } from './feed/paths.mjs'
 
 /**
  * How old the shipped blocklist is, and how old it is allowed to be.
@@ -40,7 +42,37 @@ export const FEED_MAX_AGE_DAYS = 14
 /** Where the interval belongs for anyone reading the schedule. */
 export const FEED_REFRESH_HOURS = 12
 
+/** The committed snapshot: a seed and a reference, refreshed by `pnpm feed:snapshot`. */
 export const FEED_PATH = 'feeds/phishing.json'
+
+/**
+ * The newest feed among `candidates`, by the timestamp each carries.
+ *
+ * The agent writes its state outside the git working tree (F1), so on the
+ * publishing machine `~/.okolos/state/feeds/phishing.json` is the feed that was
+ * last signed and served, while the committed snapshot moves only when someone
+ * commits it. CI has only the snapshot. A candidate that is missing or unreadable
+ * is skipped; with none readable the snapshot is returned, and its own read fails
+ * loudly.
+ */
+export function freshestFeed(candidates = [FEED_PATH, feedPaths().feed]) {
+  let best = null
+  let bestAt = -Infinity
+  for (const candidate of candidates) {
+    const file = path.resolve(root, candidate)
+    if (!existsSync(file)) continue
+    try {
+      const at = Date.parse(JSON.parse(readFileSync(file, 'utf8'))?.body?.updatedAt)
+      if (Number.isFinite(at) && at > bestAt) {
+        best = candidate
+        bestAt = at
+      }
+    } catch {
+      // unreadable: not a candidate
+    }
+  }
+  return best ?? candidates[0]
+}
 
 /**
  * The feed's age in days, from the timestamp it carries.
@@ -80,7 +112,8 @@ export function feedTooOld(now = Date.now(), file = FEED_PATH) {
     `The source turns over about every ${FEED_REFRESH_HOURS} hours, so a list this old ` +
     `blocks almost nothing that is still live — measured 2026-08-19, one host of 248 ` +
     `after six days. Run \`pnpm feed:refresh\` on the machine that holds the signing key ` +
-    `(ADR-0002: the worker never signs), or install the agent in ` +
-    `tools/launchd/app.okolos.feed.plist so it stops being a thing anyone has to remember.`
+    `(ADR-0002: the worker never signs), or install the launchd agent ` +
+    `(\`pnpm feed:agent\`) so it stops being a thing anyone has to remember. ` +
+    `\`pnpm feed:snapshot\` then copies the published feed into ${FEED_PATH} for a commit.`
   )
 }

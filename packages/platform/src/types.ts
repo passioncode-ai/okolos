@@ -76,7 +76,13 @@ export interface Downloads {
 export interface Blocking {
   /** Replaces every rule this extension owns. Partial updates drift. */
   replaceRules(rules: readonly unknown[]): Promise<void>
-  /** Fires with the URL that was redirected to our interstitial. */
+  /** How many rules are installed now — a count, without rebuilding anything. */
+  ruleCount(): Promise<number>
+  /**
+   * Fires with the URL of each top-level web navigation — the one about to be
+   * redirected to our interstitial among them. Kept cheap: it runs on navigations
+   * that are not blocked too.
+   */
   onBlocked(handler: (url: string) => void): void
 }
 
@@ -87,6 +93,7 @@ export interface KeyValueStore {
 }
 
 export interface Alarms {
+  /** Ensures the alarm exists with this period; a running one keeps its countdown. */
   create(name: string, periodInMinutes: number): Promise<void>
   onFired(handler: (name: string) => void): void
 }
@@ -123,6 +130,8 @@ export interface Runtime {
   onMessage(handler: RpcHandler): void
   /** Fires once, on a fresh install — not on updates or browser restarts. */
   onInstalled(handler: () => void): void
+  /** Fires on browser start and on every install reason (install, update, browser update). */
+  onBrowserStart(handler: () => void): void
   /** Absolute URL of a file inside the extension package. */
   getUrl(path: string): string
   openOptionsPage(): Promise<void>
@@ -209,12 +218,15 @@ export interface WebExtensionApi {
   }
   alarms: {
     create(name: string, info: { periodInMinutes: number }): void
+    /** Optional so a test double may omit it; both browsers ship it promise-based. */
+    get?(name: string): Promise<{ name: string; periodInMinutes?: number; scheduledTime?: number } | undefined>
     onAlarm: { addListener(cb: (alarm: { name: string }) => void): void }
   }
   runtime: {
     getURL(path: string): string
     openOptionsPage?(): Promise<void> | void
     onInstalled: { addListener(cb: (details: { reason: string }) => void): void }
+    onStartup?: { addListener(cb: () => void): void }
     sendMessage(message: unknown): Promise<unknown>
     onMessage: {
       addListener(
