@@ -5,6 +5,13 @@
   "type": "module",
   "license": "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "description": "The thin backend: signed feeds, model files, domain status and appeals.",
-  "scripts": { "build": "tsc -b" },
-  "dependencies": { "@okolos/core-feeds": "workspace:*" }
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@okolos/core-feeds": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "4.146.0"
+  }
 }

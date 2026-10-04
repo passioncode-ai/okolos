@@ -1,12 +1,15 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
+import { filesIn } from './tree.mjs'
+
 // @ts-expect-error — a plain .mjs tool, imported for the parsing it does.
-import { NEVER_BLOCK, RULE_LIMIT, SHORT_HOST_CHARS, SOURCES, buildSnapshot, guard, hostFrom, hostsFrom, shrankTooFar } from './ingest.mjs'
+import { NEVER_BLOCK, RULE_LIMIT, SHORT_HOST_CHARS, SOURCES, buildSnapshot, defaultOut, guard, hostFrom, hostsFrom, ingest, shrankTooFar } from './ingest.mjs'
 
 /**
  * The blocklist builder, and the two ways it can hurt someone.
@@ -337,33 +340,94 @@ describe('a list that shrank too far is not published', () => {
   })
 })
 
-describe('the threshold is wired to the write, not merely defined beside it', () => {
+describe('the version comes from what is served, not from the worktree (F1)', () => {
   /**
-   * A plant found this gap: removing the call in `main()` reddened nothing,
-   * because the function is tested and its *use* was not. `main()` fetches from
-   * the network, so the wiring is checked by reading the source — the same way
-   * `tools/feed-age.test.ts` checks that the release command calls `feedTooOld`
-   * and dies on it. Reading source is a weaker claim than running it, and it is
-   * the claim available here; what it rules out is the thing that actually
-   * happened, which is a threshold nobody consulted.
+   * `version = previous + 1` used to be read from the tracked `feeds/phishing.json`.
+   * The worktree stood at v51 and HEAD at v42, so one `git checkout -- .` made the next
+   * run publish v43, which every extension holding v51 refuses as a replay — for about
+   * eight runs, while the smoke test passed because the worker served what was signed.
    */
-  const source = readFileSync(path.join(root, 'tools/ingest.mjs'), 'utf8')
+  const hosts = (n: number) => Array.from({ length: n }, (_, i) => `https://login-${i}.campaign-host.test/x`)
+  const servedBody = (version: number, entries: number) =>
+    JSON.stringify({
+      update: { kind: 'snapshot', body: { name: 'phishing', version, updatedAt: '2026-10-03T00:00:00.000Z', entries: hosts(entries).map((u) => new URL(u).hostname) } },
+      signature: 'c2ln',
+    })
 
-  it('asks before it writes, and the order is the whole point', () => {
-    const asked = source.indexOf('shrankTooFar(previousCount')
-    const written = source.indexOf('writeFileSync(out')
-    expect(asked, 'the run never consults the threshold').toBeGreaterThan(0)
-    expect(written).toBeGreaterThan(0)
-    expect(asked, 'the check must come before the write, not after it').toBeLessThan(written)
+  function world({ served, source = hosts(300).join('\n') }: { served: { status: number; body?: string } | 'down'; source?: string }) {
+    return (async (url: string) => {
+      if (url.startsWith('https://openphish.com/')) return new Response(source)
+      if (served === 'down') throw new TypeError('fetch failed')
+      return new Response(served.body ?? '', { status: served.status })
+    }) as typeof fetch
+  }
+
+  function planted(version: number, entries: number): string {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-ingest-'))
+    const out = path.join(dir, 'state', 'feeds', 'phishing.json')
+    if (version > 0) {
+      const local = { kind: 'snapshot', body: { name: 'phishing', version, updatedAt: '2026-09-01T00:00:00.000Z', entries: hosts(entries).map((u) => new URL(u).hostname) } }
+      mkdirSync(path.dirname(out), { recursive: true })
+      writeFileSync(out, JSON.stringify(local))
+    }
+    return out
+  }
+
+  const quiet = () => undefined
+
+  it('steps past the served version when the local file was taken backwards', async () => {
+    const out = planted(3, 300)
+    const update = await ingest({ out, seed: null, fetchImpl: world({ served: { status: 200, body: servedBody(51, 300) } }), log: quiet })
+    expect(update.body.version).toBe(52)
+    expect(JSON.parse(readFileSync(out, 'utf8')).body.version).toBe(52)
   })
 
-  it('throws rather than warning, because a warning writes the file anyway', () => {
-    expect(source).toMatch(/if \(shrink\) throw new Error\(shrink\)/)
+  it('steps past a local version that is ahead of the served one', async () => {
+    const out = planted(60, 300)
+    const update = await ingest({ out, seed: null, fetchImpl: world({ served: { status: 200, body: servedBody(51, 300) } }), log: quiet })
+    expect(update.body.version).toBe(61)
   })
 
-  it('counts the previous entries rather than the previous version number', () => {
-    // The version rises on every run by construction; it is the entry count that
-    // says whether anything was lost.
-    expect(source).toMatch(/previous\?\.update\?\.body\?\.entries\?\.length/)
+  it('counts the tracked seed too, so a new machine never starts below the repository', async () => {
+    const out = planted(0, 0)
+    const seed = planted(42, 300)
+    const update = await ingest({ out, seed, fetchImpl: world({ served: { status: 404 } }), log: quiet })
+    expect(update.body.version).toBe(43)
+  })
+
+  it('refuses to build when the served version cannot be read, and writes nothing', async () => {
+    const out = planted(3, 300)
+    const before = readFileSync(out, 'utf8')
+    await expect(ingest({ out, seed: null, fetchImpl: world({ served: 'down' }), log: quiet })).rejects.toThrow()
+    await expect(ingest({ out, seed: null, fetchImpl: world({ served: { status: 503 } }), log: quiet })).rejects.toThrow(/503/)
+    expect(readFileSync(out, 'utf8')).toBe(before)
+  })
+
+  it('measures shrinkage against what users hold, not against a local file that may be gone', async () => {
+    const out = planted(0, 0)
+    await expect(
+      ingest({ out, seed: null, fetchImpl: world({ served: { status: 200, body: servedBody(51, 300) }, source: hosts(20).join('\n') }), log: quiet }),
+    ).rejects.toThrow(/shrink/)
+    expect(existsSync(out)).toBe(false)
+  })
+
+  it('writes the file whole and owner-only, leaving no temporary beside it', async () => {
+    const out = planted(0, 0)
+    await ingest({ out, seed: null, fetchImpl: world({ served: { status: 404 } }), log: quiet })
+    expect(statSync(out).mode & 0o777).toBe(0o600)
+    expect(filesIn(path.dirname(out), '.json')).toEqual(['phishing.json'])
+    expect(filesIn(path.dirname(out), '.tmp')).toEqual([])
+  })
+
+  it('writes nothing on a dry run', async () => {
+    const out = planted(0, 0)
+    const update = await ingest({ out, seed: null, dryRun: true, fetchImpl: world({ served: { status: 404 } }), log: quiet })
+    expect(update.body.version).toBe(1)
+    expect(existsSync(out)).toBe(false)
+  })
+
+  it('writes outside the git working tree by default', () => {
+    expect(defaultOut().startsWith(root), defaultOut()).toBe(false)
+    expect(defaultOut()).toMatch(/\.okolos\/state\/feeds\/phishing\.json$/)
   })
 })

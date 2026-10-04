@@ -12,6 +12,9 @@ export const FEED_REFRESH_HOURS: number
 /** The feed the extension downloads, relative to the repository root. */
 export const FEED_PATH: string
 
+/** The newest readable feed among the candidates (default: the snapshot and the agent's state). */
+export function freshestFeed(candidates?: readonly string[]): string
+
 /** Age in days, read from `body.updatedAt` rather than from the filesystem. */
 export function feedAgeDays(now?: number, file?: string): number
 

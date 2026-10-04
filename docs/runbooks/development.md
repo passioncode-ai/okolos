@@ -160,9 +160,10 @@ pnpm screenshots             # docs/store/screenshots/*.png
 
 ```bash
 pnpm i18n:sweep              # входит в gates: отказывает, если фраза мимо каталога
-pnpm feed:ingest             # собрать блок-лист из OpenPhish в feeds/phishing.json
-pnpm feed:refresh            # собрать и опубликовать одной командой (нужен ключ подписи)
+pnpm feed:ingest             # собрать блок-лист из OpenPhish в ~/.okolos/state/feeds/phishing.json
+pnpm feed:refresh            # собрать и опубликовать одной командой (ключ подписи, чекаут на origin/main)
 pnpm feed:agent              # поставить launchd-агента: обновляет фид каждые 12 часов
+pnpm feed:snapshot           # скопировать опубликованный фид в feeds/phishing.json — для коммита
 node tools/i18n-sweep.mjs --list   # каждая, с файлом и строкой
 ```
 
@@ -181,6 +182,8 @@ pnpm package:check   # те же проверки, без записи архи�
 Архивы уходят в `apps/extension/dist/release/okolos-<target>-<version>.zip`.
 Упаковка отказывается от сборки с тестовыми хуками, от манифеста, называющего
 отсутствующий файл, и от локали, не отвечающей на `__MSG__` из манифеста.
+После каждого архива она сама удаляет старые: остаются текущий и предыдущий на
+браузер (LC-15, `tools/release-prune.mjs`, тест `tools/release-prune.test.ts`).
 
 Прокси и подпись фидов — свои раннбуки:
 [worker-deploy.md](worker-deploy.md), [feed-signing.md](feed-signing.md).

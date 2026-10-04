@@ -101,7 +101,19 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
     },
 
     alarms: {
+      /**
+       * Creates the alarm only when it is missing or its period changed (LC-08).
+       *
+       * `alarms.create` replaces an alarm of the same name, and the background asks
+       * for its alarms on every wake-up — so an unconditional create reset every
+       * timer each time a page messaged the worker, and the daily inventory alarm
+       * on a browser in daily use never fired. Asking first keeps the countdown.
+       * A browser that cannot answer `get` still gets the alarm: a reset timer is
+       * the old cost, a missing one would be a schedule that never runs.
+       */
       async create(name: string, periodInMinutes: number): Promise<void> {
+        const existing = await api.alarms.get?.(name).catch(() => undefined)
+        if (existing && existing.periodInMinutes === periodInMinutes) return
         api.alarms.create(name, { periodInMinutes })
       },
       onFired(handler: (name: string) => void): void {
@@ -162,6 +174,14 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
         api.runtime.onInstalled.addListener((details) => {
           if (details.reason === 'install') handler()
         })
+      },
+
+      onBrowserStart(handler: () => void): void {
+        // Browser start, install, update and browser update: the only moments the
+        // installed rules can differ from what the stored feed says. A plain worker
+        // wake-up is not one of them, and rebuilding on every wake was LC-08's cost.
+        api.runtime.onStartup?.addListener(() => handler())
+        api.runtime.onInstalled.addListener(() => handler())
       },
 
       getUrl(path: string): string {
@@ -291,14 +311,33 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
         })
       },
 
+      async ruleCount(): Promise<number> {
+        const dnr = api.declarativeNetRequest
+        if (!dnr) return 0
+        return (await dnr.getDynamicRules()).length
+      },
+
       onBlocked(handler: (url: string) => void): void {
         // The navigation that is about to be redirected is the only place the
         // original URL is still visible: after the redirect the tab shows our
         // own page and the target is gone.
-        api.webNavigation?.onBeforeNavigate.addListener((details) => {
-          if (details.frameId !== 0) return
-          handler(details.url)
-        })
+        //
+        // Filtered to web pages, because the filter decides what wakes the worker
+        // (LC-08) and the rules only ever match http(s) main frames. It cannot be
+        // narrowed to the feed's hosts: a filter built from the stored feed would
+        // be registered after an asynchronous read, and a listener registered late
+        // misses the very event that woke the worker. Nor can the redirect carry
+        // the URL instead — the interstitial refuses its own query string so the
+        // warned-about address stays out of history (interstitial/index.ts). The
+        // handler is therefore kept to a memory write; the feed is read only when
+        // the interstitial asks.
+        api.webNavigation?.onBeforeNavigate.addListener(
+          (details) => {
+            if (details.frameId !== 0) return
+            handler(details.url)
+          },
+          { url: [{ schemes: ['http', 'https'] }] },
+        )
       },
     },
 

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error — a plain .mjs tool, typed by its use here
-import { SLOT, discover, quote, runnerPrefix, xml } from './feed-agent-credential.mjs'
+import { SLOT, discover, quote, runnerArgv, xml } from './feed-agent-credential.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
 const plist = () => readFileSync(path.join(root, 'tools/launchd/app.okolos.feed.plist'), 'utf8')
@@ -15,14 +15,20 @@ describe('the feed agent takes its token from the vault when there is one', () =
   it('puts --env before the positionals, which is the only order run accepts', () => {
     // `use_secret.py run` takes names as a remainder: a trailing --env is part
     // of the command and the run is refused (measured 2026-09-29).
-    const prefix = runnerPrefix({ python: '/opt/py/bin/python3', root: '/opt/obs/engine' })
-    expect(prefix).toBe(
-      "'/opt/py/bin/python3' '/opt/obs/engine/tools/use_secret.py' run --env prod okolos CLOUDFLARE_API_TOKEN --",
-    )
+    expect(runnerArgv({ python: '/opt/py/bin/python3', root: '/opt/obs engine' })).toEqual([
+      '/opt/py/bin/python3',
+      '/opt/obs engine/tools/use_secret.py',
+      'run',
+      '--env',
+      'prod',
+      'okolos',
+      'CLOUDFLARE_API_TOKEN',
+      '--',
+    ])
   })
 
-  it('is empty without a door, so the agent still runs on the old path', () => {
-    expect(runnerPrefix(null)).toBe('')
+  it('is null without a door, so the agent still runs on the environment path', () => {
+    expect(runnerArgv(null)).toBeNull()
   })
 
   it('keeps a path with a quote or a space one shell word', () => {
@@ -69,7 +75,10 @@ describe('the feed agent takes its token from the vault when there is one', () =
     })
   })
 
-  it('has a place in the committed plist, before the refresh', () => {
-    expect(plist()).toContain('cd REPO_PATH &amp;&amp; CREDENTIAL_RUNNER pnpm feed:refresh')
+  it('has a place in the committed plist — an environment variable, not the command line', () => {
+    // The job wraps only the publish step in it (tools/feed-job.mjs); on the
+    // command line it wrapped the whole refresh, ingest included (F2).
+    expect(plist()).toMatch(/<key>OKOLOS_SECRET_RUNNER<\/key>\s*<string>\{\{RUNNER\}\}<\/string>/)
+    expect(plist()).not.toContain('CREDENTIAL_RUNNER')
   })
 })
