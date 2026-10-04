@@ -133,14 +133,23 @@ function alive(pid: number): boolean {
 }
 
 describe('a run that hangs ends inside its watchdog (LC-03, F4)', () => {
+  // The fake ingest never ends, so a run whose watchdog does not fire never ends
+  // either, and fails on this test's timeout; a watchdog that fires late fails the
+  // bound below. What the test does not measure is how fast a loaded machine starts
+  // and reaps node processes: about 2.5 s alone, but at load ~34 (2026-10-04,
+  // `pnpm gates`) it overran vitest's default 5 s while passing alone three times
+  // out of three. So it gets room for scheduling, and the bound stays under it.
+  const WATCHDOG_MS = 1500
+  const ENDS_WITHIN_MS = WATCHDOG_MS + 13_500
+
   it('ends non-zero, kills the hung stage’s group, and writes its status', async () => {
     const w = world()
     const started = Date.now()
-    const { promise } = job(w, { watchdogMs: 1500, graceMs: 200 }, { FAKE_INGEST: 'hang' })
+    const { promise } = job(w, { watchdogMs: WATCHDOG_MS, graceMs: 200 }, { FAKE_INGEST: 'hang' })
     const record = await promise
 
     expect(record.exit).toBe(124)
-    expect(Date.now() - started).toBeLessThan(6000)
+    expect(Date.now() - started).toBeLessThan(ENDS_WITHIN_MS)
     expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'failed', stage: 'ingest', exit: 124 })
     expect(readStatus(w.paths.status)?.reason).toMatch(/watchdog/)
     const pid = Number(readFileSync(path.join(w.fake, 'ingest.pid'), 'utf8'))
@@ -149,7 +158,7 @@ describe('a run that hangs ends inside its watchdog (LC-03, F4)', () => {
     await new Promise((resolve) => setTimeout(resolve, 500))
     expect(calls(w.fake, 'ingest'), 'no retry starts after the watchdog fired').toHaveLength(1)
     expect(calls(w.fake, 'publish'), 'nothing starts after the watchdog fired').toEqual([])
-  })
+  }, 30_000)
 })
 
 describe('one run at a time (LC-03)', () => {
