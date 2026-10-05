@@ -112,7 +112,7 @@ never updated, which is the same drift this file exists to catch.)
   no marker box. No opt-in hook ships with the rule: there is no prose list on any of these
   screens, and vocabulary for a state the product cannot reach is what this project's gates
   refuse elsewhere
-- **Assets:** `apps/extension/icons`, drawn by `tools/icons.mjs`
+- **Assets:** `apps/extension/icons`, drawn by `tools/icons.mjs` — the gold ring and dot on the PassionCode.ai product tile; its SVG source is `docs/brand/marks/okolos-mark.svg`
 
 ## Web surfaces
 
