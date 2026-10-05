@@ -55,7 +55,8 @@ fails when a script is missing from it.
   `python3 docs/ux/lint.py` must pass after any UX change.
 - **Decisions** are [docs/adr/](docs/adr/); a record naming a missing file fails the build.
 - **Licence is the organisation's** — `AGPL-3.0-only OR LicenseRef-PassionCode-Commercial`:
-  open source under the GNU AGPL-3.0, commercial licence from contact@passioncode.ai
+  open source under the GNU AGPL-3.0, commercial licence through https://passioncode.ai/business/
+  (commercial@passioncode.ai)
   ([LICENSING.md](LICENSING.md), [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md), ADR-0016).
   Earlier terms are named only in the history sentence of `LICENSING.md` and `README.md`;
   `tools/licensing.test.ts` fails any other surface that presents them as current. Every new
