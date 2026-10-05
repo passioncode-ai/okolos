@@ -100,7 +100,7 @@ Phishing Army. Infostealer intelligence from Hudson Rock's community API.
 ## License
 
 Open source under the [GNU AGPL-3.0](LICENSE). A [commercial license](COMMERCIAL-LICENSE.md) is
-available for use that does not meet the AGPL's terms — contact@passioncode.ai.
+available for use that does not meet the AGPL's terms — [passioncode.ai/business](https://passioncode.ai/business/).
 Versions before this licence were released under PolyForm Noncommercial or Internal Use: commits
 after `5a8e490` up to and including `0557023`. Commits up to and including `5a8e490` were
 released under AGPL-3.0-only (the engine and `corpora/`, in the last of them, under Apache-2.0).

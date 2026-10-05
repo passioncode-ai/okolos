@@ -73,7 +73,7 @@ Okolos ищет такой текст на странице, обезврежи�
 Что уходит с устройства и почему: https://okolos-proxy.sergeysheleg4.workers.dev/privacy
 
 Исходный код открыт под GNU AGPL-3.0. Бесплатно для людей и компаний; лицензия
-для закрытых продуктов — по договорённости: contact@passioncode.ai.
+для закрытых продуктов — по договорённости: https://passioncode.ai/business/
 ```
 
 ### en
@@ -128,7 +128,7 @@ looked for on any page. The answer to that is not a promise but a screen.
 What leaves the device and why: https://okolos-proxy.sergeysheleg4.workers.dev/privacy
 
 The source is open under the GNU AGPL-3.0. Free for people and companies; a
-licence for closed-source products by agreement: contact@passioncode.ai.
+licence for closed-source products by agreement: https://passioncode.ai/business/
 ```
 
 ## Категория и языки
