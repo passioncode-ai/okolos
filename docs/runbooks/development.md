@@ -145,7 +145,7 @@ Firefox-прогон ищет бинарник в кэше Playwright, инач�
 живёт до следующей генерации, а гейт ловит расхождение раньше:
 
 ```bash
-node tools/icons.mjs         # apps/extension/icons/*.png
+node tools/icons.mjs         # apps/extension/icons/*.png и docs/brand/marks/*
 node tools/tokens.mjs        # apps/extension/src/tokens.generated.css
 node tools/privacy-page.mjs  # страница /privacy воркера из docs/privacy.md
 pnpm wireframes              # docs/ux/wireframes/*.md из рендереров
