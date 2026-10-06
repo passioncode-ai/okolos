@@ -184,7 +184,7 @@ pnpm exec vitest run tools/icons.test.ts tools/manifest.test.ts
 
 ## Открытость
 
-- Лицензия — как у всех репозиториев PassionCode.ai: `AGPL-3.0-only OR LicenseRef-PassionCode-Commercial`. Код открыт (open source, GNU AGPL-3.0), бесплатно для всех, в том числе в компаниях; использование вне условий AGPL — закрытый продукт или изменённый сервис без публикации кода — по коммерческой лицензии, contact@passioncode.ai. Карта — `LICENSING.md`, решение — ADR-0016, держит `tools/licensing.test.ts`.
+- Лицензия — как у всех репозиториев PassionCode.ai: `AGPL-3.0-only OR LicenseRef-PassionCode-Commercial`. Код открыт (open source, GNU AGPL-3.0), бесплатно для всех, в том числе в компаниях; использование вне условий AGPL — закрытый продукт или изменённый сервис без публикации кода — по коммерческой лицензии: заявка на https://passioncode.ai/business/ или commercial@passioncode.ai. Карта — `LICENSING.md`, решение — ADR-0016, держит `tools/licensing.test.ts`.
 - Сторонние данные и их условия — `docs/licences.md`, проверяется
   `tools/licensing.test.ts`.
 - Публичный ключ проверки списков вкомпилирован в расширение; приватная половина

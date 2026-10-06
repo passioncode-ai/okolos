@@ -49,6 +49,43 @@ const ALLOWED_PERMISSIONS = [
  */
 const CHROME_ONLY_PERMISSIONS: readonly string[] = []
 
+/**
+ * What belongs to the agents' extension and never to this one (ADR-0018).
+ *
+ * Okolos protects a person; Okolos Bridge lets agents into that person's browser.
+ * `debugger` cannot be an optional permission, so the day it lands in this manifest
+ * every installed copy shows "read and change all your data" again — on a security
+ * product, the worst signal there is. The bridge is a second extension in this
+ * repository instead, and these keys are the line between the two.
+ *
+ * `externally_connectable` is on the list as a key, not a permission: the two
+ * extensions meet through the local agent, never page-to-extension or
+ * extension-to-extension, which is the channel ClaudeBleed went through.
+ */
+const BRIDGE_ONLY_PERMISSIONS = ['debugger', 'nativeMessaging', 'tabGroups', 'sidePanel', 'history', 'bookmarks']
+const BRIDGE_ONLY_KEYS = ['externally_connectable', 'side_panel']
+
+function bridgeSurfaceIn(m: Record<string, unknown>): string[] {
+  const asked = [
+    ...((m.permissions as string[] | undefined) ?? []),
+    ...((m.optional_permissions as string[] | undefined) ?? []),
+  ]
+  return [...BRIDGE_ONLY_PERMISSIONS.filter((p) => asked.includes(p)), ...BRIDGE_ONLY_KEYS.filter((k) => k in m)]
+}
+
+describe('the line between Okolos and Okolos Bridge (ADR-0018)', () => {
+  for (const browser of ['chrome', 'firefox'] as const) {
+    it(`${browser}: the people's extension carries none of the bridge's permissions or keys`, () => {
+      expect(bridgeSurfaceIn(manifest(browser)), 'this belongs to Okolos Bridge, see docs/adr/0018').toEqual([])
+    })
+  }
+
+  it('would notice the bridge creeping in — the check is not blind', () => {
+    const crept = { permissions: ['storage', 'debugger'], optional_permissions: ['history'], externally_connectable: {} }
+    expect(bridgeSurfaceIn(crept)).toEqual(['debugger', 'history', 'externally_connectable'])
+  })
+})
+
 describe('what the extension asks for', () => {
   for (const browser of ['chrome', 'firefox'] as const) {
     it(`${browser}: requests only the permissions the skeleton needs`, () => {

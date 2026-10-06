@@ -21,7 +21,7 @@ a document stops saying this.
 | Use Okolos yourself, study it, change it | yes | AGPL-3.0 |
 | Install it across your company, or run its Worker for your own team | yes | AGPL-3.0 |
 | Share your changed version, or run a changed Worker as a service for others | yes, if you publish your changes' source under the AGPL | AGPL-3.0 |
-| Build it — or its code, the engine included — into a closed-source product, or run a changed hosted service without publishing its source | **no — ask first** | a commercial licence: **contact@passioncode.ai** |
+| Build it — or its code, the engine included — into a closed-source product, or run a changed hosted service without publishing its source | **no — ask first** | a commercial licence: **[passioncode.ai/business](https://passioncode.ai/business/)** (commercial@passioncode.ai) |
 
 The summary is not the licence; the texts in [LICENSE](LICENSE) and
 [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md) govern.
@@ -52,4 +52,5 @@ Contributions are accepted under [CLA.md](CLA.md), the agreement every PassionCo
 uses: you keep your copyright and let the maintainer offer your contribution under these and
 commercial terms. Opening a pull request is the agreement; there is nothing to tick.
 
-Copyright (c) 2026 Siarhei Sheleh. Commercial licences and questions: contact@passioncode.ai.
+Copyright (c) 2026 Siarhei Sheleh. Commercial licences: [passioncode.ai/business](https://passioncode.ai/business/)
+or commercial@passioncode.ai. Other questions: contact@passioncode.ai.

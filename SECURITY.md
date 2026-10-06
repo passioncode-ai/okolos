@@ -28,7 +28,7 @@ GitHub](https://github.com/passioncode-ai/okolos/security/advisories/new)
 
 **Награды нет:** программы bug bounty у проекта нет. Код открыт под GNU AGPL-3.0, пользоваться им
 бесплатно; для использования вне условий AGPL есть коммерческая лицензия —
-contact@passioncode.ai ([LICENSING.md](LICENSING.md)). Ваше имя попадёт в advisory и в
+https://passioncode.ai/business/ ([LICENSING.md](LICENSING.md)). Ваше имя попадёт в advisory и в
 CHANGELOG, если вы не против.
 
 ## Что считается уязвимостью

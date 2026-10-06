@@ -51,7 +51,10 @@ describe('licence', () => {
     expect(digest, 'LICENSE is not the unmodified AGPL-3.0 text').toBe(AGPL_SHA256)
     const offer = read('COMMERCIAL-LICENSE.md')
     expect(offer).toContain(EXPRESSION)
-    expect(offer).toContain('contact@passioncode.ai')
+    // Operator decision 2026-10-05: every commercial path leads to the business form;
+    // commercial@ is the commercial contact, contact@ stays the security address.
+    expect(offer).toContain('https://passioncode.ai/business/')
+    expect(offer).toContain('commercial@passioncode.ai')
     expect(offer).toContain('Copyright (c) 2026 Siarhei Sheleh')
   })
 
@@ -87,7 +90,7 @@ describe('licence', () => {
     expect(existsSync(path.join(root, 'docs/adr/0016-okolos-returns-to-agpl-with-a-commercial-licence.md'))).toBe(true)
     expect(read('CLA.md').startsWith('# Contributor License Agreement\n')).toBe(true)
     expect(read('README.md')).toMatch(/^## License$/m)
-    expect(read('README.md')).toMatch(/GNU AGPL-3\.0[\s\S]{0,400}contact@passioncode\.ai/)
+    expect(read('README.md')).toMatch(/GNU AGPL-3\.0[\s\S]{0,400}https:\/\/passioncode\.ai\/business\//)
   })
 
   /**
@@ -117,6 +120,31 @@ describe('licence', () => {
       const text = withoutHistory(file, read(file))
       expect(text, `${file} presents the old terms as current`).not.toMatch(oldTerms)
       expect(text, `${file} denies that Okolos is open source`).not.toMatch(denial)
+    }
+  })
+
+  /**
+   * Operator decision 2026-10-05: every commercial path leads to the request form
+   * passioncode.ai/business; contact@ stays the security and general address, so a
+   * commercial pointer to it is the old wording.
+   */
+  it('points every commercial path to the business form, not to contact@', () => {
+    const offers = [
+      'README.md',
+      'AGENTS.md',
+      'LICENSING.md',
+      'docs/store/listing.md',
+      'docs/brand/facts.md',
+      'apps/proxy/src/router.ts',
+    ]
+    const oldPointer =
+      /(commercial licen[cs]e|коммерческ\S* лицензи\S*|closed-source products|закрытых продуктов)[^.\n]{0,60}contact@passioncode\.ai/i
+    expect('a commercial licence: **contact@passioncode.ai**').toMatch(oldPointer)
+    expect('лицензия для закрытых продуктов — contact@passioncode.ai').toMatch(oldPointer)
+    for (const file of offers) {
+      const text = read(file).replace(/\s+/g, ' ')
+      expect(text, `${file} still sends a commercial request to contact@`).not.toMatch(oldPointer)
+      expect(text, `${file} names the business form`).toContain('passioncode.ai/business')
     }
   })
 })
