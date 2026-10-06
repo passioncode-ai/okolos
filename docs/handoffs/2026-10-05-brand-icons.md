@@ -32,9 +32,9 @@ the generator able to draw Okolos Bridge too.
 
 ## Open
 
-- **The Okolos mark and the Observatory mark are close relatives.** Both are a gold ring around a
-  dot. Okolos is centred and has a larger dot. Observatory is off-centre and has a satellite.
-  Whether two products may share the ring is a brand decision for the operator.
+- ~~**The Okolos mark and the Observatory mark are close relatives.**~~ Decided 2026-10-06 by the
+  operator: change the Okolos sign. It is now a closed shield around the dot (same tile, gold,
+  sizes and Bridge bar); `tools/icons.mjs`, `docs/brand/facts.md` → «Знак».
 - **Okolos Bridge has no app yet.** Its ADR ("agents get their own extension") is on the unmerged
   branch `docs/agent-browser-bridge`, and it says only "a new app beside `apps/extension`". The
   Bridge PNGs are therefore in `docs/brand/marks/`. When the app exists, add its icon directory
