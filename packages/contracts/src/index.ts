@@ -45,3 +45,22 @@ export type {
   GateReason,
   UnresolvedFinding,
 } from './gate.js'
+
+export type {
+  BridgeError,
+  BridgeRefusal,
+  BridgeResult,
+  BridgeVerb,
+  TaskProfile,
+  TaskScope,
+} from './bridge.js'
+export {
+  BRIDGE_REFUSALS,
+  BRIDGE_VERBS,
+  REFUSAL_RETRYABLE,
+  SCOPE_LIMITS,
+  inScope,
+  originOf,
+  refuse,
+  validateScope,
+} from './bridge.js'

@@ -26,6 +26,9 @@
       "path": "packages/core-sanitizer"
     },
     {
+      "path": "packages/core-snapshot"
+    },
+    {
       "path": "packages/model"
     },
     {

@@ -44,7 +44,11 @@ const rel = (p: string) => path.relative(root, p)
  * is not a formality: it is the sentence someone writes instead of noticing
  * their feature never shipped.
  */
-const EXEMPT: ReadonlyArray<{ readonly file: string; readonly why: string }> = []
+const EXEMPT: ReadonlyArray<{ readonly file: string; readonly why: string }> = [
+  { file: 'apps/extension/src/agent-probe.ts', why: 'Okolos Bridge Б1: the daemon apps/agent (module K3, B-142) is the caller and is not written yet. Branch bridge/b1 does not merge to main until K3 removes this row' },
+  { file: 'packages/core-snapshot/src/index.ts', why: 'Okolos Bridge Б1: the daemon apps/agent (module K3, B-142) is the caller and is not written yet. Branch bridge/b1 does not merge to main until K3 removes this row' },
+  { file: 'packages/core-snapshot/src/snapshot.ts', why: 'Okolos Bridge Б1: the daemon apps/agent (module K3, B-142) is the caller and is not written yet. Branch bridge/b1 does not merge to main until K3 removes this row' },
+]
 
 // ---------------------------------------------------------------------------
 // Entry points, and the evidence that each one ships.
