@@ -53,13 +53,17 @@ describe('a bounded child', () => {
 
   it('kills the whole group at the deadline, a SIGTERM-ignoring grandchild included', async () => {
     const started = Date.now()
-    const result = await runBounded(node, ['-e', STUBBORN], { timeoutMs: 800, graceMs: 300 })
+    // 3 s, not 800 ms: the deadline has to fall *after* the child has started and
+    // printed its grandchild's pid, and at a load average of 480 (measured
+    // 2026-10-06) starting node took longer than 800 ms — the run then failed on an
+    // empty stdout, a fact about the machine and not about the kill.
+    const result = await runBounded(node, ['-e', STUBBORN], { timeoutMs: 3000, graceMs: 300 })
     const pid = Number(/grandchild (\d+)/.exec(result.stdout)?.[1])
 
     expect(result.timedOut).toBe(true)
     expect(Number.isInteger(pid) && pid > 0, `printed: ${result.stdout}`).toBe(true)
     expect(await gone(pid), `grandchild ${pid} survived as an orphan`).toBe(true)
-    expect(Date.now() - started, 'the deadline is a deadline').toBeLessThan(5000)
+    expect(Date.now() - started, 'the deadline is a deadline').toBeLessThan(10000)
   })
 
   it('leaves no grandchild behind when the child exits on its own', async () => {
