@@ -50,7 +50,7 @@ const ALLOWED_PERMISSIONS = [
 const CHROME_ONLY_PERMISSIONS: readonly string[] = []
 
 /**
- * What belongs to the agents' extension and never to this one (ADR-0016).
+ * What belongs to the agents' extension and never to this one (ADR-0018).
  *
  * Okolos protects a person; Okolos Bridge lets agents into that person's browser.
  * `debugger` cannot be an optional permission, so the day it lands in this manifest
@@ -73,10 +73,10 @@ function bridgeSurfaceIn(m: Record<string, unknown>): string[] {
   return [...BRIDGE_ONLY_PERMISSIONS.filter((p) => asked.includes(p)), ...BRIDGE_ONLY_KEYS.filter((k) => k in m)]
 }
 
-describe('the line between Okolos and Okolos Bridge (ADR-0016)', () => {
+describe('the line between Okolos and Okolos Bridge (ADR-0018)', () => {
   for (const browser of ['chrome', 'firefox'] as const) {
     it(`${browser}: the people's extension carries none of the bridge's permissions or keys`, () => {
-      expect(bridgeSurfaceIn(manifest(browser)), 'this belongs to Okolos Bridge, see docs/adr/0016').toEqual([])
+      expect(bridgeSurfaceIn(manifest(browser)), 'this belongs to Okolos Bridge, see docs/adr/0018').toEqual([])
     })
   }
 

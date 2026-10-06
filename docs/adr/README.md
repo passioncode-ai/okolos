@@ -26,3 +26,5 @@
 | [0015](0015-okolos-takes-the-organisations-licence.md) | ~~Okolos — под лицензией организации: PolyForm Noncommercial или Internal Use, коммерческая по запросу~~ — заменено ADR-0016 | — |
 | [0016](0016-okolos-returns-to-agpl-with-a-commercial-licence.md) | Okolos returns to the AGPL-3.0, with a commercial licence (Fabric ADR-0092) | `tools/licensing.test.ts`, `apps/proxy/src/landing.test.ts` |
 | [0017](0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md) | The feed agent publishes from a pinned checkout and counts from what is served (lifecycle LC-02/03/12/14) | `tools/feed-job.test.ts`, `tools/publish-feed.test.ts`, `tools/ingest.test.ts` |
+| [0018](0018-agents-get-their-own-extension.md) | У агентов — своё расширение, Okolos Bridge, в этом же репозитории | `tools/manifest.test.ts` |
+| [0019](0019-page-content-never-reaches-our-infrastructure.md) | Содержимое страниц не попадает на нашу инфраструктуру; агенту — только разрешённое задачей | `packages/net/src/destinations.test.ts` |

@@ -31,7 +31,7 @@ leaked passwords, and does it locally.
 | Unit tests and the docs/runbook gates; two of them read `dist/`, so on a fresh clone run `pnpm build` first | `pnpm build && pnpm test` |
 | Everything the pre-push hook runs | `pnpm gates` |
 | End-to-end, Chromium / Firefox | `pnpm test:e2e` / `pnpm test:e2e:firefox` |
-| MCP (register + proving call) | none: Okolos neither exposes nor uses an MCP server, and none is planned yet (fabric-workspace `knowledge/products.md` → MCP gaps) |
+| MCP (register + proving call) | none yet: Okolos exposes no MCP server today. The MCP door of Okolos Agent (the agents' bridge into the browser) is decided, not built — ADR-0018, strategy §8.6; fabric-workspace `knowledge/products.md` → MCP gaps |
 
 The full list, and why each command exists, is
 [docs/runbooks/development.md](docs/runbooks/development.md); `tools/runbook.test.ts`
