@@ -102,6 +102,14 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 - **Success metric:** a message carrying a forged sender, a disguised link or a dangerous attachment is named as such before the user acts on it, with every check computed locally by default. **[assumption]** — no measurement of mail-borne scam against this corpus exists yet; the browser-side numbers in [evidence/01](../evidence/01-threat-landscape.md) are about pages, not messages.
 - **Why this is not JTBD-02.** JTBD-02 is about a page or a link the user *chose to open*. Mail arrives uninvited, is read in a program that is not the browser, and carries two things a page does not: a claimed sender whose authenticity the receiving server already assessed, and files attached to the artefact itself. A job that starts with "when I'm about to open a link" cannot carry it.
 
+### JTBD-10: Let my agents work in my browser without handing them the keys
+- **Statement:** When I give an AI agent a job that lives behind my logins — read a cabinet, file a form, check what a page says — I want it to work in my own browser through a door that shows it only what the job needs, cleans what it reads and stops at anything that spends, sends, deletes or signs in, so that delegating to an agent does not mean trusting every page it will read.
+- **Personas:** P-01
+- **Type:** functional
+- **Forces:** push: agents can already drive a browser, but through a cloud relay tied to one vendor, a copy of my cookies in someone's cloud, or a debug port any process on my machine can reach; pull: one local door every agent I use goes through, with the shield this product already is standing in it; anxiety: an agent with my sessions and a poisoned page is one instruction away from sending, paying or deleting as me; habit: handing an agent a blank browser and logging in for it by hand.
+- **Success metric:** on a page carrying planted instructions, an agent working through the door performs **no** sending, paying, deleting or signing-in action without the person, and **no** credential value reaches the agent — measured by the bridge's own end-to-end suite, not asserted. **[assumption]** until Б2 ships the actions; Б1 measures the read side.
+- **Why this is not JTBD-01.** JTBD-01 protects the person's AI from a page the person opened. Here the agent opens the pages, holds the person's sessions and acts — the threat is not only what it reads but what it then does in the person's name, and the product is the door it acts through rather than a bystander that notices.
+
 ## Customer journeys
 
 ### JRN-01: P-01 — keep my AI from being hijacked (JTBD-01)
@@ -146,6 +154,17 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 | 5 | Verdict | Reads what was found | verdict output | 4 | A score explains nothing and cannot be argued with | Name each signal, and name every check that did **not** run |
 | 6 | Attachment | Wonders whether the file is safe | the attachment | 2 | The only way most people check a file is to open it — which is the attack | Judge it as bytes, in a jailed process, and never hand it to an application |
 | 7 | After | Deletes it, or acts on it knowingly | Mail.app | 4 | — | The verdict is recorded, so "did I already check this one" has an answer |
+
+### JRN-05: P-01 — an agent does a job in my browser (JTBD-10)
+| # | Stage | User action | Touchpoint | Emotion (1-5) | Pain | Opportunity |
+|---|-------|------------|------------|---------------|------|-------------|
+| 1 | Connect | Lets an agent use the browser for the first time | agent's terminal, the bridge's prompt | 2 | Every bridge today asks for "read and change all your data" once and never again, for any agent that asks | One pairing per agent, confirmed by the person with a matching code, revocable, scoped |
+| 2 | Hand over | Gives the agent a job | the agent | 3 | The agent gets the whole browser: every tab, every login | The job carries its own reach: which sites to read, which to write, for how long |
+| 3 | Working | Keeps working in their own apps | own apps | 3 | Agent windows jump in front and type into whatever has focus | The agent works in its own window, in the background, and never takes the focus |
+| 4 | Reading | — (the agent reads pages) | the agent's window | 3 | Pages carry instructions written for the agent; the agent reads them as orders | What the agent reads is cleaned first, and the page's verdict travels with it |
+| 5 | Decision | Is asked about something that matters | the bridge's panel | 2 | Either asked about everything, or about nothing | Asked only for money, sending, deleting, signing in, sharing — in a panel a page cannot draw |
+| 6 | Hand-off | Logs in, solves a CAPTCHA, takes over | the agent's window | 3 | The agent fights the CAPTCHA, or asks for the password in chat | The task pauses, the person does that one step, the task resumes; the agent never sees the secret |
+| 7 | After | Wants to know what happened, and wants the machine back | journal, machine | 4 | No record of what the agent did as me; leftover browser processes eat the memory | Every step recorded before it happened; the task's windows and processes gone when it ends |
 
 ## User stories
 
@@ -382,6 +401,60 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
   - Given the reviewer is unavailable for any reason, when a message is checked, then the deterministic verdict still stands and the output says the review did not run.
   - Given any reviewer, when it answers, then it cannot raise the severity above what the deterministic checks found.
 - **Priority:** must
+- **Status:** proposed
+
+### ST-027: Connect an agent once, and be able to take it back
+- **Story:** As P-01, I want each agent to be paired with my browser once, by me, with a code I can compare, so that no process on my machine can drive my browser just by asking.
+- **Traces:** JTBD-10, JRN-05/#1
+- **Acceptance criteria:**
+  - Given an agent that has never connected, when it asks to use the browser, then nothing is reachable until the person confirms a pairing in the bridge's own panel, comparing a code shown in both places.
+  - Given a request without the pairing's key, or from an origin that is not the bridge, when it reaches the local door, then it is refused and the refusal is recorded.
+  - Given a paired agent, when the person revokes it, then its next call is refused and any task it holds stops.
+- **Priority:** must
+- **Status:** proposed
+
+### ST-028: An agent reads my logged-in pages, cleaned, without disturbing me
+- **Story:** As P-01, I want an agent to read pages behind my logins in its own background window, with hidden instructions removed and the page's verdict attached, so that I can delegate reading without the page steering the agent or the agent stealing my focus.
+- **Traces:** JTBD-10, JTBD-01, JRN-05/#2, JRN-05/#3, JRN-05/#4
+- **Acceptance criteria:**
+  - Given a task with its sites named, when the agent asks for a site outside them, then it is refused with a reason it can act on.
+  - Given a page with hidden instructions from the corpus, when the agent takes a snapshot, then none of them is in what it receives and the finding is attached.
+  - Given a page with a password, card or one-time-code field, when the agent reads it, then it sees the field and never its value.
+  - Given the person working in another app, when the agent opens, navigates and reads, then the person's app stays in front.
+  - Given a very large page, when the agent asks for a snapshot, then it receives it in parts it can page through, never a single answer too large to use.
+- **Priority:** must
+- **Status:** proposed
+
+### ST-029: Anything that spends, sends, deletes or signs in comes to me
+- **Story:** As P-01, I want the bridge itself — not the agent's description of what it is doing — to decide which actions need me, so that a page that talked the agent into something cannot also talk its way past me.
+- **Traces:** JTBD-10, JRN-05/#5
+- **Acceptance criteria:**
+  - Given a payment, a message being sent, a deletion, a sharing change or a sign-in, when the agent tries it, then it waits for the person in a panel the page cannot draw or click.
+  - Given a finding on the page, when the agent tries any action that writes, then that action waits for the person for the rest of the task.
+  - Given the person says no, or does not answer, when the wait ends, then the action does not happen and the agent is told it was refused by policy, not that it failed.
+  - Given the person chose "always for this site and this kind of action", when the agent repeats it, then it goes through, and the rule is listed where the person can withdraw it.
+- **Priority:** must
+- **Status:** proposed
+
+### ST-030: Take over, hand back, or stop everything
+- **Story:** As P-01, I want to do a login, a CAPTCHA or a second factor myself in the agent's window and then hand the task back, and to stop every agent at once, so that the agent never needs my secrets and never outruns me.
+- **Traces:** JTBD-10, JRN-05/#6
+- **Acceptance criteria:**
+  - Given a login wall, a CAPTCHA or a code prompt, when the agent meets it, then the task pauses and the person is told, and the agent is not offered a way round it.
+  - Given the person finished the step, when they hand back, then the task resumes from the same page.
+  - Given the stop control, when the person uses it, then no further action runs — including actions already queued — and every agent's access is suspended until the person resumes it.
+- **Priority:** must
+- **Status:** proposed
+
+### ST-031: The machine is clean after the agents are done
+- **Story:** As P-01, I want browser processes and profiles that agents left behind found, explained and removed — and agents able to clean up after themselves — so that delegating to agents does not slowly eat my memory and disk.
+- **Traces:** JTBD-10, JRN-05/#7
+- **Acceptance criteria:**
+  - Given an automation browser whose launcher is gone, with no debugging client, idle and on a temporary profile, when the cleaner runs, then it is stopped and the reason is recorded.
+  - Given a browser run by the operating system's service manager, a server of a live agent session, or the person's own browser, when the cleaner runs, then it is not touched.
+  - Given a deep scan, when the person runs it, then every item shows its size, owner, age and why it can go, and nothing is removed until chosen.
+  - Given an agent that finished its task, when it asks to clean up, then its own windows, processes and temporary profiles are gone, and another session's are not.
+- **Priority:** should
 - **Status:** proposed
 
 ## Assumptions register

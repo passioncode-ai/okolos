@@ -1,0 +1,169 @@
+{
+  "measuredAt": "2026-10-06T10:23:19.750Z",
+  "chrome": "Google Chrome 154.0.8037.98",
+  "chromeForTesting": "Google Chrome for Testing 154.0.8037.57",
+  "infobar": [
+    {
+      "label": "stable, pipe, agent profile",
+      "flags": [],
+      "frameHeight": 87,
+      "extensionLoaded": null,
+      "debuggerAttached": null
+    },
+    {
+      "label": "stable, pipe + --enable-automation (positive control)",
+      "flags": [
+        "--enable-automation"
+      ],
+      "frameHeight": 143,
+      "extensionLoaded": null,
+      "debuggerAttached": null
+    },
+    {
+      "label": "stable, --load-extension (expected ignored since 137)",
+      "flags": [
+        "--load-extension=<ext>",
+        "--disable-extensions-except=<ext>"
+      ],
+      "frameHeight": 87,
+      "extensionLoaded": false,
+      "debuggerAttached": false
+    },
+    {
+      "label": "CfT, pipe",
+      "flags": [],
+      "frameHeight": 143,
+      "extensionLoaded": null,
+      "debuggerAttached": null
+    },
+    {
+      "label": "CfT, debugger extension attached",
+      "flags": [
+        "--load-extension=<ext>",
+        "--disable-extensions-except=<ext>"
+      ],
+      "frameHeight": 143,
+      "extensionLoaded": true,
+      "debuggerAttached": true
+    },
+    {
+      "label": "CfT, debugger extension + --silent-debugger-extension-api",
+      "flags": [
+        "--silent-debugger-extension-api",
+        "--load-extension=<ext>",
+        "--disable-extensions-except=<ext>"
+      ],
+      "frameHeight": 143,
+      "extensionLoaded": true,
+      "debuggerAttached": true
+    }
+  ],
+  "cdp": {
+    "clicksSeenByPage": [
+      true
+    ],
+    "inputIsTrusted": true,
+    "axNodesOnFixture": 6,
+    "backgroundTabClicks": [],
+    "backgroundTabClickTrusted": false,
+    "backgroundTabVisibility": "hidden",
+    "backgroundTabClicksWithFocusEmulation": []
+  },
+  "snapshots": [
+    {
+      "url": "https://en.wikipedia.org/wiki/Google_Chrome",
+      "axNodes": 28277,
+      "rawBytes": 10508257,
+      "rawChunks": 11,
+      "compactLines": 7749,
+      "compactBytes": 264022,
+      "compactChunks": 1,
+      "approxCompactTokens": 66006,
+      "msToSnapshot": 2652
+    },
+    {
+      "url": "https://github.com/microsoft/playwright-mcp",
+      "axNodes": 3596,
+      "rawBytes": 1412832,
+      "rawChunks": 2,
+      "compactLines": 1038,
+      "compactBytes": 40449,
+      "compactChunks": 1,
+      "approxCompactTokens": 10112,
+      "msToSnapshot": 142
+    },
+    {
+      "url": "https://news.ycombinator.com/",
+      "axNodes": 1634,
+      "rawBytes": 633461,
+      "rawChunks": 1,
+      "compactLines": 676,
+      "compactBytes": 18807,
+      "compactChunks": 1,
+      "approxCompactTokens": 4702,
+      "msToSnapshot": 46
+    },
+    {
+      "url": "https://www.bbc.com/news",
+      "axNodes": 1547,
+      "rawBytes": 589291,
+      "rawChunks": 1,
+      "compactLines": 370,
+      "compactBytes": 21368,
+      "compactChunks": 1,
+      "approxCompactTokens": 5342,
+      "msToSnapshot": 47
+    }
+  ],
+  "focus": [
+    {
+      "moment": "before launch",
+      "frontmost": "Orca"
+    },
+    {
+      "moment": "3 s after launch (default startup window)",
+      "frontmost": "Google Chrome"
+    },
+    {
+      "moment": "after navigating the startup window",
+      "frontmost": "Google Chrome"
+    },
+    {
+      "moment": "after Target.createTarget background:true",
+      "frontmost": "Google Chrome"
+    },
+    {
+      "moment": "after four navigations in the background tab",
+      "frontmost": "Telegram"
+    },
+    {
+      "moment": "the person's app put back in front",
+      "frontmost": "Orca"
+    },
+    {
+      "moment": "after background tab + navigate + click + snapshot, window already open",
+      "frontmost": "Telegram"
+    },
+    {
+      "moment": "after a click with focus emulation in the background tab",
+      "frontmost": "Telegram"
+    },
+    {
+      "moment": "3 s after launch with --no-startup-window",
+      "frontmost": "Orca"
+    },
+    {
+      "moment": "after Target.createTarget newWindow+background and navigate",
+      "frontmost": "Telegram"
+    },
+    {
+      "moment": "window visible to the person",
+      "frontmost": "visible"
+    }
+  ],
+  "notCovered": [
+    "Chrome 155 stable: this machine had 154 at measurement time",
+    "enterprise policies (CommandLineFlagSecurityWarningsEnabled, blocked hosts, DLP): not set on the operator machine on purpose",
+    "frame height is a proxy for an infobar; the positive controls are what make it readable"
+  ]
+}
