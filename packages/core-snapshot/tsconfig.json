@@ -1,0 +1,7 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "dist" },
+  "include": ["src/**/*.ts"],
+  // Tests are not part of a built package (same reason as core-gate).
+  "exclude": ["src/**/*.test.ts"]
+}

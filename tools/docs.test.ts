@@ -59,9 +59,19 @@ describe('the map covers the territory', () => {
     }
   })
 
-  it('counts them correctly', () => {
-    expect(readme).toContain(`${members('packages').length} пакетов`)
-    expect(readme).toContain(`${members('apps').length} приложения`)
+  it('counts them correctly, in the form Russian puts the number in', () => {
+    // «21 пакетов» is not Russian: the noun follows the number (1 пакет, 2 пакета,
+    // 5 пакетов, 21 пакет). A gate that demanded one fixed form made the map
+    // ungrammatical the day the count stopped ending in 0 or 5–9.
+    expect(readme).toContain(`${members('packages').length} ${russianPlural(members('packages').length, ['пакет', 'пакета', 'пакетов'])}`)
+    expect(readme).toContain(`${members('apps').length} ${russianPlural(members('apps').length, ['приложение', 'приложения', 'приложений'])}`)
+  })
+
+  it('declines the noun the way Russian does', () => {
+    const forms: [string, string, string] = ['пакет', 'пакета', 'пакетов']
+    expect([1, 2, 5, 11, 12, 21, 22, 25, 111].map((n) => russianPlural(n, forms))).toEqual([
+      'пакет', 'пакета', 'пакетов', 'пакетов', 'пакетов', 'пакет', 'пакета', 'пакетов', 'пакетов',
+    ])
   })
 })
 
@@ -831,3 +841,13 @@ describe('the page a stranger reads is prose, not source', () => {
     expect(paragraphs).toBeLessThan(sourceLines / 2)
   })
 })
+
+/** The form of a Russian noun after a number: one, few, many. */
+function russianPlural(n: number, [one, few, many]: [string, string, string]): string {
+  const mod100 = n % 100
+  if (mod100 >= 11 && mod100 <= 14) return many
+  const mod10 = n % 10
+  if (mod10 === 1) return one
+  if (mod10 >= 2 && mod10 <= 4) return few
+  return many
+}

@@ -192,6 +192,8 @@ importers:
         specifier: workspace:*
         version: link:../contracts
 
+  packages/core-snapshot: {}
+
   packages/core-traps: {}
 
   packages/i18n: {}
