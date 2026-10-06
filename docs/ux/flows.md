@@ -693,3 +693,84 @@ flowchart TD
 - **Only new messages, and that is a default with a reason.** The store on a working machine holds tens of thousands of messages — 82 595 on the machine this was designed against, measured 2026-09-11. A watcher that judged the archive on first start would spend hours and produce a backlog nobody asked for. Reviewing what is already there is a separate, explicit act.
 - **A partial message is not judged.** The client writes a message before its attachments have all arrived. Judging the half that exists would produce a verdict about a message that does not exist yet, and the attachment checks would report "did not run" for files that are simply still coming.
 
+### FLW-21: Connect an agent to the browser
+- **Traces:** ST-027 (JTBD-10, JRN-05/#1)
+- **Goal:** an agent the person chose can use the browser, and nothing else on the machine can
+- **Entry points:** an agent's first call to the local door of Okolos Agent; the bridge's panel
+- **Success exit:** the agent is paired, listed with what it may reach, and revocable in one place
+- **Task analysis:**
+  1. See which agent is asking
+  2. Compare the code it shows with the code the panel shows
+  3. Allow, or refuse
+- **Flow:**
+
+```mermaid
+flowchart TD
+  A[Agent calls the local door] --> K{Paired key?}
+  K -->|yes| OK[Request handled under the agent's scope]
+  K -->|no| P[Panel: agent X asks to connect, code 1234]
+  P -->|person confirms, codes match| R[Key issued to the agent, stored in the keychain]
+  P -->|person refuses or no answer| N[Refused and recorded]
+  R --> OK
+  K -->|wrong origin, no key| N
+```
+
+- **Screens traversed:** none designed yet. The pairing panel is designed in Б1 and gets its SCR id there; until then this flow traces to no screen, on purpose.
+- **Local clients are not trusted for being local.** Every bridge breach of 2025–2026 that the research found came through a door that believed loopback meant "the person": ClawJacked approved pairing automatically for local clients, and CVE-2025-49596, CVE-2025-52882 and CVE-2025-66414 let a web page reach a localhost server. The pairing is a person's act, every time.
+
+### FLW-22: An agent does a task in the browser
+- **Traces:** ST-028, ST-029, ST-030 (JTBD-10, JRN-05/#2–#6)
+- **Goal:** the agent finishes the task in the person's browser; anything that matters passed through the person
+- **Entry points:** a paired agent opens a task naming its sites, verbs, time limit and step budget
+- **Success exit:** the task is closed, every step recorded before it ran, its window and processes gone
+- **Task analysis:**
+  1. The agent opens a task with its reach
+  2. The agent reads and acts inside it
+  3. The person is asked only where it matters, and can take over
+  4. The task ends cleanly
+- **Flow:**
+
+```mermaid
+flowchart TD
+  T[Task opened: sites, verbs, TTL, budget] --> W[Own window, in the background, active tab]
+  W --> S[Snapshot: cleaned, verdict attached, in parts]
+  S --> A{Action}
+  A -->|outside the task's sites| X1[Refused: origin_not_in_task]
+  A -->|read, or a plain action on a clean page| G[Done, recorded first]
+  A -->|money, send, delete, share, sign-in, or any write after a finding| Q[Panel asks the person]
+  Q -->|allow once / always here| G
+  Q -->|refuse / no answer| X2[Refused: blocked_by_shield]
+  S -->|login wall, CAPTCHA, code| H[Paused: person does the step] --> S
+  G --> S
+  G -->|task done or TTL over| E[Window and processes closed]
+  STOP[Stop control] -.-> E
+```
+
+- **Screens traversed:** none designed yet — the approval panel, the activity indicator and the hand-off notice are designed in Б1/Б2.
+- **The task gets its own window, not a background tab.** Measured 2026-10-06 (`docs/superpowers/evidence/2026-10-06-b0-agent-window.md`): input sent to a background tab never reaches the page, even with focus emulation, while a tab in a separate background window is visible and receives trusted input — and the window does not take the person's focus once it is open.
+- **"Refused" is a policy answer, not an error.** An agent that reads a refusal as a failure retries it; the codes say which kind of no it was, and a retry after a refusal counts against the task's budget.
+
+### FLW-23: Clean up after agents
+- **Traces:** ST-031 (JTBD-10, JRN-05/#7)
+- **Goal:** what agents left behind is gone, and nothing still in use was touched
+- **Entry points:** the cleaner's own schedule; the deep scan button; an agent's call when its task ends or after an error
+- **Success exit:** every removal recorded with its reason; the person's browser, services and live sessions untouched
+- **Task analysis:**
+  1. Find automation processes and profiles, and who owns them
+  2. Remove what is provably abandoned; propose the rest
+  3. Show what the deep scan would free, and remove what the person chose
+- **Flow:**
+
+```mermaid
+flowchart TD
+  C[Census: automation processes and profiles] --> O{Owner}
+  O -->|OS service or its descendant| K1[Kept]
+  O -->|live agent session| K2[Kept; proposal only]
+  O -->|the person's browser| K3[Kept]
+  O -->|launcher dead, no CDP client, idle, temp profile| R[Stopped: SIGTERM, then SIGKILL; recorded]
+  D[Deep scan] --> L[List: size, owner, age, why] -->|person chooses| RM[Removed, recorded]
+  A[Agent: task done] --> OWN[Its own windows, processes, temp profiles] --> R
+```
+
+- **Screens traversed:** none designed yet — the census and deep-scan views are designed in Б3.
+- **`ppid = 1` is not an orphan on macOS.** Every service-manager job looks like that, including a browser the machine keeps on purpose with no client between sessions. The rule is a conjunction of facts, never one of them.

@@ -53,6 +53,11 @@ are specified once in [screens.md](screens.md).
 | SCN-041 | An attachment is judged without being opened | mail-guard | P-01 | ST-025, FLW-19 | draft | — |
 | SCN-042 | A message arrives and is judged before it is read | mail-guard | P-01 | ST-022, FLW-20 | draft | — |
 | SCN-043 | Who reviewed, where it ran, and what left | mail-guard | P-01 | ST-026, FLW-19 | draft | — |
+| SCN-044 | An agent is paired once, by the person, and can be taken back | agent-bridge | P-01 | ST-027, FLW-21 | draft | — |
+| SCN-045 | An agent reads a logged-in page, cleaned, in its own background window | agent-bridge | P-01 | ST-028, FLW-22 | draft | — |
+| SCN-046 | An action that spends, sends, deletes or signs in waits for the person | agent-bridge | P-01 | ST-029, FLW-22 | draft | — |
+| SCN-047 | The person takes over a step, hands back, or stops every agent | agent-bridge | P-01 | ST-030, FLW-22 | draft | — |
+| SCN-048 | What agents left behind is cleaned, and nothing in use is touched | agent-bridge | P-01 | ST-031, FLW-23 | draft | — |
 
 ## Personas
 
@@ -949,3 +954,107 @@ that surface is not designed here.
 - **Status:** draft
 - **Coverage:** none — designed 2026-09-11, not built
 
+## agent-bridge
+
+Scope note, written before the first scenario: **this feature is Okolos Bridge, the second
+extension and the local door of Okolos Agent (ADR-0018), and it serves P-01 only.** P-02 does not
+run agents; P-03 owns a site, not an agent. Nothing here is built: the scenarios are the contract
+Б1–Б3 build against. The two doors — the bridge extension in the person's own window, and the
+agent window, a separate profile of the person's installed Chrome driven over a CDP pipe — share
+every rule below; where they differ, the scenario says so.
+
+### SCN-044: An agent is paired once, by the person, and can be taken back
+- **Persona:** P-01
+- **Feature:** agent-bridge
+- **Traces:** ST-027, FLW-21 (JTBD-10, JRN-05/#1)
+- **Entry point:** an agent's first call to the local door
+- **Preconditions:** Okolos Agent is running; the agent has never connected
+- **Steps:**
+  1. The agent calls the door without a key -> the door answers with a pairing request and shows a code; nothing else is reachable
+  2. The person sees the agent's name and the same code in the bridge's panel and confirms -> a key is issued to that agent and stored in the keychain
+  3. The person later revokes the agent -> its next call is refused and any task it holds stops
+- **Expected result:** only agents the person confirmed can reach the browser, and each one can be taken back on its own
+- **Alt paths:** the codes differ, or the person refuses or does not answer -> no key, and the attempt is recorded
+- **UI elements:** none yet — the pairing panel is designed in Б1
+- **States covered:** success, error, empty
+- **Errors & recovery:** a call carrying no key, a wrong key, or an `Origin` that is not the bridge -> refused and recorded, never treated as "local, so the person". Loopback is not a person: the research behind this feature found that every 2025–2026 bridge breach came through a door that believed it was
+- **Status:** draft
+- **Coverage:** none — designed 2026-10-06, not built
+
+### SCN-045: An agent reads a logged-in page, cleaned, in its own background window
+- **Persona:** P-01
+- **Feature:** agent-bridge
+- **Traces:** ST-028, FLW-22 (JTBD-10, JTBD-01, JRN-05/#2–#4)
+- **Entry point:** a paired agent opens a task naming its sites
+- **Preconditions:** the agent is paired; the person is logged in to the site in the profile the task uses
+- **Steps:**
+  1. The agent opens a task with its sites, verbs, time limit and step budget -> the task gets its own window, in the background, with an active tab
+  2. The agent opens a page in the task -> the page loads in that window; the person's app stays in front
+  3. The agent asks for a snapshot -> it receives the page's accessibility tree with references it can name back, hidden instructions removed, the page's verdict attached, and fields for passwords, cards and one-time codes shown without their values
+  4. The page is very large -> the snapshot arrives in parts the agent pages through, never as one answer
+- **Expected result:** the agent reads what the job needs, cannot be steered by text the page hid from people, and never sees a secret
+- **Alt paths:** the agent asks for a site outside the task -> refused with `origin_not_in_task`; the page has a finding -> the finding travels with the snapshot and the task's writes go to the person (SCN-046)
+- **UI elements:** none yet — the activity indicator is designed in Б1
+- **States covered:** success, error, partial
+- **Errors & recovery:** the browser is closed -> the request waits in the agent's queue and the agent is told `browser_offline`, not that the page is empty; the snapshot could not be cleaned -> the agent receives nothing rather than an uncleaned tree
+- **Why a window and not a tab.** Measured 2026-10-06: input to a background tab never reaches the page, while a separate background window's tab is visible and receives trusted input, and an open agent window took the person's focus in none of the readings (`docs/superpowers/evidence/2026-10-06-b0-agent-window.md`)
+- **Why the snapshot comes in parts.** Measured the same day: Wikipedia's raw tree is about 10.5 MB, and even compacted it is about 66 thousand tokens
+- **Status:** draft
+- **Coverage:** none — designed 2026-10-06, not built
+
+### SCN-046: An action that spends, sends, deletes or signs in waits for the person
+- **Persona:** P-01
+- **Feature:** agent-bridge
+- **Traces:** ST-029, FLW-22 (JTBD-10, JRN-05/#5)
+- **Entry point:** an agent's action inside a task
+- **Preconditions:** a task is open
+- **Steps:**
+  1. The agent clicks a payment, send, delete, share or sign-in control -> the bridge classifies the action from the page itself and the action waits
+  2. The person sees, in the bridge's own panel, what the action is, on which site and with what data -> chooses once, always for this site and kind of action, or no
+  3. The person allows -> the action runs and is recorded before it runs
+- **Expected result:** nothing in money, sending, deleting, sharing or signing in happens without the person, however the page phrased its request to the agent
+- **Alt paths:** the page carries a finding -> every write in the task waits for the person for the rest of the task; the person refuses or does not answer -> the action does not happen and the agent receives `blocked_by_shield`
+- **UI elements:** none yet — the approval panel is designed in Б2
+- **States covered:** success, error
+- **Errors & recovery:** the panel cannot open -> the action does not happen. The default is block, as in the existing agent gate (`packages/core-gate`), because the only path to "allow" is a person choosing it
+- **The agent's word is not the classification.** The bridge reads the control's role, the form's fields and the address; an agent that calls a payment "continue" is still making a payment
+- **Status:** draft
+- **Coverage:** none — designed 2026-10-06, not built
+
+### SCN-047: The person takes over a step, hands back, or stops every agent
+- **Persona:** P-01
+- **Feature:** agent-bridge
+- **Traces:** ST-030, FLW-22 (JTBD-10, JRN-05/#6)
+- **Entry point:** a login wall, a CAPTCHA or a code prompt in a task; the stop control
+- **Preconditions:** a task is open
+- **Steps:**
+  1. The agent meets a login wall, a CAPTCHA or a code prompt -> the task pauses and the person is told which window and why
+  2. The person does the step in that window and hands back -> the task resumes from the same page; the agent never saw what was typed
+  3. The person uses the stop control -> no further action runs, including actions already queued, and every agent's access is suspended until the person resumes it
+- **Expected result:** the agent never needs a secret and never outruns the person
+- **Alt paths:** the person does not come back before the task's time limit -> the task ends and says why
+- **UI elements:** none yet — the hand-off notice and the stop control are designed in Б2
+- **States covered:** success, empty
+- **Errors & recovery:** an action arrives while stopped -> refused, recorded, not run later
+- **No way round is offered.** The bridge does not solve CAPTCHAs or disguise automation: on the forums, people whose own browser was used that way started meeting CAPTCHAs in their own sessions and were blocked by sites
+- **Status:** draft
+- **Coverage:** none — designed 2026-10-06, not built
+
+### SCN-048: What agents left behind is cleaned, and nothing in use is touched
+- **Persona:** P-01
+- **Feature:** agent-bridge
+- **Traces:** ST-031, FLW-23 (JTBD-10, JRN-05/#7)
+- **Entry point:** the cleaner's schedule; the deep scan; an agent's call when its task ends
+- **Preconditions:** Okolos Agent is running
+- **Steps:**
+  1. The cleaner runs -> an automation browser whose launcher is gone, with no debugging client, idle and on a temporary profile, is stopped, and the reason is recorded
+  2. The person runs the deep scan -> sees every candidate with its size, owner, age and reason, and removes what they choose
+  3. An agent finishes its task and asks to clean up -> its own windows, processes and temporary profiles are gone
+- **Expected result:** the machine gets its memory and disk back, and nothing anyone still uses was touched
+- **Alt paths:** a browser kept by the operating system's service manager, a live session's server, the person's own browser, a profile whose lock points at a live process, or a package an agent's configuration names -> kept, and shown as kept with the reason
+- **UI elements:** none yet — the census and deep-scan views are designed in Б3
+- **States covered:** success, empty
+- **Errors & recovery:** a process does not stop on SIGTERM -> SIGKILL to its process group; a removal fails -> recorded as failed, never as freed
+- **An agent cleans only its own.** Asked by one session, the cleaner removes that session's tree; another session's is the scheduled cleaner's to judge
+- **Status:** draft
+- **Coverage:** none — designed 2026-10-06, not built
