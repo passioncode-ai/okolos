@@ -17,6 +17,43 @@ if [ -n "$OKOLOS_SKIP_GATES" ]; then
     exit 0
 fi
 
+# What is being pushed. Git writes one line per ref on stdin:
+#   <local ref> <local sha> <remote ref> <remote sha>
+# The gates check code, so they run when a branch or a tag receives content.
+# A lease is a ref under refs/agent-sync/leases/ (docs/AGENT_SYNC.md): taking or
+# releasing one pushed only that ref, yet ran all eight gates — minutes per
+# lease, and a lease taken for a two-line edit outlived the edit (2026-10-06).
+# Deleting a branch carries no content either. No stdin at all is a hand run,
+# and a hand run checks everything.
+zero=0000000000000000000000000000000000000000
+lines=0
+content=0
+if [ ! -t 0 ]; then
+    while read -r _local_ref local_sha remote_ref _remote_sha; do
+        [ -n "$remote_ref" ] || continue
+        lines=$((lines + 1))
+        case "$remote_ref" in
+            refs/heads/*|refs/tags/*)
+                [ "$local_sha" = "$zero" ] || content=1 ;;
+        esac
+    done
+fi
+if [ "$lines" -gt 0 ] && [ "$content" -eq 0 ]; then
+    decision=skip
+else
+    decision=gates
+fi
+if [ -n "$OKOLOS_PREPUSH_DECIDE" ]; then
+    # Prints the decision and stops: lets tools/ci.test.ts check the rule above
+    # without running eight gates per case.
+    echo "$decision"
+    exit 0
+fi
+if [ "$decision" = skip ]; then
+    echo "pre-push: no branch or tag receives content (lease refs or deletions only) — gates not needed."
+    exit 0
+fi
+
 root=$(git rev-parse --show-toplevel)
 cd "$root"
 

@@ -1,4 +1,5 @@
-import { execFileSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { globSync, readFileSync, statSync } from 'node:fs'
 
 import path from 'node:path'
@@ -33,11 +34,21 @@ const NETWORK_TOKENS = ['fetch(', 'XMLHttpRequest', 'sendBeacon', 'new WebSocket
 
 let buildError: string | null = null
 
-function build(): void {
+const run = promisify(execFile)
+
+/**
+ * Asynchronous on purpose. `execFileSync` held the worker's event loop for the
+ * whole typecheck and build, and on a loaded machine (load average 340–470,
+ * measured 2026-10-06) that outlasted vitest's worker RPC timeout: every test
+ * passed and the run still failed with "Timeout calling onTaskUpdate", which
+ * blocked the pre-push gate. Awaiting a child process keeps the loop free to
+ * answer the runner.
+ */
+async function build(): Promise<void> {
   // tsc -b emits every package's dist; the extension bundles come from vite.
   try {
-    execFileSync('pnpm', ['typecheck'], { cwd: root, stdio: 'pipe' })
-    execFileSync('pnpm', ['build'], { cwd: root, stdio: 'pipe' })
+    await run('pnpm', ['typecheck'], { cwd: root, maxBuffer: 64 * 1024 * 1024 })
+    await run('pnpm', ['build'], { cwd: root, maxBuffer: 64 * 1024 * 1024 })
   } catch (cause) {
     // Caught rather than thrown: a throw in beforeAll marks these tests
     // *skipped*, and a gate that reports "skipped" when the thing it guards is
@@ -98,8 +109,8 @@ function offenders(files: string[], tokens: string[]): Array<{ file: string; tok
   return hits
 }
 
-beforeAll(() => {
-  build()
+beforeAll(async () => {
+  await build()
 }, 300_000)
 
 describe('the artefact these gates read', () => {

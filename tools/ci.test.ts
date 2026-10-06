@@ -232,6 +232,43 @@ describe('the pre-push hook exists and runs the gates', () => {
     expect(body).not.toMatch(/pnpm -s (?!run )[\w:]+/)
   })
 
+  /**
+   * The gates check code, so a push that gives no branch or tag new content does
+   * not wait for them. Taking an agent-sync lease pushes a ref under
+   * refs/agent-sync/leases/, and until 2026-10-06 each one ran all eight gates.
+   */
+  describe('decides from what is pushed', () => {
+    const zero = '0'.repeat(40)
+    const sha = 'a'.repeat(40)
+    const decide = (stdin: string): string =>
+      execFileSync('sh', [hook], {
+        cwd: root,
+        input: stdin,
+        env: { ...process.env, OKOLOS_PREPUSH_DECIDE: '1', OKOLOS_SKIP_GATES: '' },
+        encoding: 'utf8',
+      }).trim()
+
+    it('runs the gates for a branch', () => {
+      expect(decide(`refs/heads/x ${sha} refs/heads/x ${zero}\n`)).toBe('gates')
+    })
+    it('runs the gates for a tag', () => {
+      expect(decide(`refs/tags/v1 ${sha} refs/tags/v1 ${zero}\n`)).toBe('gates')
+    })
+    it('skips them for a lease ref alone', () => {
+      expect(decide(`${sha} ${sha} refs/agent-sync/leases/docs%2Fadr%2FREADME.md ${zero}\n`)).toBe('skip')
+    })
+    it('skips them for a branch deletion', () => {
+      expect(decide(`(delete) ${zero} refs/heads/old ${sha}\n`)).toBe('skip')
+    })
+    it('runs them when a lease travels with a branch', () => {
+      const both = `${sha} ${sha} refs/agent-sync/leases/k ${zero}\nrefs/heads/x ${sha} refs/heads/x ${zero}\n`
+      expect(decide(both)).toBe('gates')
+    })
+    it('runs them on a hand run with nothing on stdin', () => {
+      expect(decide('')).toBe('gates')
+    })
+  })
+
   it('refuses rather than warns', () => {
     expect(readFileSync(hook, 'utf8')).toMatch(/exit 1/)
   })
