@@ -85,7 +85,7 @@ describe('when nothing is trusted', () => {
   it('says so, and says what would put something here', () => {
     // An empty area would read as a broken screen rather than an empty list.
     const el = render([])
-    expect(role(el, 'trusted-empty')?.textContent).toMatch(/ещё не отмечали ни один сайт/i)
+    expect(role(el, 'trusted-empty')?.textContent).toMatch(/пока не отметили настоящим ни одного сайта/i)
     expect(el.querySelectorAll('[data-role=trusted-row]')).toHaveLength(0)
   })
 })

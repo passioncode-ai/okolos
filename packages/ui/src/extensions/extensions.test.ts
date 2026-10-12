@@ -115,7 +115,7 @@ describe('the action is real', () => {
 describe('what it will not claim', () => {
   it('never shows an empty list in place of a failure', () => {
     const el = render({ kind: 'error', message: 'the store is unreadable' })
-    expect(role(el, 'error-note')?.textContent).toMatch(/не утверждение, что ничего не изменилось/i)
+    expect(role(el, 'error-note')?.textContent).toMatch(/не значит, что ничего не изменилось/i)
     expect(role(el, 'no-changes')).toBeNull()
   })
 

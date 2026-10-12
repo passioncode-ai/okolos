@@ -63,8 +63,8 @@ describe('saying which of two different things happened', () => {
     // Updating does not fix this one, and saying so is the whole point of having
     // two sentences instead of one.
     const why = role(mount({ ...PROPS, kind: 'shape-incomplete' }), 'storage-why')?.textContent ?? ''
-    expect(why).toMatch(/устройство/i)
-    expect(why).toMatch(/не исправит/i)
+    expect(why).toMatch(/структура/i)
+    expect(why).toMatch(/не поможет/i)
   })
 
   it('has a sentence for every problem the storage layer can report', () => {
@@ -123,7 +123,7 @@ describe('the two things a person can do', () => {
      * dialog's list carries, or the user is agreeing to a word.
      */
     const note = role(mount(), 'storage-reset-note')?.textContent ?? ''
-    for (const kind of ['находки', 'журнал', 'настройки', 'фиды']) {
+    for (const kind of ['находки', 'журнал', 'настройки', 'списки блокировок']) {
       expect(note, `the note does not mention ${kind}`).toContain(kind)
     }
     expect(note).toMatch(/отменить нельзя/i)

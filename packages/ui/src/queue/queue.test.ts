@@ -68,7 +68,7 @@ describe('what the queue shows', () => {
 
   it('says nothing needs the user when there is nothing', () => {
     const el = render({ shown: [], hidden: 0, rankedBy: 'full' })
-    expect(role(el, 'queue-empty')?.textContent).toMatch(/от вас ничего не нужно/i)
+    expect(role(el, 'queue-empty')?.textContent).toMatch(/от вас ничего не требуется/i)
   })
 
   it('counts what it holds back rather than hiding it', () => {

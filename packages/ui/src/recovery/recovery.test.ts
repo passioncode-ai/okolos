@@ -90,7 +90,7 @@ describe('progress', () => {
 
 describe('when we do not know what happened', () => {
   it('says the list is the broad one rather than answering a different question', () => {
-    expect(role(render('something-nobody-defined'), 'generic')?.textContent).toMatch(/самый широкий безопасный/i)
+    expect(role(render('something-nobody-defined'), 'generic')?.textContent).toMatch(/самый полный безопасный/i)
   })
 })
 
@@ -200,7 +200,7 @@ describe('taking the rest with you', () => {
   it('says outright that nothing is sent anywhere', () => {
     // The alternative design — syncing the incident to a server so it appears
     // on the phone — is the one this product cannot make.
-    expect(role(render('pasted-command'), 'portable-why')?.textContent).toMatch(/никуда ничего не отправляется/i)
+    expect(role(render('pasted-command'), 'portable-why')?.textContent).toMatch(/никуда не отправляется/i)
   })
 
   it('copies exactly what it displays', () => {
