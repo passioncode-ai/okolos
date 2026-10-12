@@ -74,8 +74,8 @@ describe('the lines a frame hands upward', () => {
     const detail = credentialDetail(lines)
     expect(detail).toContain(CATALOGUE['credUnknownHowLong']?.message)
     expect(detail).toContain(CATALOGUE['credUnknownWhenRegistered']?.message)
-    // One sentence for both, joined — not one "не известно" per unknown.
-    expect(detail.match(/Не известно/g)).toHaveLength(1)
+    // One sentence for both, joined — not one "неизвестно" per unknown.
+    expect(detail.match(/Неизвестно/g)).toHaveLength(1)
   })
 
   it('produces nothing to say when there is nothing known and nothing missing', () => {

@@ -70,7 +70,7 @@ describe('the number and its basis', () => {
   it('lists what each breach exposed', () => {
     const inventory = mergeLeaks([{ name: 'HIBP', answered: true, leaks: [LEAK] }])
     const el = render({ kind: 'ready', inventory, now: NOW })
-    expect(role(el, 'classes')?.textContent).toContain('Раскрыто:')
+    expect(role(el, 'classes')?.textContent).toContain('Утекло:')
   })
 
   it('lets the user mark one as dealt with', () => {
@@ -89,7 +89,7 @@ describe('before and during', () => {
     const idle = role(render({ kind: 'idle' }), 'idle')?.textContent ?? ''
     expect(idle, 'the idle state must say the address is sent').toMatch(/отправит ваш адрес/i)
     expect(idle, 'and must not imply the leak check is hashed').not.toMatch(/hashed form/i)
-    expect(idle, 'while keeping the password check distinct').toMatch(/частичному хешу/i)
+    expect(idle, 'while keeping the password check distinct').toMatch(/по префиксу хеша/i)
   })
 
   it('says it is working rather than showing an empty list', () => {
@@ -102,7 +102,7 @@ describe('before and during', () => {
 describe('when it fails', () => {
   it('never lets a failure read as good news', () => {
     const el = render({ kind: 'error', message: 'the network is unavailable' })
-    expect(role(el, 'error-note')?.textContent).toMatch(/не утверждение, что ничего не утекло/i)
+    expect(role(el, 'error-note')?.textContent).toMatch(/не значит, что ничего не утекло/i)
     expect(role(el, 'total')).toBeNull()
   })
 })
@@ -174,7 +174,7 @@ describe('the repair each entry offers', () => {
     const inventory = mergeLeaks([{ name: 'HIBP', answered: true, leaks: [LEAK] }])
     const el = render({ kind: 'ready', inventory, now: NOW })
     expect(role(el, 'change-password')).toBeNull()
-    expect(role(el, 'no-domain')?.textContent).toMatch(/отправить вас некуда/i)
+    expect(role(el, 'no-domain')?.textContent).toMatch(/ссылки на него нет/i)
   })
 
   it('offers no reuse check, because nothing records what would answer it', () => {

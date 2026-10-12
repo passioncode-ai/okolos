@@ -58,7 +58,7 @@ describe('on whose authority', () => {
     // A block whose origin is unknown is still a block, and the user is
     // entitled to know which of the two they are looking at.
     const el = render({ ...PROPS, feed: null, entryDate: null })
-    expect(role(el, 'source')?.textContent).toMatch(/определить не удалось/i)
+    expect(role(el, 'source')?.textContent).toMatch(/не удалось определить/i)
   })
 
   it('shows which page was stopped', () => {
@@ -69,7 +69,7 @@ describe('on whose authority', () => {
 describe('when the data is old', () => {
   it('says how old, so the user can weigh it', () => {
     const el = render({ ...PROPS, feedAgeDays: 30 })
-    expect(role(el, 'stale')?.textContent).toContain('30 дней')
+    expect(role(el, 'stale')?.textContent).toContain('дней: 30')
   })
 
   it('stays quiet about a fresh list', () => {

@@ -6,10 +6,10 @@
   ],
   "surfacesDigest": "003f14758d31a7e915f4dc4eebae589f",
   "images": {
-    "01-interstitial.png": "a0c1dbad098e1c42",
-    "02-first-run.png": "d228b05ea51432f6",
-    "03-self-audit.png": "ac99bea8abf30fd6",
-    "04-popup.png": "538cf3c92b39e9ff"
+    "01-interstitial.png": "8ff0de8221729c00",
+    "02-first-run.png": "38c38d6d68907d06",
+    "03-self-audit.png": "cf32ef5d3e1882ba",
+    "04-popup.png": "73b05deba2793214"
   },
   "shown": {
     "01-interstitial.png": "interstitial",

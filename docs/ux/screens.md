@@ -163,7 +163,7 @@ generator, and the sheet declares no colour of its own.
 ### SCR-01: First-run check
 - **Used by:** FLW-01 (all steps), FLW-14 (post-wipe return)
 - **Purpose:** deliver a real, local result within 30 seconds of install — the product's proof of value before any configuration
-- **Elements:** one-line statement of what runs locally; per-check progress list (open tabs / installed extensions / password corpus readiness); findings summary; **primary action: "С чего начать"**; secondary "Пока пропустить"; link "Что отправляется" → SCR-10
+- **Elements:** one-line statement of what runs locally; per-check progress list (open tabs / installed extensions / password corpus readiness); findings summary; **primary action: "Показать, с чего начать"**; secondary "Пока пропустить"; link "Что отправляется" → SCR-10
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
@@ -295,7 +295,7 @@ generator, and the sheet declares no colour of its own.
 ### SCR-08: Leaks and repair
 - **Used by:** FLW-10 (reuse list), FLW-11, FLW-16
 - **Purpose:** what of mine is exposed, and the repair for each
-- **Elements:** monitored sources (email, phone) with add/remove; results split into "Недавнее — устройство было заражено" and "Более старые утечки"; per-entry data classes, date, source; **primary action per entry: "Сменить пароль"**; "Отметить решённым"; archive; manual password check field; the list of sources actually checked and when
+- **Elements:** monitored sources (email, phone) with add/remove; results split into "Недавние: устройство было заражено" and "Более старые утечки"; per-entry data classes, date, source; **primary action per entry: "Сменить пароль"**; "Отметить решённым"; archive; manual password check field; the list of sources actually checked and when
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
@@ -327,7 +327,7 @@ generator, and the sheet declares no colour of its own.
 - **Behavior notes — a disable that is refused says so on the page.** Policy-installed
   extensions cannot be disabled, and the browser's answer used to arrive in a modal. It is the
   page's failure slot now, above the area, in the product's own words
-- **Behavior notes — the actions follow the change.** Each delta shows only what can be done about *it*: an extension that is **no longer installed** offers "Это изменение нормально" and nothing else, because there is nothing left to disable and no package left to read. Until 2026-08-21 all five kinds got the same two buttons, so pressing "Отключить его" on a removed extension sent `extensions/disable` for an id the browser does not have and answered a person's remedy with an error. The mapping is a `Record` over the change union (`CHANGE_ACTIONS` in `extensions.ts`), so a sixth kind fails the build until someone decides what a person can do about it — verified by planting one
+- **Behavior notes — the actions follow the change.** Each delta shows only what can be done about *it*: an extension that is **no longer installed** offers "Это изменение в порядке" and nothing else, because there is nothing left to disable and no package left to read. Until 2026-08-21 all five kinds got the same two buttons, so pressing "Отключить его" on a removed extension sent `extensions/disable` for an id the browser does not have and answered a person's remedy with an error. The mapping is a `Record` over the change union (`CHANGE_ACTIONS` in `extensions.ts`), so a sixth kind fails the build until someone decides what a person can do about it — verified by planting one
 - **Wireframe:** wireframes/SCR-09.md
 - **Coverage:** packages/ui/src/extensions/extensions.ts:renderExtensions, packages/core-extensions/src/diff.ts:diffInventory, e2e/scn-017.spec.ts
 - **Scenarios:** SCN-017, SCN-018
@@ -458,7 +458,7 @@ generator, and the sheet declares no colour of its own.
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
-  | loading | page opened | - | shell and all eight rows paint at once, each row's state reads `"считаем…"` and the band `"Считаем…"`; the shell never waits on data. The record said `"…"` for the row state until 2026-08-20: a bare ellipsis is not a state a screen reader can read out, on the one screen whose axe sweep is a gate — and it must not be `null`, which on this screen means "looked and could not read it" |
+  | loading | page opened | - | shell and all eight rows paint at once, each row's state reads `"подсчёт…"` and the band `"Подсчёт…"`; the shell never waits on data. The record said `"…"` for the row state until 2026-08-20: a bare ellipsis is not a state a screen reader can read out, on the one screen whose axe sweep is a gate — and it must not be `null`, which on this screen means "looked and could not read it" |
   | empty | nothing outstanding anywhere | - | `"Сейчас ничего не требует внимания"` plus when this was last checked; the area list still carries its states |
   | error | the store is unreadable | - | names the failure, offers repair, and **no area row claims a state** |
   | success | outstanding items exist | - | up to three ranked rows, then the eight areas |
@@ -545,7 +545,7 @@ generator, and the sheet declares no colour of its own.
 ### SCR-20: Local store unavailable
 - **Used by:** FLW-14 (in place of every area, when the store cannot be opened)
 - **Purpose:** say which of two different things happened, and offer the two things a person can do about it
-- **Elements:** heading; `[data-role=storage-why]` — one sentence per problem, and the sentences differ because the remedies do; `[data-role=storage-versions]` — the profile's version and this build's, absent rather than invented when the profile could not be read at all; `[data-role=storage-detail]` — the underlying message verbatim, last, because it is what a bug report needs and not what a user should read first; **primary action "Попробовать снова"**, "Очистить локальные данные", and `[data-role=storage-reset-note]` listing everything clearing destroys
+- **Elements:** heading; `[data-role=storage-why]` — one sentence per problem, and the sentences differ because the remedies do; `[data-role=storage-versions]` — the profile's version and this build's, absent rather than invented when the profile could not be read at all; `[data-role=storage-detail]` — the underlying message verbatim, last, because it is what a bug report needs and not what a user should read first; **primary action "Попробовать ещё раз"**, "Очистить локальные данные", and `[data-role=storage-reset-note]` listing everything clearing destroys
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|

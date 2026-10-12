@@ -97,7 +97,7 @@ describe('the evidence is the point', () => {
     const partial = evidence({ detail: { ...evidence().detail, partialScan: true } })
     const handle = mountInspector(document, { evidence: [partial], confidence: 'high' }, handlers())
     expect(handle.root.querySelector('[data-role=partial]')?.textContent).toContain(
-      'слишком велика, чтобы проверить её целиком',
+      'слишком большая, чтобы проверить её целиком',
     )
   })
 
@@ -147,7 +147,7 @@ describe('when the evidence is gone', () => {
   it('says the page changed instead of showing an empty panel', () => {
     const handle = mountInspector(document, { evidence: [], confidence: 'high' }, handlers())
     expect(handle.root.querySelector('[data-role=empty]')?.textContent).toContain(
-      'Страница изменилась после находки',
+      'После находки страница изменилась',
     )
     expect(handle.root.querySelector('[data-role=rescan]')).not.toBeNull()
   })

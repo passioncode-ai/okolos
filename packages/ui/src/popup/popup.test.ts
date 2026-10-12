@@ -165,7 +165,7 @@ describe('the queue', () => {
 
   it('says nothing needs the user when the queue is empty', () => {
     const el = render(READY)
-    expect(role(el, 'queue-empty')?.textContent).toMatch(/от вас ничего не нужно/i)
+    expect(role(el, 'queue-empty')?.textContent).toMatch(/от вас ничего не требуется/i)
   })
 })
 
@@ -181,7 +181,7 @@ describe('when local data cannot be read', () => {
   it('never shows a clean verdict it could not compute', () => {
     const el = render({ kind: 'error', message: 'the database is locked' })
     expect(role(el, 'verdict')).toBeNull()
-    expect(el.textContent).not.toMatch(/от вас ничего не нужно/i)
+    expect(el.textContent).not.toMatch(/от вас ничего не требуется/i)
   })
 })
 
