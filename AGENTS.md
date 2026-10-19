@@ -129,3 +129,23 @@ In the same run: update this repository's docs with the change; if a cross-repos
 (a product, a version, a plan row, a principle), update the page in `fabric-workspace/knowledge/`
 that owns it; land both; publish (`node scripts/workspace.mjs sync` from a Fabric checkout) or
 leave it to the scheduled sync. Leave a handoff with the exact next task.
+<!-- SSHLG:PROJECT:BEGIN managed by npx sshlg-skills enroll. To opt out, replace the whole block with one SSHLG:PROJECT:OPTOUT comment line. -->
+## Family routes in this project
+
+Surface: `app-text` (detected).
+Signals:
+- string catalogue: `packages/i18n/package.json`, `packages/i18n/tsconfig.json`
+
+Routes that apply here (the global routing block says what each one owns):
+
+| Router | Answers | Setup here |
+|---|---|---|
+| `super-ux` | what the interface must do | scenarios and their linter: present |
+| `sheleg-design` | how it looks and moves | nothing to seed |
+| `copywriting` | how it sounds | brand pack: present |
+| `evidence-docs` | what proves it | nothing to seed |
+| `task-pipeline` | how the change reaches the repository | DOCMAP: missing (`/task-pipeline setup`) |
+
+Remaining setup:
+- `/task-pipeline setup`: DOCMAP for `task-pipeline`, missing `docs/DOCMAP.md`
+<!-- SSHLG:PROJECT:END -->
