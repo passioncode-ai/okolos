@@ -28,5 +28,7 @@ export interface StatusRecord extends RunRecord {
 
 export function readStatus(file: string): StatusRecord | null
 export function writeStatus(file: string, record: RunRecord): StatusRecord
-/** Marks the record as run `runId`'s, changing nothing else; null when there is none. */
-export function stampRunId(file: string, runId: string): StatusRecord | null
+/** Marks the record as run `runId`'s (plus `facts`), changing nothing else; null when there is none. */
+export function stampRunId(file: string, runId: string, facts?: { installedOffMain?: string }): StatusRecord | null
+/** `{ installedOffMain }` from OKOLOS_INSTALLED_OFF_MAIN, or nothing. */
+export function offMainFacts(env?: Record<string, string | undefined>): { installedOffMain?: string }

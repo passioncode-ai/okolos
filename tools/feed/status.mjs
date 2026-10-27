@@ -5,7 +5,7 @@ import path from 'node:path'
  * The feed agent's last-run record (LC-03), written whole at the end of every run.
  *
  * `{ startedAt, at, outcome, stage, exit, reason?, version?, entries?, commit?, runId?,
- * recoveredCheckout?, recovery? }`
+ * recoveredCheckout?, recovery?, installedOffMain? }`
  * plus what a host needs without history: `consecutiveFailures` (alert at two) and
  * `lastPublished` (alert when it is older than the feed's freshness budget). Before
  * this, a failure was visible only in `launchctl print … last exit code` (B-133).
@@ -34,13 +34,25 @@ function writeWhole(file, full) {
  * writes only when no record of its run id exists, does not count the run twice.
  * The id goes where writeStatus puts its fields, before `consecutiveFailures` and
  * `lastPublished`: the record keeps one shape, whoever wrote it last.
- * Returns the stamped record, or null when there is none.
+ * `facts` are added beside the id (the bootstrap adds offMainFacts: a job from
+ * before B-159 does not know the mark). Returns the stamped record, or null when
+ * there is none.
  */
-export function stampRunId(file, runId) {
+export function stampRunId(file, runId, facts = {}) {
   const record = readStatus(file)
   if (!record) return null
   const { consecutiveFailures, lastPublished, ...fields } = record
-  return writeWhole(file, { ...fields, runId, consecutiveFailures, lastPublished })
+  return writeWhole(file, { ...fields, runId, ...facts, consecutiveFailures, lastPublished })
+}
+
+/**
+ * What every writer of the record adds when the agent was installed past the
+ * installer's origin/main check (--allow-branch): `{ installedOffMain }`, the
+ * installer's note, which the plist passes as OKOLOS_INSTALLED_OFF_MAIN (empty
+ * otherwise). The plist's launch line writes the same field itself.
+ */
+export function offMainFacts(env = process.env) {
+  return env.OKOLOS_INSTALLED_OFF_MAIN ? { installedOffMain: env.OKOLOS_INSTALLED_OFF_MAIN } : {}
 }
 
 export function writeStatus(file, record) {

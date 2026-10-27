@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -454,11 +454,92 @@ describe('one deadline over the whole run, repair included', () => {
   })
 })
 
+describe('an install made off origin/main is in every record the bootstrap writes (--allow-branch)', () => {
+  const OFF = 'sw/x at bbbbbbb, origin/main aaaaaaa (--allow-branch, t)'
+
+  it('in a record it adopts from a job that writes no run id or mark (one from before B-159)', async () => {
+    const w = world()
+    plantCheckout(w.paths.agentCheckout)
+    const run = async () => {
+      mkdirSync(path.dirname(w.paths.status), { recursive: true })
+      const at = new Date().toISOString()
+      writeFileSync(w.paths.status, JSON.stringify({ startedAt: at, at, outcome: 'failed', stage: 'publish', exit: 1, consecutiveFailures: 1, lastPublished: null }))
+      return failed('', 1)
+    }
+    const result = await agent(w, { run }, { OKOLOS_LAUNCH_ID: 'launch-7-7', OKOLOS_INSTALLED_OFF_MAIN: OFF }).promise
+    expect(result.exit).toBe(1)
+    expect(readStatus(w.paths.status)).toMatchObject({ stage: 'publish', runId: 'launch-7-7', installedOffMain: OFF, consecutiveFailures: 1 })
+  })
+
+  it('in the record of a stop by signal', () => {
+    const current = { stage: 'job', runId: 'r1', startedAt: 's', recovered: null }
+    expect(signalRecord(current, 'SIGTERM', 'now', { OKOLOS_INSTALLED_OFF_MAIN: OFF })).toMatchObject({ installedOffMain: OFF })
+    expect(signalRecord(current, 'SIGTERM', 'now', {})).not.toHaveProperty('installedOffMain')
+  })
+
+  /** The bootstrap installed the way the installer does, with a checkout whose job is `job`. */
+  function installed(job: (w: ReturnType<typeof world>) => string) {
+    const w = world()
+    for (const file of BOOTSTRAP_FILES) {
+      mkdirSync(w.paths.agentBin, { recursive: true })
+      writeFileSync(path.join(w.paths.agentBin, file), readFileSync(path.join(import.meta.dirname, '..', BOOTSTRAP_SOURCES[file] ?? ''), 'utf8'))
+    }
+    mkdirSync(path.join(w.paths.agentCheckout, 'tools'), { recursive: true })
+    writeFileSync(path.join(w.paths.agentCheckout, 'tools/feed-job.mjs'), job(w))
+    expect(spawnSync('git', ['init', '--quiet', w.paths.agentCheckout]).status).toBe(0)
+    const env: Record<string, string> = {
+      PATH: process.env.PATH ?? '',
+      HOME: w.base,
+      OKOLOS_STATE_DIR: w.paths.state,
+      OKOLOS_LOG_DIR: w.paths.logs,
+      OKOLOS_AGENT_CHECKOUT: w.paths.agentCheckout,
+      OKOLOS_AGENT_BIN: w.paths.agentBin,
+      OKOLOS_LAUNCH_ID: 'launch-9-9',
+      OKOLOS_INSTALLED_OFF_MAIN: OFF,
+    }
+    return { w, env }
+  }
+
+  it('in the record of its own crash (stage bootstrap)', () => {
+    const { w, env } = installed(() => 'process.exit(0)\n')
+    // A log folder that is a file: the bootstrap cannot open feed.log and crashes.
+    writeFileSync(path.join(w.base, 'not-a-folder'), '')
+    const result = spawnSync(process.execPath, [path.join(w.paths.agentBin, 'bootstrap.mjs')], {
+      env: { ...env, OKOLOS_LOG_DIR: path.join(w.base, 'not-a-folder') },
+      encoding: 'utf8',
+      timeout: 20_000,
+    })
+    expect(result.status, result.stderr).toBe(1)
+    expect(readStatus(w.paths.status)).toMatchObject({ stage: 'bootstrap', runId: 'launch-9-9', installedOffMain: OFF, consecutiveFailures: 1 })
+  })
+
+  it('in the record of a stop by SIGTERM, through the installed copy', async () => {
+    const marker = (w: ReturnType<typeof world>) => path.join(w.base, 'job-started')
+    const { w, env } = installed((at) => `import { writeFileSync } from 'node:fs'\nwriteFileSync(${JSON.stringify(marker(at))}, '')\nsetInterval(() => {}, 1000)\n`)
+    const child = spawn(process.execPath, [path.join(w.paths.agentBin, 'bootstrap.mjs')], { env, stdio: 'ignore' })
+    const exited = new Promise<number | null>((resolve) => child.on('exit', (code) => resolve(code)))
+    for (let waited = 0; !existsSync(marker(w)) && waited < 20_000; waited += 50) await new Promise((r) => setTimeout(r, 50))
+    expect(existsSync(marker(w))).toBe(true)
+    child.kill('SIGTERM')
+    const code = await exited
+    expect(readStatus(w.paths.status)).toMatchObject({ stage: 'job', exit: EXIT.signal, runId: 'launch-9-9', installedOffMain: OFF })
+    expect(code).toBe(EXIT.signal)
+  })
+})
+
 describe('a stop by signal', () => {
   it('keeps a recovered checkout in the record', () => {
     const record = signalRecord({ stage: 'job', runId: 'r1', startedAt: 's', recovered: 'missing' }, 'SIGTERM', 'now')
     expect(record).toMatchObject({ outcome: 'failed', stage: 'job', exit: EXIT.signal, runId: 'r1', recoveredCheckout: true, recovery: 'missing' })
     expect(record.reason).toMatch(/SIGTERM/)
+  })
+
+  it('records what the stop broke as the stop: a job killed under it is not a crash', async () => {
+    const w = world()
+    plantCheckout(w.paths.agentCheckout)
+    const result = await agent(w, { run: fakeJob(w, 'crashes').run, stopped: () => 'SIGTERM' }).promise
+    expect(result.exit).toBe(EXIT.signal)
+    expect(readStatus(w.paths.status)).toMatchObject({ stage: 'job', exit: EXIT.signal, reason: 'stopped by SIGTERM', consecutiveFailures: 1 })
   })
 
   it('records false when nothing was recovered', () => {

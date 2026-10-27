@@ -45,7 +45,7 @@ import { acquireLock, LockHeldError } from './feed/lock.mjs'
 import { capFile, cleanLine, openLog } from './feed/log.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { DEFAULT_WORKER, readServed } from './feed/served.mjs'
-import { writeStatus } from './feed/status.mjs'
+import { offMainFacts, writeStatus } from './feed/status.mjs'
 import { directoriesIn } from './tree.mjs'
 import { isMain } from './is-main.mjs'
 
@@ -154,6 +154,21 @@ class StageFailure extends Error {
 }
 
 /**
+ * What the bootstrap (tools/feed/bootstrap.mjs, B-159) tells the run, for every
+ * record it writes: its id, whether it recreated the checkout first, and an
+ * install made past the origin/main check (--allow-branch). A manual run has none
+ * of them and records `recoveredCheckout: false`.
+ */
+function toldByBootstrap(env) {
+  return {
+    ...(env.OKOLOS_RUN_ID ? { runId: env.OKOLOS_RUN_ID } : {}),
+    recoveredCheckout: Boolean(env.OKOLOS_RECOVERED_CHECKOUT),
+    ...(env.OKOLOS_RECOVERED_CHECKOUT ? { recovery: env.OKOLOS_RECOVERED_CHECKOUT } : {}),
+    ...offMainFacts(env),
+  }
+}
+
+/**
  * One run. Returns the status record it wrote (or, for a refused lock, the record
  * it did not write). Every external effect is a parameter.
  */
@@ -209,11 +224,7 @@ export async function runJob({
     pinned: true,
     version: undefined,
     entries: undefined,
-    ...(env.OKOLOS_RUN_ID ? { runId: env.OKOLOS_RUN_ID } : {}),
-    recoveredCheckout: Boolean(env.OKOLOS_RECOVERED_CHECKOUT),
-    ...(env.OKOLOS_RECOVERED_CHECKOUT ? { recovery: env.OKOLOS_RECOVERED_CHECKOUT } : {}),
-    // Installed past the origin/main check (--allow-branch): every record says so.
-    ...(env.OKOLOS_INSTALLED_OFF_MAIN ? { installedOffMain: env.OKOLOS_INSTALLED_OFF_MAIN } : {}),
+    ...toldByBootstrap(env),
   }
   const setStage = (next) => {
     stage = next
@@ -397,21 +408,25 @@ export async function runJob({
   }
 }
 
+/** The record of a run stopped by `signal`, with what the bootstrap told it, as every other record. */
+export function signalRecord(current, signal, at, env = process.env) {
+  return {
+    startedAt: current.startedAt,
+    at,
+    outcome: 'failed',
+    stage: current.stage,
+    exit: EXIT.signal,
+    reason: `stopped by ${signal}`,
+    ...toldByBootstrap(env),
+  }
+}
+
 /** Ends the run on SIGTERM/SIGINT the same way the watchdog does: children killed, status written. */
 function onSignal(signal, current) {
   void (async () => {
     await killAllGroups(2000)
     try {
-      writeStatus(feedPaths().status, {
-        startedAt: current.startedAt,
-        at: new Date().toISOString(),
-        outcome: 'failed',
-        stage: current.stage,
-        exit: EXIT.signal,
-        reason: `stopped by ${signal}`,
-        ...(process.env.OKOLOS_RUN_ID ? { runId: process.env.OKOLOS_RUN_ID } : {}),
-        recoveredCheckout: Boolean(process.env.OKOLOS_RECOVERED_CHECKOUT),
-      })
+      writeStatus(feedPaths().status, signalRecord(current, signal, new Date().toISOString()))
     } finally {
       process.exit(EXIT.signal)
     }

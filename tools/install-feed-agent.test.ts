@@ -381,7 +381,10 @@ describe.skipIf(process.platform === 'win32')('the launch line records what fail
   const unxml = (text: string) =>
     text.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&amp;', '&')
 
-  function launch(h: ReturnType<typeof home>, { node = process.execPath, bootstrap, pathEnv }: { node?: string; bootstrap?: string; pathEnv?: string } = {}) {
+  function launch(
+    h: ReturnType<typeof home>,
+    { node = process.execPath, bootstrap, pathEnv, extraEnv = {} }: { node?: string; bootstrap?: string; pathEnv?: string; extraEnv?: Record<string, string> } = {},
+  ) {
     const text = rendered({
       template: template(),
       runner: null,
@@ -402,6 +405,7 @@ describe.skipIf(process.platform === 'win32')('the launch line records what fail
       HOME: h.dir,
       PATH: pathEnv ?? [path.dirname(process.execPath), '/usr/bin', '/bin'].join(path.delimiter),
       OKOLOS_STATE_DIR: h.paths.state,
+      ...extraEnv,
     }
     return spawnSync('/bin/sh', ['-c', line], { env, encoding: 'utf8', timeout: 20_000 })
   }
@@ -525,6 +529,16 @@ process.exit(1)
       expect(text).not.toMatch(/installedOffMain/)
       expect(readStatus(h.paths.status)).toMatchObject({ stage: 'launch', consecutiveFailures: 5, lastPublished })
     }
+  })
+
+  it('marks an install made off origin/main, as every writer does, and nothing when there is none', () => {
+    const h = home()
+    // launchd sets the variable from the plist: empty, or the installer's note.
+    launch(h, { bootstrap: 'process.exit(1)\n', extraEnv: { OKOLOS_INSTALLED_OFF_MAIN: '' } })
+    expect(readStatus(h.paths.status)).not.toHaveProperty('installedOffMain')
+    const note = 'sw/"x"\\y at bbbbbbb, origin/main aaaaaaa (--allow-branch, 2026-10-27T12:00:00Z)'
+    launch(h, { bootstrap: 'process.exit(1)\n', extraEnv: { OKOLOS_INSTALLED_OFF_MAIN: note } })
+    expect(readStatus(h.paths.status)).toMatchObject({ stage: 'launch', installedOffMain: note, consecutiveFailures: 2 })
   })
 
   it('counts on from the previous record and keeps the last publish, as JSON the host can read', () => {

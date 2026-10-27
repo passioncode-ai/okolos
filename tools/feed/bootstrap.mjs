@@ -44,7 +44,7 @@ import { isMain } from './is-main.mjs'
 import { acquireLock, LockHeldError } from './lock.mjs'
 import { capFile, cleanLine, openLog } from './log.mjs'
 import { feedPaths } from './paths.mjs'
-import { readStatus, stampRunId, writeStatus } from './status.mjs'
+import { offMainFacts, readStatus, stampRunId, writeStatus } from './status.mjs'
 
 /** What the installer copies beside launchd: this file and every module it imports. */
 export const BOOTSTRAP_FILES = ['bootstrap.mjs', 'bounded.mjs', 'is-main.mjs', 'lock.mjs', 'log.mjs', 'paths.mjs', 'status.mjs']
@@ -221,6 +221,9 @@ export async function runAgent({
   runDeadlineMs = RUN_DEADLINE_MS,
   onStage = () => {},
   onRecovered = () => {},
+  // The signal that is stopping this run, or null. A failure it causes (the job or
+  // a repair step killed under it) is recorded as the stop it is.
+  stopped = () => null,
   // The bootstrap's stderr is launchd's StandardErrorPath (feed.launchd.log).
   relay = (line) => process.stderr.write(`${line}\n`),
 } = {}) {
@@ -237,20 +240,29 @@ export async function runAgent({
   }
 
   let recovered = null
+  /** Records the run's failure and returns `{ exit, record }`; a stop by signal wins over what it broke. */
   const fail = (stage, exit, reason) => {
+    const signal = stopped()
+    if (signal) {
+      write(`stopped by ${signal} in ${stage}`)
+      return { exit: EXIT.signal, record: writeStatus(paths.status, signalRecord({ stage, runId, startedAt, recovered }, signal, iso(), env)) }
+    }
     write(`failed in ${stage}: ${reason}`)
-    return writeStatus(paths.status, {
-      startedAt,
-      at: iso(),
-      outcome: 'failed',
-      stage,
+    return {
       exit,
-      reason,
-      runId,
-      recoveredCheckout: Boolean(recovered),
-      ...(recovered ? { recovery: recovered } : {}),
-      ...(env.OKOLOS_INSTALLED_OFF_MAIN ? { installedOffMain: env.OKOLOS_INSTALLED_OFF_MAIN } : {}),
-    })
+      record: writeStatus(paths.status, {
+        startedAt,
+        at: iso(),
+        outcome: 'failed',
+        stage,
+        exit,
+        reason,
+        runId,
+        recoveredCheckout: Boolean(recovered),
+        ...(recovered ? { recovery: recovered } : {}),
+        ...offMainFacts(env),
+      }),
+    }
   }
 
   write('── checkout')
@@ -263,7 +275,7 @@ export async function runAgent({
       write(`refused: ${cause.message}`)
       return { exit: EXIT.lockHeld, record: null }
     }
-    return { exit: EXIT.failed, record: fail('checkout', EXIT.failed, `could not take the run lock: ${cause.message}`) }
+    return fail('checkout', EXIT.failed, `could not take the run lock: ${cause.message}`)
   }
 
   // Past the deadline the repair starts no further child: its current one is killed.
@@ -315,14 +327,11 @@ export async function runAgent({
       await killAllGroups(5000)
       recovered = null
       const seconds = Math.round(runDeadlineMs / 1000)
-      return {
-        exit: EXIT.watchdog,
-        record: fail('checkout', EXIT.watchdog, `the run's deadline (${seconds} s) passed while repairing the checkout; its children were killed`),
-      }
+      return fail('checkout', EXIT.watchdog, `the run's deadline (${seconds} s) passed while repairing the checkout; its children were killed`)
     }
     if (outcome.error) {
       recovered = null
-      return { exit: EXIT.failed, record: fail('checkout', EXIT.failed, outcome.error) }
+      return fail('checkout', EXIT.failed, outcome.error)
     }
   } finally {
     clearTimeout(timer)
@@ -361,26 +370,27 @@ export async function runAgent({
   const own = after && (after.runId === runId || (!after.runId && typeof after.at === 'string' && after.at >= spawnedAt))
   // One rule for "this run wrote a record": it carries this run's id. A record
   // adopted from such a job is stamped with it, or the launch line would find no
-  // record of its id, write its own and count the one failure twice.
-  if (own) return { exit: result.code ?? EXIT.failed, record: after.runId === runId ? after : stampRunId(paths.status, runId) }
+  // record of its id, write its own and count the one failure twice. Such a job
+  // does not know an install off origin/main either, so the mark goes in too.
+  if (own) return { exit: result.code ?? EXIT.failed, record: after.runId === runId ? after : stampRunId(paths.status, runId, offMainFacts(env)) }
   if (result.code === EXIT.lockHeld) {
     write('refused: the job found another feed run holding the lock')
     return { exit: EXIT.lockHeld, record: null }
   }
   if (result.timedOut) {
-    return {
-      exit: EXIT.watchdog,
-      record: fail('job', EXIT.watchdog, `the run's deadline (${Math.round(runDeadlineMs / 1000)} s) passed during the job; its process group was killed`),
-    }
+    return fail('job', EXIT.watchdog, `the run's deadline (${Math.round(runDeadlineMs / 1000)} s) passed during the job; its process group was killed`)
   }
   const exit = result.code && result.code !== 0 ? result.code : EXIT.failed
   const said = reasonFrom(tail)
   const how = said ? `exited ${result.code ?? result.signal} — ${said}` : describe(result)
-  return { exit, record: fail('job', exit, `the job ${how} without writing its record`) }
+  return fail('job', exit, `the job ${how} without writing its record`)
 }
 
-/** The record of a run stopped by `signal`; a checkout recovered before the stop stays recorded. */
-export function signalRecord(current, signal, at) {
+/**
+ * The record of a run stopped by `signal`; a checkout recovered before the stop,
+ * and an install made off origin/main, stay recorded.
+ */
+export function signalRecord(current, signal, at, env = process.env) {
   return {
     startedAt: current.startedAt,
     at,
@@ -391,12 +401,38 @@ export function signalRecord(current, signal, at) {
     runId: current.runId,
     recoveredCheckout: Boolean(current.recovered),
     ...(current.recovered ? { recovery: current.recovered } : {}),
+    ...offMainFacts(env),
   }
 }
 
-/** On SIGTERM/SIGINT: stop the job's group, and record the stop unless the job already did. */
+/**
+ * The record of the bootstrap's own crash (stage bootstrap): best effort, from
+ * what the environment still says.
+ */
+export function crashRecord(cause, at = new Date().toISOString(), env = process.env) {
+  return {
+    startedAt: at,
+    at,
+    outcome: 'failed',
+    stage: 'bootstrap',
+    exit: EXIT.failed,
+    reason: cleanLine(cause instanceof Error ? cause.message : String(cause)),
+    ...(env.OKOLOS_LAUNCH_ID ? { runId: env.OKOLOS_LAUNCH_ID } : {}),
+    recoveredCheckout: false,
+    ...offMainFacts(env),
+  }
+}
+
+/**
+ * On SIGTERM/SIGINT: mark the run as stopping (runAgent then records what the stop
+ * broke as the stop), stop the job's group, record the stop unless this run's
+ * record is already written, and exit 143. Returns the promise main waits on, so
+ * main never exits with its own code under it.
+ */
 function onSignal(signal, current) {
-  void (async () => {
+  if (current.stopping) return current.stopping
+  current.signal = signal
+  current.stopping = (async () => {
     await killAllGroups(5000)
     try {
       const paths = feedPaths()
@@ -407,6 +443,7 @@ function onSignal(signal, current) {
       process.exit(EXIT.signal)
     }
   })()
+  return current.stopping
 }
 
 async function main() {
@@ -415,6 +452,8 @@ async function main() {
     runId: process.env.OKOLOS_LAUNCH_ID || randomUUID(),
     startedAt: new Date().toISOString(),
     recovered: null,
+    signal: null,
+    stopping: null,
   }
   process.on('SIGTERM', () => onSignal('SIGTERM', current))
   process.on('SIGINT', () => onSignal('SIGINT', current))
@@ -426,7 +465,10 @@ async function main() {
     onRecovered: (what) => {
       current.recovered = what
     },
+    stopped: () => current.signal,
   })
+  // A stop ends the process from onSignal, after the job's group is gone.
+  if (current.stopping) await current.stopping
   // One line in launchd's own log too, where the silent failure used to be.
   if (record && exit !== EXIT.ok) {
     console.error(`feed-agent: ${record.outcome} in ${record.stage}: ${record.reason ?? `exit ${exit}`} (see ${feedPaths().log})`)
@@ -439,16 +481,7 @@ if (isMain(import.meta.filename)) {
     console.error(`feed-agent: ${cause instanceof Error ? cause.stack : String(cause)}`)
     // Best effort: a crash here (an unwritable log folder, say) still counts.
     try {
-      writeStatus(feedPaths().status, {
-        startedAt: new Date().toISOString(),
-        at: new Date().toISOString(),
-        outcome: 'failed',
-        stage: 'bootstrap',
-        exit: EXIT.failed,
-        reason: cleanLine(cause instanceof Error ? cause.message : String(cause)),
-        ...(process.env.OKOLOS_LAUNCH_ID ? { runId: process.env.OKOLOS_LAUNCH_ID } : {}),
-        recoveredCheckout: false,
-      })
+      writeStatus(feedPaths().status, crashRecord(cause))
     } catch {
       // Nothing left to write to; launchd's log holds the line above.
     }

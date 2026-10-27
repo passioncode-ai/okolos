@@ -1,7 +1,7 @@
 /** Types for `bootstrap.mjs` (see `bounded.d.mts` for why these are hand-written). */
 import type { BoundedOptions, BoundedResult } from './bounded.mjs'
 import type { FeedPaths } from './paths.mjs'
-import type { StatusRecord } from './status.mjs'
+import type { RunRecord, StatusRecord } from './status.mjs'
 
 type Tool = (command: string, args: string[], options: BoundedOptions) => Promise<BoundedResult>
 
@@ -39,6 +39,7 @@ export function signalRecord(
   current: { stage: string; runId: string; startedAt: string; recovered: string | null },
   signal: string,
   at: string,
+  env?: Record<string, string | undefined>,
 ): {
   startedAt: string
   at: string
@@ -49,7 +50,11 @@ export function signalRecord(
   runId: string
   recoveredCheckout: boolean
   recovery?: string
+  installedOffMain?: string
 }
+
+/** The record of the bootstrap's own crash (stage bootstrap). */
+export function crashRecord(cause: unknown, at?: string, env?: Record<string, string | undefined>): RunRecord
 
 export function runAgent(options?: {
   paths?: FeedPaths
@@ -63,6 +68,8 @@ export function runAgent(options?: {
   runDeadlineMs?: number
   onStage?: (stage: string) => void
   onRecovered?: (what: string) => void
+  /** The signal stopping the run, or null: a failure it causes is recorded as the stop. */
+  stopped?: () => string | null
   relay?: (line: string) => void
   [key: string]: unknown
 }): Promise<{ exit: number; record: StatusRecord | null }>

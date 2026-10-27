@@ -15,6 +15,14 @@ export function watchdogFrom(env: Record<string, string | undefined>): number
 
 export function sweepLeftovers(tmp?: string, now?: number): string[]
 
+/** The record of a run stopped by `signal`, with what the bootstrap told it. */
+export function signalRecord(
+  current: { stage: string; startedAt: string },
+  signal: string,
+  at: string,
+  env?: Record<string, string | undefined>,
+): RunRecord
+
 export function runJob(options?: {
   root?: string
   paths?: FeedPaths

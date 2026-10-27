@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { acquireLock } from './feed/lock.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { readStatus } from './feed/status.mjs'
-import { runJob, STALE_AFTER_MS, sweepLeftovers, WATCHDOG_MS, watchdogFrom } from './feed-job.mjs'
+import { runJob, signalRecord, STALE_AFTER_MS, sweepLeftovers, WATCHDOG_MS, watchdogFrom } from './feed-job.mjs'
 
 /**
  * The feed agent's run: bounded, exclusive, observable (LC-03), pinned (F2), with
@@ -294,6 +294,31 @@ describe('the record carries what the bootstrap knows (B-159, B-150)', () => {
     const w = world()
     await job(w, {}, { OKOLOS_INSTALLED_OFF_MAIN: 'sw/x at bbbbbbb, origin/main aaaaaaa (--allow-branch, t)' }).promise
     expect(readStatus(w.paths.status)).toMatchObject({ installedOffMain: 'sw/x at bbbbbbb, origin/main aaaaaaa (--allow-branch, t)' })
+  })
+
+  it('carries what the bootstrap told it into the record of a stop by signal, too', () => {
+    const env = { OKOLOS_RUN_ID: 'run-3', OKOLOS_RECOVERED_CHECKOUT: 'missing', OKOLOS_INSTALLED_OFF_MAIN: 'sw/x at b, origin/main a' }
+    expect(signalRecord({ stage: 'publish', startedAt: 's' }, 'SIGTERM', 'now', env)).toEqual({
+      startedAt: 's',
+      at: 'now',
+      outcome: 'failed',
+      stage: 'publish',
+      exit: 143,
+      reason: 'stopped by SIGTERM',
+      runId: 'run-3',
+      recoveredCheckout: true,
+      recovery: 'missing',
+      installedOffMain: 'sw/x at b, origin/main a',
+    })
+    expect(signalRecord({ stage: 'start', startedAt: 's' }, 'SIGINT', 'now', {})).toEqual({
+      startedAt: 's',
+      at: 'now',
+      outcome: 'failed',
+      stage: 'start',
+      exit: 143,
+      reason: 'stopped by SIGINT',
+      recoveredCheckout: false,
+    })
   })
 
   it('records false when nothing was recovered', async () => {

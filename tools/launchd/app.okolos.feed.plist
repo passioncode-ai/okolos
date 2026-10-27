@@ -38,7 +38,8 @@
     the installed copy gone, or node exiting non-zero (not 75, a run refused by the
     lock) without a record carrying this launch's id (OKOLOS_LAUNCH_ID). It writes
     feed-status.json itself with /bin/sh and coreutils only (outcome failed, stage
-    launch, exit, reason, time; consecutiveFailures counted on; the lastPublished
+    launch, exit, reason, time, installedOffMain when the variable below is set;
+    consecutiveFailures counted on; the lastPublished
     value copied alone, never a field written after it, so the record holds one
     runId, its own; a temp file, then mv), and one line to feed.log and to this
     file's log below.
@@ -76,8 +77,9 @@ if [ "$c" -ne 0 ] &amp;&amp; [ "$c" -ne 75 ] &amp;&amp; ! grep -q "\"runId\": \"
   l=$(sed -n '/^  "lastPublished": {$/,/^  }/p; /^  "lastPublished": [^{]/p' "$s" 2&gt;/dev/null | sed '$s/,$//')
   [ -n "$l" ] || l='  "lastPublished": null'
   r=$(printf '%s' "$why" | sed 's/\\/\\\\/g; s/"/\\"/g')
+  o=''; [ -z "$OKOLOS_INSTALLED_OFF_MAIN" ] || o=$(printf '\n  "installedOffMain": "%s",' "$(printf '%s' "$OKOLOS_INSTALLED_OFF_MAIN" | sed 's/\\/\\\\/g; s/"/\\"/g')")
   mkdir -p "$st" "$lg"; t="$s.$$.tmp"
-  printf '{\n  "startedAt": "%s",\n  "at": "%s",\n  "outcome": "failed",\n  "stage": "launch",\n  "exit": %s,\n  "reason": "%s",\n  "runId": "%s",\n  "recoveredCheckout": false,\n  "consecutiveFailures": %s,\n%s\n}\n' "$at" "$at" "$c" "$r" "$id" "$((${p:-0} + 1))" "$l" &gt; "$t" &amp;&amp; chmod 600 "$t" &amp;&amp; mv -f "$t" "$s"
+  printf '{\n  "startedAt": "%s",\n  "at": "%s",\n  "outcome": "failed",\n  "stage": "launch",\n  "exit": %s,\n  "reason": "%s",\n  "runId": "%s",%s\n  "recoveredCheckout": false,\n  "consecutiveFailures": %s,\n%s\n}\n' "$at" "$at" "$c" "$r" "$id" "$o" "$((${p:-0} + 1))" "$l" &gt; "$t" &amp;&amp; chmod 600 "$t" &amp;&amp; mv -f "$t" "$s"
   printf '%s failed in launch: %s\n' "$at" "$why" &gt;&gt; "$lg/feed.log"; chmod 600 "$lg/feed.log"
   echo "feed-agent: failed in launch: $why" &gt;&amp;2
 fi
@@ -94,8 +96,9 @@ exit "$c"</string>
     it from: a worktree of the clone the installer ran in, or, when that clone is
     gone too, a fresh clone of its origin (empty when it has none). The last is
     empty unless the agent was installed off origin/main with the installer's
-    allow-branch flag; then it names the branch and commits, and every run's
-    status carries it as installedOffMain.
+    allow-branch flag; then it names the branch and commits, and every record of
+    a run carries it as installedOffMain: the launch line's, the bootstrap's and
+    the job's, a stop by signal and a record adopted from an older job included.
   -->
   <key>EnvironmentVariables</key>
   <dict>
