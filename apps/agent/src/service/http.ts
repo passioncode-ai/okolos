@@ -177,6 +177,7 @@ export async function startService(options: StartOptions): Promise<RunningServic
   }
 
   const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+    // Defaults a route may replace: a header it sets or writes wins over these.
     for (const [name, value] of Object.entries(COMMON_HEADERS)) res.setHeader(name, value)
     const url = parseTarget(req.url, port)
     res.on('finish', () =>
@@ -219,8 +220,9 @@ export async function startService(options: StartOptions): Promise<RunningServic
         return
       }
       log.write('error', 'route failed', { path: url.pathname, error: errorName(error) })
+      // Headers already out: cut the connection, so the client cannot take half an answer for a whole one.
       if (!res.headersSent) json(res, 500, { error: 'internal' })
-      else res.end()
+      else res.destroy()
     }
   }
 

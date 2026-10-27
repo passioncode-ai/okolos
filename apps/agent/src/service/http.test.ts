@@ -47,7 +47,11 @@ async function start(
   options: Partial<StartOptions> = {},
 ): Promise<{ service: RunningService; dirs: ServiceDirs }> {
   const dirs = options.dirs ?? serviceDirs(tempHome())
-  const service = await startService({ port: 0, routes: [], ...options, dirs })
+  // A held lock must fail the test, never exit the test runner.
+  const exit = (code: number) => {
+    throw new Error(`the service asked to exit ${code}`)
+  }
+  const service = await startService({ port: 0, routes: [], exit, ...options, dirs })
   services.push(service)
   return { service, dirs }
 }
@@ -361,6 +365,83 @@ describe('a refusal is told to the caller before it is answered (onRefused)', ()
   })
 })
 
+describe('wrong methods, a taken port, a route that fails halfway, a route’s own headers', () => {
+  const protocol: ReadonlyArray<{ path: string; allow: string; wrong: string }> = [
+    { path: '/.well-known/fabric-service', allow: 'GET', wrong: 'POST' },
+    { path: '/fabric/v1/events', allow: 'GET', wrong: 'POST' },
+    { path: '/fabric/v1/login-code', allow: 'POST', wrong: 'GET' },
+    { path: '/fabric/v1/login?code=AAAAAAAAAAAAAAAAAAAAAAAA', allow: 'GET', wrong: 'POST' },
+  ]
+
+  for (const { path: target, allow, wrong } of protocol) {
+    it(`${wrong} ${target.split('?')[0]} is a 405 that names ${allow}`, async () => {
+      const { service, dirs } = await start()
+      const answer = await call(service.port, target, { method: wrong, headers: bearer(dirs) })
+      expect(answer.status).toBe(405)
+      expect(answer.headers.allow).toBe(allow)
+    })
+  }
+
+  it('a port another server holds fails the start and lets the lock go', async () => {
+    const holder = net.createServer()
+    await new Promise<void>((resolve) => holder.listen(0, '127.0.0.1', resolve))
+    const taken = (holder.address() as net.AddressInfo).port
+    try {
+      const dirs = serviceDirs(tempHome())
+      await expect(startService({ port: taken, dirs, routes: [] })).rejects.toThrow(/EADDRINUSE/)
+      const next = await start({ dirs })
+      expect((await call(next.service.port, '/.well-known/fabric-service')).status).toBe(200)
+    } finally {
+      await new Promise<void>((resolve) => holder.close(() => resolve()))
+    }
+  })
+
+  it('a route that fails after its headers went out cuts the answer short instead of passing it as whole', async () => {
+    const halfway: Route = async (_req, res, ctx) => {
+      if (ctx.url.pathname !== '/halfway') return false
+      res.writeHead(200, { 'Content-Type': 'text/plain' })
+      res.write('first half')
+      throw new Error('the second half failed')
+    }
+    const { service } = await start({ routes: [halfway] })
+    const complete = await new Promise<boolean>((resolve) => {
+      const request = http.request(
+        { host: '127.0.0.1', port: service.port, path: '/halfway', headers: { Host: `127.0.0.1:${service.port}` }, agent: false },
+        (response) => {
+          response.resume()
+          response.on('close', () => resolve(response.complete))
+        },
+      )
+      request.on('error', () => resolve(false))
+      request.end()
+    })
+    expect(complete).toBe(false)
+    expect((await call(service.port, '/.well-known/fabric-service')).status).toBe(200)
+  })
+
+  it('the shell’s CSP applies unless the route sets its own', async () => {
+    const page: Route = async (_req, res, ctx) => {
+      if (ctx.url.pathname === '/own') {
+        res.writeHead(200, { 'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'" })
+        res.end('page')
+        return true
+      }
+      if (ctx.url.pathname === '/plain') {
+        res.end('plain')
+        return true
+      }
+      return false
+    }
+    const { service } = await start({ routes: [page] })
+    expect((await call(service.port, '/own')).headers['content-security-policy']).toBe(
+      "default-src 'none'; script-src 'self'; style-src 'self'",
+    )
+    expect((await call(service.port, '/plain')).headers['content-security-policy']).toBe(
+      "default-src 'none'; frame-ancestors 'self'",
+    )
+  })
+})
+
 describe('GET /.well-known/fabric-service', () => {
   it('answers without a token, from memory, with who is answering', async () => {
     const { service } = await start()
@@ -463,7 +544,9 @@ describe('the host’s routes take the host token', () => {
 
     expect(operatorSession(codes, { headers: { cookie: `theme=dark; ${pair}` } })).toBe(true)
     expect(operatorSession(codes, { headers: {} })).toBe(false)
-    expect(operatorSession(codes, { headers: { cookie: `${pair.slice(0, -1)}0` } })).toBe(false)
+    // Tampered: the last hex digit of the MAC changed (to a digit it certainly is not).
+    const tampered = `${pair.slice(0, -1)}${pair.endsWith('0') ? '1' : '0'}`
+    expect(operatorSession(codes, { headers: { cookie: tampered } })).toBe(false)
     expect(operatorSession(codes, { headers: { cookie: 'fabric_session=v2.x.1.y.z' } })).toBe(false)
   })
 
