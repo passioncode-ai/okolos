@@ -180,7 +180,8 @@ export class CdpPipe {
     const { messages, pending } = splitFrames(this.pending, chunk)
     this.pending = pending
     for (const text of messages) {
-      const message = JSON.parse(text) as Incoming
+      const message = parse(text)
+      if (message === undefined) continue
       if (typeof message.id === 'number') {
         const waiting = this.waiting.get(message.id)
         if (waiting === undefined) continue
@@ -194,6 +195,20 @@ export class CdpPipe {
         }
       }
     }
+  }
+}
+
+/**
+ * One frame as a message, or undefined for a frame that is not a JSON object.
+ * Such a frame is skipped: thrown from the stream's handler, it would end the
+ * owner's process, and with it every other session on the pipe.
+ */
+function parse(text: string): Incoming | undefined {
+  try {
+    const value: unknown = JSON.parse(text)
+    return typeof value === 'object' && value !== null ? (value as Incoming) : undefined
+  } catch {
+    return undefined
   }
 }
 

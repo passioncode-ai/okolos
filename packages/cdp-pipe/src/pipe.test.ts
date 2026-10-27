@@ -120,6 +120,12 @@ describe('launching a browser on a pipe', () => {
     expect(await pipe.send('Fake.echo', { n: 1 }, 'S-2')).toEqual({ n: 1, sessionId: 'S-2' })
   })
 
+  it('skips a frame that is not JSON and keeps reading', async () => {
+    const pipe = await fake()
+    expect(await pipe.send('Fake.garbage')).toEqual({ after: 'garbage' })
+    expect(await pipe.send('Fake.echo', { still: 'reading' })).toEqual({ still: 'reading' })
+  })
+
   it('refuses a binary that does not exist', async () => {
     await expect(
       CdpPipe.launch({ binary: path.join(tmpdir(), 'okolos-no-such-browser'), args: [], userDataDir: PROFILE }),
