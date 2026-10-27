@@ -7,7 +7,8 @@
   "N-023: BRIDGE_VERBS, toolName, BridgeResult, refuse",
   "N-006: Journal.record до ответа",
   "N-007: Pairing.verify и запрос привязки",
-  "N-003: resource: pnpm-lock.yaml; N-008 правит lockfile после N-003"
+  "N-003: resource: pnpm-lock.yaml; N-008 правит lockfile после N-003",
+  "N-014: ключи каталога для CLI привязки и шима"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -20,6 +21,7 @@
    "apps/agent/src/door/guard.ts",
    "apps/agent/src/door/stdio-shim.ts",
    "apps/agent/src/cli/pair.ts",
+   "apps/agent/src/service/http.ts",
    "apps/agent/package.json",
    "pnpm-lock.yaml",
    "apps/agent/src/door/door.test.ts",
@@ -47,7 +49,7 @@
   "имя ../x и a/b: файл ключа называется по SHA-256 имени в hex внутри clients/, 0600 (ревью R6)",
   "ключ пишется во временный файл и переименовывается только после успешного забора; существующий файл заменяется только с --replace; привязка того же имени после отзыва проходит с --replace (ревью S5)",
   "маршруты /mcp, /pair, /pair/claim объявляют paths, и well-known показывает surfaces.mcp (проверка seam N-005 круг 2)",
-  "тексты, которые читает человек, идут ключами каталога apps/agent/_locales с проверкой Copylot; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
+  "тексты, которые читает человек, идут ключами каталога, которые заранее добавил N-014; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
   "долгий поток /mcp при остановке: дверь закрывает его сама до срока слива и пишет ответ в журнал; агент за stdio-шимом получает отказ контракта internal с retryable, а не голый 503 (product N-005 круг 3, риски)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/door apps/agent/src/cli && pnpm -s run typecheck && pnpm -s run i18n:sweep"
  ],

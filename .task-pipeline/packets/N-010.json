@@ -5,7 +5,8 @@
  "inputs": [
   "CdpTransport, CdpPipe.launch (N-022); launch сам добавляет --remote-debugging-pipe и --user-data-dir, AgentWindows их не передаёт (проверка seam N-002)",
   "N-022: CdpTransport, onExit, CdpError, timeoutMs на вызов",
-  "N-024: apps/agent: package.json, tsconfig"
+  "N-024: apps/agent: package.json, tsconfig",
+  "N-014: ключ события onCloseIncomplete"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -34,7 +35,7 @@
   "на настоящем Chrome: kill -9 браузера даёт CdpError kind exited у ожидающего запроса в пределах окна EXIT_AFTER_PIPE_MS (проверка seam N-022, риск 4)",
   "onCloseIncomplete при close() окна агента: демон пишет событие с pid, отмечает degraded источник window и не считает окно закрытым; спека §3 получает это исключение (проверка seam N-022)",
   "AgentWindows зовёт close() только с константой graceMs (close(NaN) в cdp-pipe может зависнуть: риск вердикта N-022); хелперы Chrome (crashpad) после kill -9 не остаются сиротами",
-  "тексты, которые читает человек, идут ключами каталога apps/agent/_locales с проверкой Copylot; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
+  "тексты, которые читает человек, идут ключами каталога, которые заранее добавил N-014; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/window && pnpm -s run typecheck && pnpm -s run i18n:sweep"
  ],
  "guards": [
