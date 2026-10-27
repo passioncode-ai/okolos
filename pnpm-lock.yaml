@@ -60,6 +60,8 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(happy-dom@20.11.1)
 
+  apps/agent: {}
+
   apps/extension:
     dependencies:
       '@okolos/contracts':
@@ -141,6 +143,8 @@ importers:
       wrangler:
         specifier: 4.146.0
         version: 4.146.0(@types/node@22.20.1)
+
+  packages/cdp-pipe: {}
 
   packages/contracts: {}
 

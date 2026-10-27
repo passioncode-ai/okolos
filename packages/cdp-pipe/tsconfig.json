@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "dist", "types": ["node"] },
+  "include": ["src/**/*.ts"],
+  // Tests are not part of a built package (same reason as core-gate). The fake
+  // browser under src/fixtures/ is a test fixture and an .mjs, so it is not built.
+  "exclude": ["src/**/*.test.ts"]
+}
