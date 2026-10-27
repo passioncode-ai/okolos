@@ -16,13 +16,24 @@
  * 0600 in a 0700 folder. The retention sweep drops whole days past the window and rewrites the
  * one day that straddles it.
  */
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, unlinkSync } from 'node:fs'
 import { open } from 'node:fs/promises'
 import path from 'node:path'
 
 import { BRIDGE_REFUSALS, originOf, refuse, type BridgeRefusal, type BridgeVerb } from '@okolos/contracts'
 
+import { atomicWrite } from '../fabric/fabric-service.mjs'
 import type { RefusalReason } from '../service/http.js'
+
+/**
+ * Days an entry is kept: the window of the extension's own journal (`RETENTION_DAYS.journal` in
+ * @okolos/storage), so the person is told one number. The daemon does not import the extension's
+ * storage package; the test holds the two equal.
+ */
+export const RETENTION_DAYS_JOURNAL = 90
+
+const DAY_MS = 24 * 60 * 60 * 1000
+const DAY_FILE = /^(\d{4}-\d{2}-\d{2})\.jsonl$/
 
 /**
  * Calls that live outside any task. Named and spelled as `BridgeSessionVerb` in
@@ -168,6 +179,62 @@ export class Journal {
   static open(dir: string, options: { retentionDays: number }): Journal {
     mkdirSync(dir, { recursive: true, mode: 0o700 })
     return new Journal(dir, options.retentionDays)
+  }
+
+  /** The newest `limit` entries across days, oldest first. Lines that do not parse are skipped. */
+  recent(limit: number): JournalEntry[] {
+    const found: JournalEntry[] = []
+    for (const day of this.days().reverse()) {
+      if (found.length >= limit) break
+      found.unshift(...this.read(day))
+    }
+    return limit <= 0 ? [] : found.slice(-limit)
+  }
+
+  /**
+   * Drops every entry older than the retention window at `now` (ms since the epoch) and returns
+   * how many went. A day wholly past the window is deleted; the day the window's edge falls in is
+   * rewritten atomically without its older entries. The daemon calls this at start and once a day.
+   */
+  sweep(now: number): number {
+    const horizon = now - this.retentionDays * DAY_MS
+    let removed = 0
+    for (const day of this.days()) {
+      const start = Date.parse(`${day}T00:00:00.000Z`)
+      if (start >= horizon) continue
+      const entries = this.read(day)
+      if (start + DAY_MS <= horizon) {
+        unlinkSync(path.join(this.dir, `${day}.jsonl`))
+        removed += entries.length
+        continue
+      }
+      const kept = entries.filter((entry) => Date.parse(entry.at) >= horizon)
+      if (kept.length === entries.length) continue
+      atomicWrite(path.join(this.dir, `${day}.jsonl`), kept.map((entry) => `${JSON.stringify(entry)}\n`).join(''), 0o600)
+      removed += entries.length - kept.length
+    }
+    return removed
+  }
+
+  /** The days this journal holds a file for, oldest first. */
+  private days(): string[] {
+    return readdirSync(this.dir)
+      .map((name) => DAY_FILE.exec(name)?.[1])
+      .filter((day): day is string => day !== undefined)
+      .sort()
+  }
+
+  private read(day: string): JournalEntry[] {
+    const entries: JournalEntry[] = []
+    for (const line of readFileSync(path.join(this.dir, `${day}.jsonl`), 'utf8').split('\n')) {
+      if (line === '') continue
+      try {
+        entries.push(checkEntry(JSON.parse(line) as JournalEntry))
+      } catch {
+        // A line cut short by a power loss, or edited by hand: not an entry, and not fatal.
+      }
+    }
+    return entries
   }
 
   /** Appends the entry and fsyncs it before resolving; rejects when it is not written. */

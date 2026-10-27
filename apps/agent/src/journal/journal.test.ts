@@ -4,9 +4,13 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+// Test-only: the daemon does not import the extension's storage; this pins the two windows together.
+import { RETENTION_DAYS } from '@okolos/storage'
+
 import {
   answerAfterRecord,
   Journal,
+  RETENTION_DAYS_JOURNAL,
   type AnyBridgeVerb,
   type BridgeSessionVerb,
   type JournalEntry,
@@ -183,5 +187,46 @@ describe('the journal holds no page text and no field value', () => {
 
     expect(await answerAfterRecord(journal, withText, (refusal) => void sent.push(refusal ?? 'the page content'))).toBe(false)
     expect(sent).toEqual([expect.objectContaining({ success: false })])
+  })
+})
+
+describe('retention: the journal keeps what the extension’s journal keeps', () => {
+  const DAY = 24 * 60 * 60 * 1000
+  const now = Date.parse('2026-10-27T12:00:00.000Z')
+  const at = (msAgo: number) => new Date(now - msAgo).toISOString()
+
+  it('keeps 90 days, the number the extension’s journal keeps (RETENTION_DAYS.journal)', () => {
+    expect(RETENTION_DAYS_JOURNAL).toBe(RETENTION_DAYS.journal)
+    expect(RETENTION_DAYS_JOURNAL).toBe(90)
+  })
+
+  it('sweep drops every entry older than the window and keeps the rest, in order', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: RETENTION_DAYS_JOURNAL })
+    const tooOld: JournalEntry = { ...answered, at: at(400 * DAY) }
+    const justPast: JournalEntry = { ...answered, at: at(RETENTION_DAYS_JOURNAL * DAY + 60_000) }
+    const justInside: JournalEntry = { ...answered, at: at(RETENTION_DAYS_JOURNAL * DAY - 60_000) }
+    const sameDayInside: JournalEntry = { at: at(RETENTION_DAYS_JOURNAL * DAY - 120_000), outcome: 'rejected', code: 'bad_host' }
+    const yesterday: JournalEntry = { ...answered, at: at(DAY), outcome: 'refused', code: 'busy' }
+    for (const entry of [tooOld, justPast, justInside, sameDayInside, yesterday]) await journal.record(entry)
+
+    expect(journal.sweep(now)).toBe(2)
+
+    expect(onDisk(dir)).toEqual([justInside, sameDayInside, yesterday])
+    expect(journal.recent(10)).toEqual([justInside, sameDayInside, yesterday])
+    // A day wholly past the window leaves no file behind.
+    expect(readdirSync(dir)).not.toContain(`${tooOld.at.slice(0, 10)}.jsonl`)
+    expect(journal.sweep(now)).toBe(0)
+  })
+
+  it('recent gives the newest entries across days, oldest first', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: RETENTION_DAYS_JOURNAL })
+    const entries: JournalEntry[] = [3, 2, 1, 0].map((days) => ({ ...answered, at: at(days * DAY) }))
+    for (const entry of entries) await journal.record(entry)
+
+    expect(journal.recent(2)).toEqual(entries.slice(-2))
+    expect(journal.recent(10)).toEqual(entries)
+    expect(journal.recent(0)).toEqual([])
   })
 })
