@@ -89,7 +89,7 @@ function holdsRules(file: string): boolean {
  */
 const VENDORED: Record<string, string> = {
   'apps/agent/src/fabric/':
-    'the Fabric service kit for Node (Okolos Bridge Б1, node N-005), installed by `fabric_kit.py install apps/agent/src/fabric --lang node --module fabric-service` from the fabric-agent-adapter plugin; its tests run in that plugin, `fabric_kit.py status` says whether each copy is current, and the service that uses it is tested in apps/agent/src/service.',
+    'the Fabric service kit for Node (Okolos Bridge Б1, node N-005), installed by `fabric_kit.py install apps/agent/src/fabric --lang node --module fabric-service` from the fabric-agent-adapter plugin; its tests run in that plugin; apps/agent/src/fabric/kit.test.ts holds every file to the SHA-256 recorded in kit-manifest.json and our declarations to its exports, and the service that uses it is tested in apps/agent/src/service.',
 }
 
 const modules = ['packages', 'apps', 'tools']
