@@ -5,7 +5,8 @@
  "inputs": [
   "CensusEntry (bridge.ts)",
   "N-023: CensusEntry",
-  "N-024: apps/agent: package.json, tsconfig"
+  "N-024: apps/agent: package.json, tsconfig",
+  "N-014: ключи причин переписи"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -27,7 +28,7 @@
   "Chrome человека без флагов автоматизации: keep, «браузер человека»",
   "chrome-headless-shell с мёртвым родителем на $TMPDIR-профиле: keep=false, причина «сирота», но ничего не завершается",
   "процесс с --token=SECRET в argv: в ответе нет SECRET, есть путь, pid, владелец, возраст, причина и флаги автоматизации (ревью F11)",
-  "тексты, которые читает человек, идут ключами каталога apps/agent/_locales с проверкой Copylot; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
+  "тексты, которые читает человек, идут ключами каталога, которые заранее добавил N-014; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/hygiene && pnpm -s run typecheck && pnpm -s run i18n:sweep"
  ],
  "guards": [

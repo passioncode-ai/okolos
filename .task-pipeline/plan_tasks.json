@@ -267,13 +267,15 @@
    "N-023",
    "N-006",
    "N-007",
-   "N-003"
+   "N-003",
+   "N-014"
   ],
   "req": [
    "REQ-57"
   ],
   "files": [
    "Create: apps/agent/src/door/door.ts, apps/agent/src/door/guard.ts, apps/agent/src/door/stdio-shim.ts, apps/agent/src/cli/pair.ts",
+   "Modify: apps/agent/src/service/http.ts (RouteContext получает сигнал остановки AbortSignal, чтобы дверь закрыла долгий поток /mcp до срока слива; проверка seam N-024)",
    "Modify: apps/agent/package.json (зависимости @modelcontextprotocol/server, @modelcontextprotocol/node, zod), pnpm-lock.yaml",
    "Test: apps/agent/src/door/door.test.ts, apps/agent/src/door/guard.test.ts, apps/agent/src/door/stdio-shim.test.ts, apps/agent/src/cli/pair.test.ts"
   ],
@@ -295,7 +297,7 @@
    "имя ../x и a/b: файл ключа называется по SHA-256 имени в hex внутри clients/, 0600 (ревью R6)",
    "ключ пишется во временный файл и переименовывается только после успешного забора; существующий файл заменяется только с --replace; привязка того же имени после отзыва проходит с --replace (ревью S5)",
    "маршруты /mcp, /pair, /pair/claim объявляют paths, и well-known показывает surfaces.mcp (проверка seam N-005 круг 2)",
-   "тексты, которые читает человек, идут ключами каталога apps/agent/_locales с проверкой Copylot; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
+   "тексты, которые читает человек, идут ключами каталога, которые заранее добавил N-014; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
    "долгий поток /mcp при остановке: дверь закрывает его сама до срока слива и пишет ответ в журнал; агент за stdio-шимом получает отказ контракта internal с retryable, а не голый 503 (product N-005 круг 3, риски)"
   ],
   "dod": "vitest apps/agent/src/door зелёный"
@@ -331,7 +333,8 @@
   "title": "K4: окно агента",
   "deps": [
    "N-022",
-   "N-024"
+   "N-024",
+   "N-014"
   ],
   "req": [
    "REQ-61"
@@ -353,7 +356,7 @@
    "на настоящем Chrome: kill -9 браузера даёт CdpError kind exited у ожидающего запроса в пределах окна EXIT_AFTER_PIPE_MS (проверка seam N-022, риск 4)",
    "onCloseIncomplete при close() окна агента: демон пишет событие с pid, отмечает degraded источник window и не считает окно закрытым; спека §3 получает это исключение (проверка seam N-022)",
    "AgentWindows зовёт close() только с константой graceMs (close(NaN) в cdp-pipe может зависнуть: риск вердикта N-022); хелперы Chrome (crashpad) после kill -9 не остаются сиротами",
-   "тексты, которые читает человек, идут ключами каталога apps/agent/_locales с проверкой Copylot; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)"
+   "тексты, которые читает человек, идут ключами каталога, которые заранее добавил N-014; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)"
   ],
   "dod": "vitest apps/agent/src/window зелёный на этой машине с Chrome stable"
  },
@@ -375,7 +378,8 @@
   "files": [
    "Create: apps/agent/src/agent.ts (createAgent), apps/agent/src/main.ts (команды serve, pair, mcp-stdio), apps/agent/src/verbs/verbs.ts, apps/agent/src/verbs/probe.ts, tools/build-agent.mjs (бандл демона и пробника, вместе с apps/agent/src/fabric)",
    "Modify: apps/agent/package.json (bin okolos-agent → ./src/main.ts), tools/imports.mjs (бандл агента как точка входа)",
-   "Test: apps/agent/src/agent.test.ts, apps/agent/src/verbs/verbs.test.ts, apps/agent/src/verbs/skeleton.chrome.test.ts"
+   "Test: apps/agent/src/agent.test.ts, apps/agent/src/verbs/verbs.test.ts, apps/agent/src/verbs/skeleton.chrome.test.ts",
+   "Modify: apps/agent/src/service/http.ts, apps/agent/src/service/events.ts (обработчик 'error' сервера; предупреждение о вычищенных строках не теряется при неудачном старте; close() ждёт хуки onRefused; комментарии events.ts без degraded; проверки N-024)"
   ],
   "consumes": "Tasks и checkLanded (N-009), AgentWindows (N-010), Journal и answerAfterRecord (N-006), doorRoute, pair, mcp-stdio (N-008), buildSnapshot, snapshotVerdict, paginate (N-003, N-004), census и readCensus (N-012), VerbIO, toolName, canonicalVerb, isLocalAddress, toSnapshotFinding (N-023), service из N-024 (capStdoutLog, buildIdentity с корнем релиза), runProbe (бандл apps/extension/src/agent-probe.ts)",
   "produces": "`createAgent({home?, port, allowLoopbackForTests?, extraChromeArgs?}): Promise<Agent>` (каталоги из serviceDirs(home); тесты передают временный home; журнал, привязки и окна строятся в setup N-005 после замка, проверка seam N-005) в src/agent.ts: служба, дверь, задачи, окна, журнал, перепись; onRevoke(agentId) закрывает задачи агента и их окна (аудит #13); таймер Journal.sweep раз в сутки (аудит #30); main.ts: serve → createAgent, pair, mcp-stdio; bin okolos-agent указывает на собранный бандл (исходники импортируют ./x.js, обычный node их не запустит; проверка seam N-005 круг 2); инструменты MCP под toolName: session_open, open, snapshot, read, get, waitFor, close, hygiene_census; схемы zod типа z.ZodType<VerbIO[V]['input']> (аудит #26); журнал хранит canonicalVerb (аудит #19); SessionOpenResult.sessionId = Task.id, cdpSessionId не уходит агенту (аудит #28); находки только через toSnapshotFinding",
@@ -403,7 +407,9 @@
    "вторая копия демона на том же home выходит с 75, не открыв журнал, хранилище привязок и Chrome (setup после замка, проверка seam N-005)",
    "отказы двери до разбора пишутся в журнал через onRefused оболочки N-005 с DoorRejection (проверка seam N-005)",
    "CdpError превращается в отказ контракта: kind exited/closed → browser_offline, ошибка CDP о пропавшей цели (cdpCode) → tab_gone, timeout → internal; тест на каждый (проверка seam N-022)",
-   "createAgent передаёт оболочке N-005 version, buildRoot и localesDir; при неизвестном каталоге строк служба не стартует молча с ключами вместо фраз (отчёт N-005, fix 1)"
+   "createAgent передаёт оболочке N-005 version, buildRoot и localesDir; при неизвестном каталоге строк служба не стартует молча с ключами вместо фраз (отчёт N-005, fix 1)",
+   "в журнал агентов попадают только отказы маршрутов двери (/mcp, /pair, /pair/claim); опросы Fabric и загрузки страницы во время остановки туда не пишутся (проверки N-024)",
+   "сбой accept (ошибка сервера после bind) не завершает демон; close() дожидается начатых onRefused; предупреждение о вычищенных строках доходит до событий и после неудачного старта (проверка unit N-024)"
   ],
   "dod": "vitest apps/agent/src/verbs зелёный на Chrome stable"
  },
@@ -412,7 +418,8 @@
   "title": "K5: перепись процессов",
   "deps": [
    "N-023",
-   "N-024"
+   "N-024",
+   "N-014"
   ],
   "req": [
    "REQ-62"
@@ -429,7 +436,7 @@
    "Chrome человека без флагов автоматизации: keep, «браузер человека»",
    "chrome-headless-shell с мёртвым родителем на $TMPDIR-профиле: keep=false, причина «сирота», но ничего не завершается",
    "процесс с --token=SECRET в argv: в ответе нет SECRET, есть путь, pid, владелец, возраст, причина и флаги автоматизации (ревью F11)",
-   "тексты, которые читает человек, идут ключами каталога apps/agent/_locales с проверкой Copylot; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)"
+   "тексты, которые читает человек, идут ключами каталога, которые заранее добавил N-014; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)"
   ],
   "dod": "vitest apps/agent/src/hygiene зелёный"
  },
@@ -466,14 +473,14 @@
    "Modify: tools/locales.test.ts (каталог демона: одинаковые ключи в двух языках, плейсхолдеры объявлены)"
   ],
   "consumes": "—",
-  "produces": "строки страницы; число ключей меряется командой по каталогу ru (аудит #34); термины раздела «Мост для агентов»",
+  "produces": "строки страницы; число ключей меряется командой по каталогу ru (аудит #34); термины раздела «Мост для агентов»; ключи для текстов, которые читает человек, у N-008 (CLI привязки: код, ожидание, отказ; шим без ключа), N-010 (событие onCloseIncomplete с pid), N-012 (причины «не трогать» переписи), каждая через copylot_check; термин «вызов» в terminology.md: любое обращение к службе (агента к двери, страницы или Fabric к службе), его используют pairedSince и eventDrainCutOff (проверки N-024)",
   "tests": [
    "оба каталога с одинаковыми ключами; каждый $X$ объявлен в placeholders",
    "python3 docs/brand/lint.py → 0",
    "ключ строки rejection_door в обоих каталогах для отказов двери до разбора; copylot_check (seam N-001 круг 3, break 3)",
    "refusal_invalid_scope говорит «этого устройства»/«this device», как остальной продукт, и читается внутри строки refusalLine без двух двоеточий подряд; copylot_check на собранной строке (проверка product N-001 круг 2)",
    "ключи taskProfileAgent и taskProfileDisposable в обоих каталогах, copylot_check (аудит #20)",
-   "решить, идут ли через каталог тексты службы N-005 (занятый замок, события, 503): человек читает события в Fabric Dashboards"
+   "тексты службы уже идут через каталог (N-024): служба не стартует без своих ключей; N-014 переносит в каталог английские тексты набора Fabric (403, занятый замок) или записывает, почему они остаются протокольными"
   ],
   "dod": "строки и термины сделаны на стадии 3; узел добавляет проверку каталога демона в tools/locales.test.ts"
  },
@@ -512,7 +519,8 @@
    "GET /api/journal выгружает журнал агентов (JSONL, без содержимого страниц) для [data-role=agent-journal-link] (аудит #40)",
    "состояние «сессия истекла» на SCR-23 и SCR-24: страница отвечает 401, хост входит заново, экран называет причину; запись в screens.md (проверка product N-005)",
    "страница ставит свой Content-Security-Policy (script-src 'self', без inline) и читает сессию через operatorSession запущенной службы (проверка seam N-005)",
-   "маршрут страницы объявляет paths /dashboard и /api, well-known показывает surfaces.dashboard; таблица действий проходит проверку набора при старте (проверка seam N-005 круг 2)"
+   "маршрут страницы объявляет paths /dashboard и /api, well-known показывает surfaces.dashboard; таблица действий проходит проверку набора при старте (проверка seam N-005 круг 2)",
+   "состояние «служба останавливается» на SCR-23 и SCR-24: страница получает 503 во время слива и говорит об этом (проверка product N-024)"
   ],
   "dod": "vitest apps/agent/src/dashboard зелёный; SCN-044, SCN-045 переведены в built в том же изменении, python3 docs/ux/lint.py 0"
  },
@@ -622,7 +630,8 @@
    "REQ-69"
   ],
   "files": [
-   "Modify: AGENTS.md (Commands: MCP; Lifecycle: app.okolos.agent), docs/README.md (Статус, карта кода), docs/privacy.md (демон не выходит в сеть; его хранилища со сроками: события службы (7 дней или 1000; названы иначе, чем «журнал событий» расширения), лог, токен хоста, сессии, хранилище привязок, журнал агентов; проверка product N-005), docs/brand/facts.md, docs/backlog.md (Touch ID для подтверждения: строка на Б2), docs/superpowers/backlog.md, SECURITY.md (граница угроз Б1)"
+   "Modify: AGENTS.md (Commands: MCP; Lifecycle: app.okolos.agent), docs/README.md (Статус, карта кода), docs/privacy.md (демон не выходит в сеть; его хранилища со сроками: события службы (7 дней или 1000; названы иначе, чем «журнал событий» расширения), лог, токен хоста, сессии, хранилище привязок, журнал агентов; проверка product N-005), docs/brand/facts.md, docs/backlog.md (Touch ID для подтверждения: строка на Б2), docs/superpowers/backlog.md, SECURITY.md (граница угроз Б1)",
+   "Modify: AGENTS.md (LC-15: команда очистки включает apps/agent/dist, проверка seam N-024)"
   ],
   "consumes": "команды N-016, N-017",
   "produces": "доки в синхроне",
