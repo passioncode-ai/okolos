@@ -520,7 +520,7 @@
       "id": "N-013",
       "title": "UX: FLW-21/22 к экранам, SCR привязки и активности, вайрфреймы, сценарии",
       "owner": "ux",
-      "status": "pending",
+      "status": "parked",
       "blocked_by": [
         "N-024"
       ],
@@ -538,13 +538,13 @@
       ],
       "risk": "R2",
       "certification": {
-        "round": 19,
+        "round": 20,
         "tiers": {
           "unit": "pass",
-          "seam": "fail",
+          "seam": "pass",
           "product": "fail"
         },
-        "at": "504c9fab60dc44b3805e2c736752bee95c161183",
+        "at": "a719fe7ca1f5b7f1b9d519c0bd0bbac4e81f0c96",
         "history": [
           {
             "unit": "fail",
@@ -640,6 +640,11 @@
             "unit": "pass",
             "seam": "fail",
             "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
           }
         ],
         "kinds": [
@@ -661,10 +666,12 @@
           "blind",
           "blind",
           "blind",
+          "blind",
           "blind"
         ],
-        "tree": "7b4ec656e016a3ac32cf00af2f767603e0aa5731"
-      }
+        "tree": "8eed553e256485eb293ac3178107958c1ca3246d"
+      },
+      "parked_reason": "certification ceiling: 20 failing round(s), ceiling 20; failing tier(s) product; stuck on product; first break apps/extension/_locales/ru/messages.json:1887 (storageResetNote, en twin), packages/ui/src/storage/storage-problem.ts:103, docs/ux/scenarios.md:747 SCN-032, docs/backlog.md B-156: A neighbouring extension string becomes false once Okolos Agent is installed, and nothing records it. The SCR-20 storage-problem screen says «Очистка удалит всё, что Okolos хранит на этом устройстве: находки, журнал, …» / 'Clearing removes everything Okolos kept on this device'. With Okolos Agent on the device, its access list, agents' journal, service events, logs, agent profile (with what sites keep from sign-ins) and clients/ keys all survive that clearing. N-013 handled the same collision for SCN-023 and SCN-024 (scope lines, B-156), and terminology.md cites SCR-20's «Очистить локальные данные», but SCN-032, storageResetNote, B-156 and every plan node leave this sentence out; check: grep -n 'storageResetNote\\|SCN-032' docs/backlog.md prints a row, and grep -n 'Okolos Agent' docs/ux/scenarios.md shows a hit inside SCN-032; then judgement: SCN-032 reads true for a device with Okolos Agent installed. Blocker row owed on the board"
     },
     {
       "id": "N-014",
@@ -1556,6 +1563,11 @@
       "node": "N-007",
       "why": "certified at all 3 tiers in round 10",
       "precondition": "5ff2e73808dbaf8c6b2f04b795ba499424e3e8b9"
+    },
+    {
+      "verb": "park",
+      "node": "N-013",
+      "why": "certification ceiling: 20 failing round(s), ceiling 20; failing tier(s) product; stuck on product; first break apps/extension/_locales/ru/messages.json:1887 (storageResetNote, en twin), packages/ui/src/storage/storage-problem.ts:103, docs/ux/scenarios.md:747 SCN-032, docs/backlog.md B-156: A neighbouring extension string becomes false once Okolos Agent is installed, and nothing records it. The SCR-20 storage-problem screen says «Очистка удалит всё, что Okolos хранит на этом устройстве: находки, журнал, …» / 'Clearing removes everything Okolos kept on this device'. With Okolos Agent on the device, its access list, agents' journal, service events, logs, agent profile (with what sites keep from sign-ins) and clients/ keys all survive that clearing. N-013 handled the same collision for SCN-023 and SCN-024 (scope lines, B-156), and terminology.md cites SCR-20's «Очистить локальные данные», but SCN-032, storageResetNote, B-156 and every plan node leave this sentence out; check: grep -n 'storageResetNote\\|SCN-032' docs/backlog.md prints a row, and grep -n 'Okolos Agent' docs/ux/scenarios.md shows a hit inside SCN-032; then judgement: SCN-032 reads true for a device with Okolos Agent installed. Blocker row owed on the board"
     }
   ]
 }
