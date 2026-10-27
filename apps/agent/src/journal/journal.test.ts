@@ -12,6 +12,7 @@ import { BRIDGE_REFUSALS, BRIDGE_SESSION_VERBS, BRIDGE_VERBS, toolName, type Any
 import {
   answerAfterRecord,
   Journal,
+  JournalError,
   JOURNAL_REFUSAL_CODES,
   journalVerbOf,
   REJECTION_CODES,
@@ -103,14 +104,14 @@ describe('an answer that is not in the journal is not sent (ADR-0019)', () => {
     const journal = Journal.open(dir, { retentionDays: 90 })
     chmodSync(dir, 0o500)
     try {
-      await expect(journal.record(answered)).rejects.toThrow()
+      await expect(journal.record(answered)).rejects.toMatchObject({ name: 'JournalError', code: 'no_permission' })
 
       const sent: unknown[] = []
       const recorded = await answerAfterRecord(journal, answered, (refusal) => {
         sent.push(refusal ?? 'the page content')
       })
 
-      expect(recorded).toBe(false)
+      expect(recorded).toEqual({ recorded: false, cause: 'no_permission' })
       expect(sent).toEqual([
         { success: false, error: { code: 'internal', message: expect.any(String) as string, retryable: true } },
       ])
@@ -130,8 +131,52 @@ describe('an answer that is not in the journal is not sent (ADR-0019)', () => {
       seenAtSend.push(onDisk(dir))
     })
 
-    expect(recorded).toBe(true)
+    expect(recorded).toEqual({ recorded: true })
     expect(seenAtSend).toEqual([[answered]])
+  })
+})
+
+describe('a failed write tells its caller why, in a closed set of codes (journalError)', () => {
+  /** Makes every write the journal attempts fail with this errno. */
+  async function failWrites(errno: string): Promise<void> {
+    const proto = (await fileHandlePrototype()) as unknown as { write: () => Promise<never> }
+    vi.spyOn(proto, 'write').mockImplementation(() =>
+      Promise.reject(Object.assign(new Error(`${errno}: simulated`), { code: errno })),
+    )
+  }
+
+  for (const [errno, cause] of [
+    ['ENOSPC', 'no_space'],
+    ['EDQUOT', 'no_space'],
+    ['EACCES', 'no_permission'],
+    ['EPERM', 'no_permission'],
+    ['EROFS', 'no_permission'],
+    ['EIO', 'other'],
+  ] as const) {
+    it(`${errno} is ${cause}, from record and from answerAfterRecord`, async () => {
+      const journal = Journal.open(temp(), { retentionDays: 90 })
+      await failWrites(errno)
+
+      const error = await journal.record(answered).catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(JournalError)
+      expect(error).toMatchObject({ code: cause })
+
+      const sent: unknown[] = []
+      expect(await answerAfterRecord(journal, answered, (refusal) => void sent.push(refusal ?? 'the page content'))).toEqual({
+        recorded: false,
+        cause,
+      })
+      expect(sent).toEqual([expect.objectContaining({ success: false, error: expect.objectContaining({ code: 'internal' }) as unknown })])
+    })
+  }
+
+  it('the error names the cause and not the path or the entry', async () => {
+    const journal = Journal.open(temp(), { retentionDays: 90 })
+    await failWrites('ENOSPC')
+    const error = (await journal.record(answered).catch((e: unknown) => e)) as Error
+    expect(error.message).not.toContain(journal.dir)
+    expect(error.message).not.toContain('claude-code')
+    expect(error.message).toContain('no_space')
   })
 })
 
@@ -194,7 +239,10 @@ describe('the journal holds no page text and no field value', () => {
     const sent: unknown[] = []
     const withText = { ...answered, text: 'page text' } as unknown as JournalEntry
 
-    expect(await answerAfterRecord(journal, withText, (refusal) => void sent.push(refusal ?? 'the page content'))).toBe(false)
+    expect(await answerAfterRecord(journal, withText, (refusal) => void sent.push(refusal ?? 'the page content'))).toEqual({
+      recorded: false,
+      cause: 'other',
+    })
     expect(sent).toEqual([expect.objectContaining({ success: false })])
   })
 })

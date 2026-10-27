@@ -208,6 +208,50 @@ function includes(list: readonly string[], value: unknown): boolean {
   return typeof value === 'string' && list.includes(value)
 }
 
+/** Why the journal could not write an entry, from the errno: the `$WHAT$` of `journalError`. */
+export type JournalWriteFailure = 'no_space' | 'no_permission' | 'other'
+
+/** Why the journal could not be read, from the errno: the `$WHAT$` of `journalUnreadable`. */
+export type JournalReadFailure = 'no_permission' | 'unreadable' | 'other'
+
+export type JournalFailure = JournalWriteFailure | JournalReadFailure
+
+/**
+ * The journal could not write or read. `code` is the closed reason the page names; the message
+ * names the operation and the code, never a path or an entry, and the errno stays in `cause` for
+ * the daemon's log.
+ */
+export class JournalError<C extends JournalFailure = JournalFailure> extends Error {
+  constructor(
+    readonly code: C,
+    readonly operation: 'write' | 'read' | 'export',
+    options?: { cause?: unknown },
+  ) {
+    // i18n-exempt: read in the daemon's log by a developer; the page names `code` through its catalogue
+    super(`journal ${operation} failed: ${code}`, options)
+    this.name = 'JournalError'
+  }
+}
+
+function errnoOf(error: unknown): string | undefined {
+  const code = (error as { code?: unknown } | null)?.code
+  return typeof code === 'string' ? code : undefined
+}
+
+function writeFailure(error: unknown): JournalWriteFailure {
+  switch (errnoOf(error)) {
+    case 'ENOSPC':
+    case 'EDQUOT':
+      return 'no_space'
+    case 'EACCES':
+    case 'EPERM':
+    case 'EROFS':
+      return 'no_permission'
+    default:
+      return 'other'
+  }
+}
+
 export class Journal {
   private constructor(
     readonly dir: string,
@@ -280,21 +324,29 @@ export class Journal {
     return entries
   }
 
-  /** Appends the entry and fsyncs it before resolving; rejects when it is not written. */
+  /**
+   * Appends the entry and fsyncs it before resolving. Rejects with InvalidJournalEntry for an
+   * entry it will not write, and with JournalError (no_space, no_permission, other) when the disk
+   * did not take it.
+   */
   async record(entry: JournalEntry): Promise<void> {
     const written = checkEntry(entry)
     const day = new Date(written.at).toISOString().slice(0, 10)
-    const handle = await open(path.join(this.dir, `${day}.jsonl`), 'a+', 0o600)
     try {
-      // A last line cut short by a crash gets its newline first, so this entry is a line of its own.
-      const { size } = await handle.stat()
-      const last = Buffer.alloc(1)
-      if (size > 0) await handle.read(last, 0, 1, size - 1)
-      const torn = size > 0 && last[0] !== 0x0a
-      await handle.write(`${torn ? '\n' : ''}${JSON.stringify(written)}\n`)
-      await handle.sync()
-    } finally {
-      await handle.close()
+      const handle = await open(path.join(this.dir, `${day}.jsonl`), 'a+', 0o600)
+      try {
+        // A last line cut short by a crash gets its newline first, so this entry is a line of its own.
+        const { size } = await handle.stat()
+        const last = Buffer.alloc(1)
+        if (size > 0) await handle.read(last, 0, 1, size - 1)
+        const torn = size > 0 && last[0] !== 0x0a
+        await handle.write(`${torn ? '\n' : ''}${JSON.stringify(written)}\n`)
+        await handle.sync()
+      } finally {
+        await handle.close()
+      }
+    } catch (error) {
+      throw new JournalError(writeFailure(error), 'write', { cause: error })
     }
   }
 }
@@ -302,24 +354,30 @@ export class Journal {
 /** The envelope an agent gets instead of an answer the journal could not record. */
 export type JournalRefusal = ReturnType<typeof refuse>
 
+/** What answerAfterRecord did: recorded and sent the answer, or sent `internal` and why. */
+export type AnswerOutcome =
+  | { readonly recorded: true }
+  | { readonly recorded: false; readonly cause: JournalWriteFailure }
+
 /**
  * The one way an answer leaves the daemon: the entry is recorded (appended and fsynced) first,
  * and only then is `send()` called to send the answer. When the record fails, `send` is called
  * with the `internal` refusal instead, which the wrapper builds itself and which carries nothing
- * of the page. Resolves whether the entry was recorded, so the caller can log the failure.
+ * of the page, and the caller gets the cause (no_space, no_permission, other) for `journalError`.
+ * An entry the journal refuses as invalid is a bug in the caller, so its cause is `other`.
  */
 export async function answerAfterRecord(
   journal: Journal,
   entry: JournalEntry,
   send: (refusal?: JournalRefusal) => void | Promise<void>,
-): Promise<boolean> {
+): Promise<AnswerOutcome> {
   try {
     await journal.record(entry)
-  } catch {
+  } catch (error) {
     // i18n-exempt: a refusal read by the agent over MCP, not by the person
     await send(refuse('internal', 'The journal could not record this answer, so it was not sent.'))
-    return false
+    return { recorded: false, cause: error instanceof JournalError ? (error.code as JournalWriteFailure) : 'other' }
   }
   await send()
-  return true
+  return { recorded: true }
 }
