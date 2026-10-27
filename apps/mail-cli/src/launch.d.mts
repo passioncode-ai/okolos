@@ -1,5 +1,7 @@
 export declare const FAILED: 2
 
+export declare const NODE_RANGE: string
+
 export declare function runsFromSources(node: string, typescript: string | false | undefined): boolean
 
 export interface Command {

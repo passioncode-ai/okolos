@@ -1,12 +1,48 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
-import { FAILED, launch, runsFromSources } from './launch.mjs'
+import { FAILED, NODE_RANGE, launch, runsFromSources } from './launch.mjs'
 import { EXIT } from './scan.js'
 
 /**
  * The launcher with the node it runs on injected: an old node is tested
  * without installing one. `bin.test.ts` spawns the real command.
  */
+/**
+ * One range in three places: the root `engines`, which a package manager reads;
+ * the runbook, which a person reads; and the refusal, which a person on the
+ * wrong node reads. Round 2 of SW-01 found `engines` still at `>=22` while the
+ * command needed 22.18.
+ */
+describe('the node the command needs', () => {
+  const root = process.cwd()
+
+  it('is the range the root package.json declares', () => {
+    const manifest = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) as {
+      engines: { node: string }
+    }
+    expect(manifest.engines.node).toBe(NODE_RANGE)
+  })
+
+  it('is the range the development runbook states', () => {
+    const runbook = readFileSync(path.join(root, 'docs/runbooks/development.md'), 'utf8')
+    const row = runbook.split(/\r?\n/).find((line) => line.startsWith('| Node |'))
+    expect(row?.replace(/\\\|/g, '|')).toContain(`\`${NODE_RANGE}\``)
+  })
+
+  it('is the range runsFromSources accepts, at each edge', () => {
+    expect(NODE_RANGE).toBe('^22.18.0 || >=23.6.0')
+    expect(runsFromSources('22.17.99', 'strip')).toBe(false)
+    expect(runsFromSources('22.18.0', 'strip')).toBe(true)
+    expect(runsFromSources('22.99.0', 'strip')).toBe(true)
+    expect(runsFromSources('23.5.99', 'strip')).toBe(false)
+    expect(runsFromSources('23.6.0', 'strip')).toBe(true)
+    expect(runsFromSources('21.99.0', 'strip')).toBe(false)
+  })
+})
+
 describe('the failure code', () => {
   it('is the unread code of scan.ts, never 0 or 1', () => {
     expect(FAILED).toBe(EXIT.unreadable)
@@ -45,7 +81,8 @@ describe('the launcher, with the node it runs on injected', () => {
     })
     expect(code).toBe(EXIT.unreadable)
     expect(loaded).toBe(false)
-    expect(out.lines.join('')).toMatch(/^okolos-mail: .*22\.18.*22\.17\.0/)
+    expect(out.lines.join('')).toContain(`okolos-mail: Node.js ${NODE_RANGE} is needed`)
+    expect(out.lines.join('')).toContain('this is Node.js 22.17.0')
   })
 
   it('ends with 2 and a line on stderr when loading the command fails', async () => {

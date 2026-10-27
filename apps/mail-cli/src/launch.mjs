@@ -28,7 +28,14 @@ import process from 'node:process'
 /** `EXIT.unreadable` in `scan.ts`; `launch.test.ts` holds them equal. */
 export const FAILED = 2
 
-/** The first node of each line that strips types with no flag. */
+/**
+ * The nodes that run the command, as the root `package.json` declares them in
+ * `engines` and `docs/runbooks/development.md` states them; `launch.test.ts`
+ * holds all three equal.
+ */
+export const NODE_RANGE = '^22.18.0 || >=23.6.0'
+
+/** The first node of each line that strips types with no flag; the same range as `NODE_RANGE`. */
 const FLOORS = [
   { major: 22, minor: 18 },
   { major: 23, minor: 6 },
@@ -101,7 +108,7 @@ export async function launch({
     write(
       typescript === false && runsFromSources(node, 'strip')
         ? line(`this Node.js ${node} has type stripping switched off, and the command runs from its TypeScript sources; start it without --no-experimental-strip-types`)
-        : line(`Node.js 22.18 or later is needed to run the command from its TypeScript sources; this is Node.js ${node}`),
+        : line(`Node.js ${NODE_RANGE} is needed to run the command from its TypeScript sources; this is Node.js ${node}`),
     )
     return FAILED
   }
