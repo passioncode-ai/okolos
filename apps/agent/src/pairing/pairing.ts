@@ -270,22 +270,17 @@ export class Pairing {
     return { requestId: entry.requestId, code: entry.code, expiresAt: entry.createdAt + REQUEST_LIFETIME_MS }
   }
 
-  confirm(requestId: string, now: number): boolean {
-    this.sweep(now)
-    return this.confirmEntry(this.byRequestId.get(requestId), now)
-  }
-
+  /**
+   * The person's confirm, by the handle list() gave the page. There is no confirm by request id: the
+   * request id is the agent's own secret, and a door that took it for a confirm would let an agent
+   * pair itself. Confirming a confirmed request again is true and keeps the first confirm time.
+   */
   confirmByHandle(handle: string, now: number): boolean {
     this.sweep(now)
     return this.confirmEntry(this.byHandle.get(handle), now)
   }
 
-  /** An ended request cannot be declined: it stays an expired row. */
-  decline(requestId: string, now: number): boolean {
-    this.sweep(now)
-    return this.declineEntry(this.byRequestId.get(requestId))
-  }
-
+  /** The person's decline, by handle only, like the confirm. An ended request stays an expired row. */
   declineByHandle(handle: string, now: number): boolean {
     this.sweep(now)
     return this.declineEntry(this.byHandle.get(handle))

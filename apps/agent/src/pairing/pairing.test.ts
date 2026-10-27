@@ -62,6 +62,26 @@ function asked(result: ReturnType<Pairing['request']>): { requestId: string; cod
   return result
 }
 
+/**
+ * The page's handle for a request, found in list() at `now` by the code the request was given, the
+ * way the person matches the two codes. The page's actions take nothing else (audit #9).
+ */
+function handleOf(pairing: Pairing, request: { code: string }, now: number): string {
+  const rows = pairing.list(now).requests.filter((row) => row.code === request.code)
+  if (rows.length !== 1) throw new Error(`expected one row with code ${request.code}, found ${rows.length}`)
+  return rows[0]!.handle
+}
+
+/** The person confirms the request on the page at `now`. */
+function confirmAt(pairing: Pairing, request: { code: string }, now: number): boolean {
+  return pairing.confirmByHandle(handleOf(pairing, request, now), now)
+}
+
+/** The person declines the request on the page at `now`. */
+function declineAt(pairing: Pairing, request: { code: string }, now: number): boolean {
+  return pairing.declineByHandle(handleOf(pairing, request, now), now)
+}
+
 describe('the pairing request id (spec §11 F5)', () => {
   it('is 128 bits as 32 hex, and the code is six digits; the request lives five minutes', () => {
     const pairing = open()
@@ -106,10 +126,12 @@ describe('the pairing request id (spec §11 F5)', () => {
 
   it('is forgotten once the key is given out: a second claim and a late confirm find nothing', () => {
     const pairing = open()
-    const { requestId } = asked(pairing.request('Claude Code', T0))
-    expect(pairing.confirm(requestId, T0 + 1)).toBe(true)
+    const request = asked(pairing.request('Claude Code', T0))
+    const { requestId } = request
+    const handle = handleOf(pairing, request, T0)
+    expect(pairing.confirmByHandle(handle, T0 + 1)).toBe(true)
     expect(pairing.claim(requestId, T0 + 2)).toHaveProperty('key')
-    expect(pairing.confirm(requestId, T0 + 3)).toBe(false)
+    expect(pairing.confirmByHandle(handle, T0 + 3)).toBe(false)
     expect(pairing.claim(requestId, T0 + 4)).toBeNull()
     expect(pairing.list(T0 + 5).requests).toEqual([])
   })
@@ -127,8 +149,9 @@ describe('claiming the key (spec §11 F5)', () => {
 
   it('after the confirm gives a 256-bit key once; a second claim finds nothing', () => {
     const pairing = open()
-    const { requestId } = asked(pairing.request('Claude Code', T0))
-    expect(pairing.confirm(requestId, T0 + MINUTE)).toBe(true)
+    const request = asked(pairing.request('Claude Code', T0))
+    const { requestId } = request
+    expect(confirmAt(pairing, request, T0 + MINUTE)).toBe(true)
     const first = pairing.claim(requestId, T0 + MINUTE + 1)
     expect(first).toEqual({ key: expect.stringMatching(/^[0-9a-f]{64}$/) })
     expect(pairing.claim(requestId, T0 + MINUTE + 2)).toBeNull()
@@ -140,29 +163,31 @@ describe('claiming the key (spec §11 F5)', () => {
     const pairing = open()
     const late = asked(pairing.request('Claude Code', T0))
     const confirmedAt = T0 + 4 * MINUTE
-    expect(pairing.confirm(late.requestId, confirmedAt)).toBe(true)
+    expect(confirmAt(pairing, late, confirmedAt)).toBe(true)
     // Past the request's own five minutes, inside the claim window: still claimable.
     expect(pairing.claim(late.requestId, T0 + 6 * MINUTE)).toHaveProperty('key')
 
     const missed = asked(pairing.request('Codex', T0))
-    expect(pairing.confirm(missed.requestId, confirmedAt)).toBe(true)
+    expect(confirmAt(pairing, missed, confirmedAt)).toBe(true)
     expect(pairing.claim(missed.requestId, confirmedAt + CLAIM_WINDOW_MS)).toBeNull()
     expect(pairing.list(confirmedAt + CLAIM_WINDOW_MS).agents.map((a) => a.name)).toEqual(['Claude Code'])
   })
 
   it('is refused for a request the person declined', () => {
     const pairing = open()
-    const { requestId } = asked(pairing.request('Claude Code', T0))
-    expect(pairing.decline(requestId, T0)).toBe(true)
-    expect(pairing.claim(requestId, T0 + 1)).toBeNull()
-    expect(pairing.confirm(requestId, T0 + 2)).toBe(false)
+    const request = asked(pairing.request('Claude Code', T0))
+    const handle = handleOf(pairing, request, T0)
+    expect(pairing.declineByHandle(handle, T0)).toBe(true)
+    expect(pairing.claim(request.requestId, T0 + 1)).toBeNull()
+    expect(pairing.confirmByHandle(handle, T0 + 2)).toBe(false)
     expect(pairing.list(T0 + 3).requests).toEqual([])
   })
 
   it('finds nothing for an id it never gave out', () => {
     const pairing = open()
     expect(pairing.claim('0'.repeat(32), T0)).toBeNull()
-    expect(pairing.confirm('0'.repeat(32), T0)).toBe(false)
+    expect(pairing.confirmByHandle('0'.repeat(16), T0)).toBe(false)
+    expect(pairing.declineByHandle('0'.repeat(16), T0)).toBe(false)
   })
 })
 
@@ -170,10 +195,12 @@ describe('how long a request lives and how many there may be (spec §11 F5)', ()
   it('ends five minutes after its creation when nobody confirms it', () => {
     const notices: PairingNotice[] = []
     const pairing = open(storeFile(), notices)
-    const { requestId } = asked(pairing.request('Claude Code', T0))
+    const request = asked(pairing.request('Claude Code', T0))
+    const { requestId } = request
     expect(pairing.claim(requestId, T0 + REQUEST_LIFETIME_MS - 1)).toEqual({ pending: true })
     expect(pairing.claim(requestId, T0 + REQUEST_LIFETIME_MS)).toBeNull()
-    expect(pairing.confirm(requestId, T0 + REQUEST_LIFETIME_MS)).toBe(false)
+    // The ended row keeps its handle on the page, and that handle confirms nothing.
+    expect(confirmAt(pairing, request, T0 + REQUEST_LIFETIME_MS)).toBe(false)
     expect(notices.filter((n) => n.kind === 'expired')).toHaveLength(1)
   })
 
@@ -194,7 +221,7 @@ describe('how long a request lives and how many there may be (spec §11 F5)', ()
     asked(pairing.request('Never confirmed', T0))
     const late = asked(pairing.request('Confirmed late', T0 + 1))
     const confirmedAt = T0 + 2 * MINUTE
-    expect(pairing.confirm(late.requestId, confirmedAt)).toBe(true)
+    expect(confirmAt(pairing, late, confirmedAt)).toBe(true)
     expect(pairing.list(confirmedAt + 1).requests[1]).toMatchObject({ state: 'confirmed', confirmedAt, expiresAt: confirmedAt + CLAIM_WINDOW_MS })
 
     // At T0 + 5 min the unconfirmed one ends as 'expired'; the confirmed one still waits.
@@ -228,11 +255,11 @@ describe('how long a request lives and how many there may be (spec §11 F5)', ()
     asked(pairing.request('Agent two', T0 + 1))
     const third = asked(pairing.request('Agent three', T0 + 2))
     expect(pairing.request('Agent four', T0 + 3)).toEqual({ refused: 'too_many_pending' })
-    expect(pairing.confirm(first.requestId, T0 + 4)).toBe(true)
+    expect(confirmAt(pairing, first, T0 + 4)).toBe(true)
     expect(pairing.request('Agent four', T0 + 5)).toEqual({ refused: 'too_many_pending' })
     expect(pairing.claim(first.requestId, T0 + 6)).toHaveProperty('key')
     asked(pairing.request('Agent four', T0 + 7))
-    expect(pairing.decline(third.requestId, T0 + 7)).toBe(true)
+    expect(declineAt(pairing, third, T0 + 7)).toBe(true)
     asked(pairing.request('Agent five', T0 + 8))
     // An expired request waits for nothing.
     asked(pairing.request('Agent six', T0 + 8 + REQUEST_LIFETIME_MS))
@@ -242,8 +269,8 @@ describe('how long a request lives and how many there may be (spec §11 F5)', ()
     expect(MAX_NEW_PER_MINUTE).toBe(6)
     const pairing = open()
     for (let n = 0; n < 6; n++) {
-      const { requestId } = asked(pairing.request(`Agent ${n}`, T0 + n * 1000))
-      pairing.decline(requestId, T0 + n * 1000)
+      const request = asked(pairing.request(`Agent ${n}`, T0 + n * 1000))
+      expect(declineAt(pairing, request, T0 + n * 1000)).toBe(true)
     }
     expect(pairing.request('Agent seven', T0 + MINUTE - 1)).toEqual({ refused: 'too_many_requests' })
     // A refused request is not a new one: the count stays at six, and the first leaves at T0 + 1 min.
@@ -262,9 +289,9 @@ describe('how long a request lives and how many there may be (spec §11 F5)', ()
 
 /** Pairs `name` from request to claim and gives back the key. */
 function pair(pairing: Pairing, name: string, now: number): string {
-  const { requestId } = asked(pairing.request(name, now))
-  expect(pairing.confirm(requestId, now + 1)).toBe(true)
-  const claimed = pairing.claim(requestId, now + 2)
+  const request = asked(pairing.request(name, now))
+  expect(confirmAt(pairing, request, now + 1)).toBe(true)
+  const claimed = pairing.claim(request.requestId, now + 2)
   if (claimed === null || !('key' in claimed)) throw new Error('no key')
   return claimed.key
 }
@@ -491,8 +518,9 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
   it('gives no key when the store cannot be written, and the claim can be tried again', () => {
     const file = storeFile()
     const pairing = open(file)
-    const { requestId } = asked(pairing.request('Claude Code', T0))
-    pairing.confirm(requestId, T0 + 1)
+    const request = asked(pairing.request('Claude Code', T0))
+    const { requestId } = request
+    expect(confirmAt(pairing, request, T0 + 1)).toBe(true)
     chmodSync(path.dirname(file), 0o500)
     expect(() => pairing.claim(requestId, T0 + 2)).toThrow(PairingStoreError)
     expect(() => pairing.claim(requestId, T0 + 2)).toThrow(expect.objectContaining({ reason: 'unwritable', file }))
@@ -563,7 +591,7 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
     pair(before, 'Claude Code', T0)
     const pending = asked(before.request('Codex', T0 + 10))
     const confirmed = asked(before.request('Cursor', T0 + 11))
-    expect(before.confirm(confirmed.requestId, T0 + 12)).toBe(true)
+    expect(confirmAt(before, confirmed, T0 + 12)).toBe(true)
 
     const after = open(file)
     const page = after.list(T0 + 13)
@@ -605,9 +633,9 @@ describe('a notice handler that throws (fix round 1)', () => {
 
   it('still gives the agent its key once the hash is stored, and reports the failed notice', () => {
     const { pairing, reported } = failing()
-    const { requestId } = asked(pairing.request('Claude Code', T0))
-    expect(pairing.confirm(requestId, T0 + 1)).toBe(true)
-    const claimed = pairing.claim(requestId, T0 + 2)
+    const request = asked(pairing.request('Claude Code', T0))
+    expect(confirmAt(pairing, request, T0 + 1)).toBe(true)
+    const claimed = pairing.claim(request.requestId, T0 + 2)
     expect(claimed).toEqual({ key: expect.stringMatching(/^[0-9a-f]{64}$/) })
     expect(pairing.verify((claimed as { key: string }).key)).toMatchObject({ name: 'Claude Code' })
     expect(reported.map(([, notice]) => notice.kind)).toEqual(['requested', 'confirmed', 'paired'])
@@ -645,9 +673,9 @@ describe('two waiting requests under one name (spec §11 F5)', () => {
     const pairing = open()
     const first = asked(pairing.request('Claude Code', T0))
     const second = asked(pairing.request('Claude Code', T0 + 1))
-    expect(pairing.confirm(first.requestId, T0 + 2)).toBe(true)
+    expect(confirmAt(pairing, first, T0 + 2)).toBe(true)
     expect(Object.values(flags(pairing, T0 + 3))).toEqual([true, true])
-    expect(pairing.decline(second.requestId, T0 + 3)).toBe(true)
+    expect(declineAt(pairing, second, T0 + 3)).toBe(true)
     expect(Object.values(flags(pairing, T0 + 4))).toEqual([false])
   })
 
@@ -710,6 +738,14 @@ describe('two waiting requests under one name (spec §11 F5)', () => {
 })
 
 describe('the page acts by handle, never by request id (audit #9)', () => {
+  // Fix round 2: the request id is the agent's own secret, so no public method confirms or declines
+  // by it; a route that mapped it to a confirm would let an agent pair itself.
+  it('has no way to confirm or decline by request id', () => {
+    const pairing = open() as unknown as Record<string, unknown>
+    expect(pairing['confirm']).toBeUndefined()
+    expect(pairing['decline']).toBeUndefined()
+  })
+
   it('confirms by the handle list() gives, and the agent can then claim', () => {
     const pairing = open()
     const { requestId } = asked(pairing.request('Claude Code', T0))
@@ -736,8 +772,7 @@ describe('the page acts by handle, never by request id (audit #9)', () => {
     expect(row!.handle).not.toBe(requestId)
     expect(pairing.confirmByHandle(requestId, T0 + 2)).toBe(false)
     expect(pairing.declineByHandle(requestId, T0 + 2)).toBe(false)
-    expect(pairing.confirm(row!.handle, T0 + 2)).toBe(false)
-    expect(pairing.decline(row!.handle, T0 + 2)).toBe(false)
+    expect(pairing.claim(row!.handle, T0 + 2)).toBeNull()
     expect(pairing.claim(requestId, T0 + 3)).toEqual({ pending: true })
     expect(pairing.list(T0 + 3).requests[0]).toMatchObject({ state: 'pending' })
   })
@@ -745,11 +780,12 @@ describe('the page acts by handle, never by request id (audit #9)', () => {
   it('does not decline a request whose five minutes are over: it stays an expired row (fix round 1)', () => {
     const notices: PairingNotice[] = []
     const pairing = open(storeFile(), notices)
-    const byId = asked(pairing.request('Claude Code', T0))
+    const claude = asked(pairing.request('Claude Code', T0))
     asked(pairing.request('Codex', T0 + 1))
     const rows = pairing.list(T0 + 2).requests
     const codex = rows.find((row) => row.name === 'Codex')!
-    expect(pairing.decline(byId.requestId, T0 + REQUEST_LIFETIME_MS)).toBe(false)
+    // At its deadline the row is already expired; its handle, looked up then, declines nothing.
+    expect(declineAt(pairing, claude, T0 + REQUEST_LIFETIME_MS)).toBe(false)
     expect(pairing.declineByHandle(codex.handle, T0 + 1 + REQUEST_LIFETIME_MS)).toBe(false)
     expect(pairing.list(T0 + 2 + REQUEST_LIFETIME_MS).requests.map((row) => [row.name, row.state])).toEqual([
       ['Claude Code', 'expired'],
