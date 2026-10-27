@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
@@ -38,11 +38,24 @@ const empty = path.join(scratch, 'empty.eml')
 writeFileSync(empty, '')
 
 /**
- * What `tsc -b` puts in `dist/`, made here without touching `dist/`: every
- * source module transpiled into a directory beside `src/`, so relative imports
- * resolve exactly as they do from `dist/`.
+ * What `tsc -b` puts in `dist/`, made here without touching the tree: every
+ * source module transpiled into `<tmp>/apps/mail-cli/dist`, beside links to
+ * the real `src/`, `node_modules/` and `apps/extension/`, so relative imports,
+ * package resolution and the catalogue URL resolve exactly as they do from the
+ * real `dist/`. Outside the tree because other gates walk it while this runs
+ * (`tools/graph-check.test.ts` counted a temporary directory here as a source).
+ * Directory links are junctions on Windows, which need no privilege.
  */
-const built = mkdtempSync(path.join(app, '.direct-start-'))
+const mirror = mkdtempSync(path.join(os.tmpdir(), 'okolos-mail-built-'))
+const link = (target: string, at: string): void => {
+  mkdirSync(path.dirname(at), { recursive: true })
+  symlinkSync(target, at, process.platform === 'win32' ? 'junction' : 'dir')
+}
+link(src, path.join(mirror, 'apps/mail-cli/src'))
+link(path.join(app, 'node_modules'), path.join(mirror, 'apps/mail-cli/node_modules'))
+link(path.join(root, 'apps/extension'), path.join(mirror, 'apps/extension'))
+const built = path.join(mirror, 'apps/mail-cli/dist')
+mkdirSync(built)
 for (const file of filesUnder(src, '.ts')) {
   if (file.endsWith('.test.ts')) continue
   const output = ts.transpileModule(readFileSync(file, 'utf8'), {
@@ -53,7 +66,8 @@ for (const file of filesUnder(src, '.ts')) {
 
 afterAll(() => {
   rmSync(scratch, { recursive: true, force: true })
-  rmSync(built, { recursive: true, force: true })
+  // Removes the links, never what they point at.
+  rmSync(mirror, { recursive: true, force: true })
 })
 
 function start(entry: string, args: readonly string[]) {
