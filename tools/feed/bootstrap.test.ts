@@ -167,10 +167,10 @@ describe('a missing checkout is recreated, and the record says so (B-159)', () =
       { CLOUDFLARE_API_TOKEN: 'must-not-leak' },
     ).promise
     expect(seen.find((s) => s.command === 'pnpm')?.cwd).toBe(w.paths.agentCheckout)
-    for (const s of seen) {
-      expect(s.env?.CLOUDFLARE_API_TOKEN).toBeUndefined()
-      if (s.command === 'git') expect(s.env?.GIT_TERMINAL_PROMPT).toBe('0')
-    }
+    for (const s of seen) expect(s.env?.CLOUDFLARE_API_TOKEN).toBeUndefined()
+    const gits = seen.filter((s) => s.command === 'git')
+    expect(gits.length).toBeGreaterThan(0)
+    for (const s of gits) expect(s.env?.GIT_TERMINAL_PROMPT).toBe('0')
   })
 
   it('clones from origin when the source clone is gone too', async () => {

@@ -236,11 +236,11 @@ describe('the plist launchd reads', () => {
     expect(variable(rendered({ template: template(), runner: null, ...where, origin: '' }), 'OKOLOS_ORIGIN_URL')).toBe('')
   })
 
-  it('is a plist plutil accepts', () => {
+  // plutil and launchd exist only on macOS; elsewhere there is nothing to load the plist.
+  it.skipIf(process.platform !== 'darwin')('is a plist plutil accepts', () => {
     const file = path.join(mkdtempSync(path.join(os.tmpdir(), 'okolos-plist-')), 'agent.plist')
     writeFileSync(file, plist())
     const lint = spawnSync('plutil', ['-lint', file], { encoding: 'utf8' })
-    if (lint.error) return // not macOS: plutil is absent, and launchd with it
     expect(lint.status, lint.stdout + lint.stderr).toBe(0)
   })
 
