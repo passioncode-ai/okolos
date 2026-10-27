@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { acquireLock } from './feed/lock.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { readStatus } from './feed/status.mjs'
-import { runJob, STALE_AFTER_MS, sweepLeftovers } from './feed-job.mjs'
+import { runJob, STALE_AFTER_MS, sweepLeftovers, WATCHDOG_MS, watchdogFrom } from './feed-job.mjs'
 
 /**
  * The feed agent's run: bounded, exclusive, observable (LC-03), pinned (F2), with
@@ -295,6 +295,21 @@ describe('the record carries what the bootstrap knows (B-159, B-150)', () => {
     await job(w).promise
     expect(readStatus(w.paths.status)).toMatchObject({ recoveredCheckout: false })
     expect(readStatus(w.paths.status)?.recovery).toBeUndefined()
+  })
+})
+
+describe('the watchdog the bootstrap hands down (one deadline per run)', () => {
+  it('is thirty minutes when nobody shortens it', () => {
+    expect(watchdogFrom({})).toBe(WATCHDOG_MS)
+  })
+
+  it('takes a shorter one from OKOLOS_WATCHDOG_MS, never a longer one', () => {
+    expect(watchdogFrom({ OKOLOS_WATCHDOG_MS: '600000' })).toBe(600_000)
+    expect(watchdogFrom({ OKOLOS_WATCHDOG_MS: String(WATCHDOG_MS * 2) })).toBe(WATCHDOG_MS)
+  })
+
+  it('ignores a value it cannot read', () => {
+    for (const value of ['', 'soon', '-5', '0']) expect(watchdogFrom({ OKOLOS_WATCHDOG_MS: value }), value).toBe(WATCHDOG_MS)
   })
 })
 

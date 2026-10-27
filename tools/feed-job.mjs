@@ -58,6 +58,16 @@ export const STALE_AFTER_MS = INTERVAL_MS - 60 * 60 * 1000
 /** The whole run, every retry included. Far under the interval, so launchd never skips a slot. */
 export const WATCHDOG_MS = 30 * 60 * 1000
 
+/**
+ * The watchdog for this run: WATCHDOG_MS, or less when the bootstrap says less is
+ * left of the run's one deadline (OKOLOS_WATCHDOG_MS; it repaired the checkout
+ * first). Never more, and an unreadable value is ignored.
+ */
+export function watchdogFrom(env) {
+  const asked = Number(env.OKOLOS_WATCHDOG_MS)
+  return Number.isFinite(asked) && asked > 0 ? Math.min(WATCHDOG_MS, asked) : WATCHDOG_MS
+}
+
 export const DEADLINES = {
   git: 90_000,
   install: 10 * 60_000,
@@ -413,6 +423,7 @@ async function main() {
   process.on('SIGTERM', () => onSignal('SIGTERM', current))
   process.on('SIGINT', () => onSignal('SIGINT', current))
   const record = await runJob({
+    watchdogMs: watchdogFrom(process.env),
     flags: {
       ifStale: agent || argv.includes('--if-stale'),
       follow: agent || argv.includes('--follow'),

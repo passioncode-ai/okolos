@@ -4,9 +4,20 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { EXIT as JOB_EXIT } from '../feed-job.mjs'
+import { EXIT as JOB_EXIT, WATCHDOG_MS } from '../feed-job.mjs'
 import { runBounded } from './bounded.mjs'
-import { BOOTSTRAP_FILES, checkoutHealth, EXIT, JOB_TAIL_LINES, reasonFrom, recoverCheckout, runAgent } from './bootstrap.mjs'
+import {
+  BOOTSTRAP_FILES,
+  checkoutHealth,
+  EXIT,
+  JOB_GRACE_MS,
+  JOB_TAIL_LINES,
+  reasonFrom,
+  recoverCheckout,
+  RUN_DEADLINE_MS,
+  runAgent,
+  signalRecord,
+} from './bootstrap.mjs'
 import { acquireLock } from './lock.mjs'
 import { feedPaths } from './paths.mjs'
 import { readStatus } from './status.mjs'
@@ -270,7 +281,7 @@ describe('no failure path is silent (B-159)', () => {
     expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'failed', stage: 'job', recoveredCheckout: true, recovery: 'missing' })
   })
 
-  it('records a job the backstop deadline had to kill', async () => {
+  it('records a job the run’s deadline had to kill', async () => {
     const w = world()
     plantCheckout(w.paths.agentCheckout)
     const result = await agent(w, { run: fakeJob(w, 'hangs').run }).promise
@@ -375,6 +386,87 @@ describe('a job that crashes leaves its error where a person reads it', () => {
     expect(reasonFrom(["throw new TypeError('x')", '      ^', '', 'TypeError: x'])).toBe('TypeError: x')
     expect(reasonFrom(["Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/x/y.mjs'"])).toMatch(/^Error \[ERR_MODULE_NOT_FOUND\]/)
     expect(reasonFrom([])).toBe('')
+  })
+})
+
+describe('one deadline over the whole run, repair included', () => {
+  it('stops a checkout repair that outlives the run’s deadline, and records it', async () => {
+    const w = world()
+    const slow = async (command: string, args: string[]) => {
+      if (args.includes('fetch')) await new Promise((resolve) => setTimeout(resolve, 3000))
+      return fakeTool().tool(command, args)
+    }
+    const job = fakeJob(w)
+    const started = Date.now()
+    const result = await agent(w, { tool: slow, run: job.run, runDeadlineMs: 300 }).promise
+    expect(Date.now() - started).toBeLessThan(2500)
+    expect(result.exit).toBe(EXIT.watchdog)
+    expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'failed', stage: 'checkout', exit: EXIT.watchdog })
+    expect(readStatus(w.paths.status)?.reason).toMatch(/deadline/)
+    expect(job.starts).toEqual([])
+    // The lock is released, so the next run is not refused.
+    expect(existsSync(w.paths.lock)).toBe(false)
+  })
+
+  it('gives the job what is left of the run: its watchdog fires first, the backstop at the deadline', async () => {
+    const w = world()
+    plantCheckout(w.paths.agentCheckout)
+    const seen: Array<{ timeoutMs: number; watchdog: string | undefined }> = []
+    await agent(w, {
+      run: async (_c: string, _a: string[], options: { timeoutMs: number; env?: Record<string, string | undefined> }) => {
+        seen.push({ timeoutMs: options.timeoutMs, watchdog: options.env?.OKOLOS_WATCHDOG_MS })
+        return { ...ok(), code: 75 }
+      },
+    }).promise
+    const [first] = seen
+    expect(first?.timeoutMs).toBeLessThanOrEqual(RUN_DEADLINE_MS)
+    expect(first?.timeoutMs).toBeGreaterThan(RUN_DEADLINE_MS - 60_000)
+    // Nothing was repaired, so the job keeps its own thirty minutes.
+    expect(Number(first?.watchdog)).toBe(WATCHDOG_MS)
+    expect(Number(first?.watchdog)).toBeLessThanOrEqual((first?.timeoutMs ?? 0) - JOB_GRACE_MS)
+  })
+
+  it('shortens the job’s watchdog when the repair used part of the run', async () => {
+    const w = world()
+    plantCheckout(w.paths.agentCheckout)
+    const seen: string[] = []
+    await agent(w, {
+      runDeadlineMs: 10 * 60_000,
+      run: async (_c: string, _a: string[], options: { env?: Record<string, string | undefined> }) => {
+        seen.push(options.env?.OKOLOS_WATCHDOG_MS ?? '')
+        return { ...ok(), code: 75 }
+      },
+    }).promise
+    expect(Number(seen[0])).toBeLessThanOrEqual(10 * 60_000 - JOB_GRACE_MS)
+    expect(Number(seen[0])).toBeGreaterThan(0)
+  })
+
+  it('is far under the twelve-hour interval, so launchd never skips a slot', () => {
+    expect(RUN_DEADLINE_MS).toBeGreaterThan(WATCHDOG_MS + JOB_GRACE_MS)
+    expect(RUN_DEADLINE_MS).toBeLessThanOrEqual(60 * 60_000)
+  })
+})
+
+describe('a stop by signal', () => {
+  it('keeps a recovered checkout in the record', () => {
+    const record = signalRecord({ stage: 'job', runId: 'r1', startedAt: 's', recovered: 'missing' }, 'SIGTERM', 'now')
+    expect(record).toMatchObject({ outcome: 'failed', stage: 'job', exit: EXIT.signal, runId: 'r1', recoveredCheckout: true, recovery: 'missing' })
+    expect(record.reason).toMatch(/SIGTERM/)
+  })
+
+  it('records false when nothing was recovered', () => {
+    expect(signalRecord({ stage: 'checkout', runId: 'r2', startedAt: 's', recovered: null }, 'SIGINT', 'now')).toMatchObject({ recoveredCheckout: false })
+  })
+})
+
+describe('the run id', () => {
+  it('is the launcher’s when it gives one, so the launch line can tell a written record from none', async () => {
+    const w = world()
+    plantCheckout(w.paths.agentCheckout)
+    const job = fakeJob(w)
+    await agent(w, { run: job.run }, { OKOLOS_LAUNCH_ID: 'launch-42-1730000000' }).promise
+    expect(job.starts[0]?.env.OKOLOS_RUN_ID).toBe('launch-42-1730000000')
+    expect(readStatus(w.paths.status)?.runId).toBe('launch-42-1730000000')
   })
 })
 
