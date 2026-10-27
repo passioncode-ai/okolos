@@ -13,6 +13,7 @@ import {
   agentStatus,
   bootstrapDrift,
   checkBranch,
+  offMainNote,
   ensureCheckout,
   installAgent,
   installBootstrap,
@@ -587,32 +588,72 @@ describe('whether the installed bootstrap is the checkout’s', () => {
   })
 })
 
-describe('the installer installs from main only (ADR-0017)', () => {
+describe('the installer installs from origin/main only (ADR-0017)', () => {
   const git = (answers: Record<string, string>) => async (_command: string, args: string[]) => {
     const key = args.slice(2).join(' ')
     return key in answers ? ok(`${answers[key]}\n`) : { ...ok(), code: 128, stderr: `unexpected ${key}` }
   }
   const sha = (c: string) => c.repeat(40)
+  const at = (branch: string, head: string, target: string, fetch = '') => ({
+    'fetch --quiet origin main': fetch,
+    'rev-parse --abbrev-ref HEAD': branch,
+    'rev-parse HEAD': head,
+    'rev-parse origin/main': target,
+  })
 
-  it('accepts the main branch', async () => {
-    expect(await checkBranch({ repo: '/r', tool: git({ 'rev-parse --abbrev-ref HEAD': 'main' }) })).toMatchObject({ ok: true, branch: 'main' })
+  it('accepts main at origin/main, after fetching it', async () => {
+    const seen: string[] = []
+    const answers = git(at('main', sha('a'), sha('a')))
+    const tool = async (command: string, args: string[]) => (seen.push(args.slice(2).join(' ')), answers(command, args))
+    expect(await checkBranch({ repo: '/r', tool })).toMatchObject({ ok: true, branch: 'main', head: sha('a') })
+    // Compared with a freshly fetched origin/main, not whatever the clone last saw.
+    expect(seen.indexOf('fetch --quiet origin main')).toBeGreaterThanOrEqual(0)
+    expect(seen.indexOf('fetch --quiet origin main')).toBeLessThan(seen.indexOf('rev-parse origin/main'))
   })
 
   it('accepts a detached HEAD at origin/main', async () => {
-    const tool = git({ 'rev-parse --abbrev-ref HEAD': 'HEAD', 'rev-parse HEAD': sha('a'), 'rev-parse origin/main': sha('a') })
-    expect(await checkBranch({ repo: '/r', tool })).toMatchObject({ ok: true })
+    expect(await checkBranch({ repo: '/r', tool: git(at('HEAD', sha('a'), sha('a'))) })).toMatchObject({ ok: true })
+  })
+
+  it('refuses main that is behind or ahead of origin/main: the name is not the commit', async () => {
+    const result = await checkBranch({ repo: '/r', tool: git(at('main', sha('b'), sha('a'))) })
+    expect(result.ok).toBe(false)
+    expect(result.reason).toMatch(/main at bbbbbbb.*origin\/main aaaaaaa.*--allow-branch/)
   })
 
   it('refuses a feature branch, naming it and the override', async () => {
-    const result = await checkBranch({ repo: '/r', tool: git({ 'rev-parse --abbrev-ref HEAD': 'sw/sw-03' }) })
+    const result = await checkBranch({ repo: '/r', tool: git(at('sw/sw-03', sha('b'), sha('a'))) })
     expect(result.ok).toBe(false)
     expect(result.reason).toMatch(/sw\/sw-03.*origin\/main.*--allow-branch/)
   })
 
-  it('refuses a detached HEAD elsewhere, and a clone git cannot read', async () => {
-    const tool = git({ 'rev-parse --abbrev-ref HEAD': 'HEAD', 'rev-parse HEAD': sha('b'), 'rev-parse origin/main': sha('a') })
-    expect((await checkBranch({ repo: '/r', tool })).ok).toBe(false)
+  it('refuses when origin/main cannot be fetched to compare, and a clone git cannot read', async () => {
+    const offline = { ...at('main', sha('a'), sha('a')) } as Record<string, string>
+    delete offline['fetch --quiet origin main']
+    expect(await checkBranch({ repo: '/r', tool: git(offline) })).toMatchObject({ ok: false })
+    expect((await checkBranch({ repo: '/r', tool: git(offline) })).reason).toMatch(/could not fetch origin\/main/)
     expect((await checkBranch({ repo: '/r', tool: git({}) })).ok).toBe(false)
+  })
+
+  it('records an install past the refusal in the plist, for every run to carry', () => {
+    const text = rendered({
+      template: template(),
+      runner: null,
+      checkout: '/c',
+      logDir: '/l',
+      bootstrap: '/b/bootstrap.mjs',
+      offMain: 'sw/sw-03 at bbbbbbb, origin/main aaaaaaa (--allow-branch, 2026-10-27T12:00:00Z)',
+    })
+    expect(text).toMatch(/<key>OKOLOS_INSTALLED_OFF_MAIN<\/key>\s*<string>sw\/sw-03 at bbbbbbb, origin\/main aaaaaaa \(--allow-branch, 2026-10-27T12:00:00Z\)<\/string>/)
+    expect(rendered({ template: template(), runner: null, checkout: '/c', logDir: '/l', bootstrap: '/b/bootstrap.mjs' })).toMatch(
+      /<key>OKOLOS_INSTALLED_OFF_MAIN<\/key>\s*<string><\/string>/,
+    )
+  })
+
+  it('says it in one line', () => {
+    expect(offMainNote({ ok: false, branch: 'sw/sw-03', head: 'b'.repeat(40), target: 'a'.repeat(40) }, '2026-10-27T12:00:00Z')).toBe(
+      'sw/sw-03 at bbbbbbb, origin/main aaaaaaa (--allow-branch, 2026-10-27T12:00:00Z)',
+    )
   })
 })
 

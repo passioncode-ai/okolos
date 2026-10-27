@@ -85,9 +85,12 @@ exit "$c"</string>
     pnpm. It is a JSON argv (paths only, no secret), empty when this machine has no
     vault. Wrangler's telemetry is off for everything the job starts.
 
-    The other three tell the bootstrap where the checkout is and what to recreate
+    The next three tell the bootstrap where the checkout is and what to recreate
     it from: a worktree of the clone the installer ran in, or, when that clone is
-    gone too, a fresh clone of its origin (empty when it has none).
+    gone too, a fresh clone of its origin (empty when it has none). The last is
+    empty unless the agent was installed off origin/main with the installer's
+    allow-branch flag; then it names the branch and commits, and every run's
+    status carries it as installedOffMain.
   -->
   <key>EnvironmentVariables</key>
   <dict>
@@ -97,6 +100,8 @@ exit "$c"</string>
     <string>{{SOURCE_REPO}}</string>
     <key>OKOLOS_ORIGIN_URL</key>
     <string>{{ORIGIN}}</string>
+    <key>OKOLOS_INSTALLED_OFF_MAIN</key>
+    <string>{{OFF_MAIN}}</string>
     <key>OKOLOS_SECRET_RUNNER</key>
     <string>{{RUNNER}}</string>
     <key>WRANGLER_SEND_METRICS</key>

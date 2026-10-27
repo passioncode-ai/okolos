@@ -17,6 +17,8 @@ export interface RunRecord {
   readonly recoveredCheckout?: boolean
   /** What was wrong with the checkout: `missing` or `broken: <reason>`. */
   readonly recovery?: string
+  /** Set when the agent was installed off origin/main with --allow-branch: branch and commits. */
+  readonly installedOffMain?: string
 }
 
 export interface StatusRecord extends RunRecord {

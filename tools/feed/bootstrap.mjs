@@ -249,6 +249,7 @@ export async function runAgent({
       runId,
       recoveredCheckout: Boolean(recovered),
       ...(recovered ? { recovery: recovered } : {}),
+      ...(env.OKOLOS_INSTALLED_OFF_MAIN ? { installedOffMain: env.OKOLOS_INSTALLED_OFF_MAIN } : {}),
     })
   }
 

@@ -290,6 +290,12 @@ describe('the record carries what the bootstrap knows (B-159, B-150)', () => {
     expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'failed', runId: 'run-2', recoveredCheckout: true })
   })
 
+  it('carries an install made off origin/main into every record (--allow-branch)', async () => {
+    const w = world()
+    await job(w, {}, { OKOLOS_INSTALLED_OFF_MAIN: 'sw/x at bbbbbbb, origin/main aaaaaaa (--allow-branch, t)' }).promise
+    expect(readStatus(w.paths.status)).toMatchObject({ installedOffMain: 'sw/x at bbbbbbb, origin/main aaaaaaa (--allow-branch, t)' })
+  })
+
   it('records false when nothing was recovered', async () => {
     const w = world()
     await job(w).promise

@@ -212,6 +212,8 @@ export async function runJob({
     ...(env.OKOLOS_RUN_ID ? { runId: env.OKOLOS_RUN_ID } : {}),
     recoveredCheckout: Boolean(env.OKOLOS_RECOVERED_CHECKOUT),
     ...(env.OKOLOS_RECOVERED_CHECKOUT ? { recovery: env.OKOLOS_RECOVERED_CHECKOUT } : {}),
+    // Installed past the origin/main check (--allow-branch): every record says so.
+    ...(env.OKOLOS_INSTALLED_OFF_MAIN ? { installedOffMain: env.OKOLOS_INSTALLED_OFF_MAIN } : {}),
   }
   const setStage = (next) => {
     stage = next

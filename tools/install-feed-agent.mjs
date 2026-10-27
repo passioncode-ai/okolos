@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url'
 
 import { BOOTSTRAP_FILES, BOOTSTRAP_SOURCES } from './feed/bootstrap.mjs'
 import { runBounded } from './feed/bounded.mjs'
+import { openLog } from './feed/log.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { readStatus } from './feed/status.mjs'
 import { discover, quote, runnerArgv, xml } from './feed-agent-credential.mjs'
@@ -29,7 +30,8 @@ import { isMain } from './is-main.mjs'
  *
  *   node tools/install-feed-agent.mjs                      # checkout, bootstrap, plist, load
  *   node tools/install-feed-agent.mjs --dry-run            # print the plist, touch nothing
- *   node tools/install-feed-agent.mjs --allow-branch       # install from a branch other than main (recorded)
+ *   node tools/install-feed-agent.mjs --allow-branch       # install from HEAD other than origin/main (recorded:
+ *                                                          # feed.log, and installedOffMain in every run's status)
  *   node tools/install-feed-agent.mjs --status             # plist, bootstrap (and drift), launchd's view, last run
  *   node tools/install-feed-agent.mjs --uninstall          # bootout, delete the plist and bootstrap, verify
  *   node tools/install-feed-agent.mjs --uninstall --purge  # and the checkout, state and logs
@@ -64,6 +66,7 @@ const PLACEHOLDERS = [
   '{{NODE}}',
   '{{SOURCE_REPO}}',
   '{{ORIGIN}}',
+  '{{OFF_MAIN}}',
 ]
 const LAUNCHCTL_TIMEOUT_MS = 15_000
 
@@ -88,6 +91,7 @@ export function rendered({
   node = stableNode(),
   sourceRepo = root,
   origin = '',
+  offMain = '',
 }) {
   for (const token of PLACEHOLDERS) {
     if (!template.includes(token)) throw new Error(`${source} no longer contains ${token} — refusing to guess`)
@@ -101,6 +105,7 @@ export function rendered({
     .replaceAll('{{CHECKOUT}}', xml(checkout))
     .replaceAll('{{SOURCE_REPO}}', xml(sourceRepo))
     .replaceAll('{{ORIGIN}}', xml(origin))
+    .replaceAll('{{OFF_MAIN}}', xml(offMain))
     .replaceAll('{{RUNNER}}', runner ? xml(JSON.stringify(runner)).replaceAll('"', '&quot;') : '')
     .replaceAll('{{LOG_DIR}}', xml(logDir))
   if (out.includes('{{')) throw new Error('a placeholder survived rendering')
@@ -186,28 +191,46 @@ export function stableNode({ execPath = process.execPath, pathEnv = process.env.
 }
 
 /**
- * Whether this clone may install the agent: on `main`, or detached at origin/main.
- * ADR-0017: production publishes run only from origin/main, and the clone the
- * installer runs in is what the bootstrap recreates the checkout from.
+ * Whether this clone may install the agent: its HEAD is origin/main, freshly
+ * fetched, on `main` or detached. The branch name alone is not enough: a `main`
+ * behind or ahead of origin/main installs a bootstrap that is not what production
+ * runs. ADR-0017: production publishes run only from origin/main, and the clone
+ * the installer runs in is what the bootstrap recreates the checkout from.
  */
 export async function checkBranch({ repo = root, tool = runBounded }) {
-  const git = (args) => tool('git', ['-C', repo, ...args], { timeoutMs: 15_000 })
+  const git = (args, timeoutMs = 15_000) =>
+    tool('git', ['-C', repo, ...args], { timeoutMs, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } })
   const branch = await git(['rev-parse', '--abbrev-ref', 'HEAD'])
   if (branch.code !== 0) return { ok: false, branch: null, reason: `git cannot read ${repo}: ${(branch.stderr || '').trim()}` }
   const name = branch.stdout.trim()
-  if (name === 'main') return { ok: true, branch: name }
-  if (name === 'HEAD') {
-    const head = (await git(['rev-parse', 'HEAD'])).stdout.trim()
-    const target = (await git(['rev-parse', 'origin/main'])).stdout.trim()
-    if (/^[0-9a-f]{40}$/.test(head) && head === target) return { ok: true, branch: 'HEAD at origin/main' }
+  const fetched = await git(['fetch', '--quiet', 'origin', 'main'], 90_000)
+  const head = (await git(['rev-parse', 'HEAD'])).stdout.trim()
+  const target = (await git(['rev-parse', 'origin/main'])).stdout.trim()
+  const facts = { branch: name, head, target }
+  if (fetched.code !== 0) {
+    return {
+      ok: false,
+      ...facts,
+      reason:
+        `could not fetch origin/main to compare HEAD with it (${(fetched.stderr || fetched.error || '').trim()}). ` +
+        `Connect and run again, or pass --allow-branch to override.`,
+    }
   }
+  if (/^[0-9a-f]{40}$/.test(head) && head === target) return { ok: true, ...facts }
   return {
     ok: false,
-    branch: name,
+    ...facts,
     reason:
-      `${repo} is on ${name}, not main: the agent publishes production only from origin/main (ADR-0017), and ` +
-      `recreates its checkout from this clone. Install from the main clone, or pass --allow-branch to override.`,
+      `${repo} is ${name} at ${head.slice(0, 7) || 'an unreadable HEAD'}, not origin/main ${target.slice(0, 7) || '(unreadable)'}: ` +
+      `the agent publishes production only from origin/main (ADR-0017), and recreates its checkout from this clone. ` +
+      `Install from the main clone at origin/main, or pass --allow-branch to override.`,
   }
+}
+
+/** One line for an install made past checkBranch's refusal; it rides in the plist into every run's record. */
+export function offMainNote(branch, at = new Date().toISOString()) {
+  const short = (sha) => (sha ? String(sha).slice(0, 7) : 'unreadable')
+  return `${branch.branch ?? 'HEAD'} at ${short(branch.head)}, origin/main ${short(branch.target)} (--allow-branch, ${at})`
 }
 
 function digest(file) {
@@ -388,10 +411,17 @@ async function main() {
   }
 
   const branch = await checkBranch({ repo: root })
+  let offMain = ''
   if (!branch.ok) {
     if (argv.includes('--dry-run')) console.log(`— would refuse: ${branch.reason}`)
     else if (!argv.includes('--allow-branch')) throw new Error(branch.reason)
-    else console.log(`installing from ${branch.branch ?? 'an unreadable HEAD'} because --allow-branch was given (ADR-0017 expects main)`)
+    else {
+      offMain = offMainNote(branch)
+      console.log(`installing off origin/main because --allow-branch was given: ${offMain}`)
+      // Recorded where a person looks: feed.log now, and every run's status
+      // (installedOffMain) for as long as this plist is installed.
+      openLog(paths.log).write(`install: ${offMain}`)
+    }
   }
 
   const plist = rendered({
@@ -402,6 +432,7 @@ async function main() {
     bootstrap: paths.bootstrap,
     sourceRepo: root,
     origin: await originUrl({ repo: root }),
+    offMain,
   })
   if (argv.includes('--dry-run')) {
     console.log(plist)

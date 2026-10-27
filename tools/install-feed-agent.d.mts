@@ -18,10 +18,19 @@ export function rendered(options: {
   node?: string
   sourceRepo?: string
   origin?: string
+  offMain?: string
 }): string
 export function installBootstrap(options: { dir: string; from?: string; files?: readonly string[]; log?: (line: string) => void }): void
 export function stableNode(options?: { execPath?: string; pathEnv?: string }): string
-export function checkBranch(options: { repo?: string; tool?: Tool }): Promise<{ ok: boolean; branch: string | null; reason?: string }>
+export interface BranchCheck {
+  ok: boolean
+  branch: string | null
+  head?: string
+  target?: string
+  reason?: string
+}
+export function checkBranch(options: { repo?: string; tool?: Tool }): Promise<BranchCheck>
+export function offMainNote(branch: BranchCheck, at?: string): string
 export function bootstrapDrift(options: { bin: string; from: string; files?: readonly string[] }): {
   matches: boolean | null
   differs: string[]

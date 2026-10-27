@@ -265,6 +265,12 @@ describe('no failure path is silent (B-159)', () => {
     expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'failed', stage: 'checkout' })
   })
 
+  it('carries an install made off origin/main into its own records', async () => {
+    const w = world()
+    await agent(w, { tool: fakeTool({ fetchFails: true }).tool }, { OKOLOS_INSTALLED_OFF_MAIN: 'sw/x at b, origin/main a' }).promise
+    expect(readStatus(w.paths.status)).toMatchObject({ stage: 'checkout', installedOffMain: 'sw/x at b, origin/main a' })
+  })
+
   it('records a job that died before writing its own record', async () => {
     const w = world()
     plantCheckout(w.paths.agentCheckout)
