@@ -18,3 +18,5 @@ gate:  4 — command "plan_audit.py --graph .task-pipeline/graph.json --packets 
 review: 3 — surface spec — rounds 1 — returned — 2026-10-27T08:05:00+01:00
 finding: F1..F4 — blocking:B4 — round 1 — base-repro n/a
 finding: F5..F17,F19..F22,F24 — blocking:B0 should-fix 15 — round 1 — base-repro n/a
+review: 3 — surface spec — rounds 2 — returned — 2026-10-27T08:40:00+01:00
+finding: R1,R2 — blocking:B2 — round 2 — base-repro n/a

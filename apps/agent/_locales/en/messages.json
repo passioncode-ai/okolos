@@ -231,5 +231,11 @@
   },
   "journalLink": {
     "message": "Export the agents' journal"
+  },
+  "refusal_cleaning_incomplete": {
+    "message": "cleaning did not finish; no text was sent"
+  },
+  "refusal_stale_cursor": {
+    "message": "this snapshot page is out of date; take a new snapshot"
   }
 }

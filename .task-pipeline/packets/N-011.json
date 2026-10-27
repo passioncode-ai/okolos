@@ -25,7 +25,7 @@
   ]
  },
  "outputs": [
-  "инструменты MCP: session.open, open, snapshot, read, get, waitFor, screenshot, close, hygiene.census; каждый ответ проходит journal.record до отправки; `main.ts` собирает службу"
+  "инструменты MCP: session.open, open, snapshot, read, get, waitFor, close, hygiene.census (без screenshot); каждый ответ проходит journal.record до отправки; `main.ts` собирает службу"
  ],
  "acceptance": [
   "skeleton на Chrome: session.open → open локальной фикстуры со скрытой инструкцией из корпуса → snapshot не содержит текста инструкции, verdict.level = finding → close: окна нет",
@@ -33,10 +33,13 @@
   "read, get text|title, waitFor {text} строятся только из очищенных строк снимка",
   "open {ref} на ссылку вне origins.read → origin_not_in_task до перехода; редирект за область → snapshot и read отвечают origin_not_in_task",
   "каждый глагол, возвращающий URL, срезает фрагмент",
+  "tools/list не содержит screenshot (ревью R2)",
+  "фикстура, раздутая до исчерпания бюджета пробника, с позитивом после раздутия: вызов отказан cleaning_incomplete, текста позитива нет ни в одном ответе (ревью R1)",
+  "фикстура подменяет скрытый узел по таймеру каждые 5 мс: скрипты на паузе на время снимка, текст позитива не выдан; счётчик мутаций различается → cleaning_incomplete (ревью R3)",
   "open вне origins.read → origin_not_in_task, запись в журнале есть",
   "snapshot большой фикстуры приходит частями ≤ 32 КБ с курсором",
   "read возвращает boundary с nonce и origin; get title/url без фрагмента",
-  "поля password, cc-number, one-time-code с введёнными значениями (fuzz, фиксированное зерно): значений нет ни в одном ответе ни одного глагола",
+  "поля password, cc-number, one-time-code, <label> вокруг поля, aria-labelledby на поле кода, contenteditable без роли, с введёнными значениями (fuzz, фиксированное зерно): значений нет ни в одном ответе ни одного глагола (ревью R4)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/verbs"
  ],
  "guards": [

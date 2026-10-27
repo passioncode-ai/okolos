@@ -231,5 +231,11 @@
   },
   "journalLink": {
     "message": "Выгрузить журнал агентов"
+  },
+  "refusal_cleaning_incomplete": {
+    "message": "очистка не завершилась, текст не выдан"
+  },
+  "refusal_stale_cursor": {
+    "message": "эта страница снимка устарела, нужен новый снимок"
   }
 }

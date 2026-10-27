@@ -1,0 +1,8 @@
+{
+  "name": "@okolos/agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "description": "Okolos Agent: the local door through which paired agents read the person's browser, cleaned."
+}

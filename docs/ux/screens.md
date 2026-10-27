@@ -614,7 +614,7 @@ generator, and the sheet declares no colour of its own.
 - **The agent's name is shown as text and fenced.** At most 40 characters, no run of three or more digits, no control or bidirectional characters; the code sits in its own element, so a name cannot imitate it.
 - **Revoking is immediate.** The agent's next call is refused with `not_paired`, and every task it holds is closed with its window.
 - **Scenarios:** SCN-044
-- **Resources:** the pairing store, the keychain item per agent, the journal
+- **Resources:** the pairing store (the one place a key's SHA-256 lives), the journal
 - **Status:** designed
 
 ### SCR-24: Agent activity

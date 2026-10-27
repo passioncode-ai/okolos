@@ -20,7 +20,7 @@
   ]
  },
  "outputs": [
-  "`snapshotVerdict(probe: {verdicts: readonly Verdict[], truncated: boolean, unresolved: number}): SnapshotVerdict` — `{level: 'clean'|'finding'|'incomplete', findings: {kind, confidence, evidence}[]}`; `incomplete`, когда пробник упёрся в бюджет или не нашёл элемент: агенту говорится, что очистка неполная"
+  "`snapshotVerdict(probe: {verdicts: readonly Verdict[], truncated: boolean, unresolved: number}): SnapshotVerdict | {refused: 'cleaning_incomplete'}` — `{level: 'clean'|'finding', findings: {kind, confidence, evidence}[]}`; неполная очистка означает отказ без текста; `refOf(backendId, taskKey)` HMAC; `buildSnapshot` вычищает значения полей из имён"
  ],
  "acceptance": [
   "buildSnapshot с rootRef под скрытым предком возвращает пусто; с rootRef под полем ввода текст поля не выдаётся (ревью F2)",
@@ -28,7 +28,8 @@
   "корпус corpora/injections/positives.json: каждый позитив, помещённый в AX-дерево скрытым узлом, отсутствует в renderLine-выдаче (уровень функции; настоящая проверка REQ-55 в Chrome — N-011)",
   "negatives.json: ни один негатив не вырезан",
   "fuzz: 200 случайных значений, введённых в textbox/searchbox/combobox и потомки, не встречаются в выдаче (фиксированное зерно)",
-  "truncated или unresolved > 0 дают level 'incomplete', а не 'clean' (правило retro №3)",
+  "truncated или unresolved > 0 дают отказ cleaning_incomplete без текста, а не level clean (ревью R1; правило retro №3)",
+  "значение поля (AX value) вычищается из имени любого узла: <label> вокруг поля, aria-labelledby на поле кода; contenteditable без роли считается полем (ревью R4)",
   "проверка узла: pnpm -s exec vitest run packages/core-snapshot"
  ],
  "guards": [

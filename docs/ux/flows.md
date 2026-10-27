@@ -707,12 +707,14 @@ flowchart TD
 ```mermaid
 flowchart TD
   A[Agent calls the local door] --> K{Paired key?}
+  PR[okolos-agent pair: POST /pair] --> P
   K -->|yes| OK[Request handled under the agent's scope]
-  K -->|no| P[Page: agent X asks for access, code 123 456]
+  K -->|no key| N
+  P[Page: agent X asks for access, code 123 456]
   P -->|person confirms, codes match| R[Key issued to the agent once; the daemon keeps only its SHA-256]
   P -->|person refuses or no answer| N[Refused and recorded]
   R --> OK
-  K -->|wrong origin, no key| N
+  K -->|any Origin or Sec-Fetch header| N
 ```
 
 - **Screens traversed:** SCR-23 (Agent pairing), SCR-24 (Agent activity). Both are a page of Okolos Agent opened in Fabric Dashboards, because in Б1 there is no Okolos Bridge extension yet and the Okolos extension has no channel to the daemon (ADR-0018).

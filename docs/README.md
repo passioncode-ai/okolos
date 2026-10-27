@@ -13,7 +13,7 @@
 | Требования | 37: **36 DONE, 0 PARTIAL**, одно закрыто решением не выпускать — [приёмка](superpowers/audits/2026-08-05-acceptance.md), [аудит на дефекты](superpowers/audits/2026-08-08-bug-hunt.md) |
 | Сценарии | **48**, из них **38 реализованы**; шесть заведены 2026-09-11 под локальную проверку почты, пять — 2026-10-06 под мост для агентов (Okolos Bridge), и непостроенные стоят `draft` — [scenarios.md](ux/scenarios.md). Число здесь держит гейт `tools/docs.test.ts` через [brand/facts.md](brand/facts.md), а не память |
 | Тесты | `pnpm test` (unit + гейты), `pnpm test:e2e` (Chromium), `pnpm test:e2e:firefox` — счётчики намеренно не выписаны здесь: они устаревают следующим коммитом |
-| Код | 21 пакет, 3 приложения — карта ниже |
+| Код | 21 пакет, 4 приложения — карта ниже |
 | Репозиторий | `passioncode-ai/okolos` (публичный, GNU AGPL-3.0 или коммерческая лицензия — ADR-0016; перенесён из `ssheleg/okolos` 2026-09-29, старый адрес редиректит) |
 | Ждёт человека | 2 шага: аккаунт Chrome Web Store и `pnpm feed:agent` — без второго `pnpm package:check` отказывает, и с 2026-08-21 отказывает и `.githooks/pre-push` |
 
@@ -124,6 +124,7 @@ PEM-заголовок — [runbooks/feed-signing.md](runbooks/feed-signing.md).
 | `apps/extension` | само расширение: content script, service worker, страницы |
 | `apps/proxy` | тонкий Cloudflare Worker: фиды, статус домена, апелляции |
 | `apps/mail-cli` | команда `okolos-mail scan <файл>`: проверка одного письма на этой машине |
+| `apps/agent` | Okolos Agent: локальная служба, через которую привязанные агенты читают страницы в своём окне, очищенными (Б1 моста, в работе) |
 
 ## Процесс
 

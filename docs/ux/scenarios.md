@@ -970,7 +970,7 @@ every rule below; where they differ, the scenario says so.
 - **Entry point:** an agent's first call to the local door
 - **Preconditions:** Okolos Agent is running; the agent has never connected
 - **Steps:**
-  1. The agent calls the door without a key -> the door answers with a pairing request and shows a code; nothing else is reachable
+  1. The agent asks for access through `okolos-agent pair` (or the stdio shim on first start) -> it shows a six-digit code; a call to the door without a key is refused and creates no request
   2. The person sees the agent's name and the same six-digit code on the Okolos Agent page and confirms -> a key is issued to that agent once; the daemon keeps only its SHA-256
   3. The person later revokes the agent -> its next call is refused and any task it holds stops
 - **Expected result:** only agents the person confirmed can reach the browser, and each one can be taken back on its own
