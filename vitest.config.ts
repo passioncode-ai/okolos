@@ -13,6 +13,8 @@ export default defineConfig({
     // 5 s default failed correct tests and blocked the pre-push gate. A real defect
     // fails an assertion, not the clock; 30 s still catches a test that hangs.
     testTimeout: 30_000,
+    // The pre-push hook's GIT_DIR must not reach a test's git child (B-160): see the file.
+    setupFiles: ['tools/vitest-git-env.ts'],
     coverage: {
       provider: 'v8',
       include: ['packages/*/src/**/*.ts'],
