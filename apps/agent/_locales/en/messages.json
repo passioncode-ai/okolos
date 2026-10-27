@@ -153,6 +153,9 @@
       }
     }
   },
+  "taskTimeOver": {
+    "message": "The task's time is up, and Okolos Agent is closing its window"
+  },
   "taskWindowOpen": {
     "message": "Agent window open"
   },

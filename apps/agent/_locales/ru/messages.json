@@ -153,6 +153,9 @@
       }
     }
   },
+  "taskTimeOver": {
+    "message": "Время задачи вышло, Okolos Agent закрывает её окно"
+  },
   "taskWindowOpen": {
     "message": "Окно агента открыто"
   },
