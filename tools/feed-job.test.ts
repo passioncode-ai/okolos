@@ -329,6 +329,38 @@ describe('the record carries what the bootstrap knows (B-159, B-150)', () => {
   })
 })
 
+describe('a stop is recorded as the stop, as the bootstrap records it (B-159)', () => {
+  it('records a pin-stage child killed by SIGTERM as the stop: exit 143, once', async () => {
+    const w = world()
+    let signal: string | null = null
+    const base = fakeTool().tool
+    const record = await job(
+      w,
+      {
+        stopped: () => signal,
+        // git status, a pin-stage child without retries, is killed under the stop.
+        tool: async (command: string, args: string[]) => {
+          if (args.includes('status')) {
+            signal = 'SIGTERM'
+            return { code: null, signal: 'SIGTERM', stdout: '', stderr: '', timedOut: false }
+          }
+          return base(command, args)
+        },
+      },
+      { OKOLOS_RUN_ID: 'run-stop' },
+    ).promise
+    expect(record).toMatchObject({ outcome: 'failed', stage: 'pin', exit: 143, reason: 'stopped by SIGTERM', runId: 'run-stop' })
+    expect(readStatus(w.paths.status)).toMatchObject({ exit: 143, reason: 'stopped by SIGTERM', consecutiveFailures: 1 })
+    expect(calls(w.fake, 'ingest')).toEqual([])
+  })
+
+  it('records an ordinary failure as before when nothing is stopping it', async () => {
+    const w = world()
+    const record = await job(w, { stopped: () => null, tool: fakeTool({ head: 'b'.repeat(40) }).tool }).promise
+    expect(record).toMatchObject({ outcome: 'failed', stage: 'pin', exit: 1 })
+  })
+})
+
 describe('the watchdog the bootstrap hands down (one deadline per run)', () => {
   it('is thirty minutes when nobody shortens it', () => {
     expect(watchdogFrom({})).toBe(WATCHDOG_MS)

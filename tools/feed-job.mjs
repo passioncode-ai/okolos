@@ -180,6 +180,11 @@ export async function runJob({
   node = process.execPath,
   tmp = tmpdir(),
   onStage = () => {},
+  // The signal that is stopping this run, or null. A failure it causes (a stage
+  // child killed under it) is recorded as the stop, the rule the bootstrap keeps.
+  stopped = () => null,
+  // Told as soon as this run's record is written, so a stop does not write a second.
+  onRecord = () => {},
 } = {}) {
   const iso = () => new Date(now()).toISOString()
   const startedAt = iso()
@@ -222,7 +227,11 @@ export async function runJob({
     onStage(next)
     write(`── ${next}`)
   }
-  const finish = (record) => writeStatus(paths.status, { startedAt, at: iso(), ...facts, ...record })
+  const finish = (record) => {
+    const written = writeStatus(paths.status, { startedAt, at: iso(), ...facts, ...record })
+    onRecord(written)
+    return written
+  }
 
   const stageEnv = { ...withoutSecrets(env), OKOLOS_FEED_LOCK: lock.token }
   const gitEnv = {
@@ -388,6 +397,11 @@ export async function runJob({
     if (outcome.cause) {
       const cause = outcome.cause
       const failedStage = cause instanceof StageFailure ? cause.stage : stage
+      const signal = stopped()
+      if (signal) {
+        write(`stopped by ${signal} in ${failedStage}`)
+        return finish({ outcome: 'failed', stage: failedStage, exit: EXIT.signal, reason: `stopped by ${signal}` })
+      }
       write(`failed in ${failedStage}: ${cause.message}`)
       return finish({ outcome: 'failed', stage: failedStage, exit: cause.exit ?? EXIT.failed, reason: cause.message })
     }
@@ -412,22 +426,30 @@ export function signalRecord(current, signal, at, env = process.env) {
   }
 }
 
-/** Ends the run on SIGTERM/SIGINT the same way the watchdog does: children killed, status written. */
+/**
+ * Ends the run on SIGTERM/SIGINT the same way the watchdog does: children killed,
+ * status written once (runJob may already have recorded the stop it caused), exit
+ * 143. Returns the promise main waits on, so main never exits with its own code
+ * under it, as in the bootstrap.
+ */
 function onSignal(signal, current) {
-  void (async () => {
+  if (current.stopping) return current.stopping
+  current.signal = signal
+  current.stopping = (async () => {
     await killAllGroups(2000)
     try {
-      writeStatus(feedPaths().status, signalRecord(current, signal, new Date().toISOString()))
+      if (!current.recorded) writeStatus(feedPaths().status, signalRecord(current, signal, new Date().toISOString()))
     } finally {
       process.exit(EXIT.signal)
     }
   })()
+  return current.stopping
 }
 
 async function main() {
   const argv = process.argv.slice(2)
   const agent = argv.includes('--agent')
-  const current = { stage: 'start', startedAt: new Date().toISOString() }
+  const current = { stage: 'start', startedAt: new Date().toISOString(), signal: null, stopping: null, recorded: false }
   process.on('SIGTERM', () => onSignal('SIGTERM', current))
   process.on('SIGINT', () => onSignal('SIGINT', current))
   const record = await runJob({
@@ -440,7 +462,13 @@ async function main() {
     onStage: (stage) => {
       current.stage = stage
     },
+    stopped: () => current.signal,
+    onRecord: () => {
+      current.recorded = true
+    },
   })
+  // A stop ends the process from onSignal, after the stage groups are gone.
+  if (current.stopping) await current.stopping
   process.exit(record.exit)
 }
 

@@ -109,7 +109,7 @@ What a failed run leaves, and where (B-159):
 | the checkout is missing or broken and cannot be recreated, or its repair outlives the run's deadline | `stage: checkout` | yes | one line |
 | the job dies without writing its own record: a crash | `stage: job`, `reason` = the first error line of its stderr | its stderr and a line | its stderr and a line |
 | the job is killed at the run's deadline without writing its own record | `stage: job`, exit 124, `reason` = the fixed sentence "the run's deadline (2700 s) passed during the job; its process group was killed" | a line | a line |
-| the job fails in its own stages (config, pin, ingest, publish, its watchdog, a signal) | the job's stage | yes | one line |
+| the job fails in its own stages (config, pin, ingest, publish, its watchdog, a signal) | the job's stage; a stop by SIGTERM or SIGINT is recorded as the stop (exit 143, `reason: stopped by <signal>`), also when it killed a stage's child, once | yes | one line |
 | the bootstrap is stopped by SIGTERM or SIGINT and the job wrote no record of this run | the stage it was in, exit 143, `reason: stopped by <signal>`; a repair or job the stop killed is not recorded as a crash | a line when the stop broke a repair or the job | no |
 | the bootstrap itself crashes | `stage: bootstrap` | no | its stack |
 | another run holds the lock (exit 75) | nothing: the record is the running one's | one line | no |
