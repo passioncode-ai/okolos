@@ -28,7 +28,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 import { archivePlan, compareEntries, zipEntries } from './archive.mjs'
-import { binInvocation } from './bin.mjs'
+import { runToCompletion } from './bin.mjs'
 import { filesUnder } from './tree.mjs'
 import { pruneReleases, RELEASES_KEPT } from './release-prune.mjs'
 import { FEED_MAX_AGE_DAYS, feedAgeDays, feedTooOld, freshestFeed } from './feed-age.mjs'
@@ -108,8 +108,8 @@ console.log('\n── build, so the archive is of something this command made')
 const built = TARGETS.every((target) => existsSync(path.join(dist, target)))
 if (!checkOnly || !built) {
   // pnpm is pnpm.cmd on Windows, which Node will not spawn without a shell (B-163).
-  const pnpm = binInvocation('pnpm', ['build'])
-  execFileSync(pnpm.command, pnpm.args, { cwd: root, stdio: 'inherit', shell: pnpm.shell, timeout: 10 * 60_000 })
+  // At the deadline the whole tree ends, not only that cmd.exe (B-164).
+  await runToCompletion('pnpm', ['build'], { cwd: root, timeoutMs: 10 * 60_000 })
 }
 
 for (const target of TARGETS) {

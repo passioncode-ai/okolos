@@ -35,7 +35,7 @@ import { existsSync } from 'node:fs'
 
 import { Options } from 'selenium-webdriver/firefox.js'
 
-import { binInvocation } from './bin.mjs'
+import { binInvocation, endTree } from './bin.mjs'
 import { buildTooOld } from './build-age.mjs'
 import { findFirefox } from './find-firefox.mjs'
 
@@ -176,7 +176,8 @@ async function waitForDriver(timeoutMs) {
 const driverUp = await waitForDriver(60_000)
 if (!driverUp) {
   console.error('geckodriver did not start within 60s')
-  gecko.kill()
+  // The tree, not just the cmd.exe in front of it on win32.
+  endTree(gecko)
   server.close()
   process.exit(1)
 }
@@ -471,7 +472,7 @@ try {
   check('firefox run completed', false, String(cause).split('\n')[0])
 } finally {
   await driver?.quit().catch(() => undefined)
-  gecko.kill()
+  endTree(gecko)
   server.close()
 }
 

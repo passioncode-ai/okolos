@@ -1,7 +1,10 @@
 import { execFileSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { binInvocation, shCandidates } from './bin.mjs'
+import { binInvocation, endTree, runToCompletion, shCandidates } from './bin.mjs'
 
 /**
  * `pnpm` and `npx` are `.cmd` files on Windows, which Node will not spawn without a
@@ -56,4 +59,65 @@ describe('finding a POSIX sh', () => {
       'C:\\Program Files\\Git\\bin\\sh.exe',
     ])
   })
+})
+
+describe('ending what a tool started (B-164)', () => {
+  /** A child that records how it was asked to stop. */
+  function child(pid?: number) {
+    const signals: Array<string | undefined> = []
+    return { pid, signals, kill: (signal?: NodeJS.Signals) => (signals.push(signal), true) }
+  }
+
+  it('signals the child itself on macOS and Linux, as child.kill() did', () => {
+    const ran: string[][] = []
+    for (const platform of ['darwin', 'linux']) {
+      const c = child(4242)
+      endTree(c, { platform, run: (command, args) => ran.push([command, ...args]) })
+      expect(c.signals).toEqual(['SIGTERM'])
+    }
+    expect(ran).toEqual([])
+  })
+
+  it('ends the whole tree under cmd.exe on Windows with taskkill /T /F, not cmd.exe alone', () => {
+    const ran: string[][] = []
+    const c = child(4242)
+    endTree(c, { platform: 'win32', run: (command, args) => ran.push([command, ...args]) })
+    expect(ran).toEqual([['taskkill', '/PID', '4242', '/T', '/F']])
+    expect(c.signals).toEqual([])
+  })
+
+  it('falls back to kill() for a child that never got a pid', () => {
+    const ran: string[][] = []
+    const c = child(undefined)
+    endTree(c, { platform: 'win32', run: (command, args) => ran.push([command, ...args]) })
+    expect(ran).toEqual([])
+    expect(c.signals).toEqual(['SIGTERM'])
+  })
+})
+
+describe('running a command to completion', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-bin-'))
+  const script = (name: string, body: string) => {
+    const file = path.join(dir, name)
+    writeFileSync(file, body)
+    return file
+  }
+
+  it('resolves when the command exits 0', async () => {
+    await expect(runToCompletion('node', [script('ok.mjs', '')], { timeoutMs: 30_000 })).resolves.toBeUndefined()
+  })
+
+  it('rejects with the exit code when it fails', async () => {
+    await expect(
+      runToCompletion('node', [script('fail.mjs', 'process.exit(4)')], { timeoutMs: 30_000 }),
+    ).rejects.toThrow(/exit 4/)
+  })
+
+  it('ends it at the deadline and says so, rather than waiting', async () => {
+    const started = Date.now()
+    await expect(
+      runToCompletion('node', [script('hang.mjs', 'setTimeout(() => {}, 60_000)')], { timeoutMs: 500 }),
+    ).rejects.toThrow(/did not finish within 500 ms/)
+    expect(Date.now() - started).toBeLessThan(20_000)
+  }, 30_000)
 })
