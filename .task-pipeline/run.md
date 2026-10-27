@@ -26,3 +26,4 @@ stage: 4 plan — gate auto — verdict pass — 2026-10-27T09:06:00+01:00
 gate:  4 — command "plan_audit.py --graph .task-pipeline/graph.json --packets .task-pipeline/packets" — exit 0 — 2026-10-27T09:06:00+01:00
 holds: 4 — 3 (retro over budget, stage 10; README «Статус», stage 9; B-151, B-152 board rows) — enumerated 8/8 classes
 event: memory — board request a6191901 (webpilot shield copy) answered 25fd4f39; owed: post the stable bridge/b1-run2 commit in thread 5eb3f477 when N-003 and N-004 close — 2026-10-27T05:23:00+01:00
+finding: hygiene N-002 docs/README.md:122 split-table — noise — round 0 — base-repro n/a (blank line separates the packages table from the applications table; two tables, not one split)

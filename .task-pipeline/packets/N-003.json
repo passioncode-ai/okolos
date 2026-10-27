@@ -15,6 +15,7 @@
   "edit_targets": [
    "packages/core-snapshot/src/verdict.ts",
    "packages/core-snapshot/package.json",
+   "packages/core-snapshot/tsconfig.json",
    "packages/core-snapshot/src/verdict.test.ts",
    "src/corpus.test.ts",
    "src/secrets.test.ts"
@@ -32,6 +33,7 @@
   "truncated или unresolved > 0 дают отказ cleaning_incomplete без текста, а не level clean (ревью R1; правило retro №3)",
   "значение поля (AX value) вычищается из имени любого узла: <label> вокруг поля, aria-labelledby на поле кода; contenteditable без роли считается полем (ревью R4)",
   "значение ищется после удаления пробелов и разделителей и только если оно не короче 4 знаков: «4111 1111 1111 1111» в имени как «4111-1111-1111-1111» вычищается; значение «ab» имён не трогает (ревью S4)",
+  "toSnapshotFinding на настоящем выводе detectHidden (stage1) и stage3 по позитивам корпуса: concealment и carrier заполнены; тест падает, если детектор сменит формат detail (проверка seam N-001 круг 2)",
   "проверка узла: pnpm -s exec vitest run packages/core-snapshot"
  ],
  "guards": [
@@ -42,5 +44,5 @@
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "без длинного тире в текстах для людей"
  ],
- "resume": "git log --oneline origin/main..bridge/b1-run2 -- packages/core-snapshot/src/verdict.ts packages/core-snapshot/package.json packages/core-snapshot/src/verdict.test.ts; затем первый непройденный тест в списке acceptance"
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- packages/core-snapshot/src/verdict.ts packages/core-snapshot/package.json packages/core-snapshot/tsconfig.json; затем первый непройденный тест в списке acceptance"
 }

@@ -32,6 +32,7 @@
   "состояния SCR-23: loading, empty, error, success, expired; SCR-24: loading, empty, error, success — каждое по data-role",
   "инструмент pairing.confirm через MCP отвечает human-step-required со ссылкой /dashboard",
   "строки берутся из каталога; ключ без строки виден как [key]",
+  "отказ двери (DoorRejection) в списке отказов показывается одной строкой rejection_door, refusalKey для него не вызывается и не бросает (проверка seam N-001 круг 2)",
   "Set-Cookie от /fabric/v1/login несёт HttpOnly и SameSite=Strict (ревью R8)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/dashboard"
  ],
