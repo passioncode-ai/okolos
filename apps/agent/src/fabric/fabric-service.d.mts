@@ -16,6 +16,9 @@ export class ServiceError extends Error {}
 
 export function nowIso(): string
 
+/** Temporary file, fsync, rename: the file is either the old bytes or the new ones. */
+export function atomicWrite(file: string, data: string | Uint8Array, mode?: number): void
+
 /** A sentence for a 403 when the request is not this service's, else null. */
 export function checkRequest(
   port: number,

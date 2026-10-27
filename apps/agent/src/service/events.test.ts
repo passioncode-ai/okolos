@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, statSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -46,5 +46,59 @@ describe('the events feed', () => {
 
   it('refuses a kind that is not dotted lowercase (the kit’s rule)', () => {
     expect(() => new EventLog(file()).append('Service Started', 'info', 'x')).toThrow(/dotted lowercase/)
+  })
+})
+
+describe('retention at start: at least 7 days or 1000 events (fabric-service/0.1)', () => {
+  const DAY = 24 * 60 * 60 * 1000
+  const NOW = Date.parse('2026-10-27T12:00:00Z')
+
+  /** A log file of `count` events, the first `old` of them 8 days old, the rest from today. */
+  function seeded(count: number, old: number): string {
+    const where = file()
+    const lines: string[] = []
+    for (let id = 1; id <= count; id += 1) {
+      const at = new Date(id <= old ? NOW - 8 * DAY : NOW - 60_000).toISOString()
+      lines.push(JSON.stringify({ id: String(id), at, kind: 'service.started', level: 'info', text: `Start ${id}.` }))
+    }
+    writeFileSync(where, `${lines.join('\n')}\n`, { mode: 0o600 })
+    return where
+  }
+
+  const ids = (log: EventLog) => log.read('0', 10_000).map((e) => Number(e.id))
+
+  it('drops events older than 7 days beyond the newest 1000', () => {
+    const log = new EventLog(seeded(1200, 1200), { now: () => NOW })
+    const kept = ids(log)
+    expect(kept).toHaveLength(1000)
+    expect(kept[0]).toBe(201)
+    expect(kept.at(-1)).toBe(1200)
+  })
+
+  it('keeps every event of the last 7 days, however many', () => {
+    const log = new EventLog(seeded(1500, 300), { now: () => NOW })
+    const kept = ids(log)
+    expect(kept).toHaveLength(1200)
+    expect(kept[0]).toBe(301)
+  })
+
+  it('keeps the newest 1000 even when most are old', () => {
+    const log = new EventLog(seeded(1100, 1050), { now: () => NOW })
+    const kept = ids(log)
+    expect(kept).toHaveLength(1000)
+    expect(kept[0]).toBe(101)
+  })
+
+  it('keeps a small log whole, however old', () => {
+    expect(ids(new EventLog(seeded(10, 10), { now: () => NOW }))).toHaveLength(10)
+  })
+
+  it('keeps ids, so a host’s cursor stays valid, and the file stays 0600', () => {
+    const where = seeded(1200, 1200)
+    const log = new EventLog(where, { now: () => NOW })
+    expect(log.append('service.started', 'info', 'Okolos Agent started.').id).toBe('1201')
+    expect(log.read('1199', 50).map((e) => e.id)).toEqual(['1200', '1201'])
+    expect(statSync(where).mode & 0o777).toBe(0o600)
+    expect(readFileSync(where, 'utf8').trim().split('\n')).toHaveLength(1001)
   })
 })
