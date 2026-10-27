@@ -326,7 +326,11 @@ export interface CensusEntry {
   readonly reason: string
 }
 
-/** `agent` carries the person's logins; `disposable` is a fresh profile with none. */
+/**
+ * `agent` is the persistent profile: what a site keeps in it stays from task to
+ * task, and sign-ins will live there once the person makes them (Б2, SCN-047; in
+ * Б1 it holds none). `disposable` is a temporary profile, gone with the task.
+ */
 export type TaskProfile = 'agent' | 'disposable'
 
 export interface TaskScope {
@@ -496,8 +500,9 @@ export function validateScope(input: unknown): { ok: true; scope: TaskScope } | 
   if (typeof budget !== 'number' || !Number.isInteger(budget) || budget < 1 || budget > SCOPE_LIMITS.maxStepBudget) {
     return { ok: false, reason: `stepBudget must be an integer from 1 to ${SCOPE_LIMITS.maxStepBudget}` } // i18n-exempt: a refusal read by the agent over MCP, not by the person
   }
-  // Required, no default: the default would be `agent`, the profile with the
-  // person's logins, and a task should reach them only by saying so (ревью F26).
+  // Required, no default: the default would be `agent`, the persistent profile
+  // where what one task leaves a later task finds (and, from Б2, the sign-ins),
+  // and a task should reach it only by saying so (ревью F26).
   const profile = raw.profile
   if (profile !== 'agent' && profile !== 'disposable') return { ok: false, reason: "profile must be 'agent' or 'disposable'" } // i18n-exempt: a refusal read by the agent over MCP, not by the person
 
