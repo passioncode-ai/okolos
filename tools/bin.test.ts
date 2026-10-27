@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 
-import { binInvocation } from './bin.mjs'
+import { binInvocation, shCandidates } from './bin.mjs'
 
 /**
  * `pnpm` and `npx` are `.cmd` files on Windows, which Node will not spawn without a
@@ -41,5 +41,19 @@ describe('starting pnpm or npx', () => {
     const run = binInvocation('pnpm', ['--version'])
     const version = execFileSync(run.command, run.args, { shell: run.shell, encoding: 'utf8' })
     expect(version.trim()).toMatch(/^\d+\.\d+\.\d+/)
+  })
+})
+
+describe('finding a POSIX sh', () => {
+  it('is sh on macOS and Linux', () => {
+    expect(shCandidates('darwin')).toEqual(['sh'])
+  })
+
+  it("falls back to Git for Windows' own sh, found beside git, on Windows", () => {
+    expect(shCandidates('win32', 'C:/Program Files/Git/mingw64/libexec/git-core')).toEqual([
+      'sh',
+      'C:\\Program Files\\Git\\usr\\bin\\sh.exe',
+      'C:\\Program Files\\Git\\bin\\sh.exe',
+    ])
   })
 })

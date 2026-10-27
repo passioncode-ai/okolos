@@ -13,6 +13,8 @@
  * that should have to say so.
  */
 
+import path from 'node:path'
+
 /** Characters `cmd.exe` would read as something other than part of an argument. */
 const CMD_SPECIAL = /[\s"&|<>^%!()]/
 
@@ -29,4 +31,24 @@ export function binInvocation(name, args, platform = process.platform) {
     throw new Error(`refusing to pass ${unsafe.map((a) => JSON.stringify(a)).join(', ')} through cmd.exe`)
   }
   return { command: name, args: [...args], shell: true }
+}
+
+/**
+ * Where a POSIX `sh` can be, in the order to try. On macOS and Linux it is `sh`.
+ * Windows has none of its own; Git for Windows ships one, on PATH inside Git Bash
+ * and the hooks it runs but not in PowerShell or cmd, so it is also looked for
+ * beside Git itself (`git --exec-path` is `<git>/mingw64/libexec/git-core`).
+ *
+ * @param {string} [platform]
+ * @param {string} [gitExecPath] what `git --exec-path` printed
+ * @returns {string[]}
+ */
+export function shCandidates(platform = process.platform, gitExecPath = '') {
+  if (platform !== 'win32') return ['sh']
+  const candidates = ['sh']
+  if (gitExecPath !== '') {
+    const git = path.win32.resolve(gitExecPath, '..', '..', '..')
+    candidates.push(path.win32.join(git, 'usr', 'bin', 'sh.exe'), path.win32.join(git, 'bin', 'sh.exe'))
+  }
+  return candidates
 }

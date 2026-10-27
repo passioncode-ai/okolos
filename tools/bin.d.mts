@@ -9,3 +9,5 @@ export function binInvocation(
   args: readonly string[],
   platform?: string,
 ): { command: string; args: string[]; shell: boolean }
+/** Where a POSIX sh can be, in the order to try: `sh`, then Git for Windows' own on win32. */
+export function shCandidates(platform?: string, gitExecPath?: string): string[]

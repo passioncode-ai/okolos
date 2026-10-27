@@ -1,7 +1,9 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+
+import { shCandidates } from './bin.mjs'
 
 /**
  * What CI claims about itself.
@@ -296,8 +298,16 @@ describe('the pre-push hook exists and runs the gates', () => {
   describe('decides from what is pushed', () => {
     const zero = '0'.repeat(40)
     const sha = 'a'.repeat(40)
+    // Git runs the hook with its own sh; on Windows outside Git Bash that sh is not on
+    // PATH, so it is looked for beside git (B-162). On macOS and Linux it is `sh`.
+    const gitExecPath =
+      process.platform === 'win32' ? execFileSync('git', ['--exec-path'], { encoding: 'utf8' }).trim() : ''
+    const sh =
+      shCandidates(process.platform, gitExecPath).find(
+        (candidate) => spawnSync(candidate, ['-c', 'exit 0']).status === 0,
+      ) ?? 'sh'
     const decide = (stdin: string): string =>
-      execFileSync('sh', [hook], {
+      execFileSync(sh, [hook], {
         cwd: root,
         input: stdin,
         env: { ...process.env, OKOLOS_PREPUSH_DECIDE: '1', OKOLOS_SKIP_GATES: '' },
