@@ -20,7 +20,7 @@
   ]
  },
  "outputs": [
-  "`findChrome(): string | null`; `class AgentWindows { constructor({binary, profileDir, launch = CdpPipe.launch}); openWindow(): Promise<{targetId, sessionId}>; closeWindow(targetId); shutdown() }` — аргументы `--remote-debugging-pipe --no-startup-window --no-first-run --no-default-browser-check --user-data-dir=<profile>` и никогда `--enable-automation`"
+  "`findChrome(): string | null`; `class AgentWindows { constructor({binary, profileDir, launch = CdpPipe.launch}); openWindow(): Promise<{targetId, sessionId}> /* targetId и есть windowId в SessionOpenResult */; closeWindow(targetId); shutdown() }` — аргументы `--remote-debugging-pipe --no-startup-window --no-first-run --no-default-browser-check --user-data-dir=<profile>` и никогда `--enable-automation`"
  ],
  "acceptance": [
   "аргументы запуска: нет --enable-automation, есть --no-startup-window (фальшивый launch)",

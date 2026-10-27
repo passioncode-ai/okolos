@@ -3,7 +3,7 @@
  "node": "N-015",
  "intent": "Страница демона: SCR-23, SCR-24",
  "inputs": [
-  "Pairing.list/confirm/decline/revoke, Tasks.list, Journal.recent, каталоги строк",
+  "Pairing.list/confirm/decline/revoke, Tasks.list, Journal.recent, каталоги строк, refusalKey (N-001) для строк отказов",
   "N-007: список привязок и отзыв",
   "N-009: список активных задач",
   "N-013: состояния экранов SCR",

@@ -3,7 +3,7 @@
  "node": "N-009",
  "intent": "K3: задачи",
  "inputs": [
-  "validateScope, inScope, refuse (bridge.ts)",
+  "validateScope, inScope, refuse, verbAllowed (close разрешён всегда) (bridge.ts)",
   "N-001: validateScope и отказы"
  ],
  "decision_refs": [

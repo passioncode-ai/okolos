@@ -18,7 +18,7 @@
   ]
  },
  "outputs": [
-  "`census(ps: string, launchctl: string, opts: {selfPid, home}): CensusEntry[]` — `{pid, ppid, kind, owner, keep: boolean, reason}`; `readCensus()` вызывает `ps -axo pid=,ppid=,lstart=,command=` и `launchctl list` с таймаутом"
+  "`census(ps: string, launchctl: string, opts: {selfPid, home, now}): CensusEntry[]` — тип из N-001: `{pid, ppid, executable, owner: string|null, ageSeconds, flags: string[], keep: boolean, reason}`, без полной командной строки; `readCensus()` вызывает `ps -axo pid=,ppid=,lstart=,command=` и `launchctl list` с таймаутом"
  ],
  "acceptance": [
   "процесс --remote-debugging-port с живым родителем-сессией: keep, owner = сессия",
