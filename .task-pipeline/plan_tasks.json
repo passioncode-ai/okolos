@@ -203,7 +203,7 @@
    "Test: apps/agent/src/journal/journal.test.ts"
   ],
   "consumes": "serviceDirs().data",
-  "produces": "`class Journal { static open(dir, {retentionDays}): Journal; record(e: JournalEntry): Promise<void> /* append + fsync, бросает при сбое */; recent(limit): JournalEntry[]; sweep(now) }`; `JournalEntry {at, agent, task?, verb, origin?, outcome: 'answered'|'refused'|'rejected', code?: BridgeRefusal | DoorRejection, bytes?, verdict?}`; `DoorRejection = 'bad_host'|'bad_origin'|'bad_content_type'|'bad_request'`; JournalEntry — объединение по outcome: у 'rejected' нет agent и verb (аудит #38); verb: AnyBridgeVerb, канонический (аудит #19); `answerAfterRecord(journal, entry, send)` — единственная обёртка «запись до ответа», при сбое записи отправляет конверт отказа internal без содержимого страницы (аудит #18); RETENTION_DAYS_JOURNAL = 90, тест сверяет с RETENTION_DAYS.journal из @okolos/storage (аудит #30) (проверка seam N-001 круг 2) — без текста страницы и значений полей",
+  "produces": "`class Journal { static open(dir, {retentionDays}): Journal; record(e: JournalEntry): Promise<void> /* append + fsync, бросает при сбое */; recent(limit): JournalEntry[]; sweep(now) }`; `JournalEntry {at, agent, task?, verb, origin?, outcome: 'answered'|'refused'|'rejected', code?: BridgeRefusal | DoorRejection, bytes?, verdict?}`; `DoorRejection = 'bad_host'|'bad_origin'|'cross_site'|'bad_content_type'|'bad_request'` (значения onRefused оболочки N-005); JournalEntry — объединение по outcome: у 'rejected' нет agent и verb (аудит #38); verb: AnyBridgeVerb, канонический (аудит #19); `answerAfterRecord(journal, entry, send)` — единственная обёртка «запись до ответа», при сбое записи отправляет конверт отказа internal без содержимого страницы (аудит #18); RETENTION_DAYS_JOURNAL = 90, тест сверяет с RETENTION_DAYS.journal из @okolos/storage (аудит #30) (проверка seam N-001 круг 2) — без текста страницы и значений полей",
   "tests": [
    "record дописывает строку и делает fsync до возврата (шпион на fd.sync)",
    "каталог только для чтения → record бросает, и обёртка answerAfterRecord отдаёт internal, а не ответ",
@@ -271,7 +271,9 @@
    "тестовый MCP-клиент (@modelcontextprotocol/client) получает tools/list после привязки",
    "правила двери (Host, Origin, Sec-Fetch-*, JSON) проверены на /pair и /pair/claim так же, как на /mcp (ревью R5)",
    "имя ../x и a/b: файл ключа называется по SHA-256 имени в hex внутри clients/, 0600 (ревью R6)",
-   "ключ пишется во временный файл и переименовывается только после успешного забора; существующий файл заменяется только с --replace; привязка того же имени после отзыва проходит с --replace (ревью S5)"
+   "ключ пишется во временный файл и переименовывается только после успешного забора; существующий файл заменяется только с --replace; привязка того же имени после отзыва проходит с --replace (ревью S5)",
+   "маршруты /mcp, /pair, /pair/claim объявляют paths, и well-known показывает surfaces.mcp (проверка seam N-005 круг 2)",
+   "тексты, которые читает человек, идут ключами каталога apps/agent/_locales с проверкой Copylot; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)"
   ],
   "dod": "vitest apps/agent/src/door зелёный"
  },
@@ -327,7 +329,8 @@
    "onExit: самостоятельный выход браузера отличается от выхода по close() (поле requested), окна задач помечаются закрытыми; send, отклонённый как closed, ведёт к close() группы (проверка seam N-022)",
    "на настоящем Chrome: kill -9 браузера даёт CdpError kind exited у ожидающего запроса в пределах окна EXIT_AFTER_PIPE_MS (проверка seam N-022, риск 4)",
    "onCloseIncomplete при close() окна агента: демон пишет событие с pid, отмечает degraded источник window и не считает окно закрытым; спека §3 получает это исключение (проверка seam N-022)",
-   "AgentWindows зовёт close() только с константой graceMs (close(NaN) в cdp-pipe может зависнуть: риск вердикта N-022); хелперы Chrome (crashpad) после kill -9 не остаются сиротами"
+   "AgentWindows зовёт close() только с константой graceMs (close(NaN) в cdp-pipe может зависнуть: риск вердикта N-022); хелперы Chrome (crashpad) после kill -9 не остаются сиротами",
+   "тексты, которые читает человек, идут ключами каталога apps/agent/_locales с проверкой Copylot; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)"
   ],
   "dod": "vitest apps/agent/src/window зелёный на этой машине с Chrome stable"
  },
@@ -352,7 +355,7 @@
    "Test: apps/agent/src/agent.test.ts, apps/agent/src/verbs/verbs.test.ts, apps/agent/src/verbs/skeleton.chrome.test.ts"
   ],
   "consumes": "Tasks и checkLanded (N-009), AgentWindows (N-010), Journal и answerAfterRecord (N-006), doorRoute, pair, mcp-stdio (N-008), buildSnapshot, snapshotVerdict, paginate (N-003, N-004), census и readCensus (N-012), VerbIO, toolName, canonicalVerb, isLocalAddress, toSnapshotFinding (N-023), service из N-005 (capStdoutLog, buildIdentity с корнем релиза), runProbe (бандл apps/extension/src/agent-probe.ts)",
-  "produces": "`createAgent({home?, port, allowLoopbackForTests?, extraChromeArgs?}): Promise<Agent>` (каталоги из serviceDirs(home); тесты передают временный home; журнал, привязки и окна строятся в setup N-005 после замка, проверка seam N-005) в src/agent.ts: служба, дверь, задачи, окна, журнал, перепись; onRevoke(agentId) закрывает задачи агента и их окна (аудит #13); таймер Journal.sweep раз в сутки (аудит #30); main.ts: serve → createAgent, pair, mcp-stdio; инструменты MCP под toolName: session_open, open, snapshot, read, get, waitFor, close, hygiene_census; схемы zod типа z.ZodType<VerbIO[V]['input']> (аудит #26); журнал хранит canonicalVerb (аудит #19); SessionOpenResult.sessionId = Task.id, cdpSessionId не уходит агенту (аудит #28); находки только через toSnapshotFinding",
+  "produces": "`createAgent({home?, port, allowLoopbackForTests?, extraChromeArgs?}): Promise<Agent>` (каталоги из serviceDirs(home); тесты передают временный home; журнал, привязки и окна строятся в setup N-005 после замка, проверка seam N-005) в src/agent.ts: служба, дверь, задачи, окна, журнал, перепись; onRevoke(agentId) закрывает задачи агента и их окна (аудит #13); таймер Journal.sweep раз в сутки (аудит #30); main.ts: serve → createAgent, pair, mcp-stdio; bin okolos-agent указывает на собранный бандл (исходники импортируют ./x.js, обычный node их не запустит; проверка seam N-005 круг 2); инструменты MCP под toolName: session_open, open, snapshot, read, get, waitFor, close, hygiene_census; схемы zod типа z.ZodType<VerbIO[V]['input']> (аудит #26); журнал хранит canonicalVerb (аудит #19); SessionOpenResult.sessionId = Task.id, cdpSessionId не уходит агенту (аудит #28); находки только через toSnapshotFinding",
   "tests": [
    "skeleton на Chrome: session.open → open локальной фикстуры со скрытой инструкцией из корпуса → snapshot не содержит текста инструкции, verdict.level = finding → close: окна нет",
    "корпус в Chrome: HTML-фикстура из каждого позитива positives.json (по носителю и сокрытию), ответы snapshot, read, get text, waitFor {text} не содержат текста позитива (ревью F1, F3)",
@@ -402,7 +405,8 @@
    "потомок задачи launchd с ppid 1: keep, причина «служба ОС»",
    "Chrome человека без флагов автоматизации: keep, «браузер человека»",
    "chrome-headless-shell с мёртвым родителем на $TMPDIR-профиле: keep=false, причина «сирота», но ничего не завершается",
-   "процесс с --token=SECRET в argv: в ответе нет SECRET, есть путь, pid, владелец, возраст, причина и флаги автоматизации (ревью F11)"
+   "процесс с --token=SECRET в argv: в ответе нет SECRET, есть путь, pid, владелец, возраст, причина и флаги автоматизации (ревью F11)",
+   "тексты, которые читает человек, идут ключами каталога apps/agent/_locales с проверкой Copylot; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)"
   ],
   "dod": "vitest apps/agent/src/hygiene зелёный"
  },
@@ -483,7 +487,8 @@
    "строка задачи SCR-24 показывает профиль: с логинами человека или без них; SCN-045 шаг 1 и FLW-22 называют цель задачи (проверка product N-001 круг 2)",
    "GET /api/journal выгружает журнал агентов (JSONL, без содержимого страниц) для [data-role=agent-journal-link] (аудит #40)",
    "состояние «сессия истекла» на SCR-23 и SCR-24: страница отвечает 401, хост входит заново, экран называет причину; запись в screens.md (проверка product N-005)",
-   "страница ставит свой Content-Security-Policy (script-src 'self', без inline) и читает сессию через operatorSession запущенной службы (проверка seam N-005)"
+   "страница ставит свой Content-Security-Policy (script-src 'self', без inline) и читает сессию через operatorSession запущенной службы (проверка seam N-005)",
+   "маршрут страницы объявляет paths /dashboard и /api, well-known показывает surfaces.dashboard; таблица действий проходит проверку набора при старте (проверка seam N-005 круг 2)"
   ],
   "dod": "vitest apps/agent/src/dashboard зелёный; SCN-044, SCN-045 переведены в built в том же изменении, python3 docs/ux/lint.py 0"
  },
@@ -511,7 +516,8 @@
    "релиз содержит бандл, apps/agent/src/fabric и apps/agent/static (аудит #37)",
    "install пишет plist через launchdPlist набора и зовёт capStdoutLog при старте",
    "дескриптор берёт auth.tokenFile из servicePaths(dirs) N-005, а не из своей копии пути (проверка seam N-005)",
-   "релиз содержит apps/agent/_locales; buildIdentity от корня релиза даёт digest, не коммит чужого git (отчёт N-005, fix 1)"
+   "релиз содержит apps/agent/_locales; buildIdentity от корня релиза даёт digest, не коммит чужого git (отчёт N-005, fix 1)",
+   "serviceDirs из dirs.ts и serviceDirs набора Fabric дают одни и те же каталоги (их использует uninstall --purge); тест держит их вместе (проверка seam N-005 круг 2)"
   ],
   "dod": "vitest tools/install-agent.test.ts tools/runbook.test.ts зелёные"
  },

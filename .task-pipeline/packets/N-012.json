@@ -27,7 +27,8 @@
   "Chrome человека без флагов автоматизации: keep, «браузер человека»",
   "chrome-headless-shell с мёртвым родителем на $TMPDIR-профиле: keep=false, причина «сирота», но ничего не завершается",
   "процесс с --token=SECRET в argv: в ответе нет SECRET, есть путь, pid, владелец, возраст, причина и флаги автоматизации (ревью F11)",
-  "проверка узла: pnpm -s exec vitest run apps/agent/src/hygiene && pnpm -s run typecheck"
+  "тексты, которые читает человек, идут ключами каталога apps/agent/_locales с проверкой Copylot; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/hygiene && pnpm -s run typecheck && pnpm -s run i18n:sweep"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",

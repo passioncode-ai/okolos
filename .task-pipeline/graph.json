@@ -218,24 +218,30 @@
    ],
    "risk": "R2",
    "certification": {
-    "round": 1,
+    "round": 2,
     "tiers": {
-     "unit": "fail",
-     "seam": "fail",
+     "unit": "pass",
+     "seam": "pass",
      "product": "fail"
     },
-    "at": "0b4dcc00cdbe4d5378a6ce3ebeb070da1e9c77f7",
+    "at": "dfba2abf3afa3446d51246c9b71bcda8bb159398",
     "history": [
      {
       "unit": "fail",
       "seam": "fail",
       "product": "fail"
+     },
+     {
+      "unit": "pass",
+      "seam": "pass",
+      "product": "fail"
      }
     ],
     "kinds": [
+     "blind",
      "blind"
     ],
-    "tree": "ef2630be2289df1b91565fb6b867b92dc1a5c527"
+    "tree": "cf420836a8e3562b8c2949b3f0e2ab06270ac9e4"
    }
   },
   {
@@ -284,7 +290,7 @@
     "N-003"
    ],
    "serves": "REQ-57",
-   "check": "pnpm -s exec vitest run apps/agent/src/door apps/agent/src/cli && pnpm -s run typecheck",
+   "check": "pnpm -s exec vitest run apps/agent/src/door apps/agent/src/cli && pnpm -s run typecheck && pnpm -s run i18n:sweep",
    "touches": [
     "apps/agent/src/door/door.ts",
     "apps/agent/src/door/guard.ts",
@@ -326,7 +332,7 @@
     "N-005"
    ],
    "serves": "REQ-61",
-   "check": "pnpm -s exec vitest run apps/agent/src/window && pnpm -s run typecheck",
+   "check": "pnpm -s exec vitest run apps/agent/src/window && pnpm -s run typecheck && pnpm -s run i18n:sweep",
    "touches": [
     "apps/agent/src/window/chrome.ts",
     "apps/agent/src/window/window.ts",
@@ -375,7 +381,7 @@
     "N-005"
    ],
    "serves": "REQ-62",
-   "check": "pnpm -s exec vitest run apps/agent/src/hygiene && pnpm -s run typecheck",
+   "check": "pnpm -s exec vitest run apps/agent/src/hygiene && pnpm -s run typecheck && pnpm -s run i18n:sweep",
    "touches": [
     "apps/agent/src/hygiene/census.ts",
     "apps/agent/src/hygiene/census.test.ts"

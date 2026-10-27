@@ -46,7 +46,9 @@
   "правила двери (Host, Origin, Sec-Fetch-*, JSON) проверены на /pair и /pair/claim так же, как на /mcp (ревью R5)",
   "имя ../x и a/b: файл ключа называется по SHA-256 имени в hex внутри clients/, 0600 (ревью R6)",
   "ключ пишется во временный файл и переименовывается только после успешного забора; существующий файл заменяется только с --replace; привязка того же имени после отзыва проходит с --replace (ревью S5)",
-  "проверка узла: pnpm -s exec vitest run apps/agent/src/door apps/agent/src/cli && pnpm -s run typecheck"
+  "маршруты /mcp, /pair, /pair/claim объявляют paths, и well-known показывает surfaces.mcp (проверка seam N-005 круг 2)",
+  "тексты, которые читает человек, идут ключами каталога apps/agent/_locales с проверкой Copylot; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/door apps/agent/src/cli && pnpm -s run typecheck && pnpm -s run i18n:sweep"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
