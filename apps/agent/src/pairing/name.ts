@@ -221,3 +221,28 @@ export function namesLookAlike(a: string, b: string): boolean {
   const keys = new Set(nameKeys(a))
   return nameKeys(b).some((k) => keys.has(k))
 }
+
+/**
+ * The characters a stored name may never carry: controls, format characters, separators, lone
+ * surrogates and the default-ignorables. Frozen for the store rule; the request rule has its own.
+ */
+const STORE_CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{Default_Ignorable_Code_Point}]/u
+
+/**
+ * Whether a name read back from the pairing store may stand (fix round 5): a string in NFC, 1 to
+ * MAX_NAME_LENGTH code points, with no bidirectional control and no control or default-ignorable
+ * character. This store rule is deliberately looser than the request rule (`checkAgentName`: the
+ * allowlist, the digits, the reserved name) and must stay so: the request rule may tighten in a later
+ * release, and an agent paired under the old one must not lose its access when the daemon opens its
+ * store. So this rule only ever loosens, and the schema carries no rule version.
+ */
+export function isStorableName(name: unknown): name is string {
+  return (
+    typeof name === 'string' &&
+    name.length > 0 &&
+    name === name.normalize('NFC') &&
+    [...name].length <= MAX_NAME_LENGTH &&
+    !BIDI.test(name) &&
+    !STORE_CONTROL.test(name)
+  )
+}

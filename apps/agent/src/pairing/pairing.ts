@@ -29,7 +29,7 @@ import path from 'node:path'
 
 import { atomicWrite } from '../fabric/fabric-service.mjs'
 import type { ServiceDirs } from '../service/dirs.js'
-import { checkAgentName, namesLookAlike, type NameRefusal } from './name.js'
+import { checkAgentName, isStorableName, namesLookAlike, type NameRefusal } from './name.js'
 
 /** The pairing store: the one place a key's SHA-256 lives, in the service data folder. */
 export function pairingStoreFile(dirs: ServiceDirs): string {
@@ -57,11 +57,13 @@ export class PairingStoreError extends Error {
   }
 }
 
-export type StoreRefusal = 'unreadable' | 'not_json' | 'not_a_store' | 'bad_record' | 'unwritable' | 'changed_on_disk'
+export type StoreRefusal = 'unreadable' | 'not_json' | 'not_a_store' | 'bad_record' | 'unwritable' | 'too_large' | 'changed_on_disk'
 
 /**
  * A store file larger than this is not opened (`not_a_store`, fix round 4): a pairing is about 200
- * bytes, so this holds thousands, and a larger file is not one the daemon wrote.
+ * bytes, so this holds thousands, and a larger file is not one the daemon wrote. Nor is one written
+ * (`too_large`, fix round 5): a write whose text would be larger throws and leaves the file and the
+ * agents in memory as they were, so the daemon never writes a store it would refuse to open.
  */
 export const MAX_STORE_BYTES = 1024 * 1024
 
@@ -491,8 +493,13 @@ export class Pairing {
    */
   private save(agents: StoredAgent[]): void {
     if (!sameFingerprint(fingerprintOnDisk(this.file, this.onDisk?.size), this.onDisk)) throw new PairingStoreError(this.file, 'changed_on_disk')
-    const content: StoreFile = { schema: SCHEMA, agents }
+    // Only the known fields are written, whatever the objects carry (fix round 5).
+    const content: StoreFile = {
+      schema: SCHEMA,
+      agents: agents.map(({ agentId, name, pairedAt, lastCallAt, keyHash }) => ({ agentId, name, pairedAt, lastCallAt, keyHash })),
+    }
     const text = `${JSON.stringify(content, null, 2)}\n`
+    if (Buffer.byteLength(text, 'utf8') > MAX_STORE_BYTES) throw new PairingStoreError(this.file, 'too_large')
     try {
       atomicWrite(this.file, text, 0o600)
     } catch (error) {
@@ -565,11 +572,13 @@ function fingerprintOnDisk(file: string, expectedSize?: number): Fingerprint | n
 /**
  * Reads and checks the store. Refused, with the file left as it is: a file that cannot be read
  * (`unreadable`); one over MAX_STORE_BYTES, told by its size before it is read (`not_a_store`); one
- * that is not JSON (`not_json`) or not a pairing store (`not_a_store`); and (`bad_record`) a record of
- * the wrong shape, one agent id twice (a revoke would be ambiguous), one key hash twice (one key
- * would open two agents), or a name `checkAgentName` refuses. That last one also covers names stored
- * under the rules of an earlier round of N-007 that the allowlist of round 4 refuses: this is
- * pre-release code, no store has been installed anywhere, so there is no migration (fix round 4).
+ * that is not JSON (`not_json`) or not a pairing store, a top-level field other than `schema` and
+ * `agents` included (`not_a_store`); and (`bad_record`) a record that is not exactly `agentId` (16
+ * lowercase hex), `name`, `pairedAt` and `lastCallAt` (non-negative integer ms, `lastCallAt` or
+ * null) and `keyHash` (64 lowercase hex), with no other field (a write would drop it, fix round 5);
+ * one agent id twice (a revoke would be ambiguous); one key hash twice (one key would open two
+ * agents); or a name the store rule refuses (`isStorableName`). The store rule is looser than the
+ * request rule on purpose, so an agent paired under an earlier rule keeps its access (fix round 5).
  */
 function readStore(file: string): { agents: StoredAgent[]; onDisk: Fingerprint | null } {
   let size: number
@@ -591,7 +600,7 @@ function readStore(file: string): { agents: StoredAgent[]; onDisk: Fingerprint |
   } catch (error) {
     throw new PairingStoreError(file, 'not_json', { cause: error })
   }
-  if (!isRecord(value) || value['schema'] !== SCHEMA || !Array.isArray(value['agents'])) {
+  if (!isRecord(value) || !sameKeys(value, STORE_FIELDS) || value['schema'] !== SCHEMA || !Array.isArray(value['agents'])) {
     throw new PairingStoreError(file, 'not_a_store')
   }
   const agents = value['agents'] as unknown[]
@@ -599,7 +608,6 @@ function readStore(file: string): { agents: StoredAgent[]; onDisk: Fingerprint |
   // One agent id twice would make a revoke and a last call ambiguous (fix round 3).
   if (new Set(agents.map((agent) => agent.agentId)).size !== agents.length) throw new PairingStoreError(file, 'bad_record')
   if (new Set(agents.map((agent) => agent.keyHash)).size !== agents.length) throw new PairingStoreError(file, 'bad_record')
-  if (agents.some((agent) => checkAgentName(agent.name) !== null)) throw new PairingStoreError(file, 'bad_record')
   return { agents, onDisk: fingerprint(bytes) }
 }
 
@@ -612,13 +620,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+const STORE_FIELDS = ['agents', 'schema'] as const
+const RECORD_FIELDS = ['agentId', 'keyHash', 'lastCallAt', 'name', 'pairedAt'] as const
+
+/** The object has exactly these fields, no more and no fewer. */
+function sameKeys(value: Record<string, unknown>, fields: readonly string[]): boolean {
+  const keys = Object.keys(value)
+  return keys.length === fields.length && fields.every((field) => Object.hasOwn(value, field))
+}
+
+/** A time the store keeps: whole ms since the epoch, not negative. */
+function isTime(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+}
+
 function isStoredAgent(value: unknown): value is StoredAgent {
   return (
     isRecord(value) &&
+    sameKeys(value, RECORD_FIELDS) &&
     typeof value['agentId'] === 'string' &&
-    typeof value['name'] === 'string' &&
-    typeof value['pairedAt'] === 'number' &&
-    (value['lastCallAt'] === null || typeof value['lastCallAt'] === 'number') &&
+    /^[0-9a-f]{16}$/.test(value['agentId']) &&
+    isStorableName(value['name']) &&
+    isTime(value['pairedAt']) &&
+    (value['lastCallAt'] === null || isTime(value['lastCallAt'])) &&
     typeof value['keyHash'] === 'string' &&
     /^[0-9a-f]{64}$/.test(value['keyHash'])
   )

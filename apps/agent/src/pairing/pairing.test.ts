@@ -658,8 +658,8 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
         JSON.stringify({
           schema: 'okolos-agent/pairings/1',
           agents: [
-            { agentId: 'a1', name: 'x', pairedAt: 0, lastCallAt: null, keyHash: 'a'.repeat(64) },
-            { agentId: 'a1', name: 'y', pairedAt: 1, lastCallAt: null, keyHash: 'b'.repeat(64) },
+            { agentId: '00000000000000a1', name: 'x', pairedAt: 0, lastCallAt: null, keyHash: 'a'.repeat(64) },
+            { agentId: '00000000000000a1', name: 'y', pairedAt: 1, lastCallAt: null, keyHash: 'b'.repeat(64) },
           ],
         }),
         'bad_record',
@@ -1219,23 +1219,99 @@ describe('what a store may hold (fix round 4)', () => {
   }
 
   const store = (agents: unknown[]): string => JSON.stringify({ schema: 'okolos-agent/pairings/1', agents })
+  const ID1 = '00000000000000a1'
+  const ID2 = '00000000000000a2'
+  const sha = (key: string): string => createHash('sha256').update(key, 'utf8').digest('hex')
 
   it('refuses one key hash under two agents as a bad record, the file left as it was', () => {
-    expect(refusal(store([agentRow('a1', 'Claude Code', 'a'.repeat(64)), agentRow('a2', 'Codex', 'a'.repeat(64))]))).toBe('bad_record')
-    expect(refusal(store([agentRow('a1', 'Claude Code', 'a'.repeat(64)), agentRow('a2', 'Codex', 'b'.repeat(64))]))).toBeNull()
+    expect(refusal(store([agentRow(ID1, 'Claude Code', 'a'.repeat(64)), agentRow(ID2, 'Codex', 'a'.repeat(64))]))).toBe('bad_record')
+    expect(refusal(store([agentRow(ID1, 'Claude Code', 'a'.repeat(64)), agentRow(ID2, 'Codex', 'b'.repeat(64))]))).toBeNull()
   })
 
-  // Pre-release code: no store has been installed anywhere, so a name stored under the rules of an
-  // earlier round and refused by the allowlist now is not migrated; the store is refused.
-  it('refuses a stored name the name rules refuse, the file left as it was', () => {
-    for (const name of ['Oko\u0399os', 'Caf\u00e9', 'agent 123', 'Okolos', '', 'a'.repeat(41), 'agent\u202ex']) {
-      expect(refusal(store([agentRow('a1', name, 'a'.repeat(64))])), JSON.stringify(name)).toBe('bad_record')
+  // Fix round 5: a stored name is checked by the store rule, which is looser than the request rule
+  // and stays so: an agent paired under rules that later tighten keeps its access.
+  it('refuses a stored name only for what no rule ever let in, the file left as it was', () => {
+    for (const name of ['', 'a'.repeat(41), 'agent\u202ex', 'agent\u0007', 'a\u200bgent', 'agent\u2028x', 'Cafe\u0301', 7]) {
+      expect(refusal(store([agentRow(ID1, name as string, 'a'.repeat(64))])), JSON.stringify(name)).toBe('bad_record')
     }
+  })
+
+  it('opens and verifies a stored name the allowlist of new requests refuses (fix round 5)', () => {
+    for (const name of ['Caf\u00e9', 'Oko\u0399os', 'agent 123', 'Okolos', '\u0419\u0432\u0430\u043d', 'a'.repeat(40)]) {
+      const file = storeFile()
+      writeFileSync(file, store([agentRow(ID1, name, sha('the key'))]), { mode: 0o600 })
+      expect(open(file).verify('the key'), JSON.stringify(name)).toEqual({ agentId: ID1, name, pairedAt: T0, lastCallAt: null })
+    }
+  })
+
+  it('refuses an agent id that is not 16 lowercase hex, a key hash that is not 64, and a bad time (fix round 5)', () => {
+    const good = agentRow(ID1, 'Claude Code', 'a'.repeat(64))
+    expect(refusal(store([good]))).toBeNull()
+    for (const bad of [
+      { ...good, agentId: 'a1' },
+      { ...good, agentId: '00000000000000A1' },
+      { ...good, agentId: '0'.repeat(17) },
+      { ...good, agentId: '0'.repeat(15) + 'g' },
+      { ...good, keyHash: 'A'.repeat(64) },
+      { ...good, keyHash: 'a'.repeat(63) },
+      { ...good, pairedAt: -1 },
+      { ...good, pairedAt: 1.5 },
+      { ...good, pairedAt: '0' },
+      { ...good, pairedAt: 2 ** 53 },
+      { ...good, lastCallAt: -1 },
+      { ...good, lastCallAt: 0.5 },
+    ]) {
+      expect(refusal(store([bad])), JSON.stringify(bad)).toBe('bad_record')
+    }
+  })
+
+  it('refuses a record with a field it does not know, or without one it needs (fix round 5)', () => {
+    const good = agentRow(ID1, 'Claude Code', 'a'.repeat(64))
+    expect(refusal(store([{ ...good, note: 'hi' }]))).toBe('bad_record')
+    expect(refusal(store([{ ...good, key: 'the key' }]))).toBe('bad_record')
+    const { lastCallAt: _dropped, ...withoutLastCall } = good
+    expect(refusal(store([withoutLastCall]))).toBe('bad_record')
+    // A field the store itself does not know is refused too: a write would drop it.
+    expect(refusal(JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: [good], extra: 1 }))).toBe('not_a_store')
+  })
+
+  it('writes the five fields of a record and nothing else', () => {
+    const file = storeFile()
+    pair(open(file), 'Claude Code', T0)
+    const written = JSON.parse(readFileSync(file, 'utf8')) as { agents: Array<Record<string, unknown>> }
+    expect(Object.keys(written).sort()).toEqual(['agents', 'schema'])
+    expect(Object.keys(written.agents[0]!).sort()).toEqual(['agentId', 'keyHash', 'lastCallAt', 'name', 'pairedAt'])
+  })
+
+  it('writes nothing whose text would pass 1 MiB: a too_large store error, memory and file kept (fix round 5)', () => {
+    // A compact file just under the limit opens; the written form, indented, would be larger.
+    const rows: Record<string, unknown>[] = []
+    let size = Buffer.byteLength(store([]))
+    for (let n = 0; ; n++) {
+      const row = agentRow(n.toString(16).padStart(16, '0'), 'A', n.toString(16).padStart(64, '0'))
+      const grown = size + Buffer.byteLength(JSON.stringify(row)) + (rows.length > 0 ? 1 : 0)
+      if (grown > MAX_STORE_BYTES) break
+      rows.push(row)
+      size = grown
+    }
+    const text = store(rows)
+    expect(Buffer.byteLength(text)).toBe(size)
+    const file = storeFile()
+    writeFileSync(file, text, { mode: 0o600 })
+    const pairing = open(file)
+    const first = rows[0]!['agentId'] as string
+    expect(() => pairing.revoke(first, T0)).toThrow(expect.objectContaining({ name: 'PairingStoreError', reason: 'too_large', file }))
+    expect(readFileSync(file, 'utf8')).toBe(text)
+    expect(pairing.list(T0).agents).toHaveLength(rows.length)
+    const request = asked(pairing.request('Codex', T0))
+    expect(confirmAt(pairing, request, T0 + 1)).toBe(true)
+    expect(() => pairing.claim(request.requestId, T0 + 2)).toThrow(expect.objectContaining({ reason: 'too_large' }))
+    expect(readFileSync(file, 'utf8')).toBe(text)
   })
 
   it('refuses a file over 1 MiB as not a store, without reading it as one', () => {
     expect(MAX_STORE_BYTES).toBe(1024 * 1024)
-    const valid = store([agentRow('a1', 'Claude Code', 'a'.repeat(64))])
+    const valid = store([agentRow(ID1, 'Claude Code', 'a'.repeat(64))])
     const atLimit = valid + ' '.repeat(MAX_STORE_BYTES - Buffer.byteLength(valid))
     expect(Buffer.byteLength(atLimit)).toBe(MAX_STORE_BYTES)
     expect(refusal(atLimit)).toBeNull()
