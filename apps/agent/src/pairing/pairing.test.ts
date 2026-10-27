@@ -824,9 +824,9 @@ describe('when a notice happened (fix round 3)', () => {
     expect(confirmAt(pairing, late, confirmedAt)).toBe(true)
     // Nothing looks until long after both ends.
     pairing.list(T0 + 20 * MINUTE)
-    expect(notices.filter((n) => n.kind === 'expired' || n.kind === 'claim_expired').map((n) => [n.kind, n.name, n.at])).toEqual([
-      ['expired', 'Never confirmed', T0 + REQUEST_LIFETIME_MS],
-      ['claim_expired', 'Confirmed late', confirmedAt + CLAIM_WINDOW_MS],
+    expect(notices.filter((n) => n.kind === 'expired' || n.kind === 'claim_expired')).toEqual([
+      { kind: 'expired', handle: expect.any(String), name: 'Never confirmed', at: T0 + REQUEST_LIFETIME_MS, cause: 'timeout' },
+      { kind: 'claim_expired', handle: expect.any(String), name: 'Confirmed late', at: confirmedAt + CLAIM_WINDOW_MS, cause: 'timeout' },
     ])
   })
 })
@@ -1047,9 +1047,9 @@ describe('closing the pairing (fix round 4)', () => {
 
     const at = T0 + 40
     pairing.close(at)
-    expect(notices.map((n) => [n.kind, 'name' in n ? n.name : '', n.at])).toEqual([
-      ['expired', 'Codex', at],
-      ['claim_expired', 'Cursor', at],
+    expect(notices.map((n) => [n.kind, 'name' in n ? n.name : '', n.at, 'cause' in n ? n.cause : ''])).toEqual([
+      ['expired', 'Codex', at, 'stopped'],
+      ['claim_expired', 'Cursor', at, 'stopped'],
     ])
     expect(pairing.list(at + 1).requests.map((row) => [row.name, row.state, row.expiresAt])).toEqual([
       ['Codex', 'expired', at],
@@ -1068,8 +1068,9 @@ describe('closing the pairing (fix round 4)', () => {
 
     pairing.close(T0 + 20)
     expect(pairing.request('Aider', T0 + 21)).toEqual({ refused: 'closed' })
-    expect(pairing.claim(pending.requestId, T0 + 21)).toEqual({ refused: 'unknown' })
-    expect(pairing.claim(confirmed.requestId, T0 + 21)).toEqual({ refused: 'unknown' })
+    // Fix round 5: a claim for a request the close ended is told so.
+    expect(pairing.claim(pending.requestId, T0 + 21)).toEqual({ refused: 'stopped' })
+    expect(pairing.claim(confirmed.requestId, T0 + 21)).toEqual({ refused: 'stopped' })
     for (const handle of handles) {
       expect(pairing.confirmByHandle(handle, T0 + 21)).toBe(false)
       expect(pairing.declineByHandle(handle, T0 + 21)).toBe(false)
@@ -1077,6 +1078,20 @@ describe('closing the pairing (fix round 4)', () => {
     const page = pairing.list(T0 + 22)
     expect(page.agents.map((a) => a.name)).toEqual(['Claude Code'])
     expect(page.requests.map((row) => row.state)).toEqual(['expired', 'claim_expired'])
+  })
+
+  it('keeps the reason of a request that ended before the close, and dates a late end by its deadline (fix round 5)', () => {
+    const notices: PairingNotice[] = []
+    const pairing = open(storeFile(), notices)
+    const declined = asked(pairing.request('Codex', T0))
+    const late = asked(pairing.request('Cursor', T0 + 1))
+    expect(declineAt(pairing, declined, T0 + 4 * MINUTE)).toBe(true)
+    // The close comes after Cursor's deadline: it ends by timeout, not by the close.
+    pairing.close(T0 + 1 + REQUEST_LIFETIME_MS + 10)
+    expect(notices.find((n) => n.kind === 'expired')).toMatchObject({ name: 'Cursor', at: T0 + 1 + REQUEST_LIFETIME_MS, cause: 'timeout' })
+    expect(pairing.claim(declined.requestId, T0 + REQUEST_LIFETIME_MS + 20)).toEqual({ refused: 'declined' })
+    expect(pairing.claim(late.requestId, T0 + REQUEST_LIFETIME_MS + 20)).toEqual({ refused: 'expired' })
+    expect(pairing.claim('0'.repeat(32), T0 + REQUEST_LIFETIME_MS + 20)).toEqual({ refused: 'unknown' })
   })
 
   it('says nothing more when closed twice', () => {

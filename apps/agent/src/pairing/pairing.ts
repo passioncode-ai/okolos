@@ -88,11 +88,15 @@ export type RequestRefusal = NameRefusal | 'too_many_pending' | 'too_many_reques
 /**
  * Why a claim gets no key (fix round 3), so the CLI can tell the person the true reason: the person
  * `declined` the request; it `expired` before anyone confirmed it; it was confirmed but the key was
- * not collected within CLAIM_WINDOW_MS (`claim_expired`); the key was already given out (`claimed`).
- * Each is answered for EXPIRED_SHOWN_MS after the end; after that, and for an id the daemon never
- * gave out or gave out before a restart, the answer is `unknown`.
+ * not collected within CLAIM_WINDOW_MS (`claim_expired`); the key was already given out (`claimed`);
+ * the daemon was stopping and `close` ended it while it still waited (`stopped`, fix round 5). Each
+ * is answered for EXPIRED_SHOWN_MS after the end; after that, and for an id the daemon never gave out
+ * or gave out before a restart, the answer is `unknown`.
  */
-export type ClaimRefusal = 'declined' | 'expired' | 'claim_expired' | 'claimed' | 'unknown'
+export type ClaimRefusal = 'declined' | 'expired' | 'claim_expired' | 'claimed' | 'stopped' | 'unknown'
+
+/** Why a waiting request ended unanswered (fix round 5): its time ran out, or `close` ended it. */
+export type EndCause = 'timeout' | 'stopped'
 
 /** A paired agent as the page and the door see it. The key's hash stays inside this module. */
 export interface AgentRecord {
@@ -142,14 +146,22 @@ export interface PublicRequest {
  * request id, the code or a key. `at` (ms since the epoch, fix round 3) is when it happened: for
  * `expired` the request's deadline (its creation plus REQUEST_LIFETIME_MS), for `claim_expired` the
  * confirm plus CLAIM_WINDOW_MS, whenever a later call found the end; for the others the `now` of the
- * call that caused it.
+ * call that caused it. An end carries its `cause` (fix round 5): `timeout` for a deadline, `stopped`
+ * for a request `close` ended, dated by the close.
  */
 export type PairingNotice =
   | {
-      readonly kind: 'requested' | 'confirmed' | 'declined' | 'expired' | 'claim_expired'
+      readonly kind: 'requested' | 'confirmed' | 'declined'
       readonly handle: string
       readonly name: string
       readonly at: number
+    }
+  | {
+      readonly kind: 'expired' | 'claim_expired'
+      readonly handle: string
+      readonly name: string
+      readonly at: number
+      readonly cause: EndCause
     }
   | { readonly kind: 'paired'; readonly handle: string; readonly agentId: string; readonly name: string; readonly at: number }
   | { readonly kind: 'revoked'; readonly agentId: string; readonly name: string; readonly at: number }
@@ -289,17 +301,19 @@ export class Pairing {
   /**
    * Ends the pairing, for the daemon to run before it stops (fix round 4). Every request still open
    * ends at `now`: a pending one as `expired`, a confirmed one as `claim_expired`, each with its
-   * notice dated `now` and its row kept for the page like any ended one (a request already past its
-   * deadline ends at that deadline, as always). Then the last calls are flushed; a flush that fails
-   * throws PairingStoreError, and the requests stay ended. After the close a request is refused as
-   * `closed`, a claim is told `unknown` (as after a restart), a confirm and a decline find nothing;
-   * list, verify, touch, revoke and flush still work. A second close only flushes.
+   * notice dated `now` with the cause `stopped`, and its row kept for the page like any ended one (a
+   * request already past its deadline ends at that deadline, as always, with the cause `timeout`).
+   * Then the last calls are flushed; a flush that fails throws PairingStoreError, and the requests
+   * stay ended. After the close a request is refused as `closed`; a claim for a request the close
+   * ended is told `stopped` (fix round 5), one that ended before keeps its own reason, and both turn
+   * `unknown` after EXPIRED_SHOWN_MS; a confirm and a decline find nothing; list, verify, touch,
+   * revoke and flush still work. A second close only flushes.
    */
   close(now: number): void {
     if (!this.closed) {
       this.sweep(now)
       this.closed = true
-      for (const entry of [...this.byHandle.values()]) this.end(entry, now)
+      for (const entry of [...this.byHandle.values()]) this.end(entry, now, 'stopped')
     }
     this.flush()
   }
@@ -350,7 +364,7 @@ export class Pairing {
    * and otherwise the reason it gets none (`ClaimRefusal`). A claim never makes a new request.
    */
   claim(requestId: string, now: number): { key: string } | { pending: true } | { refused: ClaimRefusal } {
-    if (this.closed) return { refused: 'unknown' }
+    // After a close no request waits, so every id ends in the refusals below (or is unknown).
     this.sweep(now)
     const entry = this.byRequestId.get(requestId)
     if (entry === undefined) return { refused: this.refusals.get(sha256(requestId))?.refused ?? 'unknown' }
@@ -438,7 +452,7 @@ export class Pairing {
     for (const entry of [...this.byHandle.values()]) {
       const endedAt = deadline(entry)
       if (now < endedAt) continue
-      this.end(entry, endedAt)
+      this.end(entry, endedAt, 'timeout')
     }
     for (const row of [...this.ended.values()]) {
       if (now - row.endedAt >= EXPIRED_SHOWN_MS) this.ended.delete(row.handle)
@@ -450,14 +464,15 @@ export class Pairing {
 
   /**
    * Ends a waiting request at `endedAt`, nobody having declined or claimed it: `expired` when never
-   * confirmed, `claim_expired` when confirmed. The page keeps a row without the request id.
+   * confirmed, `claim_expired` when confirmed. The page keeps a row without the request id. A claim
+   * is told the kind for a timeout and `stopped` for a close.
    */
-  private end(entry: Entry, endedAt: number): void {
+  private end(entry: Entry, endedAt: number, cause: EndCause): void {
     const kind = entry.confirmedAt === null ? 'expired' : 'claim_expired'
-    this.forget(entry, kind, endedAt)
+    this.forget(entry, cause === 'stopped' ? 'stopped' : kind, endedAt)
     const { handle, name, code, createdAt, confirmedAt } = entry
     this.ended.set(handle, { handle, name, code, createdAt, confirmedAt, endedAt })
-    this.notify({ kind, handle, name, at: endedAt })
+    this.notify({ kind, handle, name, at: endedAt, cause })
   }
 
   /** Ends a request: its id is dropped, and only the id's SHA-256 is kept with why it ended. */
