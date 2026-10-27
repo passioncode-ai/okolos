@@ -35,6 +35,8 @@ export const BRIDGE_REFUSALS = [
   'in_use_by_person',
   'browser_offline',
   'blocked_by_shield',
+  'cleaning_incomplete',
+  'stale_cursor',
   'internal',
 ] as const
 export type BridgeRefusal = (typeof BRIDGE_REFUSALS)[number]
@@ -57,6 +59,11 @@ export const REFUSAL_RETRYABLE: Readonly<Record<BridgeRefusal, boolean>> = {
   in_use_by_person: true,
   browser_offline: true,
   blocked_by_shield: false,
+  // The cleaner ran out of budget or lost an element: the agent gets no text at
+  // all, and the same page defeats the cleaner the same way on the next call.
+  cleaning_incomplete: false,
+  // A cursor belongs to one stored snapshot; it never starts naming another.
+  stale_cursor: false,
   internal: true,
 }
 

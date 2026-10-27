@@ -80,4 +80,14 @@ describe('a refusal', () => {
       error: { code: 'origin_not_in_task', message: 'x', retryable: false },
     })
   })
+
+  it('covers a page it could not fully clean and a cursor from another snapshot, and neither is worth retrying', () => {
+    // Asking again cannot change either: the page that defeated the cleaner
+    // defeats it the same way, and a cursor never becomes another snapshot's.
+    for (const code of ['cleaning_incomplete', 'stale_cursor'] as const) {
+      expect(BRIDGE_REFUSALS, code).toContain(code)
+      expect(REFUSAL_RETRYABLE[code], code).toBe(false)
+      expect(refuse(code, 'x').error.retryable, code).toBe(false)
+    }
+  })
 })
