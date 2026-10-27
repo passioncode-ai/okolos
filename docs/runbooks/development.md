@@ -33,10 +33,11 @@
 |---|---|---|
 | Node | `>=22` (проверено на 26.4.0) | всё остальное |
 | pnpm | `11.10.0` — задан в `packageManager` | воркспейс из 21 пакета |
-| Python 3 | любой 3.x (проверено на 3.14.6) | `docs/ux/lint.py`, `tools/model/evaluate.py` |
+| Python 3 | любой 3.x (проверено на 3.14.6), под именем `python3`, `python` или `py -3` | `docs/ux/lint.py`, `docs/brand/lint.py`, `tools/model/evaluate.py` |
 | Браузеры Playwright | ставятся командой ниже | e2e в Chromium и Firefox |
 
-Corepack включит нужный pnpm сам:
+Corepack включит нужный pnpm сам (Node 22–24; с Node 25 corepack в поставку Node не
+входит, и pnpm ставится сам, см. «Windows» ниже, на macOS и Linux так же):
 
 ```bash
 corepack enable
@@ -48,6 +49,78 @@ pnpm exec playwright install chromium firefox
 `.githooks`, и с этого момента `git push` не уходит без гейтов. Это не
 формальность — 2026-08-07 красный коммит ушёл именно потому, что правило жило в
 документе, а push в шелле.
+
+### Windows
+
+`pnpm gates` и хук pre-push рассчитаны и на Windows-чекаут (B-162, B-163). Сверх
+таблицы выше нужны:
+
+- **Git for Windows.** Хук запускает его `sh`; `tools/ci.test.ts` находит этот `sh`
+  рядом с `git` (`git --exec-path`), даже когда в PATH его нет, как в PowerShell и cmd.
+- **Оболочка: Git Bash или PowerShell 7** (`pwsh`). Команды этого раннбука идут в обеих,
+  кроме двух, которым нужен Git Bash (или macOS и Linux): запись доступа
+  `printf %s "$VALUE" | node tools/access.mjs set …` в разделе «Доступы» (в PowerShell нет
+  `printf`) и замер окна агента `node tools/agent-window-spike.mjs` в разделе «Прочее»
+  (он работает только на macOS и Linux: путь `/tmp` и сигнал группе процессов Chrome). В
+  `cmd.exe` и Windows PowerShell 5.1 часть команд читается иначе.
+- **Node и pnpm.** На Node 22–24 pnpm включает corepack, как выше. С Node 25 corepack
+  в Node не входит: pnpm ставится `npm i -g pnpm` или автономным установщиком с
+  pnpm.io (`iwr https://get.pnpm.io/install.ps1 -useb | iex` в PowerShell); версию
+  всё равно задаёт `packageManager`.
+- **Python 3 под одним из имён `py -3`, `python`, `python3`.** Гейты зовут Python через
+  `tools/python.mjs`: он берёт первое имя, которое докажет, что это Python 3, поэтому
+  заглушка из Microsoft Store не проходит. На Windows линтеры получают `PYTHONUTF8=1`,
+  иначе русский вывод через трубу хука падает в cp1252.
+
+Что на Windows делается иначе, и где это проверено:
+
+| Что | macOS, Linux | Windows | Проверка |
+|---|---|---|---|
+| Python | `python3`, затем `python` | `py -3`, `python`, `python3` | `tools/python.test.ts` |
+| `pnpm`, `npx` из инструментов | без оболочки | через cmd.exe одной строкой команды; аргумент со спецсимволом cmd отклоняется | `tools/bin.test.ts` |
+| архив `pnpm package` | `zip -q -r -X` | `%SystemRoot%\System32\tar.exe -a` | `tools/archive.test.ts` |
+| дерево процессов фида | сигнал группе | `taskkill /T`, через паузу `/T /F` | `tools/feed/bounded.test.ts` |
+| geckodriver в e2e Firefox, сборка в `pnpm package` по сроку | `child.kill()` | `taskkill /PID <pid> /T /F`: иначе кончается только cmd.exe | `tools/bin.test.ts` |
+| права 0600 на файлы с секретами | проверяются | тесты пропущены с причиной, `access.mjs` пишет `n/a` | `tools/feed/log.test.ts`, `tools/access.test.ts` |
+| Firefox для e2e | кэш Playwright в домашней папке | `%LOCALAPPDATA%\ms-playwright\firefox-*\firefox\firefox.exe` | `tools/find-firefox.test.ts` |
+
+Клон, сделанный до появления `.gitattributes`, держит в рабочем дереве CRLF: Git не
+переписывает файл, который не менялся, а `git add --renormalize .` трогает только индекс
+(индекс этого репозитория и так в LF, это держит `tools/ci.test.ts`, «holds no CRLF in the
+index»). Рабочее дерево переводят один раз, на чистом дереве: сначала закоммитьте или
+спрячьте (`git stash`) свою работу, потому что `reset --hard` выбрасывает незакоммиченное.
+
+```bash
+git status --porcelain                          # пусто: работа закоммичена или спрятана
+git rm -r --cached -q . && git reset -q --hard  # индекс заново из HEAD, файлы заново по .gitattributes
+git ls-files --eol | grep w/crlf                # ничего не печатает: на диске нет CRLF
+```
+
+Эти три строки исполняет `tools/ci.test.ts` («a clone made before .gitattributes is
+converted by the runbook's own commands»): берёт их из этого блока и гоняет во временном
+репозитории с `core.autocrlf=true`, где хук до перевода лежит с CRLF.
+
+Firefox для e2e на Windows лежит в `%LOCALAPPDATA%\ms-playwright`; порядок поиска один на
+все платформы и записан ниже, в разделе «Тесты, которые не входят в `gates`».
+
+`pnpm package` сверяет архив со сборкой по списку файлов из центрального каталога zip,
+а не по байтам: `zip` и `tar` пишут разные байты. Концы строк держит `.gitattributes`
+(`* text=auto eol=lf`): чекаут получает LF при любом `core.autocrlf`, и это проверяет
+`tools/ci.test.ts` («line endings are LF on every checkout»).
+
+На Windows гейты гоняет задача CI `gates (windows)` на `windows-latest`
+(`.github/workflows/ci.yml`, B-164; первый зелёный прогон
+[40517607494](https://github.com/passioncode-ai/okolos/actions/runs/40517607494) на
+`714e336`). Её шаги: `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`,
+`pnpm build`, `pnpm test` (в нём архив через `tar.exe` из System32 и решение хука под `sh`
+из Git for Windows), `pnpm ux:lint`, `pnpm brand:lint`, `pnpm i18n:sweep` и
+`pnpm package:check` (проверки архива без записи). На Windows не проверены: e2e в Chromium и
+Firefox (обе задачи e2e идут только на Linux, решение записано в `ci.yml`), полный прогон
+хука pre-push со всеми гейтами, `pnpm package` с записью архива и загрузка в магазины архива,
+собранного на Windows, поиск Firefox в настоящем кэше Windows. Строки таблицы выше про e2e
+(geckodriver, Firefox в `%LOCALAPPDATA%`) доказаны только тестами, которым платформа
+передаётся параметром. Агент фида работает только под launchd на macOS (ADR-0017), на
+Windows его нет.
 
 ## Цикл разработки
 
@@ -153,9 +226,14 @@ elements» и больше ничего, а между навигацией и �
 это проверка, а не соглашение — закрытый корень и есть граница доверия
 ([ADR-0001](../adr/0001-closed-shadow-root.md)).
 
-Firefox-прогон ищет бинарник в кэше Playwright, иначе — `FIREFOX_BINARY`. Он
-поднимает geckodriver на порту 4444; занятый порт — самая частая причина
-непонятного падения.
+Firefox-прогон берёт бинарник так (`tools/find-firefox.mjs`, тест
+`tools/find-firefox.test.ts`, «lets FIREFOX_BINARY win»): `FIREFOX_BINARY`, когда переменная
+задана, на любой платформе; иначе самый новый Firefox из кэшей Playwright:
+`PLAYWRIGHT_BROWSERS_PATH`, затем на macOS и Linux `~/Library/Caches/ms-playwright`,
+`~/.cache/ms-playwright` и `/root/.cache/ms-playwright`, на Windows
+`%LOCALAPPDATA%\ms-playwright`. Нет ни одного: прогон отказывает с командой
+`pnpm exec playwright install firefox`. Он поднимает geckodriver на порту 4444; занятый порт
+бывает самой частой причиной непонятного падения.
 
 ## Генерируемое — руками не править
 

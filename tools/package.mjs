@@ -27,6 +27,8 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
 
+import { archivePlan, compareEntries, zipEntries } from './archive.mjs'
+import { runToCompletion } from './bin.mjs'
 import { filesUnder } from './tree.mjs'
 import { pruneReleases, RELEASES_KEPT } from './release-prune.mjs'
 import { FEED_MAX_AGE_DAYS, feedAgeDays, feedTooOld, freshestFeed } from './feed-age.mjs'
@@ -105,7 +107,9 @@ console.log('\n── build, so the archive is of something this command made')
 // the build step runs first and every target is already there.
 const built = TARGETS.every((target) => existsSync(path.join(dist, target)))
 if (!checkOnly || !built) {
-  execFileSync('pnpm', ['build'], { cwd: root, stdio: 'inherit', timeout: 10 * 60_000 })
+  // pnpm is pnpm.cmd on Windows, which Node will not spawn without a shell (B-163).
+  // At the deadline the whole tree ends, not only that cmd.exe (B-164).
+  await runToCompletion('pnpm', ['build'], { cwd: root, timeoutMs: 10 * 60_000 })
 }
 
 for (const target of TARGETS) {
@@ -186,10 +190,21 @@ for (const target of TARGETS) {
   mkdirSync(out, { recursive: true })
   const archive = path.join(out, `okolos-${target}-${manifest.version}.zip`)
   rmSync(archive, { force: true })
-  // `-X` drops the extra attributes that make two archives of identical bytes
-  // differ; the store cares about none of them and a reviewer diffing two
-  // releases does.
-  execFileSync('zip', ['-q', '-r', '-X', archive, '.'], { cwd: dir, timeout: 120_000 })
+  // `zip -X` on macOS and Linux; the System32 tar on Windows, which has no zip (B-163).
+  const plan = archivePlan(archive, contents)
+  execFileSync(plan.command, plan.args, { cwd: dir, timeout: 120_000 })
+
+  // Checked by contents, not bytes: two tools write two byte streams, and what the
+  // store unpacks is the list of files. Every file of the build, and nothing else.
+  const { missing: unpacked, extra } = compareEntries(zipEntries(readFileSync(archive)), contents)
+  if (unpacked.length > 0 || extra.length > 0) {
+    die(
+      `${path.relative(root, archive)} does not hold the build:` +
+        (unpacked.length > 0 ? `\n     missing: ${unpacked.join(', ')}` : '') +
+        (extra.length > 0 ? `\n     extra: ${extra.join(', ')}` : ''),
+    )
+  }
+  ok(`the archive holds exactly the ${contents.length} files of the build`)
 
   const bytes = statSync(archive).size
   const digest = createHash('sha256').update(readFileSync(archive)).digest('hex')

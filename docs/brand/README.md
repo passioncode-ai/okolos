@@ -5,7 +5,8 @@ Contract: brand-contract v1
 Три файла и один линтер. [voice.md](voice.md) — голос и пять правил,
 [terminology.md](terminology.md) — одно понятие один термин на каждом языке,
 [facts.md](facts.md) — что о продукте можно утверждать и чем это проверяется.
-`python3 docs/brand/lint.py` проверяет пак против контракта; он подключён к
+`pnpm brand:lint` (это `docs/brand/lint.py` через тот Python 3, что есть на машине)
+проверяет пак против контракта; он подключён к
 `pnpm gates`, к `.githooks/pre-push` и к CI, и ошибка в нём отказывает в пуше.
 
 ## Что линтер читает

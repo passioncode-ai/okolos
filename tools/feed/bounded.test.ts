@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { liveGroups, runBounded } from './bounded.mjs'
+import { groupSpawnOptions, killPlan, liveGroups, runBounded, SECRET_VARIABLES, sweepsAfterExit, withoutSecrets } from './bounded.mjs'
 
 /**
  * Every child has an owner, a deadline and a process group (LC-02).
@@ -66,7 +66,10 @@ describe('a bounded child', () => {
     expect(Date.now() - started, 'the deadline is a deadline').toBeLessThan(10000)
   })
 
-  it('leaves no grandchild behind when the child exits on its own', async () => {
+  // Windows cannot find the children of a parent that has already exited, and
+  // bounded.mjs does not sweep there by design (a reused PID would be killed), so
+  // this is a POSIX promise and is skipped on win32 (B-162).
+  it.skipIf(!sweepsAfterExit())('leaves no grandchild behind when the child exits on its own', async () => {
     const LEAVES = `
       const { spawn } = require('node:child_process')
       const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
@@ -97,5 +100,50 @@ describe('a bounded child', () => {
       onLine: (stream, line) => lines.push(`${stream}:${line}`),
     })
     expect(lines.sort()).toEqual(['stderr:b', 'stdout:a'])
+  })
+})
+
+describe('the kill, per platform', () => {
+  /**
+   * Windows has no process groups: `process.kill(-pid)` throws there, and
+   * `detached: true` opens a console instead of a group (B-162). The platform is a
+   * parameter so the Windows branch is checked on every machine, not only on one.
+   */
+  it('signals the group on macOS and Linux, as before', () => {
+    expect(killPlan(4242, 'SIGTERM', 'darwin')).toEqual({ kind: 'group', pid: -4242, signal: 'SIGTERM' })
+    expect(killPlan(4242, 'SIGKILL', 'linux')).toEqual({ kind: 'group', pid: -4242, signal: 'SIGKILL' })
+  })
+
+  it('ends the tree with taskkill on Windows, forced only at SIGKILL', () => {
+    expect(killPlan(4242, 'SIGTERM', 'win32')).toEqual({
+      kind: 'taskkill',
+      command: 'taskkill',
+      args: ['/PID', '4242', '/T'],
+    })
+    expect(killPlan(4242, 'SIGKILL', 'win32')).toEqual({
+      kind: 'taskkill',
+      command: 'taskkill',
+      args: ['/PID', '4242', '/T', '/F'],
+    })
+  })
+
+  it('detaches into a group of its own only where groups exist', () => {
+    expect(groupSpawnOptions('darwin').detached).toBe(true)
+    expect(groupSpawnOptions('linux').detached).toBe(true)
+    expect(groupSpawnOptions('win32').detached).toBe(false)
+  })
+
+  it('sweeps the group after a normal exit on POSIX only, where a group outlives its leader', () => {
+    expect(sweepsAfterExit('darwin')).toBe(true)
+    expect(sweepsAfterExit('win32')).toBe(false)
+  })
+})
+
+describe('a child that does not publish gets no credential', () => {
+  it('drops every Cloudflare credential variable from a copy, and leaves the original alone', () => {
+    const env = { PATH: '/bin', CLOUDFLARE_API_TOKEN: 't', CLOUDFLARE_API_KEY: 'k', CLOUDFLARE_ACCOUNT_ID: 'a' }
+    expect(SECRET_VARIABLES).toEqual(['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY'])
+    expect(withoutSecrets(env)).toEqual({ PATH: '/bin', CLOUDFLARE_ACCOUNT_ID: 'a' })
+    expect(env.CLOUDFLARE_API_KEY).toBe('k')
   })
 })

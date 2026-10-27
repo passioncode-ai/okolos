@@ -11,6 +11,14 @@ export interface RunRecord {
   readonly entries?: number
   readonly commit?: string | null
   readonly pinned?: boolean
+  /** The bootstrap's id for this run, so it can tell the job's record from an older one. */
+  readonly runId?: string
+  /** True when the bootstrap had to recreate the checkout before this run (B-159, B-150). */
+  readonly recoveredCheckout?: boolean
+  /** What was wrong with the checkout: `missing` or `broken: <reason>`. */
+  readonly recovery?: string
+  /** Set when the agent was installed off origin/main with --allow-branch: branch and commits. */
+  readonly installedOffMain?: string
 }
 
 export interface StatusRecord extends RunRecord {
@@ -20,3 +28,7 @@ export interface StatusRecord extends RunRecord {
 
 export function readStatus(file: string): StatusRecord | null
 export function writeStatus(file: string, record: RunRecord): StatusRecord
+/** Marks the record as run `runId`'s (plus `facts`), changing nothing else; null when there is none. */
+export function stampRunId(file: string, runId: string, facts?: { installedOffMain?: string }): StatusRecord | null
+/** `{ installedOffMain }` from OKOLOS_INSTALLED_OFF_MAIN, or nothing. */
+export function offMainFacts(env?: Record<string, string | undefined>): { installedOffMain?: string }

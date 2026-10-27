@@ -20,7 +20,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 
-import { filesUnder } from './tree.mjs'
+import { filesUnder, posixRelative } from './tree.mjs'
 
 /** What the four images actually render: the UI package, the options page, the style sheet. */
 export const SURFACES = [
@@ -53,7 +53,12 @@ function surfaceFiles(root) {
       files.push(absolute)
     }
   }
-  return files.sort()
+  // Sorted by the repository's spelling: a backslash sorts elsewhere than `/` (B-164).
+  return files.sort((a, b) => {
+    const left = posixRelative(root, a)
+    const right = posixRelative(root, b)
+    return left < right ? -1 : left > right ? 1 : 0
+  })
 }
 
 /**
@@ -66,7 +71,8 @@ function surfaceFiles(root) {
 export function surfacesDigest(root) {
   const hash = createHash('sha256')
   for (const file of surfaceFiles(root)) {
-    hash.update(path.relative(root, file))
+    // `/` on every platform, so a Windows checkout of the same tree has the same digest.
+    hash.update(posixRelative(root, file))
     hash.update('\0')
     hash.update(readFileSync(file))
     hash.update('\0')

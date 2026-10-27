@@ -16,6 +16,7 @@
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
+import { isMain } from './is-main.mjs'
 
 const root = process.cwd()
 
@@ -164,10 +165,12 @@ export function purposeOf(id) {
  */
 export function composedRoles(source) {
   const text = readFileSync(path.join(root, source), 'utf8')
-  const dir = path.dirname(source)
+  // `source` is repository-relative and spelled with `/`; path.posix keeps it so on
+  // Windows, where the "from" line would otherwise print backslashes (B-164).
+  const dir = path.posix.dirname(source)
   const found = []
   for (const match of text.matchAll(/from '(\.[^']+)\.js'/g)) {
-    const target = path.join(dir, `${match[1]}.ts`)
+    const target = path.posix.join(dir, `${match[1]}.ts`)
     try {
       readFileSync(path.join(root, target), 'utf8')
     } catch {
@@ -257,6 +260,9 @@ export function writeAll() {
   return Object.keys(SCREENS).length
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// The path, not a `file://` string built from it: on Windows argv[1] is `C:\…`, and
+// the string never equalled the URL, so `pnpm wireframes` wrote nothing (B-162).
+// Real paths, so a run through a symlink or a junction still runs (tools/is-main.mjs).
+if (isMain(import.meta.filename)) {
   console.log(`wrote ${writeAll()} wireframes`)
 }

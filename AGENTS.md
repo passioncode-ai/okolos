@@ -52,7 +52,8 @@ fails when a script is missing from it.
   term from `terminology.md` is mandatory, a number from `facts.md` is taken by command
   at the time of the edit. `tools/docs.test.ts` holds this.
 - **User-facing behaviour starts in [docs/ux/scenarios.md](docs/ux/scenarios.md)**, and
-  `python3 docs/ux/lint.py` must pass after any UX change.
+  `pnpm ux:lint` (it runs `docs/ux/lint.py` with whichever Python 3 the machine has) must
+  pass after any UX change.
 - **Decisions** are [docs/adr/](docs/adr/); a record naming a missing file fails the build.
 - **Licence is the organisation's** — `AGPL-3.0-only OR LicenseRef-PassionCode-Commercial`:
   open source under the GNU AGPL-3.0, commercial licence through https://passioncode.ai/business/
@@ -78,19 +79,60 @@ server; `apps/mail-cli` is an on-demand CLI and `apps/proxy` is a remote Cloudfl
 
 | What | Who starts it | Cadence | With no window | Who stops it | Idle budget |
 |---|---|---|---|---|---|
-| launchd agent **`app.okolos.feed`** (`gui/<uid>`, plist from `tools/launchd/app.okolos.feed.plist`) | a person, once: `pnpm feed:agent` (machine holding the signing key, ADR-0002) | `StartInterval` 43200 s + `RunAtLoad`; a login run ends as "skipped" when the served feed is under 11 h old | the whole job is background: `Nice 5`, `ProcessType Background`, no `KeepAlive` | its own exit; watchdog 30 min kills the run's process groups; removed by `node tools/install-feed-agent.mjs --uninstall [--purge]` (deletes the plist, verifies with `launchctl print`) | 0 processes and 0 RSS between runs; a run is about a minute, twice a day |
-| a run's children: `git fetch`/`checkout`, `pnpm install --filter @okolos/proxy` (only when the lockfile moved), `node tools/ingest.mjs`, the secret runner → `node tools/publish-feed.mjs` → `pnpm exec wrangler` | `tools/feed-job.mjs`, each in its own process group | per run | — | deadline per child (git 90 s, install 10 min, ingest 3 min, publish 6 min), then SIGTERM → SIGKILL to the group | none left after the run (`tools/feed/bounded.test.ts`) |
+| launchd agent **`app.okolos.feed`** (`gui/<uid>`, plist from `tools/launchd/app.okolos.feed.plist`); its command is a `/bin/sh` launch line that starts `node ~/.okolos/bin/feed-agent/bootstrap.mjs`, a copy of `tools/feed/bootstrap.mjs` outside the checkout, never a `cd` into it (B-159) | a person, once: `pnpm feed:agent` from a clone whose HEAD is a freshly fetched origin/main and whose installed files (the bootstrap's seven sources and the plist template) carry no uncommitted change (machine holding the signing key, ADR-0002; any other HEAD, or such a change, is refused in one line naming the files; `--allow-branch` overrides and is recorded in `feed.log` and as `installedOffMain` in every record of a run: the launch line's, the bootstrap's and the job's, a stop by signal and a record adopted from an older job included) | `StartInterval` 43200 s + `RunAtLoad`; a login run ends as "skipped" when the served feed is under 11 h old | the whole job is background: `Nice 5`, `ProcessType Background`, no `KeepAlive` | its own exit; one deadline over the run, 45 min from the bootstrap's start, checkout repair included: a repair still going is killed and recorded, the job's watchdog is what is left minus 2 min (at most its own 30 min), and the bootstrap kills the job's group at the deadline; worst case 45 min plus a 5 s kill grace; removed by `node tools/install-feed-agent.mjs --uninstall [--purge]` (deletes the plist, `~/.okolos/bin/feed-agent/` and an emptied `~/.okolos/bin`, verifies with `launchctl print`) | 0 processes and 0 RSS between runs; a run is about a minute, twice a day |
+| a run's children: when the checkout is missing or broken, the bootstrap's `git worktree prune`/`fetch`/`worktree add` in the installing clone (or `git clone` of its origin when that clone is gone) and `pnpm install --filter @okolos/proxy`; then `node tools/feed-job.mjs --agent`, and its `git fetch`/`checkout`, `pnpm install --filter @okolos/proxy` (only when the lockfile moved), `node tools/ingest.mjs`, the secret runner → `node tools/publish-feed.mjs` → `pnpm exec wrangler` | `tools/feed/bootstrap.mjs`, then `tools/feed-job.mjs`; each child in its own process group | per run | — | deadline per child (git 90 s, worktree add 2 min, clone 5 min, install 10 min, ingest 3 min, publish 6 min), then SIGTERM → SIGKILL to the group; a repair takes at most 21 min on the clone path | none left after the run (`tools/feed/bounded.test.ts`) |
 | MV3 service worker (Chrome) / event page (Firefox) | the browser, on a listened event | alarms `okolos:feeds` 6 h, `okolos:retention` 24 h, `okolos:inventory` 24 h — created only when missing | wakes on messages, alarms, downloads and top-level http(s) navigations (memory write only) | the browser, after ~30 s idle; no timer outlives a wake | per wake: three alarm checks and timestamp reads; per day: ≤ 4 feed pulls, 2 sweeps, 1 extension review, 0 rule rebuilds without a change (`apps/extension/src/background/wake.test.ts`) |
 | content script and MAIN-world page watcher | the browser, per http(s) page and frame | event-driven, paced rescans | — | the page's lifetime | no work while the page is unchanged |
 
 Files the feed agent writes — all outside the working tree, all bounded (LC-12): state in
 `~/.okolos/state/` (`feeds/phishing.json`, `feed-status.json`, `feed.lock`); logs in
 `~/Library/Logs/Okolos/` (`feed.log`, 5 × 5 MB, mode 0600; `feed.launchd.log`, capped at start;
-`wrangler/`, pruned by wrangler after 30 days); its own checkout `~/.okolos/agent-checkout`
-(a worktree at origin/main); private `$TMPDIR/okolos-feed-*` directories removed in `finally`,
-older ones swept at the next start. The run's record — `outcome`, `stage`, `exit`, `version`,
-`entries`, `consecutiveFailures`, `lastPublished` — is what a host reads: alert at two failures in
-a row or when `lastPublished.at` is older than 26 h. Decision: [ADR-0017](docs/adr/0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md).
+`wrangler/`, pruned by wrangler after 30 days); the bootstrap launchd starts, in
+`~/.okolos/bin/feed-agent/` (seven files, `BOOTSTRAP_SOURCES` in `tools/feed/bootstrap.mjs`:
+`bootstrap.mjs`, `bounded.mjs`, `lock.mjs`, `log.mjs`, `paths.mjs` and `status.mjs` from
+`tools/feed/`, and `is-main.mjs` from `tools/is-main.mjs`, not the re-export in `tools/feed/`;
+replaced whole at each install;
+`--status` says when they differ from the checkout's); its own checkout `~/.okolos/agent-checkout`
+at origin/main (a worktree of the clone `pnpm feed:agent` ran from, or a clone of that clone's origin
+when the clone is gone; recreated by the bootstrap when it is missing; a broken one is moved to
+`~/.okolos/agent-checkout.broken`, one kept, removed by `--purge`); in the clone `pnpm feed:agent`
+ran from, the installer's and the bootstrap's `git worktree prune`, `git fetch origin main` and
+`git worktree add` (its `.git/worktrees/` entry and remote refs, nothing in its working tree);
+private `$TMPDIR/okolos-feed-*` directories removed in `finally`, older ones swept at the next
+start.
+
+What a failed run leaves, and where (B-159):
+
+| Failure | `feed-status.json` (`outcome: failed`, counted in `consecutiveFailures`) | `feed.log` | `feed.launchd.log` |
+|---|---|---|---|
+| `node` cannot be found, the installed bootstrap copy is gone, or `node` exits non-zero and no record carries this launch's `runId` | `stage: launch`, written by the plist's `/bin/sh` line (`lastPublished` kept, its own `runId` only) | one line | one line |
+| the checkout is missing or broken and cannot be recreated, or its repair outlives the run's deadline | `stage: checkout` | yes | one line |
+| the job dies without writing its own record: a crash | `stage: job`, `reason` as `runAgent` in `tools/feed/bootstrap.mjs` builds it: "the job exited <code or signal>", a dash, the first of the job's last 50 output lines (stdout and stderr) that reads as an error, else the last of them (`reasonFrom`), then "without writing its record"; with no output, "the job exited <code or signal> without writing its record" | its output and a line | its output and a line |
+| the job is killed at the run's deadline without writing its own record | `stage: job`, exit 124, `reason` = the fixed sentence "the run's deadline (2700 s) passed during the job; its process group was killed" | a line | a line |
+| the job fails in its own stages (config, pin, ingest, publish, its watchdog, a signal) | the job's stage; a stop by SIGTERM or SIGINT is recorded as the stop (exit 143, `reason: stopped by <signal>`), also when it killed a stage's child, once | yes | one line |
+| the bootstrap is stopped by SIGTERM or SIGINT (launchd signals the launch line's `/bin/sh`, its main pid, which passes the signal on to the bootstrap and waits for it) and the job wrote no record of this run | the stage it was in, exit 143, `reason: stopped by <signal>`; a repair or job the stop killed is not recorded as a crash | a line when the stop broke a repair or the job | no |
+| the bootstrap itself crashes | `stage: bootstrap` | no | its stack |
+| another run holds the lock (exit 75) | nothing: the record is the running one's | one line | no |
+
+Not recorded anywhere: launchd not running the agent at all (no plist, unloaded or disabled), or
+`/bin/sh` itself failing; `node tools/install-feed-agent.mjs --status` and `launchctl print` show
+those. A record is this run's when it carries this launch's `runId`: the job writes it from
+`OKOLOS_RUN_ID`, and the bootstrap stamps it into a record it adopts from a job that writes none, so
+one failure is counted once. `recoveredCheckout: true` (with `recovery`) marks a run whose checkout
+had to be recreated (B-150's evidence). `installedOffMain` marks every record of an agent installed
+with `--allow-branch`, whichever writer wrote it. The record (`outcome`, `stage`, `exit`, `version`,
+`entries`, `consecutiveFailures`, `lastPublished`, `recoveredCheckout`, `installedOffMain`) is meant
+for a host to alert on (two
+failures in a row, or `lastPublished.at` older than 26 h), but **nothing reads it yet**: that alarm
+is OBS-32 in `passioncode-ai/project-observatory-dashboard` (B-135 is done: it filed that row), and
+it does not read `feed-status.json` yet. Until it does, a person reads `--status`.
+
+**After this lands (B-159), once, by a person:** the Mac keeps running the old plist (`cd` into the
+checkout) until the agent is reinstalled. From the main clone, at origin/main: `pnpm feed:agent`,
+then `node tools/install-feed-agent.mjs --status` must show `"bootstrap": true`,
+`"plistStartsBootstrap": true` and `"loaded": true`, and
+`plutil -extract ProgramArguments.2 raw -o - ~/Library/LaunchAgents/app.okolos.feed.plist` must
+name `~/.okolos/bin/feed-agent/bootstrap.mjs`. B-159 closes only after that check. Decision: [ADR-0017](docs/adr/0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md).
 
 **Build retention (LC-15).** Release archives go to `apps/extension/dist/release/`, and
 `pnpm package` keeps the current and the previous one per browser itself
@@ -101,7 +143,8 @@ a row or when `lastPublished.at` is older than 26 h. Decision: [ADR-0017](docs/a
 `rm -rf apps/extension/dist/chrome* apps/extension/dist/firefox* apps/extension/.tsc packages/*/dist test-results playwright-report node_modules/.vite`
 before ending its run. It leaves `dist/release/` and every `node_modules` alone, and
 `pnpm build` restores what a gate needs. (Not `git clean -X` with pathspecs: measured
-2026-10-03, its dry run would remove the whole `node_modules` tree.)
+2026-10-03, its dry run would remove the whole `node_modules` tree.) Both commands are POSIX
+shell: on Windows run them in Git Bash, not PowerShell or `cmd.exe`.
 
 ## Organisation
 

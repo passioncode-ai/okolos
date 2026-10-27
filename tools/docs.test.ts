@@ -289,7 +289,7 @@ describe('every citation names something that exists', () => {
    */
   const claims = (doc: string): string[] =>
     readFileSync(path.join(root, doc), 'utf8')
-      .split('\n')
+      .split(/\r?\n/)
       .filter((line) => /\*\*Coverage:\*\*|^\| `/.test(line))
       .filter((line) => !/\bplanned\b/.test(line))
 
@@ -859,7 +859,7 @@ describe('the page a stranger reads is prose, not source', () => {
     // count instead of near its paragraph count.
     const paragraphs = (html.match(/<p>/g) ?? []).length
     const sourceLines = readFileSync(path.join(root, 'docs/privacy.md'), 'utf8')
-      .split('\n')
+      .split(/\r?\n/)
       .filter((l) => l.trim() !== '' && !l.startsWith('|') && !l.startsWith('- ') && !l.startsWith('#'))
       .length
     expect(paragraphs).toBeLessThan(sourceLines / 2)

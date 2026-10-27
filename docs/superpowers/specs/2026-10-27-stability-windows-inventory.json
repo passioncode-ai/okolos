@@ -1,0 +1,326 @@
+{
+ "schema": "inventory/1",
+ "topic": "stability-windows",
+ "items": [
+  {
+   "id": "B-158",
+   "title": "Срок снимка фида 14 дней снова сделает main красным 2026-11-09: агент публикует, снимок коммитит человек",
+   "area": "feed",
+   "kind": "gap",
+   "severity": "high",
+   "evidence": "run 39315134792 (2026-10-19) package:check «feeds/phishing.json is 15.6 days old»; tools/feed-age.mjs FEED_MAX_AGE_DAYS=14; CI без расписания",
+   "proposed_fix": "агент фида после публикации открывает или обновляет PR со снимком, когда закоммиченный снимок старше 7 дней; слияние по зелёным проверкам",
+   "status": "open",
+   "module": "feed",
+   "node": [
+    "SW-06"
+   ],
+   "wave": 2,
+   "release": "this"
+  },
+  {
+   "id": "B-159",
+   "title": "Агент фида падает молча, если его рабочей копии нет: задача не стартует, feed-status.json не пишется",
+   "area": "feed",
+   "kind": "bug",
+   "severity": "high",
+   "evidence": "~/Library/Logs/Okolos/feed.launchd.log: 35 строк «cd: /Users/sshlg/.okolos/agent-checkout: No such file or directory»; consecutiveFailures 0 при 17 днях простоя (B-149, B-150)",
+   "proposed_fix": "plist запускает задачу не через cd в рабочую копию; задача сама восстанавливает рабочую копию и пишет статус при любом исходе, включая её отсутствие",
+   "status": "open",
+   "module": "feed",
+   "node": [
+    "SW-03"
+   ],
+   "wave": 1,
+   "release": "this"
+  },
+  {
+   "id": "B-160",
+   "title": "Основная копия репозитория стала «голой» (core.bare = true) после инцидента с GIT_DIR",
+   "area": "repo",
+   "kind": "bug",
+   "severity": "high",
+   "evidence": "~/DATA/okolos-extension/.git/config: bare = true, mtime 2026-10-27 08:40; git status: «must be run in a work tree»",
+   "proposed_fix": "исправлено вручную 2026-10-27 (git config core.bare false, копия конфигурации сохранена); гейт B-154 закрывает причину",
+   "status": "fixed",
+   "module": "tooling",
+   "node": [
+    "SW-04"
+   ],
+   "wave": 3,
+   "release": "this"
+  },
+  {
+   "id": "B-161",
+   "title": "okolos-mail scan на Windows не запускается и выходит с 0 («ничего не найдено»)",
+   "area": "mail-cli",
+   "kind": "bug",
+   "severity": "high",
+   "evidence": "apps/mail-cli/src/index.ts:76 import.meta.url.endsWith(process.argv[1].split('/').pop()); scan.ts:29 nothingFound = 0",
+   "proposed_fix": "проверка запуска через pathToFileURL(argv[1]) или realpath сравнение; тест с путём Windows",
+   "status": "open",
+   "module": "mail-cli",
+   "node": [
+    "SW-01"
+   ],
+   "wave": 1,
+   "release": "this"
+  },
+  {
+   "id": "B-162",
+   "title": "pnpm gates и pre-push на Windows падают: python3, права 0600 в тестах, kill(-pid), нет .gitattributes, разбор строк по \\n",
+   "area": "tooling",
+   "kind": "gap",
+   "severity": "high",
+   "evidence": "package.json ux:lint; tools/brand-gate.mjs:22; tools/feed/log.test.ts:28; tools/feed/bounded.mjs:26; нет .gitattributes; tools/docs.test.ts:292",
+   "proposed_fix": "поиск python (python3, python, py -3); проверки прав только на POSIX; группа процессов через taskkill /T на win32; .gitattributes eol=lf; разбор строк по /\\r?\\n/",
+   "status": "open",
+   "module": "tooling",
+   "node": [
+    "SW-02"
+   ],
+   "wave": 1,
+   "release": "this"
+  },
+  {
+   "id": "B-163",
+   "title": "pnpm package, e2e Firefox и deploy-worker на Windows не стартуют: zip, pnpm/npx без оболочки, поиск Firefox",
+   "area": "tooling",
+   "kind": "gap",
+   "severity": "medium",
+   "evidence": "tools/package.mjs:108,192; tools/firefox-e2e.mjs:55-66,209; tools/deploy-worker.mjs:51",
+   "proposed_fix": "запуск .cmd через shell на win32; zip без системного zip; findFirefox с LOCALAPPDATA и .exe",
+   "status": "open",
+   "module": "tooling",
+   "node": [
+    "SW-02"
+   ],
+   "wave": 1,
+   "release": "this"
+  },
+  {
+   "id": "B-164",
+   "title": "CI запускается только на Linux, поломки Windows не видны",
+   "area": "ci",
+   "kind": "gap",
+   "severity": "medium",
+   "evidence": ".github/workflows/ci.yml:15,98,144 runs-on: ubuntu-latest",
+   "proposed_fix": "job на windows-latest: сборка и unit-гейты; e2e остаются на Linux",
+   "status": "open",
+   "module": "ci",
+   "node": [
+    "SW-05"
+   ],
+   "wave": 2,
+   "release": "this"
+  },
+  {
+   "id": "B-165",
+   "title": "Не хватает Windows-типов загрузок и опасных схем ссылок; ClickFix без msiexec, rundll32, regsvr32",
+   "area": "extension-core",
+   "kind": "gap",
+   "severity": "medium",
+   "evidence": "packages/core-download/src/judge.ts:88-102 (нет .dll .one .xll .appinstaller .library-ms .search-ms и др.); adapter.ts:21 и agent-gate.ts:308 молча отбрасывают не http(s); packages/core-traps/src/clickfix.ts:56,74",
+   "proposed_fix": "дополнить список типов с тестами; находка на ссылки ms-msdt:, search-ms:, ms-appinstaller:, file:// на сетевые папки; LOLBins в ClickFix; сценарий SCN и строки через Copylot",
+   "status": "open",
+   "module": "extension-core",
+   "node": [
+    "SW-07"
+   ],
+   "wave": 2,
+   "release": "this"
+  },
+  {
+   "id": "B-166",
+   "title": "Windows и Edge нигде не обещаны и не исключены; нет листинга Edge Add-ons",
+   "area": "docs",
+   "kind": "doc-missing",
+   "severity": "medium",
+   "evidence": "README.md:63,72; docs/store/listing.md:3; docs/brand/facts.md без Windows; docs/runbooks/development.md без ОС",
+   "proposed_fix": "записать поддерживаемые ОС и браузеры в facts.md, README, раннбук; Edge Add-ons в B-137",
+   "status": "open",
+   "module": "docs",
+   "node": [
+    "SW-08"
+   ],
+   "wave": 2,
+   "release": "this"
+  },
+  {
+   "id": "B-167",
+   "title": "Okolos Agent (мост Б1) только под macOS, и это нигде не решено",
+   "area": "bridge",
+   "kind": "contradiction",
+   "severity": "medium",
+   "evidence": "bridge/b1-run2: apps/agent/src/service/dirs.ts:55-57 ~/Library; brief:62 не упоминает Windows",
+   "proposed_fix": "решение в брифе и ADR моста: Б1 только macOS, Windows отдельной фазой, со строкой бэклога",
+   "status": "open",
+   "module": "bridge",
+   "node": [
+    "SW-08"
+   ],
+   "wave": 2,
+   "release": "this"
+  },
+  {
+   "id": "B-168",
+   "title": "Падение e2e scn-017 на main 2026-09-29 нигде не записано",
+   "area": "e2e",
+   "kind": "gap",
+   "severity": "low",
+   "evidence": "run 36563089100: e2e/scn-017.spec.ts:17 toBeVisible",
+   "proposed_fix": "повторить под нагрузкой; если воспроизводится, ожидание по событию",
+   "status": "open",
+   "module": "e2e",
+   "node": [
+    "SW-09"
+   ],
+   "wave": 2,
+   "release": "this"
+  },
+  {
+   "id": "B-169",
+   "title": "Фиксированные ожидания перед проверками отсутствия в e2e: под нагрузкой проходят, когда должны падать",
+   "area": "e2e",
+   "kind": "weak-impl",
+   "severity": "low",
+   "evidence": "e2e/scn-036.spec.ts:205,224; scn-035:211; scn-008:79; scn-011:67; scn-006:55,67; scn-034:117; scn-031:78",
+   "proposed_fix": "ждать сигнала завершения проверки (журнал или атрибут), а не время",
+   "status": "open",
+   "module": "e2e",
+   "node": [
+    "SW-09"
+   ],
+   "wave": 2,
+   "release": "this"
+  },
+  {
+   "id": "B-170",
+   "title": "8 мажорных обновлений dev-зависимостей (typescript 7, vitest 5, vite 8, eslint 10)",
+   "area": "deps",
+   "kind": "plan",
+   "severity": "low",
+   "evidence": "pnpm outdated -r: 19 устаревших, 8 мажорных; pnpm audit --prod: 0",
+   "proposed_fix": "обновления отдельной волной программы, по одному пакету с гейтами",
+   "status": "carried",
+   "module": "deps",
+   "node": [
+    "SW-12"
+   ],
+   "wave": null,
+   "release": "program"
+  },
+  {
+   "id": "B-78",
+   "title": "Под нагрузкой проверка страницы молча пропускает её (scan-blinded); e2e scn-005 падает 1 из 190",
+   "area": "extension-core",
+   "kind": "bug",
+   "severity": "medium",
+   "evidence": "e2e/scn-005.spec.ts:35 скан 626 мс > 500 мс, 0 кандидатов, только журнал scan-blinded",
+   "proposed_fix": "продолжение скана по частям вместо отказа, или видимое состояние «страница не проверена»",
+   "status": "open",
+   "module": "extension-core",
+   "node": [
+    "SW-09"
+   ],
+   "wave": 2,
+   "release": "this"
+  },
+  {
+   "id": "B-125",
+   "title": "Ключ HIBP читается, но в интерфейсе его негде ввести",
+   "area": "extension",
+   "kind": "bug",
+   "severity": "medium",
+   "evidence": "apps/extension/src/background/index.ts:748 читает hibp:apiKey, записи нет",
+   "proposed_fix": "поле ключа в настройках по цепочке UX (сценарий, экран, строки)",
+   "status": "open",
+   "module": "extension-core",
+   "node": [
+    "SW-10"
+   ],
+   "wave": 2,
+   "release": "this"
+  },
+  {
+   "id": "B-131",
+   "title": "inference/score отправляется, но никто не обрабатывает",
+   "area": "extension",
+   "kind": "bug",
+   "severity": "medium",
+   "evidence": "apps/extension/src/background/index.ts:208; packages/contracts/src/rpc.ts:443; ADR-0006:50-58",
+   "proposed_fix": "убрать отправку и контракт или подключить обработчик по ADR-0006",
+   "status": "open",
+   "module": "extension-core",
+   "node": [
+    "SW-10"
+   ],
+   "wave": 2,
+   "release": "this"
+  },
+  {
+   "id": "B-148",
+   "title": "Неназванный unit-тест падает в pre-push под нагрузкой",
+   "area": "tooling",
+   "kind": "bug",
+   "severity": "low",
+   "evidence": "запись 2026-10-06, тест не назван",
+   "proposed_fix": "ловить имя теста в журнале pre-push; без воспроизведения строка остаётся",
+   "status": "carried",
+   "module": "tooling",
+   "node": [
+    "SW-12"
+   ],
+   "wave": null,
+   "release": "program"
+  },
+  {
+   "id": "B-154",
+   "title": "Закрепить защиту от унаследованного GIT_DIR (причина B-160)",
+   "area": "tooling",
+   "kind": "gap",
+   "severity": "medium",
+   "evidence": "вердикт N-025; B-160",
+   "proposed_fix": "gitEnv по git rev-parse --local-env-vars, гейт учит cwd, тест buildIdentity",
+   "status": "open",
+   "module": "tooling",
+   "node": [
+    "SW-04"
+   ],
+   "wave": 3,
+   "release": "this"
+  },
+  {
+   "id": "B-142",
+   "title": "Мост Б1: 4 из 25 узлов готовы",
+   "area": "bridge",
+   "kind": "plan",
+   "severity": "high",
+   "evidence": "bridge/b1-run2 .task-pipeline/graph.json",
+   "proposed_fix": "продолжить граф прогона Б1",
+   "status": "open",
+   "module": "bridge",
+   "node": [
+    "SW-11"
+   ],
+   "wave": 3,
+   "release": "this"
+  },
+  {
+   "id": "B-157",
+   "title": "N-007 и N-013 запаркованы предохранителем; оператор 2026-10-27 «давай все доделаем»",
+   "area": "bridge",
+   "kind": "plan",
+   "severity": "high",
+   "evidence": "bridge/b1-run2 docs/backlog.md B-157; run.md",
+   "proposed_fix": "продолжить круги: N-007 ещё один прошедший, N-013 проверка исправления 0795850",
+   "status": "open",
+   "module": "bridge",
+   "node": [
+    "SW-11"
+   ],
+   "wave": 3,
+   "release": "this"
+  }
+ ]
+}

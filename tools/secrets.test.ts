@@ -79,7 +79,7 @@ function settingKeys(): Array<{ key: string; where: string }> {
       if (/^[A-Za-z][\w.-]*:[A-Za-z][\w.-]*$/.test(key)) found.push({ key, where })
     }
 
-    for (const line of text.split('\n')) {
+    for (const line of text.split(/\r?\n/)) {
       if (!line.includes("'settings'") && !line.includes('readSetting(')) continue
       // A plain literal: db.get('settings', 'popup:lastCheck')
       for (const m of line.matchAll(/'([A-Za-z][\w.-]*:[A-Za-z][\w.-]*)'/g)) {

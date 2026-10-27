@@ -21,6 +21,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { toCss } from './tokens.mjs'
+import { isMain } from './is-main.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const OUT = path.join(root, 'apps/proxy/src/style.generated.ts')
@@ -129,7 +130,8 @@ export function toModule() {
   )
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Real paths, so a run through a symlink or a junction still runs (tools/is-main.mjs).
+if (isMain(import.meta.filename)) {
   writeFileSync(OUT, toModule())
   console.log(`wrote ${path.relative(root, OUT)}`)
 }

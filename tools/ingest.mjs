@@ -54,6 +54,7 @@ import path from 'node:path'
 import { acquireLock } from './feed/lock.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { DEFAULT_WORKER, nextVersion, readServed } from './feed/served.mjs'
+import { isMain } from './is-main.mjs'
 
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -181,7 +182,7 @@ export function hostFrom(line) {
 export function hostsFrom(text) {
   const seen = new Set()
   const hosts = []
-  for (const line of text.split('\n')) {
+  for (const line of text.split(/\r?\n/)) {
     const host = hostFrom(line)
     if (host === null || seen.has(host)) continue
     seen.add(host)
@@ -421,7 +422,7 @@ async function main() {
   }
 }
 
-if (import.meta.filename === process.argv[1]) {
+if (isMain(import.meta.filename)) {
   main().catch((cause) => {
     console.error(`ingest: ${cause instanceof Error ? cause.message : String(cause)}`)
     process.exit(1)

@@ -64,10 +64,14 @@ Full vector coverage: [docs/coverage-matrix.md](docs/coverage-matrix.md).
 listing, no GitHub release. Build it and load the unpacked extension:
 
 ```bash
-corepack enable && pnpm install     # Node and pnpm; also installs the pre-push hook
+corepack enable && pnpm install     # Node 22 to 24; also installs the pre-push hook
 pnpm build                          # apps/extension/dist/chrome and apps/extension/dist/firefox
 pnpm package                        # the store zips, checked, in apps/extension/dist/release/
 ```
+
+Corepack ships with Node 22 to 24 only. On Node 25 and later, and on Windows, install pnpm and
+run `pnpm install` as the [development runbook](docs/runbooks/development.md#windows) says
+(`npm i -g pnpm` or the pnpm.io installer; `packageManager` still pins the version).
 
 Chrome: `chrome://extensions` → Developer mode → **Load unpacked** →
 `apps/extension/dist/chrome`. Edge takes the same Chrome build: `edge://extensions` →
