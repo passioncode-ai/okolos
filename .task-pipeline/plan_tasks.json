@@ -116,7 +116,7 @@
    "Test: packages/core-snapshot/src/verdict.test.ts, packages/core-snapshot/src/corpus.test.ts, packages/core-snapshot/src/secrets.test.ts"
   ],
   "consumes": "`buildSnapshot`, `AxNode` (packages/core-snapshot/src/snapshot.ts); `Verdict` (@okolos/contracts)",
-  "produces": "`snapshotVerdict(probe: {verdicts: readonly Verdict[], truncated: boolean, unresolved: number}): SnapshotVerdict | {refused: 'cleaning_incomplete'}` — `{level: 'clean'|'finding', findings: SnapshotFinding[]}`, каждая находка строится только через `toSnapshotFinding` из N-023 (без текста, локатора и detail страницы); неполная очистка означает отказ без текста; `refOf(backendId, taskKey)` HMAC; `buildSnapshot` вычищает значения полей из имён",
+  "produces": "`snapshotVerdict(probe: {verdicts, truncated, unresolved}, snapshot: Pick<Snapshot,'incomplete'>): SnapshotVerdict | {refused: 'cleaning_incomplete'}` (incomplete или неполный пробник означает отказ без текста); находки только через `toSnapshotFinding` из N-023; `buildSnapshot(nodes, {hidden, taskKey /* обязателен, 16+ байт */, secretFields /* обязателен, пустое множество = нет секретных */, rootRef?, refMap?}): Snapshot {lines, refMap, hiddenUnmatched, incomplete}`; внутри поля ничего не даёт имени и текста; значения полей вычищаются из имён (4 знака, 3 у секретных; NFKD, свёртка регистра, цифры любых письменностей; значение, разбитое по узлам); бюджеты очистки дают incomplete; `refOf(backendId, taskKey)` HMAC-SHA-256; `resolveRef(refs, ref, taskKey, nodes, {hidden, secretFields}): {found:true, backendDOMNodeId, inField} | {found:false, reason:'unknown'|'hidden'}`; `secretFieldIds(DOM.getDocument roots)`; `isSecretInput`; `sha256(bytes)`; `clampMaxBytes(n)`, `MIN_PAGE_BYTES`, `MAX_PAGE_BYTES`",
   "tests": [
    "buildSnapshot с rootRef под скрытым предком возвращает пусто; с rootRef под полем ввода текст поля не выдаётся (ревью F2)",
    "refs непрозрачны: refOf(backendId, taskKey) — HMAC; ref другой задачи не находит узла",
@@ -148,7 +148,7 @@
    "Test: packages/core-snapshot/src/pages.test.ts"
   ],
   "consumes": "`pageOf`, `utf8Bytes`, `SnapshotLine` (snapshot.ts)",
-  "produces": "`DEFAULT_MAX_BYTES = 32 * 1024`; `encodeCursor({from, digest}) / decodeCursor(c): {from, digest} | null`; `paginate(lines, {cursor?, maxBytes?}): {text, cursor?, partial}` — курсор несёт дайджест снимка, курсор от другого снимка отвергается",
+  "produces": "`encodeCursor({from, digest}) / decodeCursor(c): {from, digest} | null`; `paginate(lines, {cursor?, maxBytes?}): {text, cursor?, partial}` зажимает maxBytes через clampMaxBytes из @okolos/core-snapshot (MIN_PAGE_BYTES..MAX_PAGE_BYTES, своего DEFAULT_MAX_BYTES нет); дайджест курсора строится экспортированным sha256; курсор от другого снимка отвергается",
   "tests": [
    "дерево формы Википедии (29 714 узлов, детерминированное): каждая страница ≤ 32 КБ UTF-8, страниц ≥ 8, конкатенация страниц равна полному тексту",
    "курсор чужого снимка → null, демон отвечает stale_cursor (ревью R10)",
@@ -439,7 +439,7 @@
    "Test: apps/agent/src/agent.test.ts, apps/agent/src/verbs/verbs.test.ts, apps/agent/src/verbs/skeleton.chrome.test.ts",
    "Modify: apps/agent/src/service/http.ts, apps/agent/src/service/events.ts (обработчик 'error' сервера; предупреждение о вычищенных строках не теряется при неудачном старте; close() ждёт хуки onRefused; комментарии events.ts без degraded; проверки N-024)"
   ],
-  "consumes": "Tasks и checkLanded (N-009), AgentWindows (N-010), Journal и answerAfterRecord (N-006), doorRoute, pair, mcp-stdio (N-008), buildSnapshot, snapshotVerdict, paginate (N-003, N-004), census и readCensus (N-012), VerbIO, toolName, canonicalVerb, isLocalAddress, toSnapshotFinding (N-023), service из N-024 (capStdoutLog, buildIdentity с корнем релиза), runProbe (бандл apps/extension/src/agent-probe.ts)",
+  "consumes": "Tasks и checkLanded (N-009), AgentWindows (N-010), Journal и answerAfterRecord (N-006), doorRoute, pair, mcp-stdio (N-008), buildSnapshot (taskKey и secretFields обязательны), snapshotVerdict(probe, snapshot), resolveRef, secretFieldIds, hiddenUnmatched и incomplete снимка (N-003), paginate (N-004), census и readCensus (N-012), VerbIO, toolName, canonicalVerb, isLocalAddress, toSnapshotFinding (N-023), service из N-024 (capStdoutLog, buildIdentity с корнем релиза), runProbe (бандл apps/extension/src/agent-probe.ts)",
   "produces": "`createAgent({home?, port, allowLoopbackForTests?, extraChromeArgs?}): Promise<Agent>` (каталоги из serviceDirs(home); тесты передают временный home; журнал, привязки и окна строятся в setup N-005 после замка, проверка seam N-005) в src/agent.ts: служба, дверь, задачи, окна, журнал, перепись; onRevoke(agentId) закрывает задачи агента и их окна (аудит #13); таймер Journal.sweep раз в сутки (аудит #30); main.ts: serve → createAgent, pair, mcp-stdio; bin okolos-agent указывает на собранный бандл (исходники импортируют ./x.js, обычный node их не запустит; проверка seam N-005 круг 2); инструменты MCP под toolName: session_open, open, snapshot, read, get, waitFor, close, hygiene_census; схемы zod типа z.ZodType<VerbIO[V]['input']> (аудит #26); журнал хранит canonicalVerb (аудит #19); SessionOpenResult.sessionId = Task.id, cdpSessionId не уходит агенту (аудит #28); находки только через toSnapshotFinding",
   "tests": [
    "skeleton на Chrome: session.open → open локальной фикстуры со скрытой инструкцией из корпуса → snapshot не содержит текста инструкции, verdict.level = finding → close: окна нет",
@@ -497,7 +497,7 @@
    "окно задачи, чей срок вышел, но которую таймер ещё не убрал, закрылось само: setWindow через ручку, сохранённую при open, ставит windowOpen false (риск N-009 r3 seam #3)",
    "задача с profile 'disposable' получает своё временное окружение профиля у N-010; openWindow без профиля для неё не годится (наблюдение N-009 r3 seam)",
    "ключ HMAC для ref и хранилище снимка задачи принадлежат N-011; Task.id (это sessionId агента) ключом ref не служит (риск N-009 r3 seam #1)",
-   "N-011 читает type и autocomplete полей (DOM.describeNode или пробник), применяет isSecretInput из @okolos/core-snapshot и передаёт их id в buildSnapshot как secretFields; без этого порог 3 знаков для полей пароля, карты и кода не работает (N-003, открытый пункт 2)",
+   "secretFields строится только через secretFieldIds из @okolos/core-snapshot по корням DOM.getDocument (depth -1, pierce true); своего классификатора секретных полей N-011 не пишет (N-003 круг 2)",
    "buildSnapshot всегда получает ключ задачи (taskKey, 16+ байт, не Task.id); ref вида e<id> не появляется ни в одном ответе (N-003)",
    "в настоящем Chrome пробник расширения режет любой текст, скрытый отрисовкой, даже без инструкции: e2e не утверждает, что негативы корпуса остаются в снимке (N-003, открытый пункт 4)",
    "Journal.close() вызывается на каждом пути остановки демона, включая слив по SIGTERM в оболочке службы: оболочка получает хук владельца на слив (apps/agent/src/service/http.ts), тест останавливает демон во время потока отказов двери и находит счёт пропущенных в журнале (N-006 круг 3)",
@@ -506,7 +506,8 @@
    "open {ref} и другие глаголы со ссылкой идут через resolveRef из @okolos/core-snapshot; found:false и inField:true для open дают отказ; refMap объединяется по документу, потому что снимок поддерева несёт только свои ссылки (N-003 круг 1)",
    "Chrome-фикстура: трёхзначный cc-csc внутри своего label не доходит до агента; настоящий <select> отдаёт варианты как option или MenuListOption, и секретный select не отдаёт ни одного; текст под display:none не получает узла в дереве (иначе snapshotVerdict отказывает по hiddenUnmatched) (N-003 круг 1)",
    "Journal.open с JournalError(locked, open) пишет событие и выходит; отклонённый close() пишется событием (замок снят всё равно); все записи журнала штампуются одними часами демона; после close() записей нет (N-006 круг 3)",
-   "демон раз в минуту вызывает Journal.flushCounts(now) своими часами (N-006 круг 4); журнал открывается в setup оболочки после service.lock и закрывается на каждом пути остановки"
+   "демон раз в минуту вызывает Journal.flushCounts(now) своими часами (N-006 круг 4); журнал открывается в setup оболочки после service.lock и закрывается на каждом пути остановки",
+   "снимок поддерева по rootRef возвращает refMap только своих ссылок: N-011 сливает его с сохранённой картой документа, а не заменяет (N-003 круг 2)"
   ],
   "dod": "vitest apps/agent/src/verbs зелёный на Chrome stable"
  },
