@@ -18,7 +18,6 @@
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import path from 'node:path'
 import process from 'node:process'
 
 import {
@@ -37,11 +36,12 @@ import {
   sessionCookieHeader,
   Stopping,
   tokenMatches,
+  type DegradedSource,
   type ServiceStatus,
 } from '../fabric/fabric-service.mjs'
-import type { ServiceDirs } from './dirs.js'
+import { servicePaths, type ServiceDirs, type ServicePaths } from './dirs.js'
 import { EventLog } from './events.js'
-import { buildIdentity, wellKnown, type Build } from './wellknown.js'
+import { buildIdentity, wellKnown } from './wellknown.js'
 
 /** What a route is handed besides the request: the parsed URL and the service's own checks. */
 export interface RouteContext {
@@ -56,13 +56,38 @@ export interface RouteContext {
   operatorSession(req: IncomingMessage): boolean
 }
 
-/** A route answers the request and resolves true, or leaves it alone and resolves false. */
-export type Route = (req: IncomingMessage, res: ServerResponse, ctx: RouteContext) => Promise<boolean>
+/**
+ * A route answers the request and resolves true, or leaves it alone and resolves false. `paths`
+ * names what it serves: the well-known document declares `/mcp` and `/dashboard` only when a
+ * route claims them, so a host never opens a page nothing answers.
+ */
+export type Route = ((req: IncomingMessage, res: ServerResponse, ctx: RouteContext) => Promise<boolean>) & {
+  readonly paths?: readonly string[]
+}
+
+/** The language of the sentences a person reads: events in Fabric Dashboards, the refusal while stopping. */
+export type Locale = 'ru' | 'en'
+
+/** What `setup` is handed: the service's state, opened after the lock and before the bind. */
+export interface SetupContext {
+  readonly dirs: ServiceDirs
+  readonly paths: ServicePaths
+  readonly events: EventLog
+  readonly codes: LoginCodes
+  readonly log: RotatingLog
+  readonly locale: Locale
+}
 
 export interface RunningService {
   /** The port actually bound (the one asked for, or the free one the system gave for 0). */
   readonly port: number
   address(): AddressInfo
+  /** The events feed; its `trim(now)` is the daily trim. */
+  readonly events: EventLog
+  /** Sign-in codes of this running instance. */
+  readonly codes: LoginCodes
+  /** Whether a request carries a live operator session of this instance. */
+  operatorSession(req: { readonly headers: { readonly cookie?: string | undefined } }): boolean
   /** Drain, stop listening, release the lock. Safe to call more than once. */
   close(): Promise<void>
 }
@@ -70,8 +95,27 @@ export interface RunningService {
 export interface StartOptions {
   readonly port: number
   readonly dirs: ServiceDirs
+  /** The package version the well-known document names (the entry point reads it, not this module). */
+  readonly version: string
+  /** The code's root: the commit when it is this checkout, a digest of its files otherwise. */
+  readonly buildRoot: string
+  /** Routes known before the start; built-in routes run first, then these, then setup's. */
   readonly routes?: readonly Route[]
-  readonly build?: Build
+  /**
+   * Builds routes that need state of their own (a journal, the access list, the agent window),
+   * called after the lock, the token and the events exist and before the bind. A second copy never
+   * reaches it; a throw fails the start and lets the lock go.
+   */
+  readonly setup?: (ctx: SetupContext) => Promise<readonly Route[]>
+  /** Defaults to 'ru', the language Fabric's interface speaks to the operator. */
+  readonly locale?: Locale
+  /** The owner's degraded sources, merged into the well-known document on every request. */
+  readonly degraded?: () => readonly DegradedSource[]
+  /** The owner's action table and extensions for the well-known document. */
+  readonly wellKnownExtras?: () => {
+    readonly actions?: readonly unknown[]
+    readonly extensions?: Readonly<Record<string, unknown>>
+  }
   /** How a copy that finds the lock held leaves; the process's exit unless a test passes its own. */
   readonly exit?: (code: number) => void
   /** Install the SIGTERM/SIGINT drain (the daemon does; in-process tests do not). */
@@ -107,19 +151,32 @@ export async function startService(options: StartOptions): Promise<RunningServic
   // i18n-exempt: reached only when a test's exit returns; the daemon has already exited 75 with the kit's sentence
   if (!lock) throw new ServiceError('Another copy of Okolos Agent holds the lock; this one did not start.')
 
-  // 2. State, only after the lock.
-  const token = ensureToken(path.join(dirs.data, 'host.token'))
-  const log = new RotatingLog(path.join(dirs.logs, 'service.jsonl'))
-  const codes = new LoginCodes(path.join(dirs.data, 'auth'), 120, { token })
-  const events = new EventLog(path.join(dirs.data, 'events.jsonl'))
-  const build = options.build ?? buildIdentity()
+  // 2. State, only after the lock. Whatever fails from here to the bind lets the lock go.
+  const paths = servicePaths(dirs)
+  const locale: Locale = options.locale ?? 'ru'
+  let token: string
+  let log: RotatingLog
+  let codes: LoginCodes
+  let events: EventLog
+  let added: readonly Route[]
+  try {
+    token = ensureToken(paths.hostToken)
+    log = new RotatingLog(paths.serviceLog)
+    codes = new LoginCodes(paths.sessions, 120, { token })
+    events = new EventLog(paths.events)
+    added = (await options.setup?.({ dirs, paths, events, codes, log, locale })) ?? []
+  } catch (error) {
+    lock.release()
+    throw error
+  }
+  const build = buildIdentity(options.buildRoot)
   const startedAt = nowIso()
   const drain = new Drain()
   let status: ServiceStatus = 'starting'
   let port = options.port
 
   const hostAuthorized = (req: IncomingMessage) => tokenMatches(req.headers.authorization, token)
-  const sessionOf = (req: IncomingMessage) => operatorSession(codes, req)
+  const sessionOf = (req: { readonly headers: { readonly cookie?: string | undefined } }) => operatorSession(codes, req)
 
   const builtIn: Route = async (req, res, ctx) => {
     const { pathname } = ctx.url
@@ -155,7 +212,23 @@ export async function startService(options: StartOptions): Promise<RunningServic
     return false
   }
 
-  const routes: readonly Route[] = [builtIn, ...(options.routes ?? [])]
+  const routes: readonly Route[] = [builtIn, ...(options.routes ?? []), ...added]
+  const served = routes.flatMap((route) => route.paths ?? [])
+
+  const document = () => {
+    const extras = options.wellKnownExtras?.() ?? {}
+    return wellKnown({
+      version: options.version,
+      build,
+      startedAt,
+      pid: process.pid,
+      status,
+      degraded: [...(options.degraded?.() ?? [])],
+      served,
+      ...(extras.actions === undefined ? {} : { actions: extras.actions }),
+      ...(extras.extensions === undefined ? {} : { extensions: extras.extensions }),
+    })
+  }
 
   /** Tells the caller's hook first; a hook that throws turns the answer into a 500 with no body. */
   const refuse = async (
@@ -205,7 +278,7 @@ export async function startService(options: StartOptions): Promise<RunningServic
         methodNotAllowed(res, 'GET')
         return
       }
-      json(res, 200, wellKnown({ build, startedAt, pid: process.pid, status, degraded: [] }))
+      json(res, 200, document())
       return
     }
     const ctx: RouteContext = { url, port, dirs, log, events, hostAuthorized, operatorSession: sessionOf }
@@ -293,6 +366,9 @@ export async function startService(options: StartOptions): Promise<RunningServic
   return {
     port,
     address: () => server.address() as AddressInfo,
+    events,
+    codes,
+    operatorSession: sessionOf,
     close: async () => {
       if (drain.requestStop()) markStopping()
       await finish(await drain.wait(DRAIN_SECONDS))

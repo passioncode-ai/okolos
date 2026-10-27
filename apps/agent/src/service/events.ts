@@ -28,17 +28,22 @@ export class EventLog {
     this.file = file
     const events = this.all()
     this.last = Number(events.at(-1)?.id ?? 0)
-    this.trim(events, now())
+    this.trim(now())
   }
 
-  /** Drops what is both older than KEEP_DAYS and outside the newest KEEP_EVENTS. */
-  private trim(events: readonly FabricEvent[], now: number): void {
-    if (events.length <= KEEP_EVENTS) return
+  /**
+   * Drops what is both older than KEEP_DAYS and outside the newest KEEP_EVENTS; returns how many.
+   * Runs at start, and the daemon calls it once a day so a long run stays bounded too.
+   */
+  trim(now: number = Date.now()): number {
+    const events = this.all()
+    if (events.length <= KEEP_EVENTS) return 0
     const horizon = now - KEEP_DAYS * 24 * 60 * 60 * 1000
     const firstOfNewest = events.length - KEEP_EVENTS
     const kept = events.filter((event, index) => index >= firstOfNewest || Date.parse(event.at) >= horizon)
-    if (kept.length === events.length) return
+    if (kept.length === events.length) return 0
     atomicWrite(this.file, kept.map((event) => `${JSON.stringify(event)}\n`).join(''), 0o600)
+    return events.length - kept.length
   }
 
   append(kind: string, level: FabricEvent['level'], text: string): FabricEvent {

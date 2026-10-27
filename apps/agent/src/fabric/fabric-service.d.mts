@@ -55,8 +55,16 @@ export function ensureToken(file: string): string
 export interface WellKnownSurfaces {
   events: { path: string }
   dashboard?: { path: string; login: boolean }
-  mcp?: { path: string; transport: 'streamable-http'; auth?: 'descriptor' | 'own' | 'delegation' }
+  mcp?: {
+    path: string
+    transport: 'streamable-http'
+    auth?: 'descriptor' | 'own' | 'delegation'
+    capabilities?: readonly string[]
+  }
 }
+
+/** extensions/actions/0.1 (DEC-0121): its key in `extensions`. */
+export const ACTIONS_EXTENSION_KEY: string
 
 export interface DegradedSource {
   source: string
@@ -80,6 +88,7 @@ export interface WellKnownDocument {
   degraded: DegradedSource[]
   surfaces: WellKnownSurfaces
   update: { available: unknown }
+  extensions?: Record<string, unknown>
 }
 
 export function buildWellKnown(input: {
@@ -93,6 +102,10 @@ export function buildWellKnown(input: {
   degraded?: readonly DegradedSource[]
   surfaces: WellKnownSurfaces
   pid?: number
+  /** The action table (DEC-0121 AP-1), written under extensions/actions/0.1; refused when invalid. */
+  actions?: readonly unknown[]
+  /** Extensions by key (dashboard, connections, …); a known key the kit finds invalid is refused. */
+  extensions?: Readonly<Record<string, unknown>>
 }): WellKnownDocument
 
 export class LoginCodes {

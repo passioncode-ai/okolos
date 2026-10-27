@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
 import net from 'node:net'
 import os from 'node:os'
@@ -7,8 +7,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { LoginCodes } from '../fabric/fabric-service.mjs'
-import { serviceDirs, type ServiceDirs } from './dirs.js'
+import { ACTIONS_EXTENSION_KEY, LoginCodes } from '../fabric/fabric-service.mjs'
+import { serviceDirs, servicePaths, type ServiceDirs } from './dirs.js'
 import {
   operatorSession,
   startService,
@@ -19,6 +19,9 @@ import {
 } from './http.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
+
+/** What the daemon's entry point passes in: the package version and the code's root (apps/agent here). */
+const IDENTITY = { version: '0.0.0', buildRoot: path.resolve(here, '..', '..') } as const
 
 // ---------------------------------------------------------------------------
 // Real servers on free ports, real lock files in temporary homes, real processes.
@@ -51,7 +54,7 @@ async function start(
   const exit = (code: number) => {
     throw new Error(`the service asked to exit ${code}`)
   }
-  const service = await startService({ port: 0, routes: [], exit, ...options, dirs })
+  const service = await startService({ ...IDENTITY, port: 0, routes: [], exit, ...options, dirs })
   services.push(service)
   return { service, dirs }
 }
@@ -170,6 +173,7 @@ describe('one copy, locked before any side effect', () => {
     const codes: number[] = []
     await expect(
       startService({
+        ...IDENTITY,
         port: 0,
         dirs: { ...dirs, logs: path.join(home, 'second-logs') },
         exit: (code) => {
@@ -388,7 +392,7 @@ describe('wrong methods, a taken port, a route that fails halfway, a route’s o
     const taken = (holder.address() as net.AddressInfo).port
     try {
       const dirs = serviceDirs(tempHome())
-      await expect(startService({ port: taken, dirs, routes: [] })).rejects.toThrow(/EADDRINUSE/)
+      await expect(startService({ ...IDENTITY, port: taken, dirs, routes: [] })).rejects.toThrow(/EADDRINUSE/)
       const next = await start({ dirs })
       expect((await call(next.service.port, '/.well-known/fabric-service')).status).toBe(200)
     } finally {
@@ -442,9 +446,156 @@ describe('wrong methods, a taken port, a route that fails halfway, a route’s o
   })
 })
 
+describe('routes built after the lock (setup)', () => {
+  it('runs after the lock and the token exist, and its routes are served beside the plain ones', async () => {
+    const seen: Array<{ lockPid: string; token: boolean; locale: string }> = []
+    const fromSetup: Route = Object.assign(
+      async (_req: http.IncomingMessage, res: http.ServerResponse, ctx: { url: URL }) => {
+        if (ctx.url.pathname !== '/from-setup') return false
+        res.end('setup')
+        return true
+      },
+      { paths: ['/from-setup'] },
+    )
+    const { service } = await start({
+      routes: [later],
+      setup: async (ctx) => {
+        seen.push({
+          lockPid: readFileSync(ctx.paths.lock, 'utf8'),
+          token: statSync(ctx.paths.hostToken).isFile(),
+          locale: ctx.locale,
+        })
+        ctx.events.append('setup.ready', 'info', 'Ready.')
+        expect(ctx.codes.issue().url).toMatch(/^\/fabric\/v1\/login\?code=/)
+        return [fromSetup]
+      },
+    })
+    expect(seen).toEqual([{ lockPid: String(process.pid), token: true, locale: 'ru' }])
+    expect((await call(service.port, '/from-setup')).body).toBe('setup')
+    expect((await call(service.port, '/later')).status).toBe(200)
+  })
+
+  it('is never called by a copy that finds the lock held', async () => {
+    const dirs = serviceDirs(tempHome())
+    await start({ dirs })
+    let called = 0
+    await expect(
+      start({
+        dirs,
+        setup: async () => {
+          called += 1
+          return []
+        },
+      }),
+    ).rejects.toThrow(/exit 75/)
+    expect(called).toBe(0)
+  })
+
+  it('a setup that throws fails the start and lets the lock go', async () => {
+    const dirs = serviceDirs(tempHome())
+    await expect(
+      start({
+        dirs,
+        setup: async () => {
+          throw new Error('the journal cannot be opened')
+        },
+      }),
+    ).rejects.toThrow(/journal/)
+    const next = await start({ dirs })
+    expect((await call(next.service.port, '/.well-known/fabric-service')).status).toBe(200)
+  })
+
+  it('state that cannot be opened (a token file others can read) fails the start and lets the lock go', async () => {
+    const dirs = serviceDirs(tempHome())
+    const paths = servicePaths(dirs)
+    mkdirSync(dirs.data, { recursive: true })
+    writeFileSync(paths.hostToken, 'x'.repeat(43), { mode: 0o644 })
+    await expect(start({ dirs })).rejects.toThrow(/readable by others/)
+    chmodSync(paths.hostToken, 0o600)
+    const next = await start({ dirs })
+    expect((await call(next.service.port, '/.well-known/fabric-service')).status).toBe(200)
+  })
+})
+
+describe('what the running service hands its owner', () => {
+  it('its events, with a public trim, and its sign-in codes and session check', async () => {
+    const { service, dirs } = await start()
+    service.events.append('window.closed', 'info', 'The agent window closed.')
+    const page = JSON.parse((await call(service.port, '/fabric/v1/events', { headers: bearer(dirs) })).body)
+    expect(page.events.map((e: { kind: string }) => e.kind)).toContain('window.closed')
+    expect(service.events.trim(Date.now())).toBe(0)
+
+    const { url } = service.codes.issue()
+    const signedIn = await call(service.port, url)
+    const pair = String(signedIn.headers['set-cookie']).split(';')[0] ?? ''
+    expect(service.operatorSession({ headers: { cookie: pair } })).toBe(true)
+    expect(service.operatorSession({ headers: {} })).toBe(false)
+  })
+
+  it('keeps its files where servicePaths says, which is what the installer writes into the descriptor', async () => {
+    const { dirs } = await start()
+    const paths = servicePaths(dirs)
+    expect(statSync(paths.hostToken).mode & 0o777).toBe(0o600)
+    expect(statSync(paths.events).isFile()).toBe(true)
+    expect(statSync(paths.serviceLog).isFile()).toBe(true)
+    expect(statSync(paths.sessions).isDirectory()).toBe(true)
+  })
+})
+
+describe('what the well-known document says, from the owner', () => {
+  it('the version and the build root it was given', async () => {
+    const { service } = await start({ version: '9.8.7' })
+    const doc = JSON.parse((await call(service.port, '/.well-known/fabric-service')).body)
+    expect(doc.service.version).toBe('9.8.7')
+    expect(doc.service.build.commit).toMatch(/^[0-9a-f]{40}$/)
+  })
+
+  it('declares /mcp and /dashboard only when a route serves them', async () => {
+    const bare = await start()
+    const plain = JSON.parse((await call(bare.service.port, '/.well-known/fabric-service')).body)
+    expect(Object.keys(plain.surfaces)).toEqual(['events'])
+
+    const door: Route = Object.assign(async () => false, { paths: ['/mcp', '/pair'] })
+    const page: Route = Object.assign(async () => false, { paths: ['/dashboard'] })
+    const full = await start({ routes: [door], setup: async () => [page] })
+    const doc = JSON.parse((await call(full.service.port, '/.well-known/fabric-service')).body)
+    expect(doc.surfaces.mcp).toEqual({ path: '/mcp', transport: 'streamable-http', auth: 'own' })
+    expect(doc.surfaces.dashboard).toEqual({ path: '/dashboard', login: true })
+  })
+
+  it('merges the owner’s degraded sources, and the status follows them', async () => {
+    let degraded = [{ source: 'browser', reason: 'Chrome is not installed.' }]
+    const { service } = await start({ degraded: () => degraded })
+    const hurt = JSON.parse((await call(service.port, '/.well-known/fabric-service')).body)
+    expect(hurt.status).toBe('degraded')
+    expect(hurt.degraded).toEqual([{ source: 'browser', reason: 'Chrome is not installed.' }])
+
+    degraded = []
+    const well = JSON.parse((await call(service.port, '/.well-known/fabric-service')).body)
+    expect(well.status).toBe('ready')
+    expect(well.degraded).toEqual([])
+  })
+
+  it('carries the owner’s extensions and action table', async () => {
+    const door: Route = Object.assign(async () => false, { paths: ['/mcp', '/dashboard'] })
+    const { service } = await start({
+      routes: [door],
+      wellKnownExtras: () => ({
+        extensions: { 'https://example.test/extensions/probe/0.1': { probe: true } },
+        actions: [{ id: 'agent.revoke', title: 'Revoke access', tool: 'agent.revoke', gate: 'relayed' }],
+      }),
+    })
+    const doc = JSON.parse((await call(service.port, '/.well-known/fabric-service')).body)
+    expect(doc.extensions['https://example.test/extensions/probe/0.1']).toEqual({ probe: true })
+    expect(doc.extensions[ACTIONS_EXTENSION_KEY].actions[0].id).toBe('agent.revoke')
+  })
+})
+
 describe('GET /.well-known/fabric-service', () => {
   it('answers without a token, from memory, with who is answering', async () => {
-    const { service } = await start()
+    // The door and the page as later nodes register them: a route that claims the paths.
+    const claims: Route = Object.assign(async () => false, { paths: ['/mcp', '/dashboard'] })
+    const { service } = await start({ routes: [claims] })
     const answer = await call(service.port, '/.well-known/fabric-service')
     expect(answer.status).toBe(200)
     expect(answer.headers['content-type']).toMatch(/^application\/json/)

@@ -12,6 +12,7 @@
  */
 import process from 'node:process'
 import { setTimeout } from 'node:timers'
+import { fileURLToPath, URL } from 'node:url'
 
 import { serviceDirs } from '../dirs.ts'
 import { startService } from '../http.ts'
@@ -24,5 +25,11 @@ if (!home) {
 
 setTimeout(() => process.exit(3), 60_000).unref()
 
-const service = await startService({ port: 0, dirs: serviceDirs(home), handleSignals: true })
+const service = await startService({
+  port: 0,
+  dirs: serviceDirs(home),
+  version: '0.0.0',
+  buildRoot: fileURLToPath(new URL('../../..', import.meta.url)),
+  handleSignals: true,
+})
 process.stdout.write(`${JSON.stringify({ port: service.port, pid: process.pid })}\n`)

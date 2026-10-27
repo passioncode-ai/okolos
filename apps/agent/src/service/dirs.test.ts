@@ -2,7 +2,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { INSTANCE, PORT, SERVICE_ID, serviceDirs } from './dirs.js'
+import { INSTANCE, PORT, SERVICE_ID, serviceDirs, servicePaths } from './dirs.js'
 
 describe('where Okolos Agent keeps its things', () => {
   it('is the service okolos-agent.default on port 47871', () => {
@@ -17,6 +17,17 @@ describe('where Okolos Agent keeps its things', () => {
       data: path.join(home, 'Library', 'Application Support', 'okolos-agent'),
       logs: path.join(home, 'Library', 'Logs', 'okolos-agent'),
       cache: path.join(home, 'Library', 'Caches', 'okolos-agent'),
+    })
+  })
+
+  it('names each file the shell keeps, for the installer and the tests to share', () => {
+    const dirs = serviceDirs(path.join(os.tmpdir(), 'someone'))
+    expect(servicePaths(dirs)).toEqual({
+      lock: path.join(dirs.data, 'service.lock'),
+      hostToken: path.join(dirs.data, 'host.token'),
+      events: path.join(dirs.data, 'events.jsonl'),
+      sessions: path.join(dirs.data, 'auth'),
+      serviceLog: path.join(dirs.logs, 'service.jsonl'),
     })
   })
 

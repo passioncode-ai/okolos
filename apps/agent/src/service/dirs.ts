@@ -22,6 +22,33 @@ export interface ServiceDirs {
   readonly cache: string
 }
 
+export interface ServicePaths {
+  /** The single-instance lock; the kit names it `<data>/service.lock`. */
+  readonly lock: string
+  /** The host's token (0600); the descriptor's `auth.tokenFile` names this file. */
+  readonly hostToken: string
+  /** The events feed, JSON lines. */
+  readonly events: string
+  /** Login codes, operator sessions and the session key. */
+  readonly sessions: string
+  /** The rotating structured log. */
+  readonly serviceLog: string
+}
+
+/**
+ * Each file the shell keeps, named once: the service opens these, and the installer writes the
+ * same token path into the descriptor, so the two cannot disagree.
+ */
+export function servicePaths(dirs: ServiceDirs): ServicePaths {
+  return {
+    lock: path.join(dirs.data, 'service.lock'),
+    hostToken: path.join(dirs.data, 'host.token'),
+    events: path.join(dirs.data, 'events.jsonl'),
+    sessions: path.join(dirs.data, 'auth'),
+    serviceLog: path.join(dirs.logs, 'service.jsonl'),
+  }
+}
+
 /** The service's folders under `home` (macOS layout). Names them only; creates nothing. */
 export function serviceDirs(home: string = os.homedir()): ServiceDirs {
   return {
