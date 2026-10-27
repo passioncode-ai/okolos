@@ -33,70 +33,14 @@ import { fileURLToPath } from 'node:url'
 import { Builder, By, until } from 'selenium-webdriver'
 import { existsSync } from 'node:fs'
 
-import { directoriesIn } from './tree.mjs'
 import { Options } from 'selenium-webdriver/firefox.js'
 
+import { binInvocation } from './bin.mjs'
 import { buildTooOld } from './build-age.mjs'
+import { findFirefox } from './find-firefox.mjs'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const BUILD = path.join(root, 'apps/extension/dist/firefox')
-/**
- * Finds the Firefox Playwright installed, without naming its build number.
- *
- * The number changes with every Playwright upgrade, and a path that carries one
- * turns an unrelated dependency bump into a red Firefox job — which is exactly
- * the pressure that gets a browser dropped from CI. So the newest build in the
- * cache is used, and an explicit FIREFOX_BINARY still wins for anyone pointing
- * at a system install.
- */
-function findFirefox() {
-  if (process.env.FIREFOX_BINARY) return process.env.FIREFOX_BINARY
-
-  const home = process.env.HOME ?? ''
-  const roots = [
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
-    path.join(home, 'Library/Caches/ms-playwright'),
-    path.join(home, '.cache/ms-playwright'),
-    '/root/.cache/ms-playwright',
-  ].filter(Boolean)
-
-  // Both layouts: macOS ships an .app bundle, Linux a bare binary.
-  const suffixes = [
-    'firefox/Nightly.app/Contents/MacOS/firefox',
-    'firefox/firefox',
-  ]
-
-  const found = []
-  for (const dir of roots) {
-    let entries
-    try {
-      entries = directoriesIn(dir)
-    } catch {
-      continue
-    }
-    for (const entry of entries) {
-      const build = /^firefox-(\d+)$/.exec(entry)
-      if (!build) continue
-      for (const suffix of suffixes) {
-        const candidate = path.join(dir, entry, suffix)
-        if (existsSync(candidate)) found.push({ build: Number(build[1]), candidate })
-      }
-    }
-  }
-
-  if (found.length === 0) {
-    throw new Error(
-      'No Playwright Firefox found. Run `pnpm exec playwright install firefox`, ' +
-        'or set FIREFOX_BINARY to a Firefox you already have.',
-    )
-  }
-
-  // Newest build wins: an old one left behind by a previous version would
-  // otherwise be tested instead of the one the suite was written against.
-  found.sort((a, b) => b.build - a.build)
-  return found[0].candidate
-}
-
 let BINARY
 try {
   BINARY = findFirefox()
@@ -206,7 +150,9 @@ const server = createServer((req, res) => {
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
 const origin = `http://127.0.0.1:${server.address().port}`
 
-const gecko = spawn('npx', ['geckodriver', '--port', '4444'], { stdio: 'ignore' })
+// npx is npx.cmd on Windows, which Node will not spawn without a shell (B-163).
+const npx = binInvocation('npx', ['geckodriver', '--port', '4444'])
+const gecko = spawn(npx.command, npx.args, { stdio: 'ignore', shell: npx.shell })
 
 /**
  * Wait for readiness rather than sleeping a guessed interval: on a cold

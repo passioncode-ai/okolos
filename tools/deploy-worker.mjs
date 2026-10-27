@@ -20,6 +20,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 
+import { binInvocation } from './bin.mjs'
 import { renderConfig } from './deploy-config.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -48,8 +49,11 @@ function loadEnv() {
 }
 
 function wrangler(args, { capture = false } = {}) {
-  const out = execFileSync('npx', ['wrangler', ...args], {
+  // npx is npx.cmd on Windows, which Node will not spawn without a shell (B-163).
+  const npx = binInvocation('npx', ['wrangler', ...args])
+  const out = execFileSync(npx.command, npx.args, {
     cwd: proxy,
+    shell: npx.shell,
     encoding: 'utf8',
     stdio: capture ? ['inherit', 'pipe', 'inherit'] : 'inherit',
     env: process.env,
