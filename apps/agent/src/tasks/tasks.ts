@@ -10,7 +10,15 @@
  * and never refused for an exhausted budget.
  *
  * The table lives in memory; the daemon owns the clock and passes `now` (milliseconds since the
- * epoch) into every call that asks whether a task is still alive. Nothing here reads the time.
+ * epoch) into every call that asks whether a task is still alive. Nothing here reads the time. Every
+ * method that takes `now` throws a TypeError before it acts unless `now` is a safe integer >= 0, the
+ * clock contract Pairing holds (fix round 1): NaN would compare false and switch expiry off.
+ *
+ * Two kinds of object leave this module (fix round 1). `open` and `get` give the task itself, the
+ * live handle the verbs (N-011) charge, check and set the window on. `list` and `sweep` give frozen
+ * copies for reading (the page, N-015, and the windows to close): `charge`, `checkLanded` and
+ * `setWindow` answer `no_such_task` to a copy, so whoever reads the list cannot spend another agent's
+ * steps or move its window fields. The scope is frozen at `open`, on the handle and on every copy.
  */
 
 import { randomBytes } from 'node:crypto'
@@ -40,10 +48,16 @@ export interface Task {
   readonly openedAt: number
   /** Calls charged so far, refused ones included; at most `scope.stepBudget`. */
   readonly stepsUsed: number
-  /** The CDP targetId of the task's window (`SessionOpenResult.windowId`), once N-011 has opened it. */
-  windowId?: string
-  /** Whether the task's window is open (SCR-24 taskWindowOpen / taskWindowClosed); N-011 sets it from N-010's window events. */
-  windowOpen: boolean
+  /** The CDP targetId of the task's window (`SessionOpenResult.windowId`), once N-011 has set it with `setWindow`. */
+  readonly windowId?: string
+  /** Whether the task's window is open (SCR-24 taskWindowOpen / taskWindowClosed); N-011 sets it with `setWindow` from N-010's window events. */
+  readonly windowOpen: boolean
+}
+
+/** What `setWindow` records; a field left out keeps its value. */
+export interface TaskWindow {
+  readonly windowId?: string
+  readonly windowOpen?: boolean
 }
 
 /** A refusal of the goal: `invalid_scope`, naming the field and the `checkFreeText` code. */
@@ -59,6 +73,9 @@ export type OpenTaskResult = BridgeResult<Task> | { readonly success: false; rea
 /** Bytes behind a task id. */
 const ID_BYTES = 16
 
+/** Draws of a task id before `open` gives up: with 128 random bits even a second draw practically never happens. */
+const ID_DRAWS = 8
+
 export type RandomSource = (size: number) => Uint8Array
 
 export interface TasksOptions {
@@ -68,7 +85,16 @@ export interface TasksOptions {
 
 interface TaskRecord extends Task {
   stepsUsed: number
+  windowId?: string
+  windowOpen: boolean
 }
+
+/**
+ * The records that sit in some table now, whichever `Tasks` holds them: `checkLanded` keeps the
+ * plan's signature (task, url) and still knows whether the task is open. A record joins at `open` and
+ * leaves at `close`, `closeAllOf` and `sweep`; a copy never joins.
+ */
+const liveTasks = new WeakSet<Task>()
 
 /**
  * Why the goal cannot be shown, or null. Decided here, stated once: the length is the raw string's,
@@ -98,6 +124,7 @@ export class Tasks {
    * (the agent can act on it); every other fault is `validateScope`'s reason.
    */
   open(agentId: string, scopeInput: unknown, now: number): OpenTaskResult {
+    checkClock(now, 'open')
     if (typeof scopeInput === 'object' && scopeInput !== null) {
       const fault = goalFault((scopeInput as Record<string, unknown>).goal)
       if (fault !== null) {
@@ -108,8 +135,9 @@ export class Tasks {
     const checked = validateScope(scopeInput)
     if (!checked.ok) return refuse('invalid_scope', checked.reason)
 
-    const task: TaskRecord = { id: this.newId(), agentId, scope: checked.scope, openedAt: now, stepsUsed: 0, windowOpen: false }
+    const task: TaskRecord = { id: this.newId(), agentId, scope: frozenScope(checked.scope), openedAt: now, stepsUsed: 0, windowOpen: false }
     this.table.set(task.id, task)
+    liveTasks.add(task)
     return { success: true, data: task }
   }
 
@@ -119,9 +147,10 @@ export class Tasks {
    * task whose ttl has run out is `task_expired` until it is closed or swept.
    */
   get(agentId: string, taskId: string, now: number): BridgeResult<Task> {
+    checkClock(now, 'get')
     const task = this.table.get(taskId)
     if (task === undefined || task.agentId !== agentId) return noSuchTask()
-    if (expired(task, now)) return refuse('task_expired', 'the task has run out of time') // i18n-exempt: a refusal read by the agent over MCP, not by the person
+    if (expired(task, now)) return expiredTask()
     return { success: true, data: task }
   }
 
@@ -134,16 +163,33 @@ export class Tasks {
    * (spec §2.3). `close` is neither charged nor refused: it only gives back what the task holds.
    *
    * `task` must be the object `open` or `get` returned and still in the table; a closed task, or a
-   * copy, is `no_such_task` and is not charged. The ttl is `get`'s to check, with the clock.
+   * copy (what `list` and `sweep` give is one), is `no_such_task` and is not charged. A task whose
+   * ttl ran out by `now` is `task_expired` and is not charged either (fix round 1), so a caller that
+   * did not `get` first still spends nothing on it.
    */
-  charge(task: Task, verb: BridgeVerb, url?: string): BridgeResult<void> {
+  charge(task: Task, verb: BridgeVerb, now: number, url?: string): BridgeResult<void> {
+    checkClock(now, 'charge')
     const record = this.table.get(task.id)
     if (record === undefined || record !== task) return noSuchTask()
     if (verb === 'close') return DONE
+    if (expired(record, now)) return expiredTask()
     if (record.stepsUsed >= record.scope.stepBudget) return refuse('budget_exhausted', `the task has used all ${record.scope.stepBudget} of its steps`) // i18n-exempt: a refusal read by the agent over MCP, not by the person
     record.stepsUsed += 1
     if (!verbAllowed(record.scope, verb)) return refuse('verb_not_in_task', `the task does not name the verb ${verb}`) // i18n-exempt: a refusal read by the agent over MCP, not by the person
     if (url !== undefined && !inScope(record.scope, url)) return notInTask()
+    return DONE
+  }
+
+  /**
+   * Records the task's window: its CDP targetId once N-011 opened it, and whether it is open, from
+   * N-010's window events. `task` must be the live handle `open` or `get` returned and still in the
+   * table; a copy, or a task no longer open, is `no_such_task` and nothing moves.
+   */
+  setWindow(task: Task, window: TaskWindow): BridgeResult<void> {
+    const record = this.table.get(task.id)
+    if (record === undefined || record !== task) return noSuchTask()
+    if (window.windowId !== undefined) record.windowId = window.windowId
+    if (window.windowOpen !== undefined) record.windowOpen = window.windowOpen
     return DONE
   }
 
@@ -156,33 +202,50 @@ export class Tasks {
     const task = this.table.get(taskId)
     if (task === undefined || task.agentId !== agentId) return noSuchTask()
     this.table.delete(taskId)
+    liveTasks.delete(task)
     return { success: true, data: task }
   }
 
   /** Closes every task of `agentId` (the agent's access was revoked) and returns them, so the caller closes their windows. */
   closeAllOf(agentId: string): Task[] {
     const closed = [...this.table.values()].filter((task) => task.agentId === agentId)
-    for (const task of closed) this.table.delete(task.id)
+    for (const task of closed) {
+      this.table.delete(task.id)
+      liveTasks.delete(task)
+    }
     return closed
   }
 
-  /** The tasks still alive at `now`, oldest first. */
+  /** Frozen copies of the tasks still alive at `now`, oldest first; a copy is for reading only. */
   list(now: number): Task[] {
-    return [...this.table.values()].filter((task) => !expired(task, now))
+    checkClock(now, 'list')
+    return [...this.table.values()].filter((task) => !expired(task, now)).map(snapshot)
   }
 
-  /** Removes the tasks whose time ran out by `now` and returns them, so the caller closes their windows. */
+  /** Removes the tasks whose time ran out by `now` and returns frozen copies, so the caller closes their windows. */
   sweep(now: number): Task[] {
+    checkClock(now, 'sweep')
     const over = [...this.table.values()].filter((task) => expired(task, now))
-    for (const task of over) this.table.delete(task.id)
-    return over
+    for (const task of over) {
+      this.table.delete(task.id)
+      liveTasks.delete(task)
+    }
+    return over.map(snapshot)
   }
 
+  /**
+   * A fresh id: exactly ID_BYTES from the random source, drawn again on a clash with an open task, at
+   * most ID_DRAWS times. A source that gives another length, or keeps clashing, is broken; `open`
+   * throws rather than shorten the id or loop for ever.
+   */
   private newId(): string {
-    for (;;) {
-      const id = Buffer.from(this.random(ID_BYTES)).toString('hex')
+    for (let draw = 0; draw < ID_DRAWS; draw += 1) {
+      const bytes = this.random(ID_BYTES)
+      if (bytes.length !== ID_BYTES) throw new Error(`Tasks: the random source gave ${bytes.length} bytes, ${ID_BYTES} needed`) // i18n-exempt: a fault of the random source thrown to the daemon's code, never shown to the person
+      const id = Buffer.from(bytes).toString('hex')
       if (!this.table.has(id)) return id
     }
+    throw new Error(`Tasks: no free task id after ${ID_DRAWS} draws`) // i18n-exempt: a fault of the random source thrown to the daemon's code, never shown to the person
   }
 }
 
@@ -212,12 +275,51 @@ function expired(task: Task, now: number): boolean {
  * Whether the URL a navigation actually landed on is still inside the task (ревью F9, аудит #39): a
  * redirect from a named origin to one the task did not name is `origin_not_in_task`. The fragment
  * does not count. Charges nothing: the call that navigated was the step.
+ *
+ * A task that is no longer open (closed, its agent revoked, swept) or a copy is `no_such_task`
+ * whatever the URL (fix round 1), so a call in flight when the person revokes the agent does not pass
+ * its last gate. The ttl is not judged here: the call that navigated was charged inside it.
  */
 export function checkLanded(task: Task, actualUrl: string): BridgeResult<void> {
+  if (!liveTasks.has(task)) return noSuchTask()
   return inScope(task.scope, actualUrl) ? DONE : notInTask()
 }
 
+/** A frozen copy of a task; its scope is the task's own, frozen at `open`. */
+function snapshot(task: TaskRecord): Task {
+  const copy: Task = {
+    id: task.id,
+    agentId: task.agentId,
+    scope: task.scope,
+    openedAt: task.openedAt,
+    stepsUsed: task.stepsUsed,
+    ...(task.windowId === undefined ? {} : { windowId: task.windowId }),
+    windowOpen: task.windowOpen,
+  }
+  return Object.freeze(copy)
+}
+
+/** The scope frozen through: nobody holding a task or a copy widens what it may reach. */
+function frozenScope(scope: TaskScope): TaskScope {
+  return Object.freeze({
+    ...scope,
+    origins: Object.freeze({ read: Object.freeze([...scope.origins.read]), write: Object.freeze([...scope.origins.write]) }),
+    verbs: Object.freeze([...scope.verbs]),
+  })
+}
+
+/** A time the table takes: whole ms since the epoch, not negative (the rule of Pairing's `isTime`). */
+function checkClock(now: number, method: string): void {
+  if (typeof now !== 'number' || !Number.isSafeInteger(now) || now < 0) {
+    throw new TypeError(`Tasks.${method}: now must be a safe integer >= 0, got ${String(now)}`)
+  }
+}
+
 const DONE: BridgeResult<void> = { success: true, data: undefined }
+
+function expiredTask(): BridgeResult<never> {
+  return refuse('task_expired', 'the task has run out of time') // i18n-exempt: a refusal read by the agent over MCP, not by the person
+}
 
 function noSuchTask(): BridgeResult<never> {
   return refuse('no_such_task', 'no task with this id is open for this agent') // i18n-exempt: a refusal read by the agent over MCP, not by the person

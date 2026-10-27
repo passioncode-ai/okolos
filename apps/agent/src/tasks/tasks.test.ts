@@ -196,15 +196,15 @@ describe('Tasks.charge', () => {
   it('charges one step for an allowed call inside the task', () => {
     const tasks = new Tasks()
     const task = opened(tasks)
-    expect(tasks.charge(task, 'open', 'https://example.com/flights?to=LIS')).toEqual({ success: true, data: undefined })
-    expect(tasks.charge(task, 'snapshot')).toEqual({ success: true, data: undefined })
+    expect(tasks.charge(task, 'open', T0, 'https://example.com/flights?to=LIS')).toEqual({ success: true, data: undefined })
+    expect(tasks.charge(task, 'snapshot', T0)).toEqual({ success: true, data: undefined })
     expect(task.stepsUsed).toBe(2)
   })
 
   it('refuses a verb the task did not name as verb_not_in_task, and charges the step', () => {
     const tasks = new Tasks()
     const task = opened(tasks, 'agent-a', { verbs: ['open'] })
-    const error = refusal(tasks.charge(task, 'read'))
+    const error = refusal(tasks.charge(task, 'read', T0))
     expect(error.code).toBe('verb_not_in_task')
     expect(error.retryable).toBe(false)
     expect(task.stepsUsed).toBe(1)
@@ -214,47 +214,47 @@ describe('Tasks.charge', () => {
     const tasks = new Tasks()
     const task = opened(tasks, 'agent-a', { stepBudget: 10 })
     for (const url of ['https://evil.example.net/', 'http://example.com/', 'https://example.com:8443/', 'https://sub.example.com/', 'file:///etc/passwd', 'not a url']) {
-      expect(refusal(tasks.charge(task, 'open', url)).code).toBe('origin_not_in_task')
+      expect(refusal(tasks.charge(task, 'open', T0, url)).code).toBe('origin_not_in_task')
     }
-    expect(refusal(tasks.charge(task, 'open', 'https://evil.example.net/')).retryable).toBe(false)
+    expect(refusal(tasks.charge(task, 'open', T0, 'https://evil.example.net/')).retryable).toBe(false)
     expect(task.stepsUsed).toBe(7)
   })
 
   it('refuses the call after the last step as budget_exhausted, and the count stays at the budget', () => {
     const tasks = new Tasks()
     const task = opened(tasks, 'agent-a', { stepBudget: 2 })
-    ok(tasks.charge(task, 'snapshot'))
-    ok(tasks.charge(task, 'snapshot'))
-    const error = refusal(tasks.charge(task, 'snapshot'))
+    ok(tasks.charge(task, 'snapshot', T0))
+    ok(tasks.charge(task, 'snapshot', T0))
+    const error = refusal(tasks.charge(task, 'snapshot', T0))
     expect(error.code).toBe('budget_exhausted')
     expect(error.retryable).toBe(false)
-    expect(refusal(tasks.charge(task, 'open', 'https://evil.example.net/')).code).toBe('budget_exhausted')
+    expect(refusal(tasks.charge(task, 'open', T0, 'https://evil.example.net/')).code).toBe('budget_exhausted')
     expect(task.stepsUsed).toBe(2)
   })
 
   it('a refusal spends a step too: refused calls alone exhaust the budget (spec §2.3)', () => {
     const tasks = new Tasks()
     const task = opened(tasks, 'agent-a', { stepBudget: 2, verbs: ['open'] })
-    expect(refusal(tasks.charge(task, 'read')).code).toBe('verb_not_in_task')
-    expect(refusal(tasks.charge(task, 'open', 'https://evil.example.net/')).code).toBe('origin_not_in_task')
+    expect(refusal(tasks.charge(task, 'read', T0)).code).toBe('verb_not_in_task')
+    expect(refusal(tasks.charge(task, 'open', T0, 'https://evil.example.net/')).code).toBe('origin_not_in_task')
     expect(task.stepsUsed).toBe(2)
-    expect(refusal(tasks.charge(task, 'open', 'https://example.com/')).code).toBe('budget_exhausted')
+    expect(refusal(tasks.charge(task, 'open', T0, 'https://example.com/')).code).toBe('budget_exhausted')
   })
 
   it('the fragment of a URL does not change the origin check', () => {
     const tasks = new Tasks()
     const task = opened(tasks)
-    ok(tasks.charge(task, 'open', 'https://example.com/page#https://evil.example.net/'))
-    ok(tasks.charge(task, 'open', 'https://shop.example.org/#'))
-    expect(refusal(tasks.charge(task, 'open', 'https://evil.example.net/#https://example.com')).code).toBe('origin_not_in_task')
+    ok(tasks.charge(task, 'open', T0, 'https://example.com/page#https://evil.example.net/'))
+    ok(tasks.charge(task, 'open', T0, 'https://shop.example.org/#'))
+    expect(refusal(tasks.charge(task, 'open', T0, 'https://evil.example.net/#https://example.com')).code).toBe('origin_not_in_task')
   })
 
   it('close is never charged and never refused, not even with every step used or unnamed in verbs', () => {
     const tasks = new Tasks()
     const task = opened(tasks, 'agent-a', { stepBudget: 1, verbs: ['snapshot'] })
-    ok(tasks.charge(task, 'snapshot'))
-    expect(refusal(tasks.charge(task, 'snapshot')).code).toBe('budget_exhausted')
-    expect(tasks.charge(task, 'close')).toEqual({ success: true, data: undefined })
+    ok(tasks.charge(task, 'snapshot', T0))
+    expect(refusal(tasks.charge(task, 'snapshot', T0)).code).toBe('budget_exhausted')
+    expect(tasks.charge(task, 'close', T0)).toEqual({ success: true, data: undefined })
     expect(task.stepsUsed).toBe(1)
   })
 
@@ -262,7 +262,7 @@ describe('Tasks.charge', () => {
     const tasks = new Tasks()
     const task = opened(tasks)
     tasks.closeAllOf('agent-a')
-    expect(refusal(tasks.charge(task, 'snapshot')).code).toBe('no_such_task')
+    expect(refusal(tasks.charge(task, 'snapshot', T0)).code).toBe('no_such_task')
     expect(task.stepsUsed).toBe(0)
   })
 
@@ -270,7 +270,7 @@ describe('Tasks.charge', () => {
     const tasks = new Tasks()
     const task = opened(tasks)
     const forged = { ...task, stepsUsed: 0, scope: { ...task.scope, stepBudget: 500 } }
-    expect(refusal(tasks.charge(forged, 'snapshot')).code).toBe('no_such_task')
+    expect(refusal(tasks.charge(forged, 'snapshot', T0)).code).toBe('no_such_task')
   })
 })
 
@@ -316,8 +316,8 @@ describe('Tasks.close and closeAllOf', () => {
   it('close works on a task that used all its steps, and on one whose time ran out', () => {
     const tasks = new Tasks()
     const spent = opened(tasks, 'agent-a', { stepBudget: 1 })
-    ok(tasks.charge(spent, 'snapshot'))
-    expect(refusal(tasks.charge(spent, 'snapshot')).code).toBe('budget_exhausted')
+    ok(tasks.charge(spent, 'snapshot', T0))
+    expect(refusal(tasks.charge(spent, 'snapshot', T0)).code).toBe('budget_exhausted')
     expect(ok(tasks.close('agent-a', spent.id)).stepsUsed).toBe(1)
     const late = opened(tasks, 'agent-a', { ttlSeconds: 1 })
     expect(refusal(tasks.get('agent-a', late.id, T0 + 5_000)).code).toBe('task_expired')
@@ -361,13 +361,201 @@ describe('Tasks.list and sweep', () => {
     expect(refusal(tasks.get('agent-a', short.id, T0 + 10_000)).code).toBe('no_such_task')
     expect(tasks.list(T0 + 10_000)).toEqual([long])
   })
+})
 
-  it('the window fields are the caller to set: N-011 records the window and whether it is open', () => {
+// Fix round 1 (cert N-009 r1, unit finding 1): what list and sweep give is a frozen copy, so the page
+// that reads the list cannot charge a task, move its window fields or widen its scope.
+describe('list and sweep give snapshots, not the tasks themselves', () => {
+  it("charging a list() element is no_such_task and charges nothing, another agent's task included", () => {
+    const tasks = new Tasks()
+    const mine = opened(tasks, 'agent-a')
+    const theirs = opened(tasks, 'agent-b')
+    const [mineShown, theirsShown] = tasks.list(T0)
+    expect(mineShown).toEqual(mine)
+    expect(mineShown).not.toBe(mine)
+    expect(refusal(tasks.charge(mineShown!, 'snapshot', T0)).code).toBe('no_such_task')
+    expect(refusal(tasks.charge(theirsShown!, 'snapshot', T0)).code).toBe('no_such_task')
+    expect(ok(tasks.get('agent-a', mine.id, T0)).stepsUsed).toBe(0)
+    expect(ok(tasks.get('agent-b', theirs.id, T0)).stepsUsed).toBe(0)
+  })
+
+  it('mutating a list() element throws and changes nothing in the table', () => {
     const tasks = new Tasks()
     const task = opened(tasks)
-    task.windowId = 'TARGET-1'
-    task.windowOpen = true
+    const shown = tasks.list(T0)[0] as unknown as Record<string, unknown> & { scope: { stepBudget: number; origins: { read: string[] }; verbs: string[] } }
+    expect(Object.isFrozen(shown)).toBe(true)
+    expect(() => { shown.windowOpen = true }).toThrow(TypeError)
+    expect(() => { shown.windowId = 'TARGET-X' }).toThrow(TypeError)
+    expect(() => { shown.stepsUsed = 99 }).toThrow(TypeError)
+    expect(() => { shown.agentId = 'agent-b' }).toThrow(TypeError)
+    expect(() => { shown.scope.stepBudget = 500 }).toThrow(TypeError)
+    expect(() => shown.scope.origins.read.push('https://evil.example.net')).toThrow(TypeError)
+    expect(() => shown.scope.verbs.push('click')).toThrow(TypeError)
+    const live = ok(tasks.get('agent-a', task.id, T0))
+    expect(live).toMatchObject({ agentId: 'agent-a', windowOpen: false, stepsUsed: 0 })
+    expect(live.windowId).toBeUndefined()
+    expect(live.scope.stepBudget).toBe(3)
+    expect(live.scope.origins.read).toEqual(['https://example.com', 'https://shop.example.org'])
+    expect(refusal(tasks.charge(live, 'open', T0, 'https://evil.example.net/')).code).toBe('origin_not_in_task')
+  })
+
+  it('setWindow and checkLanded refuse a list() element as no_such_task', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks)
+    const shown = tasks.list(T0)[0]!
+    expect(refusal(tasks.setWindow(shown, { windowId: 'TARGET-X', windowOpen: true })).code).toBe('no_such_task')
+    expect(refusal(checkLanded(shown, 'https://example.com/')).code).toBe('no_such_task')
+    expect(ok(tasks.get('agent-a', task.id, T0))).toMatchObject({ windowOpen: false })
+  })
+
+  it('a snapshot is a copy at the time of the call: later steps do not move it', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks)
+    const before = tasks.list(T0)[0]!
+    ok(tasks.charge(task, 'snapshot', T0))
+    expect(before.stepsUsed).toBe(0)
+    expect(tasks.list(T0)[0]!.stepsUsed).toBe(1)
+  })
+
+  it('sweep gives frozen snapshots too', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a', { ttlSeconds: 10 })
+    const [swept] = tasks.sweep(T0 + 10_000)
+    expect(swept).toEqual(task)
+    expect(swept).not.toBe(task)
+    expect(Object.isFrozen(swept)).toBe(true)
+    expect(Object.isFrozen(swept!.scope)).toBe(true)
+  })
+})
+
+describe('setWindow: N-011 records the window of a task it got through get', () => {
+  it('sets windowId and windowOpen on the live task, and list shows them', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks)
+    const live = ok(tasks.get('agent-a', task.id, T0))
+    expect(tasks.setWindow(live, { windowId: 'TARGET-1', windowOpen: true })).toEqual({ success: true, data: undefined })
     expect(tasks.list(T0)[0]).toMatchObject({ windowId: 'TARGET-1', windowOpen: true })
+    // The window closed: windowOpen alone moves, the id stays for the record.
+    ok(tasks.setWindow(live, { windowOpen: false }))
+    expect(tasks.list(T0)[0]).toMatchObject({ windowId: 'TARGET-1', windowOpen: false })
+  })
+
+  it('refuses a task no longer in the table, and a copy, as no_such_task', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks)
+    const copy = { ...task }
+    expect(refusal(tasks.setWindow(copy, { windowOpen: true })).code).toBe('no_such_task')
+    ok(tasks.close('agent-a', task.id))
+    expect(refusal(tasks.setWindow(task, { windowOpen: true })).code).toBe('no_such_task')
+    expect(task.windowOpen).toBe(false)
+  })
+})
+
+// Fix round 1 (cert N-009 r1, seam finding 2): one clock contract with Pairing. A time that is not a
+// whole non-negative ms would switch expiry off (NaN compares false), so it is never taken.
+describe('the clock a caller passes', () => {
+  const BAD = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -1, 1.5, 2 ** 53, '1' as unknown as number]
+
+  it('open throws a TypeError on a time it cannot use, and opens nothing', () => {
+    const tasks = new Tasks()
+    for (const now of BAD) expect(() => tasks.open('agent-a', scope(), now), String(now)).toThrow(TypeError)
+    expect(() => tasks.open('agent-a', scope(), Number.NaN)).toThrow(/^Tasks\.open: now must be a safe integer >= 0, got NaN$/)
+    expect(tasks.list(T0)).toEqual([])
+  })
+
+  it('get, charge, list and sweep throw a TypeError on it before they act', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a', { ttlSeconds: 1 })
+    for (const now of BAD) {
+      const label = String(now)
+      expect(() => tasks.get('agent-a', task.id, now), label).toThrow(TypeError)
+      expect(() => tasks.charge(task, 'snapshot', now), label).toThrow(TypeError)
+      expect(() => tasks.charge(task, 'close', now), label).toThrow(TypeError)
+      expect(() => tasks.list(now), label).toThrow(TypeError)
+      expect(() => tasks.sweep(now), label).toThrow(TypeError)
+    }
+    expect(() => tasks.get('agent-a', task.id, Number.POSITIVE_INFINITY)).toThrow(/^Tasks\.get: now must be a safe integer >= 0, got Infinity$/)
+    expect(task.stepsUsed).toBe(0)
+    expect(tasks.list(T0)).toEqual([task])
+  })
+})
+
+// Fix round 1 (cert N-009 r1, seam finding 3): a gate passed after the person revoked the agent must
+// not let page text out, so checkLanded asks whether the task is still open.
+describe('checkLanded on a task that is no longer open', () => {
+  it('refuses a closed task as no_such_task, even when the URL is inside', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks)
+    ok(tasks.close('agent-a', task.id))
+    expect(refusal(checkLanded(task, 'https://example.com/')).code).toBe('no_such_task')
+  })
+
+  it('refuses a task of a revoked agent (closeAllOf) as no_such_task', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks)
+    tasks.closeAllOf('agent-a')
+    expect(refusal(checkLanded(task, 'https://example.com/')).code).toBe('no_such_task')
+  })
+
+  it('refuses a swept task as no_such_task', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a', { ttlSeconds: 10 })
+    tasks.sweep(T0 + 10_000)
+    expect(refusal(checkLanded(task, 'https://example.com/')).code).toBe('no_such_task')
+  })
+
+  it('refuses a copy of a live task as no_such_task', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks)
+    expect(refusal(checkLanded({ ...task }, 'https://example.com/')).code).toBe('no_such_task')
+    ok(checkLanded(task, 'https://example.com/'))
+  })
+})
+
+// Fix round 1 (cert N-009 r1, unit finding 2): charge checks the ttl itself, so a caller that skipped
+// get cannot spend a step on a task whose time ran out.
+describe('charge checks the time', () => {
+  it('refuses a task whose ttl has run out as task_expired, from openedAt + ttlSeconds on, without charging', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a', { ttlSeconds: 60 })
+    ok(tasks.charge(task, 'snapshot', T0 + 59_999))
+    const error = refusal(tasks.charge(task, 'snapshot', T0 + 60_000))
+    expect(error.code).toBe('task_expired')
+    expect(error.retryable).toBe(REFUSAL_RETRYABLE.task_expired)
+    expect(refusal(tasks.charge(task, 'open', T0 + 60_000, 'https://evil.example.net/')).code).toBe('task_expired')
+    expect(task.stepsUsed).toBe(1)
+  })
+
+  it('close is still neither charged nor refused on an expired task', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a', { ttlSeconds: 60 })
+    expect(tasks.charge(task, 'close', T0 + 120_000)).toEqual({ success: true, data: undefined })
+    expect(task.stepsUsed).toBe(0)
+  })
+})
+
+// Fix round 1 (cert N-009 r1, unit finding 3): the id draw is bounded and takes only 16 bytes.
+describe('the task id draw', () => {
+  it('throws after a bounded number of draws when the random source keeps colliding, and opens nothing', () => {
+    const sizes: number[] = []
+    const tasks = new Tasks({
+      random: (size) => {
+        sizes.push(size)
+        return Buffer.alloc(16, 0xab)
+      },
+    })
+    const first = opened(tasks)
+    expect(() => tasks.open('agent-a', scope(), T0)).toThrow(/^Tasks: no free task id after 8 draws$/)
+    expect(sizes).toHaveLength(1 + 8)
+    expect(tasks.list(T0)).toEqual([first])
+  })
+
+  it('throws when the random source gives other than 16 bytes, and opens nothing', () => {
+    for (const bytes of [15, 0, 17]) {
+      const tasks = new Tasks({ random: () => Buffer.alloc(bytes, 0xab) })
+      expect(() => tasks.open('agent-a', scope(), T0), String(bytes)).toThrow(`Tasks: the random source gave ${bytes} bytes, 16 needed`)
+      expect(tasks.list(T0)).toEqual([])
+    }
   })
 })
 
