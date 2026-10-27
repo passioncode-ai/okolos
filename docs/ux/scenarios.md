@@ -554,6 +554,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Traces:** ST-019, FLW-14 (JTBD-05)
 - **Entry point:** settings screen
 - **Preconditions:** local data exists
+- **Scope:** the Okolos extension's local data. Okolos Agent, the separate daemon of the agents' bridge, keeps its own access list and agents' journal: the journal is exported from its page (SCR-24), and both are removed by its uninstaller with `--purge`
 - **Steps:**
   1. User clicks "Wipe all data" -> system asks for confirmation and lists exactly what will be deleted — **one kind per store, nine of them.** The word "exactly" was here before the list was: the confirmation named five while `wipeAll` cleared nine, so `models`, `feeds`, `snapshots` and the password-reuse index went unmentioned and the user agreed to five while nine went. Safe in direction, and still a confirmation that had not asked. Completeness now lives in `DATA_KIND_KEY: Record<StoreName, string>`, so a new store fails the build until the dialog has words for it
   2. User confirms -> system deletes all local data
@@ -573,6 +574,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Traces:** ST-019, FLW-14 (JTBD-05)
 - **Entry point:** settings screen
 - **Preconditions:** local data exists
+- **Scope:** the Okolos extension's local data. Okolos Agent, the separate daemon of the agents' bridge, keeps its own access list and agents' journal: the journal is exported from its page (SCR-24), and both are removed by its uninstaller with `--purge`
 - **Steps:**
   1. User clicks "Export all data" -> system produces a JSON file containing findings, journal, settings, and the outbound log
   2. User saves the file -> system confirms and states what the file contains

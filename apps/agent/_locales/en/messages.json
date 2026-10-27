@@ -346,7 +346,7 @@
     "message": "read the page text"
   },
   "verb_get": {
-    "message": "get a text, title or address"
+    "message": "get an address, title, text or element count"
   },
   "verb_waitFor": {
     "message": "wait on the page"

@@ -38,6 +38,7 @@
   "ключи для семи событий привязки (requested, confirmed, declined, expired, claim_expired, paired, revoked) с именем после слова «агент»; N-011 добавляет их в проверку ключей при старте (проверки N-013 круг 4)",
   "слова для кодов сбоя журнала no_space, no_permission, other (подставляются в $WHAT$ строк journalError и journalUnreadable) (проверки N-013 круг 4)",
   "строки CLI для ClaimRefusal (declined, expired, claim_expired, claimed, unknown) и подсказка про --replace; copylot_check (проверки N-013 круг 5)",
+  "слова для name_script (имя пишется только латиницей A–Z или только кириллицей, цифры 0–9, пробел и знаки - _ . ( ) ' / +) и для name_reserved, которые описывают правило, а не утверждают «похоже на Okolos»: правило отказывает и честным именам вроде «Echo Kolos» (проверки N-007 круг 4)",
   "проверка узла: python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts"
  ],
  "guards": [

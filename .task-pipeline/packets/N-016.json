@@ -38,6 +38,7 @@
   "okolos-agent doctor --json на нечитаемом хранилище привязок и на журнале, который не пишется или не читается, называет каждую проблему с путём и причиной: строки pairingStoreError, journalError, journalUnreadable и agentRevokeFailed обещают именно это (проверки N-013 круг 4)",
   "установка кладёт okolos-agent в ~/.local/bin (ссылка на текущий релиз), --uninstall её убирает; если ~/.local/bin нет в PATH, установщик говорит, какую строку добавить в профиль оболочки; после установки `okolos-agent doctor` и `okolos-agent pair --name x --help` запускаются из новой оболочки (проверки N-013 круг 5)",
   "okolos-agent doctor без --json печатает человеку то же, что --json, словами; называет отсутствующий Chrome и политику, запрещающую нужные флаги (причина browser_offline) (проверки N-013 круг 5)",
+  "--uninstall --purge удаляет и данные Okolos Agent: список доступов, журнал агентов, события, логи; без --purge они остаются, и установщик это говорит (SCN-023, SCN-024: стирание и выгрузка расширения их не касаются) (проверка product N-013 круг 6)",
   "проверка узла: pnpm -s exec vitest run tools/install-agent.test.ts tools/runbook.test.ts"
  ],
  "guards": [
