@@ -988,12 +988,12 @@ every rule below; where they differ, the scenario says so.
 - **Entry point:** a paired agent opens a task naming its sites
 - **Preconditions:** the agent is paired; the person is logged in to the site in the profile the task uses
 - **Steps:**
-  1. The agent opens a task with its sites, verbs, time limit and step budget -> the task gets its own window, in the background, with an active tab
+  1. The agent opens a task with its sites, verbs, time limit, step budget and profile (`agent`, with the person's logins, or `disposable`, without them; there is no default) -> the task gets its own window, in the background, with an active tab
   2. The agent opens a page in the task -> the page loads in that window; the person's app stays in front
   3. The agent asks for a snapshot -> it receives the page's accessibility tree with references it can name back, hidden instructions removed, the page's verdict attached, and fields for passwords, cards and one-time codes shown without their values
   4. The page is very large -> the snapshot arrives in parts the agent pages through, never as one answer
 - **Expected result:** the agent reads what the job needs, cannot be steered by text the page hid from people, and never sees a secret
-- **Alt paths:** the agent asks for a site outside the task -> refused with `origin_not_in_task`; the page has a finding -> the finding travels with the snapshot and the task's writes go to the person (SCN-046)
+- **Alt paths:** the task names no profile, or names this machine or the local network (`localhost`, `127.0.0.1`, `10.x`, `192.168.x`, `*.local` and the like) -> refused with `invalid_scope` before any window opens. In Б1 an agent cannot reach a local development server through the bridge: those addresses include the daemon's own page and every other local service, and a developer profile that can is a separate, later feature; the agent asks for a site outside the task -> refused with `origin_not_in_task`; the page has a finding -> the finding travels with the snapshot and the task's writes go to the person (SCN-046)
 - **UI elements:** SCR-24: `[data-role=agent-tasks]`, `[data-role=agent-refusals]`
 - **States covered:** success, error, partial
 - **Errors & recovery:** the browser is closed -> the agent is told `browser_offline`, marked retryable, not that the page is empty; nothing is queued; the snapshot could not be cleaned -> the agent receives nothing rather than an uncleaned tree

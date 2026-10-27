@@ -723,7 +723,7 @@ flowchart TD
 ### FLW-22: An agent does a task in the browser
 - **Traces:** ST-028, ST-029, ST-030 (JTBD-10, JRN-05/#2–#6)
 - **Goal:** the agent finishes the task in the person's browser; anything that matters passed through the person
-- **Entry points:** a paired agent opens a task naming its sites, verbs, time limit and step budget
+- **Entry points:** a paired agent opens a task naming its sites, verbs, time limit, step budget and profile
 - **Success exit:** the task is closed, every step recorded before it ran, its window and processes gone
 - **Task analysis:**
   1. The agent opens a task with its reach
@@ -734,7 +734,8 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  T[Task opened: sites, verbs, TTL, budget] --> W[Own window, in the background, active tab]
+  T0[Task asked: sites, verbs, TTL, budget, profile] -->|no profile, or this machine or the local network| X0[Refused: invalid_scope]
+  T0 --> T[Task opened] --> W[Own window, in the background, active tab]
   W --> S[Snapshot: cleaned, verdict attached, in parts]
   S --> A{Action}
   A -->|outside the task's sites| X1[Refused: origin_not_in_task]

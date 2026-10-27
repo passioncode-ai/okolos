@@ -194,7 +194,7 @@
     "message": "the agent has no access"
   },
   "refusal_invalid_scope": {
-    "message": "the task was described wrongly"
+    "message": "task not accepted: a mistake in its description, or an address on this machine or the local network"
   },
   "refusal_no_such_task": {
     "message": "no such task"
