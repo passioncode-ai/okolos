@@ -228,11 +228,14 @@ export class Pairing {
     return this.confirmEntry(this.byHandle.get(handle), now)
   }
 
-  decline(requestId: string): boolean {
+  /** An ended request cannot be declined: it stays an expired row. */
+  decline(requestId: string, now: number): boolean {
+    this.sweep(now)
     return this.declineEntry(this.byRequestId.get(requestId))
   }
 
-  declineByHandle(handle: string): boolean {
+  declineByHandle(handle: string, now: number): boolean {
+    this.sweep(now)
     return this.declineEntry(this.byHandle.get(handle))
   }
 

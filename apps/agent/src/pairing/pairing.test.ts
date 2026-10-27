@@ -93,7 +93,7 @@ describe('the pairing request id (spec §11 F5)', () => {
     const byName = new Map(page.requests.map((row) => [row.name, row.handle]))
 
     expect(pairing.confirmByHandle(byName.get('Claude Code')!, T0 + 4)).toBe(true)
-    expect(pairing.declineByHandle(byName.get('Codex')!)).toBe(true)
+    expect(pairing.declineByHandle(byName.get('Codex')!, T0 + 4)).toBe(true)
     const claimed = pairing.claim(paired.requestId, T0 + 5)
     expect(claimed).toHaveProperty('key')
     const later = pairing.list(T0 + REQUEST_LIFETIME_MS + 10)
@@ -153,7 +153,7 @@ describe('claiming the key (spec §11 F5)', () => {
   it('is refused for a request the person declined', () => {
     const pairing = open()
     const { requestId } = asked(pairing.request('Claude Code', T0))
-    expect(pairing.decline(requestId)).toBe(true)
+    expect(pairing.decline(requestId, T0)).toBe(true)
     expect(pairing.claim(requestId, T0 + 1)).toBeNull()
     expect(pairing.confirm(requestId, T0 + 2)).toBe(false)
     expect(pairing.list(T0 + 3).requests).toEqual([])
@@ -199,7 +199,7 @@ describe('how long a request lives and how many there may be (spec §11 F5)', ()
     expect(pairing.request('Agent four', T0 + 5)).toEqual({ refused: 'too_many_pending' })
     expect(pairing.claim(first.requestId, T0 + 6)).toHaveProperty('key')
     asked(pairing.request('Agent four', T0 + 7))
-    expect(pairing.decline(third.requestId)).toBe(true)
+    expect(pairing.decline(third.requestId, T0 + 7)).toBe(true)
     asked(pairing.request('Agent five', T0 + 8))
     // An expired request waits for nothing.
     asked(pairing.request('Agent six', T0 + 8 + REQUEST_LIFETIME_MS))
@@ -210,7 +210,7 @@ describe('how long a request lives and how many there may be (spec §11 F5)', ()
     const pairing = open()
     for (let n = 0; n < 6; n++) {
       const { requestId } = asked(pairing.request(`Agent ${n}`, T0 + n * 1000))
-      pairing.decline(requestId)
+      pairing.decline(requestId, T0 + n * 1000)
     }
     expect(pairing.request('Agent seven', T0 + MINUTE - 1)).toEqual({ refused: 'too_many_requests' })
     // A refused request is not a new one: the count stays at six, and the first leaves at T0 + 1 min.
@@ -430,7 +430,7 @@ describe('two waiting requests under one name (spec §11 F5)', () => {
     const second = asked(pairing.request('Claude Code', T0 + 1))
     expect(pairing.confirm(first.requestId, T0 + 2)).toBe(true)
     expect(Object.values(flags(pairing, T0 + 3))).toEqual([true, true])
-    expect(pairing.decline(second.requestId)).toBe(true)
+    expect(pairing.decline(second.requestId, T0 + 3)).toBe(true)
     expect(Object.values(flags(pairing, T0 + 4))).toEqual([false])
   })
 
@@ -493,7 +493,7 @@ describe('the page acts by handle, never by request id (audit #9)', () => {
     const pairing = open()
     const { requestId } = asked(pairing.request('Claude Code', T0))
     const [row] = pairing.list(T0 + 1).requests
-    expect(pairing.declineByHandle(row!.handle)).toBe(true)
+    expect(pairing.declineByHandle(row!.handle, T0 + 1)).toBe(true)
     expect(pairing.claim(requestId, T0 + 2)).toBeNull()
     expect(pairing.list(T0 + 3).requests).toEqual([])
   })
@@ -504,11 +504,27 @@ describe('the page acts by handle, never by request id (audit #9)', () => {
     const [row] = pairing.list(T0 + 1).requests
     expect(row!.handle).not.toBe(requestId)
     expect(pairing.confirmByHandle(requestId, T0 + 2)).toBe(false)
-    expect(pairing.declineByHandle(requestId)).toBe(false)
+    expect(pairing.declineByHandle(requestId, T0 + 2)).toBe(false)
     expect(pairing.confirm(row!.handle, T0 + 2)).toBe(false)
-    expect(pairing.decline(row!.handle)).toBe(false)
+    expect(pairing.decline(row!.handle, T0 + 2)).toBe(false)
     expect(pairing.claim(requestId, T0 + 3)).toEqual({ pending: true })
     expect(pairing.list(T0 + 3).requests[0]).toMatchObject({ state: 'pending' })
+  })
+
+  it('does not decline a request whose five minutes are over: it stays an expired row (fix round 1)', () => {
+    const notices: PairingNotice[] = []
+    const pairing = open(storeFile(), notices)
+    const byId = asked(pairing.request('Claude Code', T0))
+    asked(pairing.request('Codex', T0 + 1))
+    const rows = pairing.list(T0 + 2).requests
+    const codex = rows.find((row) => row.name === 'Codex')!
+    expect(pairing.decline(byId.requestId, T0 + REQUEST_LIFETIME_MS)).toBe(false)
+    expect(pairing.declineByHandle(codex.handle, T0 + 1 + REQUEST_LIFETIME_MS)).toBe(false)
+    expect(pairing.list(T0 + 2 + REQUEST_LIFETIME_MS).requests.map((row) => [row.name, row.state])).toEqual([
+      ['Claude Code', 'expired'],
+      ['Codex', 'expired'],
+    ])
+    expect(notices.filter((n) => n.kind === 'declined')).toEqual([])
   })
 
   it('does not confirm a request whose five minutes are over', () => {
