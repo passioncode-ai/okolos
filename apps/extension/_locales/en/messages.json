@@ -2134,21 +2134,15 @@
     "message": "comparing the address on this device"
   },
   "warnOutsideLinkHeadline": {
-    "message": "This link opens a program on your computer, not a page"
+    "message": "This link may open a program on your computer, not a page"
   },
   "warnOutsideLinkProgram": {
-    "message": "The address starts with $SCHEME$:, and the browser hands an address like this to a program on your computer.",
+    "message": "The address starts with $SCHEME$:, and the browser hands an address like this to a program on your computer if one is installed.",
     "placeholders": {
       "scheme": {
         "content": "$1"
       }
     }
-  },
-  "warnOutsideLinkShare": {
-    "message": "Opening a shared folder can run a file from it and send your Windows sign-in details to that computer."
-  },
-  "warnOutsideLinkShareHeadline": {
-    "message": "This link opens a folder on another computer"
   },
   "warnOutsideLinkSource": {
     "message": "reading the link's address on this device"

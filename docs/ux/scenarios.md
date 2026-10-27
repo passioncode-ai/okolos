@@ -58,7 +58,7 @@ are specified once in [screens.md](screens.md).
 | SCN-046 | An action that spends, sends, deletes or signs in waits for the person | agent-bridge | P-01 | ST-029, FLW-22 | draft | — |
 | SCN-047 | The person takes over a step, hands back, or stops every agent | agent-bridge | P-01 | ST-030, FLW-22 | draft | — |
 | SCN-048 | What agents left behind is cleaned, and nothing in use is touched | agent-bridge | P-01 | ST-031, FLW-23 | draft | — |
-| SCN-049 | A link would open a program or a shared folder outside the browser | web-guard | P-02 | ST-007, FLW-06 | implemented | 2026-10-27 unit |
+| SCN-049 | A link would open a program outside the browser | web-guard | P-02 | ST-007, FLW-06 | implemented | 2026-10-27 unit |
 
 ## Personas
 
@@ -304,22 +304,23 @@ See [foundation.md](foundation.md) → Personas.
 - **Status:** implemented
 - **Coverage:** packages/core-traps/src/techsupport.ts:detectTechSupport, apps/extension/src/content/traps.ts:watchForTraps, e2e/scn-008.spec.ts
 
-### SCN-049: A link would open a program or a shared folder outside the browser
+### SCN-049: A link would open a program outside the browser
 - **Persona:** P-02
 - **Feature:** web-guard
 - **Traces:** ST-007, FLW-06 (JTBD-02, JRN-03/#3)
-- **Entry point:** a click (left, middle, or a script's `element.click()`) on a link whose address hands the click to a Windows program: `ms-msdt:`, `search-ms:`, `search:`, `ms-appinstaller:`, `ms-officecmd:`; an Office link (`ms-word:`, `ms-excel:`, `ms-powerpoint:`) whose document comes over plain http or from a shared folder; or a `file:` address that names another computer
+- **Entry point:** a click (left, middle, or a script's `element.click()`) on a link whose address hands the click to a Windows program: `ms-msdt:`, `search-ms:`, `search:`, `ms-appinstaller:`, `ms-officecmd:`; or an Office link (`ms-word:`, `ms-excel:`, `ms-powerpoint:`, `ms-visio:`, `ms-access:`, `ms-project:`, `ms-publisher:`, `ms-spd:`, `ms-infopath:`, `onenote:`) whose document comes over plain http, from a shared folder or from a `file://` address on another computer; a percent-encoded `|u|` reads the same as a plain one
 - **Preconditions:** none; the address is read on this device and nothing is fetched
 - **Steps:**
-  1. User clicks the link -> system stops the click before the browser passes the address on, and shows the blocking warning: for a program, "This link opens a program on your computer, not a page", with the scheme the address starts with; for a shared folder, "This link opens a folder on another computer", with what opening one can do
+  1. User clicks the link -> system stops the click before the browser passes the address on, and shows the blocking warning "This link may open a program on your computer, not a page", with the scheme the address starts with and that the browser hands such an address to a program if one is installed. "May" because the program exists on Windows and usually not on macOS or Linux, where the browser then does nothing; the sentence is true on every system, and the product does not check which one it runs on
   2. User reads it -> system names the other computer when the address carries one, and says the click was stopped and nothing was opened
   3. User clicks "Leave this page" -> system returns to the previous page
-- **Expected result:** no program starts and no shared folder opens because of a link the person did not know was one
+- **Expected result:** no program starts because of a link the person did not know was one
 - **Alt paths:** user clicks "This is wrong" -> the warning closes and that one link on this page goes through on the next click; a different link is a different decision. A ClickFix or tech-support warning is already up -> the click is still stopped and journalled, and the panel keeps the warning it holds (one panel, never two)
 - **UI elements:** SCR-03 blocking banner (clickfix variant: the same trap by another road), "Leave this page" (primary), "This is wrong"
 - **States covered:** success
 - **Errors & recovery:** the address will not parse -> nothing is claimed about it and the click goes on as before; this check reads addresses and has no other way to fail
 - **Not named, on purpose:** the "open in the desktop app" link SharePoint and OneDrive put on every document page (`ms-word:ofe|u|https://...`). It is the ordinary case, and a warning on each one is how a person learns to dismiss this one
+- **Not named: a bare `file:` link to a shared folder** (`file://host/share/...`), dropped in round 1 of the certification (2026-10-27). Chromium and Firefox refuse a `file:` navigation from an http(s) page on their own: measured, the console says "Not allowed to load local resource", the address stays the same and no request is made. The first version warned that such a link "opens a folder on another computer" and could send Windows sign-in details, which described an opening that cannot happen from a web page; a warning that claims more than was checked breaks voice rule 2. A shared folder is still named where a program does the opening: inside a `search-ms:` link or an Office link, which the browser does hand over
 - **Known limit: only a click on a link is seen.** A page that sets `location` or calls `window.open` with such an address, a form whose action is one, and a link inside an embedded frame are not held; the watcher runs in the top frame like the rest of the trap watching (SCN-008). A page script that stops the click before it reaches the document hides it as well, which the agent gate shares (SCN-010)
 - **Known limit: the browser's own question is not relied on.** Chrome and Firefox ask before opening a program, and a person can tick "always allow" there once; after that the browser asks nothing, which is why the click is held here
 - **With an agent on the page:** on a page with an unresolved finding the agent gate blocks the same scripted click outright, without asking, and journals no address (`apps/extension/src/content/agent-gate.test.ts`); on a page without one this watcher holds it

@@ -202,7 +202,7 @@ generator, and the sheet declares no colour of its own.
 - **Status note:** built for the injection variant only
 - **Used by:** FLW-02, FLW-05, FLW-06, FLW-07, FLW-08, FLW-09, FLW-10
 - **Purpose:** speak at the moment of the decision, inside the page, without stealing the page
-- **Elements:** severity icon + label; one-sentence plain-language reason; **one primary action per variant**; secondary "Показать" → SCR-04 where applicable; "Это неверно"; dismiss. Variants: `injection`, `lookalike`, `clickfix` (blocking), `techsupport`, `download`, `credential`, `password`. The `clickfix` variant also carries the link that would open a program or a shared folder outside the browser (SCN-049, 2026-10-27): the same trap by another road, with its own headline and sentence and no new element
+- **Elements:** severity icon + label; one-sentence plain-language reason; **one primary action per variant**; secondary "Показать" → SCR-04 where applicable; "Это неверно"; dismiss. Variants: `injection`, `lookalike`, `clickfix` (blocking), `techsupport`, `download`, `credential`, `password`. The `clickfix` variant also carries the link that may open a program outside the browser (SCN-049, 2026-10-27): the same trap by another road, with its own headline and sentence and no new element
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|

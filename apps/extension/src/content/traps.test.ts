@@ -217,14 +217,16 @@ describe('a link that opens a program or a shared folder (B-165)', () => {
     expect(deps.warned).toHaveBeenCalledWith('outside-link', ['search-ms', 'opens-a-program'])
   })
 
-  it('says a folder on another computer would open, for a file address with a host', () => {
+  it('leaves a file address with a host to the browser, which refuses it from a page', () => {
+    // Chromium and Firefox refuse a `file:` navigation from an http(s) page on their
+    // own; a warning that a shared folder opens would describe what cannot happen.
     const { mounts, mountWarning } = mounted()
-    watch({ mountWarning })
+    const deps = watch({ mountWarning })
     const event = click(link('file://fileserver.attacker.test/share/invoice.lnk'))
 
-    expect(event.defaultPrevented).toBe(true)
-    expect(mounts[0]?.props.headline).toBe('[warnOutsideLinkShareHeadline]')
-    expect(mounts[0]?.props.detail).toContain('[warnOutsideLinkShare]')
+    expect(event.defaultPrevented).toBe(false)
+    expect(mounts).toHaveLength(0)
+    expect(deps.warned).not.toHaveBeenCalled()
   })
 
   it('stops a click a script made, the way an agent or a page would click', () => {

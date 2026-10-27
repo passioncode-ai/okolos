@@ -8,20 +8,24 @@
  * campaigns use exactly that: `ms-msdt:` ran the troubleshooting tool behind Follina,
  * `search-ms:` opens Explorer on a folder served from another computer so a program
  * there looks like a local file, `ms-appinstaller:` installs a package from an address
- * written inside the link. A file address with a host opens a shared folder on another
- * computer, and Windows sends that computer the person's sign-in details when it does.
+ * written inside the link.
+ *
+ * **What it does not name: a bare `file:` address.** The first version named a file
+ * address with a host as a shared folder on another computer. Round 1 of the
+ * certification measured what the browser does with one: Chromium and Firefox refuse a
+ * `file:` navigation from an http(s) page on their own ("Not allowed to load local
+ * resource", the address unchanged, no request made). A warning about an opening that
+ * cannot happen is a claim the product did not check, so that branch is gone. A shared
+ * folder is still named where a program does the opening: inside a `search-ms:` link or
+ * an Office link, which the browser does hand over.
  *
  * Pure and local: the address is read, never fetched. What comes back is codes and the
  * one value a sentence needs (the remote host, when the address names one); the words
  * are the surface's, like every other detector here.
  */
 
-export type OutsideLinkKind = 'program' | 'share'
-
 export interface OutsideLinkVerdict {
-  /** `program` when a Windows program takes the address, `share` for a network folder. */
-  readonly kind: OutsideLinkKind
-  /** The scheme in lower case, without the colon: `search-ms`, `file`. */
+  /** The scheme in lower case, without the colon: `search-ms`, `ms-word`. */
   readonly scheme: string
   /** The other computer the address reaches, when it names one. */
   readonly host: string | null
@@ -52,7 +56,21 @@ const PROGRAM_SCHEMES: ReadonlySet<string> = new Set([
  * document arriving over plain http or from a shared folder, which is how a remote
  * template or a sign-in leak is delivered. So only that shape is named.
  */
-const OFFICE_SCHEMES: ReadonlySet<string> = new Set(['ms-word', 'ms-excel', 'ms-powerpoint'])
+const OFFICE_SCHEMES: ReadonlySet<string> = new Set([
+  'ms-word',
+  'ms-excel',
+  'ms-powerpoint',
+  // The rest of the desktop Office handlers take the same `ofe|u|<document>` form, and
+  // round 1 of the certification found them passing silently.
+  'ms-visio',
+  'ms-access',
+  'ms-project',
+  'ms-publisher',
+  'ms-spd',
+  'ms-infopath',
+  // OneNote also takes the notebook straight after the colon: `onenote:http://…`.
+  'onenote',
+])
 
 export function classifyOutsideLink(href: string): OutsideLinkVerdict | null {
   const address = href.trim()
@@ -60,26 +78,35 @@ export function classifyOutsideLink(href: string): OutsideLinkVerdict | null {
   if (scheme === undefined) return null
 
   if (PROGRAM_SCHEMES.has(scheme)) {
-    return { kind: 'program', scheme, host: remoteHost(decoded(address)), signals: [scheme, 'opens-a-program'] }
+    return { scheme, host: remoteHost(decoded(address)), signals: [scheme, 'opens-a-program'] }
   }
 
   if (OFFICE_SCHEMES.has(scheme)) {
-    const document = /\|u\|(.+)$/i.exec(address)?.[1]?.trim()
-    if (document === undefined || /^https:\/\//i.test(document)) return null
+    const document = officeDocument(scheme, address)
+    if (document === null || /^https:\/\//i.test(document)) return null
     return {
-      kind: 'program',
       scheme,
-      host: remoteHost(decoded(document)),
+      host: remoteHost(document),
       signals: [scheme, 'document-not-over-https'],
     }
   }
 
-  if (scheme === 'file') {
-    const host = shareHost(address)
-    return host === null ? null : { kind: 'share', scheme, host, signals: [scheme, 'points-to-a-network-share'] }
-  }
-
   return null
+}
+
+/**
+ * The document an Office link would open, decoded, or null when it names none.
+ *
+ * Read on the decoded address so `ofe%7Cu%7Chttp://…` is the same link as
+ * `ofe|u|http://…`: the handler decodes it before it fetches.
+ */
+function officeDocument(scheme: string, address: string): string | null {
+  const plain = decoded(address)
+  const named = /\|u\|(.+)$/i.exec(plain)?.[1]?.trim()
+  if (named !== undefined && named !== '') return named
+  if (scheme !== 'onenote') return null
+  const rest = plain.slice(scheme.length + 1).trim()
+  return rest === '' ? null : rest
 }
 
 /** Percent-decoded where it can be; a malformed escape leaves the address as written. */
@@ -92,32 +119,16 @@ function decoded(text: string): string {
 }
 
 /**
- * The first other computer an address names: a `\\host\share` path or an http(s) URL,
- * whichever comes first. `@SSL` and a port end the name, as they do for Windows.
+ * The first other computer an address names: a `\\host\share` path, an http(s) URL or a
+ * `file://host/` address, whichever comes first. `@SSL` and a port end the name, as they
+ * do for Windows; `file:///` (a local path) and `file://localhost/` name no other computer.
  */
 function remoteHost(text: string): string | null {
   const unc = /\\\\([^\\/@:%?&|"'\s]+)/.exec(text)
   const url = /\bhttps?:\/\/([^\\/@:?&|"'\s#]+)/i.exec(text)
-  const first = [unc, url]
+  const file = /\bfile:\/\/(?!localhost[\\/])([^\\/@:?&|"'\s#]+)/i.exec(text)
+  const first = [unc, url, file]
     .filter((match): match is RegExpExecArray => match !== null)
     .sort((a, b) => a.index - b.index)[0]
   return first?.[1]?.toLowerCase() ?? null
-}
-
-/** The host of a file address that points off this computer, or null for a local file. */
-function shareHost(address: string): string | null {
-  let url: URL
-  try {
-    url = new URL(address)
-  } catch {
-    return null
-  }
-  const host = url.hostname.toLowerCase()
-  if (host !== '' && host !== 'localhost') return host
-  // `file:////host/share`: the parser leaves the host empty and the path starting `//`.
-  if (url.pathname.startsWith('//')) {
-    const named = url.pathname.slice(2).split('/')[0]?.toLowerCase() ?? ''
-    return named === '' || named === 'localhost' ? null : named
-  }
-  return null
 }

@@ -207,16 +207,15 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
   }
 
   function showOutsideLink(href: string, verdict: OutsideLinkVerdict): void {
-    const share = verdict.kind === 'share'
     banner = mount(
       {
         // The ClickFix variant on purpose: the same trap by another road. The page wants
         // something run outside the browser, and the panel interrupts for the same reason.
         variant: 'clickfix',
         severity: 'critical',
-        headline: share ? t('warnOutsideLinkShareHeadline') : t('warnOutsideLinkHeadline'),
+        headline: t('warnOutsideLinkHeadline'),
         detail: [
-          share ? t('warnOutsideLinkShare') : t('warnOutsideLinkProgram', verdict.scheme),
+          t('warnOutsideLinkProgram', verdict.scheme),
           verdict.host === null ? '' : t('warnOutsideLinkWhere', verdict.host),
           t('warnOutsideLinkStopped'),
         ]
