@@ -90,9 +90,8 @@ describe('no negative of the corpus is cut', () => {
       expect(snapshot.hiddenRemoved).toBe(0)
       // A one-character text (a decorative glyph) is dropped as text without words, not cut.
       const shown = collapsed(c.candidate.text)
-      if (shown.length >= 2) {
-        expect(snapshot.lines.map((l) => l.name).some((n) => n.startsWith(shown.slice(0, 60)))).toBe(true)
-      }
+      const present = snapshot.lines.map((l) => l.name).some((n) => n.startsWith(shown.slice(0, 60)))
+      expect(present || shown.length < 2).toBe(true)
       expect(snapshotVerdict({ verdicts, truncated: false, unresolved: 0 })).toEqual({ level: 'clean', findings: [] })
     })
   }
@@ -139,10 +138,8 @@ describe('a finding built from the detectors’ real output', () => {
         expect(e.stage).toBe(stage)
         expect(e.concealment).toEqual(concealment)
         expect(e.carrier).toBe(carrier)
-        if (inType(c)) {
-          expect(e.concealment.length).toBeGreaterThan(0)
-          expect(e.carrier).not.toBeNull()
-        }
+        // Filled for every case whose corpus values are in the contract.
+        expect(!inType(c) || (e.concealment.length > 0 && e.carrier !== null)).toBe(true)
       }
     }
   }
