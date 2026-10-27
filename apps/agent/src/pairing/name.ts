@@ -23,12 +23,21 @@ export type NameRefusal =
   | 'name_reserved'
 
 /**
- * A name reads as a code when it carries this many numeric characters in total, whatever separates
- * them ("1 2 3", "12-34-56"), counting every kind Unicode calls numeric (\p{N}: fullwidth,
+ * A name reads as a code when it carries more than this many numeric characters in total, whatever
+ * separates them ("1 2 3", "12-34-56"), counting every kind Unicode calls numeric (\p{N}: fullwidth,
  * Arabic-Indic, superscript, circled, Roman). Fix round 1 of N-007, stricter than F12's "in a row".
+ * Fix round 3: they are counted after NFKC too, so one character that reads as two numerals (the
+ * circled 21, U+3251) counts as two; the larger count decides, so a Roman numeral, which NFKC turns
+ * into letters, still counts as one. Letters that look like numerals (З, О, б) are not counted: the
+ * page shows the code in an element of its own (SCR-23).
  */
 const MAX_NUMERIC = 2
 const NUMERIC = /\p{N}/gu
+
+function numerals(name: string): number {
+  const count = (text: string): number => text.match(NUMERIC)?.length ?? 0
+  return Math.max(count(name), count(name.normalize('NFKC')))
+}
 
 /** The marks that reorder or isolate text: embeddings, overrides, isolates and the directional marks. */
 const BIDI = /[؜‎‏‪-‮⁦-⁩]/u
@@ -69,7 +78,7 @@ export function checkAgentName(name: string): NameRefusal | null {
   if (BIDI.test(name)) return 'name_bidi'
   if (CONTROL.test(name) || STACKED_MARKS.test(name)) return 'name_control'
   if (!VISIBLE.test(name)) return 'name_empty'
-  if ((name.match(NUMERIC)?.length ?? 0) > MAX_NUMERIC) return 'name_digits'
+  if (numerals(name) > MAX_NUMERIC) return 'name_digits'
   if (nameSkeleton(name).includes(RESERVED)) return 'name_reserved'
   return null
 }

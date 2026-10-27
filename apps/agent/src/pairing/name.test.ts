@@ -44,6 +44,19 @@ describe('the name an agent gives itself', () => {
     expect(checkAgentName('agent 42')).toBeNull()
   })
 
+  // Fix round 3: numerals are counted after NFKC, so one character that reads as two numerals
+  // counts as two. Letters that look like numerals (З, О, б) are not counted: the page shows the
+  // code in an element of its own (SCR-23).
+  it('counts numerals after NFKC: a circled 21 is two (fix round 3)', () => {
+    expect(checkAgentName('1㉑')).toBe('name_digits')
+    expect(checkAgentName('agent ⑩0')).toBe('name_digits')
+    expect(checkAgentName('agent ㉑')).toBeNull()
+    // NFKC turns Roman numerals into letters; they still count as numerals as written.
+    expect(checkAgentName('agent ⅠⅡⅢ')).toBe('name_digits')
+    expect(checkAgentName('Зоя')).toBeNull()
+    expect(checkAgentName('ЗОб agent')).toBeNull()
+  })
+
   it('refuses control and other invisible characters', () => {
     expect(checkAgentName('agent\u0000x')).toBe('name_control')
     expect(checkAgentName('agent\nnext line')).toBe('name_control')
