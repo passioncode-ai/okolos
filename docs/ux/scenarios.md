@@ -988,14 +988,14 @@ every rule below; where they differ, the scenario says so.
 - **Feature:** agent-bridge
 - **Traces:** ST-028, FLW-22 (JTBD-10, JTBD-01, JRN-05/#2–#4)
 - **Entry point:** a paired agent opens a task naming its sites
-- **Preconditions:** the agent is paired. In Б1 the agent profile starts with no sign-ins and Б1 gives the person no way to add them, so the agent reads pages that need no sign-in; reading a logged-in page comes with the sign-in step of SCN-047 in Б2. The Okolos extension does not guard the agent profile: stable Chrome refuses `--load-extension`, and the snapshot cleaning is what stands between the page and the agent
+- **Preconditions:** the agent is paired. In Б1 the agent profile starts with no sign-ins and Б1 has no sign-in step, so the agent is meant for pages that need no sign-in; a person can still sign in by hand in a visible agent window, and the agent profile keeps that sign-in. The designed sign-in step is SCN-047 in Б2. The Okolos extension does not guard the agent profile: stable Chrome refuses `--load-extension`, and the snapshot cleaning is what stands between the page and the agent
 - **Steps:**
-  1. The agent opens a task with its sites, verbs, time limit and step budget -> the task gets its own window, in the background, with an active tab
+  1. The agent opens a task with its goal in its own words, its sites, verbs, profile (the agent profile or a temporary one), time limit and step budget -> the task gets its own window, in the background, with an active tab; a site that is an address of this machine or the local network, or a name reserved for local networks (`.local`, `.home.arpa`, `.internal`, `.lan`, a single-label name), is refused with `invalid_scope`
   2. The agent opens a page in the task -> the page loads in that window; the person's app stays in front
   3. The agent asks for a snapshot -> it receives the page's accessibility tree with references it can name back, hidden instructions removed, the page's verdict attached, and fields for passwords, cards and one-time codes shown without their values
   4. The page is very large -> the snapshot arrives in parts the agent pages through, never as one answer
 - **Expected result:** the agent reads what the job needs, cannot be steered by text the page hid from people, and never sees a secret
-- **Alt paths:** the agent asks for a site outside the task -> refused with `origin_not_in_task`; the page has a finding -> the finding travels with the snapshot and the task's writes go to the person (SCN-046)
+- **Alt paths:** the agent asks for a site outside the task -> refused with `origin_not_in_task`; a public name that resolves to an address on this machine or the local network (such as a router's own domain) -> refused when the page answers from that address; the page has a finding -> the finding travels with the snapshot and the task's writes go to the person (SCN-046)
 - **UI elements:** SCR-24: `[data-role=agent-tasks]`, `[data-role=agent-refusals]`, `[data-role=agent-journal-skipped]`, `[data-role=agent-journal-link]`
 - **States covered:** loading, success, error (journal cannot be written), journal-unreadable, empty, session-expired, stopping (SCR-24); partial (the snapshot arrives in parts, on the agent's side)
 - **Errors & recovery:** the browser is closed -> the agent is told `browser_offline`, marked retryable, not that the page is empty; nothing is queued; the snapshot could not be cleaned -> the agent receives nothing rather than an uncleaned tree

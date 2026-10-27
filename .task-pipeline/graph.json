@@ -291,13 +291,13 @@
    ],
    "risk": "R3",
    "certification": {
-    "round": 7,
+    "round": 8,
     "tiers": {
      "unit": "pass",
      "seam": "pass",
-     "product": "pass"
+     "product": "fail"
     },
-    "at": "b251f87eafe1cc14778c914120a51b987c7b5137",
+    "at": "9cccb92501dc6f58d7cdb15faceb5e4a339a0803",
     "history": [
      {
       "unit": "pass",
@@ -333,6 +333,11 @@
       "unit": "pass",
       "seam": "pass",
       "product": "pass"
+     },
+     {
+      "unit": "pass",
+      "seam": "pass",
+      "product": "fail"
      }
     ],
     "kinds": [
@@ -342,9 +347,10 @@
      "adversarial",
      "adversarial",
      "adversarial",
-     "adversarial"
+     "adversarial",
+     "blind"
     ],
-    "tree": "4f1cefec206cdf4af790ec9e75e5ca6c06de5788"
+    "tree": "d125536cde801a977ef82502629e2cf66a67d4f1"
    }
   },
   {
@@ -487,13 +493,13 @@
    ],
    "risk": "R2",
    "certification": {
-    "round": 12,
+    "round": 13,
     "tiers": {
      "unit": "fail",
-     "seam": "fail",
+     "seam": "pass",
      "product": "fail"
     },
-    "at": "fb07c61b462553e6fb2d5d91b87508b9eb6d530e",
+    "at": "e71075b37dcd19c6cec62358da2ac989f967e4f6",
     "history": [
      {
       "unit": "fail",
@@ -554,6 +560,11 @@
       "unit": "fail",
       "seam": "fail",
       "product": "fail"
+     },
+     {
+      "unit": "fail",
+      "seam": "pass",
+      "product": "fail"
      }
     ],
     "kinds": [
@@ -568,9 +579,10 @@
      "blind",
      "blind",
      "blind",
+     "blind",
      "blind"
     ],
-    "tree": "90a0137e7961c894fd03c6a007e69f72b68afed0"
+    "tree": "f7484cb191c7fe16b037fba15dc9777ff12f201b"
    }
   },
   {
@@ -849,24 +861,30 @@
    ],
    "risk": "R2",
    "certification": {
-    "round": 1,
+    "round": 2,
     "tiers": {
-     "unit": "fail",
+     "unit": "pass",
      "seam": "fail",
-     "product": "pass"
+     "product": "fail"
     },
-    "at": "0d78e85bcaf02ae7e6cd5f2d27b96386379ff2d9",
+    "at": "e71075b37dcd19c6cec62358da2ac989f967e4f6",
     "history": [
      {
       "unit": "fail",
       "seam": "fail",
       "product": "pass"
+     },
+     {
+      "unit": "pass",
+      "seam": "fail",
+      "product": "fail"
      }
     ],
     "kinds": [
+     "blind",
      "blind"
     ],
-    "tree": "7044f11f2f84e770e696b46e3e6d07fd5366a9e8"
+    "tree": "f7484cb191c7fe16b037fba15dc9777ff12f201b"
    }
   },
   {

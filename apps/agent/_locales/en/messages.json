@@ -105,7 +105,7 @@
     }
   },
   "pairingStoreError": {
-    "message": "The access list cannot be read: $WHAT$. Until it is fixed, every call to the door ends in an Okolos Agent failure: no key can be checked. Run okolos-agent doctor to see what is wrong with the file.",
+    "message": "The access list cannot be read: $WHAT$. Until it is fixed, every call that carries a key ends in an Okolos Agent failure: the key cannot be checked. New access requests are not taken. Run okolos-agent doctor to see what is wrong with the file.",
     "placeholders": {
       "what": {
         "content": "$1"
@@ -163,7 +163,7 @@
     "message": "Recent refusals and failures"
   },
   "refusalsEmpty": {
-    "message": "No refusals or failures."
+    "message": "The agents' journal has no refusals or failures."
   },
   "refusalLine": {
     "message": "$WHEN$. $AGENT$, call “$ASKED$”. Refused: $WHAT$",
