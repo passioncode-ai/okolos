@@ -235,7 +235,7 @@ describe('the comparison key of a name', () => {
 
   it('gives a Cyrillic name two keys: its transliteration and its look in Latin letters', () => {
     expect(nameKeys('Околос')).toEqual(['okolos', 'okoloc'])
-    expect(nameKeys('Агент Иван')).toEqual(['agentlvan', 'agehtlbah'])
+    expect(nameKeys('Агент Иван')).toEqual(['agentlvan', 'arehtlbah'])
     expect(nameKeys('Щука')).toEqual(['schuka', 'schyka'])
     // An all-Cyrillic name that reads as a Latin one looks alike by its look.
     expect(namesLookAlike('\u0421\u043e\u0441\u043e\u0430', 'Cocoa')).toBe(true)
@@ -243,6 +243,25 @@ describe('the comparison key of a name', () => {
     // ... and a transliteration is a look-alike too.
     expect(namesLookAlike('Кодекс', 'Kodeks')).toBe(true)
     expect(namesLookAlike('Колос', 'Codex')).toBe(false)
+  })
+
+  // Fix round 6: a key with no letter left is no key. Names of digits alone drop to an empty key, and
+  // two different numbers are not one name.
+  it('never marks two names on an empty key (fix round 6)', () => {
+    expect(namesLookAlike('12', '34')).toBe(false)
+    expect(namesLookAlike('42', '-- 7 --')).toBe(false)
+    expect(nameKeys('42')).toEqual(['az'])
+    expect(namesLookAlike('12', '12')).toBe(true)
+  })
+
+  // Fix round 6: more Cyrillic letters are read by their shape, on top of the table of round 4:
+  // п as n, г as r, ь and б as b, з as e (it looks like a 3, which reads as e).
+  it('reads п, г, ь, б and з by their shape in the look key (fix round 6)', () => {
+    expect(namesLookAlike('\u0421\u0433\u043e\u043f', 'Cron')).toBe(true) // Сгоп
+    expect(namesLookAlike('\u0431\u043e\u0442', 'bot')).toBe(true) // бот
+    expect(namesLookAlike('\u044c\u043e\u0442', 'bot')).toBe(true) // ьот
+    expect(namesLookAlike('\u0437\u0441\u043e', 'eco')).toBe(true) // зсо
+    expect(nameKeys('\u0421\u0433\u043e\u043f')).toEqual(['sgop', 'cron'])
   })
 })
 

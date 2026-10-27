@@ -147,10 +147,14 @@ const TRANSLITERATION: Readonly<Record<string, string>> = {
   ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
 }
 
-/** The Cyrillic letters that look like a Latin one, written as that letter; the rest by sound. */
+/**
+ * The Cyrillic letters that look like a Latin one, written as that letter; the rest by sound. Fix
+ * round 6 adds the shapes п as n, г as r, ь and б as b, and з as e (it looks like a 3, read as e).
+ */
 const LOOK: Readonly<Record<string, string>> = {
   ...TRANSLITERATION,
   а: 'a', в: 'b', е: 'e', к: 'k', м: 'm', н: 'h', о: 'o', р: 'p', с: 'c', т: 't', у: 'y', х: 'x',
+  п: 'n', г: 'r', ь: 'b', б: 'b', з: 'e',
 }
 
 /** The letter each digit reads as (fix round 5): 0 o, 1 l, 2 z, 3 e, 4 a, 5 s, 6 g, 7 t, 8 b, 9 g. */
@@ -201,10 +205,12 @@ function reservedKeys(name: string): string[] {
  * is `claude`); then rn as m, vv as w, cl as d. Digits: one key drops them, so a number added to a
  * name does not make it another (`Claude 2` is `Claude`); one reads each as the letter it resembles,
  * so `C1aude` is `Claude`. A Cyrillic name has both of those by sound (`Околос` is `okolos`) and by
- * look (`Сосоа` is `cocoa`). Duplicates are dropped, in this order: sound with digits dropped, sound
- * with digits as letters, look with digits dropped, look with digits as letters. Used by the
- * duplicate check (`namesLookAlike`); the reserved name has keys of its own. Meant for names that
- * pass the allowlist; anything else is dropped from the key.
+ * look (`Сосоа` is `cocoa`, `Сгоп` is `cron`). Duplicates are dropped, in this order: sound with digits
+ * dropped, sound with digits as letters, look with digits dropped, look with digits as letters. An
+ * empty key is dropped too (fix round 6): a name of digits alone has no letter left once they are
+ * dropped, and two such names ("12", "34") are not one name. Used by the duplicate check
+ * (`namesLookAlike`); the reserved name has keys of its own. Meant for names that pass the
+ * allowlist; anything else is dropped from the key.
  */
 export function nameKeys(name: string): string[] {
   const lower = lowerNfc(name)
@@ -214,10 +220,10 @@ export function nameKeys(name: string): string[] {
       keys.push(TWO_LETTER_SHAPES.reduce((key, [shape, letter]) => key.replace(shape, letter), letters(lower, table, digits)))
     }
   }
-  return [...new Set(keys)]
+  return [...new Set(keys)].filter((key) => key !== '')
 }
 
-/** Two names look alike when they share a key. */
+/** Two names look alike when they share a key; an empty key is no key (fix round 6). */
 export function namesLookAlike(a: string, b: string): boolean {
   const keys = new Set(nameKeys(a))
   return nameKeys(b).some((k) => keys.has(k))
