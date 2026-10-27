@@ -662,9 +662,17 @@ setInterval(() => {}, 1000)
       shell.on('exit', (code, signal) => resolve({ code, signal })),
     )
     let started: { job: number; bootstrap: number } | null = null
+    /** The pids, once the job has written them whole: the file exists, empty, before its write lands. */
+    const readPids = () => {
+      try {
+        started = JSON.parse(readFileSync(pids, 'utf8'))
+      } catch {
+        started = null
+      }
+      return started !== null
+    }
     try {
-      expect(await until(() => existsSync(pids)), 'the job never started').toBe(true)
-      started = JSON.parse(readFileSync(pids, 'utf8'))
+      expect(await until(readPids), 'the job never started').toBe(true)
       shell.kill('SIGTERM')
       const end = await Promise.race([exited, new Promise<null>((resolve) => setTimeout(() => resolve(null), 15_000))])
       expect(end, 'the launch line did not end').toEqual({ code: 143, signal: null })
@@ -673,9 +681,12 @@ setInterval(() => {}, 1000)
       expect(readFileSync(h.paths.log, 'utf8')).not.toMatch(/failed in launch/)
       expect(await until(() => !alive(started!.job) && !alive(started!.bootstrap), 10_000), 'the bootstrap or the job outlived the stop').toBe(true)
     } finally {
-      // Only what this test started: the shell, and the two node processes it named.
+      // Only what this test started: the shell, and the two node processes it named
+      // (read again, so a failure before the first read still ends them).
       shell.kill('SIGKILL')
-      for (const pid of started ? [started.job, started.bootstrap] : []) if (alive(pid)) process.kill(pid, 'SIGKILL')
+      if (!started) readPids()
+      const named = started as { job: number; bootstrap: number } | null
+      for (const pid of named ? [named.job, named.bootstrap] : []) if (alive(pid)) process.kill(pid, 'SIGKILL')
     }
   }, 45_000)
 
