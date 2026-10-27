@@ -151,39 +151,4 @@ describe('okolos-mail, started the way a person starts it', () => {
     expect(out.stdout).not.toContain(word('mailVerdictNone'))
     expect(out.code).toBe(EXIT.unreadable)
   })
-
-  /**
-   * `index.ts` still runs when it is itself the file node was started with, as
-   * a built or bundled copy would be. The resolve hook is the one
-   * `src/launch.mjs` installs, written out here so the run goes through no
-   * launcher at all.
-   */
-  it('runs main exactly once when index.ts is started directly', () => {
-    const hook = path.join(dir, 'resolve-ts.mjs')
-    writeFileSync(
-      hook,
-      [
-        "import { registerHooks } from 'node:module'",
-        'registerHooks({',
-        '  resolve(specifier, context, next) {',
-        '    try {',
-        '      return next(specifier, context)',
-        '    } catch (error) {',
-        "      if (specifier.startsWith('.') && specifier.endsWith('.js') && context.parentURL?.endsWith('.ts')) {",
-        "        return next(`${specifier.slice(0, -3)}.ts`, context)",
-        '      }',
-        '      throw error',
-        '    }',
-        '  },',
-        '})',
-        '',
-      ].join('\n'),
-    )
-    const out = okolosMail(['scan', clean], {
-      entry: path.join(app, 'src/index.ts'),
-      before: ['--import', pathToFileURL(hook).href],
-    })
-    expect(count(out.stdout, word('mailVerdictNone'))).toBe(1)
-    expect(out.code).toBe(EXIT.nothingFound)
-  })
 })

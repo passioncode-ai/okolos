@@ -18,7 +18,7 @@
  * The stderr lines are diagnostics of the runtime, not product copy: they are
  * written before the catalogue can be read, on a node that may not be able to
  * read the code that reads it. The verdict and every refusal of a message stay
- * in the catalogue (`index.ts`, `scan.ts`).
+ * in the catalogue (`command.ts`, `scan.ts`).
  */
 // The namespace, not `{ registerHooks }`: a named import of an export an old
 // node lacks fails as the file links, before the version check can refuse.
@@ -57,16 +57,22 @@ export function runsFromSources(node, typescript) {
   return floor !== undefined && minor >= floor.minor
 }
 
-/** @param {string} text */
-const line = (text) => `okolos-mail: ${text}\n`
+/**
+ * Set by `loadSources` before it imports `index.ts`, so `index.ts` knows it was
+ * handed the command rather than started with it. Absent means started: the
+ * default is to run, never to exit quietly.
+ */
+export const LAUNCHED = Symbol.for('okolos.mail-cli.launched')
+
+let hooked = false
 
 /**
- * Register the hook, then import the command. Dynamic, because a static import
- * would be resolved before the hook exists.
- *
- * @returns {Promise<{ run: (argv: readonly string[], env: NodeJS.ProcessEnv) => void }>}
+ * Let node find the `.ts` beside a missing `.js`, the spelling TypeScript
+ * requires in imports, when the importer is itself `.ts`. Once per process.
  */
-export async function loadSources() {
+export function installHook() {
+  if (hooked) return
+  hooked = true
   nodeModule.registerHooks({
     resolve(specifier, context, next) {
       try {
@@ -79,6 +85,20 @@ export async function loadSources() {
       }
     },
   })
+}
+
+/** @param {string} text */
+const line = (text) => `okolos-mail: ${text}\n`
+
+/**
+ * Install the hook, then import the command. Dynamic, because a static import
+ * would be resolved before the hook exists.
+ *
+ * @returns {Promise<{ run: (argv: readonly string[], env: NodeJS.ProcessEnv) => Promise<void> | void }>}
+ */
+export async function loadSources() {
+  installHook()
+  Reflect.set(globalThis, LAUNCHED, true)
   return import('./index.ts')
 }
 
@@ -114,7 +134,7 @@ export async function launch({
   }
   try {
     const { run } = await load()
-    run(argv, env)
+    await run(argv, env)
     return undefined
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
