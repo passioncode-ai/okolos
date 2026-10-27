@@ -36,6 +36,17 @@ function alive(pid: number): boolean {
   }
 }
 
+/**
+ * The upper bound for a wall-clock assertion: five times what the step is
+ * expected to take. These tests run real processes, and a loaded machine runs
+ * them 3-5x slower (vitest.config.ts); a bound any thinner fails a gate when
+ * nothing hangs, which the runbook promises it does not
+ * (docs/runbooks/development.md, "Под большой нагрузкой машины").
+ */
+function atMost(expectedMs: number): number {
+  return 5 * expectedMs
+}
+
 /** Waits until the predicate holds or the deadline passes; returns the last answer. */
 async function eventually(predicate: () => boolean, ms = 3000): Promise<boolean> {
   const until = Date.now() + ms
@@ -413,7 +424,8 @@ describe('closing ends the whole process group', () => {
     const pipe = await fake()
     const started = Date.now()
     await pipe.close(5000)
-    expect(Date.now() - started).toBeLessThan(2500)
+    // Expected: under 500 ms (the fake leaves at once); the grace is 5000.
+    expect(Date.now() - started).toBeLessThan(atMost(500))
     expect(alive(pipe.pid)).toBe(false)
   })
 
@@ -466,12 +478,35 @@ describe('closing ends the whole process group', () => {
 
     await pipe.close(grace)
 
-    // Three graces (ask, SIGTERM, SIGKILL) and timer jitter, nothing more.
-    expect(Date.now() - started).toBeLessThan(3 * grace + 50)
+    // Three graces (ask, SIGTERM, SIGKILL), each waited out in full, and no hang.
+    const took = Date.now() - started
+    expect(took).toBeGreaterThanOrEqual(3 * grace)
+    expect(took).toBeLessThan(atMost(3 * grace))
     expect(incomplete).toEqual([pipe.pid])
     expect(refused).toContainEqual([-pipe.pid, 'SIGKILL'])
     // The browser really is still there: close said so rather than pretending.
     expect(alive(pipe.pid)).toBe(true)
+  })
+
+  it('never hangs on a loaded machine either: each signal call slow, the deadline still holds', async () => {
+    const incomplete: number[] = []
+    const pipe = await fake(['--ignore-close'], {
+      kill: (() => {
+        // A busy machine: every call costs 30 ms of CPU before it fails.
+        const until = Date.now() + 30
+        let spins = 0
+        while (Date.now() < until) spins++
+        throw Object.assign(new Error(`kill EPERM after ${spins} spins`), { code: 'EPERM' })
+      }) as typeof process.kill,
+      onCloseIncomplete: (pid) => incomplete.push(pid),
+    })
+    const grace = 200
+    const started = Date.now()
+
+    await pipe.close(grace)
+
+    expect(Date.now() - started).toBeLessThan(atMost(3 * grace))
+    expect(incomplete).toEqual([pipe.pid])
   })
 
   it('reports a group it could not end, by default, as one stderr line naming the pid', async () => {
