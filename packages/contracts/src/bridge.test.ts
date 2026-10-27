@@ -31,6 +31,7 @@ const base = {
   verbs: ['open', 'snapshot'],
   ttlSeconds: 600,
   stepBudget: 50,
+  profile: 'agent',
 }
 
 describe('a task scope', () => {
@@ -39,6 +40,14 @@ describe('a task scope', () => {
       ok: true,
       scope: { origins: { read: ['https://billing.example.com'], write: [] }, profile: 'agent' },
     })
+  })
+
+  it('names its profile, because a default would hand the person’s logins to a task that never asked', () => {
+    const withoutProfile: Record<string, unknown> = { ...base }
+    delete withoutProfile.profile
+    expect(validateScope(withoutProfile)).toEqual({ ok: false, reason: "profile must be 'agent' or 'disposable'" })
+    expect(validateScope({ ...base, profile: 'incognito' }).ok).toBe(false)
+    expect(validateScope({ ...base, profile: 'disposable' })).toMatchObject({ ok: true, scope: { profile: 'disposable' } })
   })
 
   it('refuses an origin that is not http(s)', () => {

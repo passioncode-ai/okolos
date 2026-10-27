@@ -216,7 +216,9 @@ export function validateScope(input: unknown): { ok: true; scope: TaskScope } | 
   if (typeof budget !== 'number' || !Number.isInteger(budget) || budget < 1 || budget > SCOPE_LIMITS.maxStepBudget) {
     return { ok: false, reason: `stepBudget must be an integer from 1 to ${SCOPE_LIMITS.maxStepBudget}` } // i18n-exempt: a refusal read by the agent over MCP, not by the person
   }
-  const profile = raw.profile ?? 'agent'
+  // Required, no default: the default would be `agent`, the profile with the
+  // person's logins, and a task should reach them only by saying so (ревью F26).
+  const profile = raw.profile
   if (profile !== 'agent' && profile !== 'disposable') return { ok: false, reason: "profile must be 'agent' or 'disposable'" } // i18n-exempt: a refusal read by the agent over MCP, not by the person
 
   return {
