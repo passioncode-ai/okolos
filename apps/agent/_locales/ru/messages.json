@@ -45,7 +45,7 @@
     "message": "Отклонить"
   },
   "pairingConfirmed": {
-    "message": "Доступ для агента $NAME$ подтверждён. Агент заберёт ключ в течение пяти минут.",
+    "message": "Доступ для агента $NAME$ подтверждён. Ключ можно забрать в течение пяти минут.",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -94,10 +94,10 @@
     }
   },
   "pairingEmpty": {
-    "message": "Ни один агент не подключён."
+    "message": "Ни у одного агента нет доступа."
   },
   "pairingHow": {
-    "message": "Агент просит доступ командой okolos-agent pair в терминале. Его код появится здесь. Адрес двери: $URL$.",
+    "message": "Агент просит доступ командой okolos-agent pair --name \"<имя>\" в терминале. Его код появится здесь. Адрес двери: $URL$.",
     "placeholders": {
       "url": {
         "content": "$1"
@@ -105,7 +105,7 @@
     }
   },
   "pairingStoreError": {
-    "message": "Список доступов не читается: $WHAT$. Пока его не починить, дверь отказывает всем агентам.",
+    "message": "Список доступов не читается: $WHAT$. Пока его не починят, дверь отказывает всем вызовам. Запустите okolos-agent doctor: он скажет, что с файлом.",
     "placeholders": {
       "what": {
         "content": "$1"
@@ -166,7 +166,7 @@
     "message": "Отказов не было."
   },
   "refusalLine": {
-    "message": "$WHEN$, $AGENT$ просил $ASKED$: $WHAT$",
+    "message": "$WHEN$. Агент $AGENT$, вызов «$ASKED$». Отказ: $WHAT$",
     "placeholders": {
       "when": {
         "content": "$1"
@@ -195,7 +195,7 @@
     "message": "сайт вне задачи"
   },
   "refusal_verb_not_in_task": {
-    "message": "действие вне задачи"
+    "message": "задача этого не разрешает"
   },
   "refusal_budget_exhausted": {
     "message": "шаги задачи кончились"
@@ -216,7 +216,7 @@
     "message": "Chrome не запущен или недоступен"
   },
   "refusal_blocked_by_shield": {
-    "message": "защита Okolos остановила действие"
+    "message": "защита Okolos не пропустила вызов"
   },
   "refusal_internal": {
     "message": "сбой Okolos Agent, ответ не выдан"
@@ -256,7 +256,7 @@
     }
   },
   "pairingCollecting": {
-    "message": "Подтверждено. Агент забирает ключ до $TIME$.",
+    "message": "Подтверждено. Ключ ждёт агента до $TIME$.",
     "placeholders": {
       "time": {
         "content": "$1"
@@ -267,7 +267,7 @@
     "message": "Агент не забрал ключ за пять минут. Доступ не выдан, агенту нужно попросить снова."
   },
   "pairingDuplicate": {
-    "message": "Ещё один запрос с таким же именем. Сверьте код особенно внимательно."
+    "message": "Имя похоже на имя другого запроса. Сверьте код особенно внимательно."
   },
   "pairingAsked": {
     "message": "Запросил в $TIME$",
@@ -286,7 +286,7 @@
     }
   },
   "refusalDoorLine": {
-    "message": "$WHEN$, вызов не от агента отклонён до разбора: $WHAT$",
+    "message": "$WHEN$, отказ на двери: $WHAT$",
     "placeholders": {
       "when": {
         "content": "$1"
@@ -297,32 +297,72 @@
     }
   },
   "rejection_bad_host": {
-    "message": "чужой адрес службы"
+    "message": "вызов пришёл на чужой адрес службы"
   },
   "rejection_bad_origin": {
-    "message": "вызов со страницы в браузере"
+    "message": "вызов пришёл со страницы в браузере"
   },
   "rejection_cross_site": {
-    "message": "вызов с чужого сайта"
+    "message": "вызов пришёл с чужого сайта"
   },
   "rejection_bad_content_type": {
-    "message": "неверный формат вызова"
+    "message": "вызов в неверном формате"
   },
   "rejection_bad_request": {
-    "message": "вызов не разобран"
+    "message": "вызов не удалось разобрать"
   },
   "rejection_stopping": {
     "message": "служба останавливалась"
   },
   "rejection_not_paired": {
-    "message": "вызов без ключа доступа"
+    "message": "у вызова нет действующего ключа доступа"
   },
   "journalError": {
-    "message": "Журнал агентов не пишется: $WHAT$. Пока его не починить, агенты получают отказ, и ни один ответ со страницы не уходит.",
+    "message": "Журнал агентов не пишется: $WHAT$. Пока его не починят, агенты получают отказ, а содержимое страниц не уходит. Запустите okolos-agent doctor: он скажет, что с журналом.",
     "placeholders": {
       "what": {
         "content": "$1"
       }
     }
+  },
+  "pairingLooksLikeAgent": {
+    "message": "Имя похоже на имя агента с доступом: $NAME$. Сверьте код особенно внимательно.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "agentRevokeFailed": {
+    "message": "Доступ агента $NAME$ не отозван: список доступов не записался. Агент по-прежнему может работать. Попробуйте ещё раз; не выйдет, запустите okolos-agent doctor.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "verb_open": {
+    "message": "открыть страницу"
+  },
+  "verb_snapshot": {
+    "message": "сделать снимок страницы"
+  },
+  "verb_read": {
+    "message": "прочитать снимок"
+  },
+  "verb_get": {
+    "message": "взять часть снимка"
+  },
+  "verb_waitFor": {
+    "message": "подождать на странице"
+  },
+  "verb_close": {
+    "message": "закрыть задачу"
+  },
+  "verb_session_open": {
+    "message": "открыть задачу"
+  },
+  "verb_hygiene_census": {
+    "message": "провести перепись процессов"
   }
 }

@@ -244,7 +244,8 @@
   ],
   "files": [
    "Create: apps/agent/src/journal/journal.ts",
-   "Test: apps/agent/src/journal/journal.test.ts"
+   "Test: apps/agent/src/journal/journal.test.ts",
+   "Modify: tools/reachable.test.ts (проверка seam N-007 круг 2)"
   ],
   "consumes": "serviceDirs().data",
   "produces": "`class Journal { static open(dir, {retentionDays}): Journal; record(e: JournalEntry): Promise<void> /* append + fsync, бросает при сбое */; recent(limit): JournalEntry[]; sweep(now) }`; `JournalEntry {at, agent, task?, verb, origin?, outcome: 'answered'|'refused'|'rejected', code?: BridgeRefusal | DoorRejection, bytes?, verdict?}`; `DoorRejection = 'bad_host'|'bad_origin'|'cross_site'|'stopping'|'bad_content_type'|'bad_request'` (значения onRefused оболочки N-024); JournalEntry — объединение по outcome: у 'rejected' нет agent и verb (аудит #38); verb: AnyBridgeVerb, канонический (аудит #19); `answerAfterRecord(journal, entry, send)` — единственная обёртка «запись до ответа», при сбое записи отправляет конверт отказа internal без содержимого страницы (аудит #18); RETENTION_DAYS_JOURNAL = 90, тест сверяет с RETENTION_DAYS.journal из @okolos/storage (аудит #30) (проверка seam N-001 круг 2) — без текста страницы и значений полей",
@@ -252,7 +253,8 @@
    "record дописывает строку и делает fsync до возврата (шпион на fd.sync)",
    "каталог только для чтения → record бросает, и обёртка answerAfterRecord отдаёт internal, а не ответ",
    "запись с полем text или value отвергается типом и рантайм-проверкой",
-   "sweep удаляет записи старше срока; срок берётся из RETENTION_DAYS журнала расширения"
+   "sweep удаляет записи старше срока; срок берётся из RETENTION_DAYS журнала расширения",
+   "запись журнала несёт agentId рядом с именем агента: два агента с одинаковым именем различимы в журнале и на SCR-24 (проверки N-013 круг 3, N-007 круг 2)"
   ],
   "dod": "vitest apps/agent/src/journal зелёный; плант «ответ до записи» наблюдён красным"
  },
@@ -267,7 +269,8 @@
   ],
   "files": [
    "Create: apps/agent/src/pairing/pairing.ts, apps/agent/src/pairing/name.ts",
-   "Test: apps/agent/src/pairing/pairing.test.ts, apps/agent/src/pairing/name.test.ts"
+   "Test: apps/agent/src/pairing/pairing.test.ts, apps/agent/src/pairing/name.test.ts",
+   "Modify: apps/agent/package.json, apps/agent/tsconfig.json, pnpm-lock.yaml, tools/reachable.test.ts (зависимость @okolos/core-lookalike; проверка seam N-007 круг 2)"
   ],
   "consumes": "serviceDirs().data",
   "produces": "`class Pairing { static open(file): Pairing; request(agentName, now): {requestId, code, expiresAt} | {refused: reason}; confirm(requestId, now); decline(requestId); claim(requestId, now): {key} | {pending: true} | null; verify(key): AgentRecord | null; revoke(agentId); list(now): {requests: PublicRequest[] /* без requestId, с handle для страницы */, agents}; confirmByHandle(handle, now); declineByHandle(handle) }`; `checkAgentName(name): string | null` (причина отказа)",
@@ -311,7 +314,7 @@
    "любой Origin (в том числе http://localhost:3000) или Sec-Fetch-Site → 403, запроса привязки нет (ревью F7)",
    "Content-Type не application/json → 415",
    "журнал недоступен (ответ — конверт internal из answerAfterRecord, без содержимого; аудит #18): каждый маршрут и вид ответа (отказ двери, ошибка разбора, ошибка протокола, ответ инструмента) уходит без тела (ревью F14)",
-   "ключ отозван → 403 not_paired и вызван onRevoke(agentId); закрытие задач и окон проверяет N-011",
+   "ключ отозван → 403 not_paired (verify отозванного ключа отдаёт null, как неизвестного); onRevoke зовёт тот, кто вызвал Pairing.revoke (страница N-015, действие agent.revoke) с AgentRecord, один тип onRevoke(record: AgentRecord) в N-008 и N-011 (проверки N-013 круг 3, N-007 круг 2)",
    "stdio-шим: читает ключ из файла 0600 клиента, проксирует stdin/stdout ↔ /mcp; без файла ключа печатает в stderr, как пройти привязку, и выходит 2",
    "CLI pair: печатает код, ждёт подтверждения, пишет ключ в clients/<имя>.key 0600; отказ человека → выход 1 без файла",
    "тестовый MCP-клиент (@modelcontextprotocol/client) получает tools/list после привязки",
@@ -323,7 +326,10 @@
    "долгий поток /mcp при остановке: дверь закрывает его сама до срока слива и пишет ответ в журнал; агент за stdio-шимом получает отказ контракта internal с retryable, а не голый 503 (product N-005 круг 3, риски)",
    "журнал двери не записывает тела /pair и /pair/claim (в них requestId); без заголовка X-Okolos-Agent-Key дверь отказывает not_paired, не вызывая Pairing.verify (отчёт N-007)",
    "каждый принятый вызов двери зовёт Pairing.touch(agentId, now): «последний вызов» на SCR-23 берётся отсюда (проверки N-007)",
-   "сбой записи в Pairing.touch не роняет вызов агента: ответ уходит, сбой пишется в лог службы (отчёт N-007 fix 1)"
+   "сбой записи в Pairing.touch не роняет вызов агента: ответ уходит, сбой пишется в лог службы (отчёт N-007 fix 1)",
+   "ни один маршрут двери не подтверждает и не отклоняет запрос: у Pairing нет confirm по requestId, только confirmByHandle со страницы; тест обходит маршруты /mcp, /pair, /pair/claim и проверяет, что запрос остаётся pending (проверки N-013 круг 3, N-007 круг 2)",
+   "сбой записи хранилища в claim: /pair/claim отвечает отказом internal с retryable, ключ не выдан, запрос остаётся, следующий claim после починки выдаёт ключ (проверки N-013 круг 3, N-007 круг 2)",
+   "отказы двери в журнале несут только коды DoorRejection | not_paired, у каждого есть строка rejection_<код>; при нечитаемом хранилище привязок дверь пишет not_paired (проверки N-013 круг 3, N-007 круг 2)"
   ],
   "dod": "vitest apps/agent/src/door зелёный"
  },
@@ -342,7 +348,7 @@
    "Test: apps/agent/src/tasks/tasks.test.ts"
   ],
   "consumes": "validateScope, inScope, refuse, verbAllowed (close разрешён всегда) (bridge.ts)",
-  "produces": "`class Tasks { open(agentId, scopeInput, now): BridgeResult<Task>; get(agentId, taskId, now): BridgeResult<Task>; charge(task, verb, url?): BridgeResult<void>; closeAllOf(agentId); list(now) }`; `Task {id, agentId, scope, openedAt, stepsUsed, windowId?}`; `checkLanded(task, actualUrl): BridgeResult<void>` (аудит #39); SessionOpenResult.sessionId = Task.id",
+  "produces": "`class Tasks { open(agentId, scopeInput, now): BridgeResult<Task>; get(agentId, taskId, now): BridgeResult<Task>; charge(task, verb, url?): BridgeResult<void>; closeAllOf(agentId); list(now) }`; `Task {id, agentId, scope, openedAt, stepsUsed, windowId?, windowOpen: boolean /* SCR-24 taskWindowOpen/taskWindowClosed; ставит N-011 по событию окна N-010 */}`; `checkLanded(task, actualUrl): BridgeResult<void>` (аудит #39); SessionOpenResult.sessionId = Task.id",
   "tests": [
    "каждый отказ BRIDGE_REFUSALS, который выдают задачи (invalid_scope, no_such_task, origin_not_in_task, verb_not_in_task, budget_exhausted, task_expired), — свой тест",
    "чужая задача (другой agentId) → no_such_task (ревью F8)",
@@ -435,7 +441,11 @@
    "createAgent передаёт оболочке N-005 version, buildRoot и localesDir; при неизвестном каталоге строк служба не стартует молча с ключами вместо фраз (отчёт N-005, fix 1)",
    "в журнал агентов попадают только отказы маршрутов двери (/mcp, /pair, /pair/claim); опросы Fabric и загрузки страницы во время остановки туда не пишутся (проверки N-024)",
    "сбой accept (ошибка сервера после bind) не завершает демон; close() дожидается начатых onRefused; предупреждение о вычищенных строках доходит до событий и после неудачного старта (проверка unit N-024)",
-   "onRevoke получает AgentRecord из Pairing.revoke и закрывает задачи и окна именно этого агента; хранилище привязок не читается при старте: служба стартует, страница показывает состояние error SCR-23, дверь отказывает всем (проверки N-007)"
+   "onRevoke получает AgentRecord из Pairing.revoke и закрывает задачи и окна именно этого агента; хранилище привязок не читается при старте: служба стартует, страница показывает состояние error SCR-23, дверь отказывает всем (проверки N-007)",
+   "Pairing onNotice связан с событиями службы: requested, confirmed, declined, expired, claim_expired, paired, revoked пишутся в events.jsonl фиксированными фразами без requestId; отклонённый и истёкший запрос оставляют запись (SCN-044 alt path); onNoticeError идёт в лог службы (проверки N-013 круг 3, N-007 круг 2)",
+   "последний сбой записи журнала (время и код причины) хранится и отдаётся странице: SCR-24 error и строка journalError берут его, причина в словах из каталога (проверки N-013 круг 3, N-007 круг 2)",
+   "остановка демона зовёт Pairing.flush(): время последнего вызова каждого агента переживает перезапуск (проверки N-013 круг 3, N-007 круг 2)",
+   "Task.windowOpen падает в false, когда окно задачи закрыто не через close, и SCR-24 показывает taskWindowClosed (проверки N-013 круг 3, N-007 круг 2)"
   ],
   "dod": "vitest apps/agent/src/verbs зелёный на Chrome stable"
  },
@@ -510,7 +520,9 @@
    "ключи taskProfileAgent и taskProfileDisposable в обоих каталогах, copylot_check (аудит #20)",
    "тексты службы уже идут через каталог (N-024): служба не стартует без своих ключей; N-014 переносит в каталог английские тексты набора Fabric (403, занятый замок) или записывает, почему они остаются протокольными",
    "eventsUnreadable не утверждает, что сохранены все остальные события: обрезка по сроку при том же старте может удалить старые (проверка product N-024 круг 2)",
-   "слова для машинных причин привязки: name_not_text, name_empty, name_too_long, name_digits, name_bidi, name_control, too_many_pending, too_many_requests и причин хранилища unreadable, not_json, not_a_store, bad_record; copylot_check (проверка product N-007)"
+   "слова для машинных причин привязки: name_not_text, name_empty, name_too_long, name_digits, name_bidi, name_control, too_many_pending, too_many_requests и причин хранилища unreadable, not_json, not_a_store, bad_record; copylot_check (проверка product N-007)",
+   "ключи verb_<глагол> для каждого AnyBridgeVerb (точки как подчёркивания: verb_session_open), исчерпывающая функция verbKey как refusalKey; на странице не появляется идентификатор глагола (проверки N-013 круг 3, N-007 круг 2)",
+   "слова для причин сбоя журнала (то, что подставляется в $WHAT$ строки journalError) и хранилища (pairingStoreError, agentRevokeFailed), copylot_check (проверки N-013 круг 3, N-007 круг 2)"
   ],
   "dod": "строки и термины сделаны на стадии 3; узел добавляет проверку каталога демона в tools/locales.test.ts"
  },
@@ -540,8 +552,8 @@
    "без куки → 401; запись без X-Okolos-Request → 403; запись без Origin или с чужим Origin → 403; чужой Host на любом маршруте → 403 (ревью F4)",
    "requestId не попадает в HTML и /api/state; подтверждение идёт по handle, который страница получила в своей сессии",
    "имя агента выводится текстом (textContent), код в отдельном элементе [data-role=pairing-code]",
-   "состояния SCR-23: loading, empty, error, success, expired; SCR-24: loading, empty, error, success — каждое по data-role",
-   "инструмент pairing.confirm через MCP отвечает human-step-required со ссылкой /dashboard",
+   "состояния SCR-23: loading, empty, error, success, expired, confirmed, claim-expired, revoke-failed (у confirmed и claim-expired нет кнопок); SCR-24: loading, empty, error, success; каждое по data-role (проверки N-013 круг 3, N-007 круг 2)",
+   "инструмент pairing.confirm через MCP отвечает human-step-required со ссылкой Fabric Dashboards fabric-dashboards://service/okolos-agent.default?path=/dashboard, не http://127.0.0.1 (проверки N-013 круг 3, N-007 круг 2)",
    "строки берутся из каталога; ключ без строки виден как [key]",
    "отказ двери до разбора и отказ not_paired без агента показываются строкой refusalDoorLine с причиной rejection_<код>; refusalKey для них не вызывается и не бросает (проверка seam N-001 круг 2)",
    "страница принимает только сессию, выданную N-005; атрибуты куки проверяет N-005 (аудит #12)",
@@ -552,7 +564,10 @@
    "маршрут страницы объявляет paths /dashboard и /api, well-known показывает surfaces.dashboard; таблица действий проходит проверку набора при старте (проверка seam N-005 круг 2)",
    "состояние «служба останавливается» на SCR-23 и SCR-24: страница получает 503 во время слива и говорит об этом (проверка product N-024)",
    "во время слива загрузка /dashboard получает страницу «служба останавливается» (маршрут страницы отвечает сам до слива или N-011 даёт оболочке страницу 503), а не сырой JSON 503 (проверка seam N-024 круг 2)",
-   "SCR-23 и screens.md говорят, что перезапуск демона закрывает открытые запросы: CLI получает отказ, агенту нужно попросить снова (проверка product N-007)"
+   "SCR-23 и screens.md говорят, что перезапуск демона закрывает открытые запросы: CLI получает отказ, агенту нужно попросить снова (проверка product N-007)",
+   "элементы SCR-23: pairing-duplicate (похоже на другой ждущий запрос), pairing-lookalike (похоже на агента с доступом, строка pairingLooksLikeAgent называет его), pairing-asked, pairing-notice, pairing-how с --name, строка pairedSinceNever (проверки N-013 круг 3, N-007 круг 2)",
+   "строка отказа SCR-24 показывает вызов словами verb_*: ни один идентификатор глагола (session.open, waitFor) не доходит до страницы (проверки N-013 круг 3, N-007 круг 2)",
+   "отзыв, который не записался: POST /api/agents/:id/revoke получает PairingStoreError, страница показывает agentRevokeFailed, строка агента остаётся, onRevoke не вызван (проверки N-013 круг 3, N-007 круг 2)"
   ],
   "dod": "vitest apps/agent/src/dashboard зелёный; SCN-044, SCN-045 переведены в built в том же изменении, python3 docs/ux/lint.py 0"
  },
@@ -604,8 +619,8 @@
   "produces": "`pnpm test:e2e:bridge`",
   "tests": [
    "skeleton: MCP-клиент вызывает инструменты по toolName (session_open …), журнал хранит каноническое написание (session.open) → привязка через страницу → session.open → open → snapshot без скрытой инструкции → close",
-   "SCN-044: неверный код → отклонить; отзыв → следующий вызов not_paired, задача закрыта",
-   "SCN-045: страница показывает задачу агента и отказ origin_not_in_task",
+   "SCN-044: неверный код → отклонить; истёкший запрос (часы через createAgent) показан строкой expired; вызов с заголовком Origin виден на SCR-24 как отказ на двери; отзыв → следующий вызов not_paired, задача закрыта (проверки N-013 круг 3, N-007 круг 2)",
+   "SCN-045: страница показывает задачу агента и отказ origin_not_in_task; без задач SCR-24 в состоянии empty (проверки N-013 круг 3, N-007 круг 2)",
    "playwright test --list основного конфига не показывает e2e/bridge (аудит #15)"
   ],
   "dod": "pnpm test:e2e:bridge зелёный; все процессы Chrome и демона закрыты после прогона"

@@ -970,13 +970,13 @@ every rule below; where they differ, the scenario says so.
 - **Entry point:** an agent's first call to the local door
 - **Preconditions:** Okolos Agent is running; the agent has never connected
 - **Steps:**
-  1. The agent asks for access through `okolos-agent pair` (`POST /pair`, a door route that needs no key) -> the terminal shows a six-digit code; a call to `/mcp` without a key is refused and creates no request
+  1. The agent asks for access through `okolos-agent pair --name "<name>"` (`POST /pair`, a door route that needs no key) -> the terminal shows a six-digit code; a call to `/mcp` without a key is refused and creates no request
   2. The person sees the agent's name and the same six-digit code on the Okolos Agent page and confirms -> a key is issued to that agent once; the daemon keeps only its SHA-256
   3. The person later revokes the agent -> its next call is refused and any task it holds stops
 - **Expected result:** only agents the person confirmed reach the browser through the door, and each one can be taken back on its own. Code already running as the person is outside Б1's boundary (spec §11 F4)
-- **Alt paths:** the codes differ, or the person declines or does not answer within five minutes -> no key, and the attempt is recorded; the person confirms but the agent does not collect its key within five minutes of the confirmation -> no access, the row says the key was not collected, and the agent has to ask again
-- **UI elements:** SCR-23: `[data-role=pairing-requests]`, `[data-role=pairing-code]`, `[data-role=pairing-asked]`, `[data-role=pairing-duplicate]`, `[data-role=pairing-confirm]`, `[data-role=pairing-decline]`, `[data-role=pairing-notice]`, `[data-role=paired-agents]`, `[data-role=agent-revoke]`, `[data-role=pairing-how]`
-- **States covered:** success, error, empty, expired, confirmed (the agent has not collected its key yet)
+- **Alt paths:** the codes differ, or the person declines or does not answer within five minutes -> no key, and the attempt is recorded in the service's events (declined, expired); the person confirms but the agent does not collect its key within five minutes of the confirmation -> no access, the row says the key was not collected, and the agent has to ask again
+- **UI elements:** SCR-23: `[data-role=pairing-requests]`, `[data-role=pairing-code]`, `[data-role=pairing-asked]`, `[data-role=pairing-duplicate]`, `[data-role=pairing-lookalike]`, `[data-role=pairing-confirm]`, `[data-role=pairing-decline]`, `[data-role=pairing-notice]`, `[data-role=paired-agents]`, `[data-role=agent-revoke]`, `[data-role=pairing-how]`
+- **States covered:** success, error, empty, expired, confirmed (the agent has not collected its key yet), claim-expired (the agent did not collect its key), revoke-failed (the access list could not be written; the agent keeps access and the page says so)
 - **Errors & recovery:** a call carrying no key or a wrong key -> refused and recorded; a call carrying any `Origin` or `Sec-Fetch-*` header (a web page) -> refused before any pairing request is made, and recorded, never treated as "local, so the person". Loopback is not a person: the research behind this feature found that every 2025–2026 bridge breach came through a door that believed it was
 - **Status:** draft
 - **Coverage:** none — designed 2026-10-06, not built

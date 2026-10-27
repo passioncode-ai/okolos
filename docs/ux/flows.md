@@ -695,7 +695,7 @@ flowchart TD
 
 ### FLW-21: Connect an agent to the browser
 - **Traces:** ST-027 (JTBD-10, JRN-05/#1)
-- **Goal:** an agent the person chose can use the browser, and no other agent and no web page can; code running as the person is outside Б1's boundary (spec §11 F4)
+- **Goal:** an agent the person chose can use the browser, and no other agent through the door and no web page can; code running as the person is outside Б1's boundary (spec §11 F4), and a coding agent with a shell on this machine is such code: in Б1 only the snapshot cleaning stands between a page and it (spec §11 R9)
 - **Entry points:** `okolos-agent pair --name "<name>"` in the terminal; the Okolos Agent page in Fabric Dashboards
 - **Success exit:** the agent is paired, listed with when it got access and its last call, and revocable in one place
 - **Task analysis:**
@@ -714,7 +714,7 @@ flowchart TD
   P -->|person confirms, codes match| C[Confirmed: the CLI collects the key within five minutes]
   C -->|collected| R[Key issued to the agent once; the daemon keeps only its SHA-256]
   C -->|not collected in time| N
-  P -->|person refuses or no answer| N[Refused and recorded]
+  P -->|person refuses or no answer| N[Refused and recorded in the service's events]
   R --> OK
   K -->|any Origin or Sec-Fetch header| N
 ```

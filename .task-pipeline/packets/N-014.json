@@ -33,6 +33,8 @@
   "тексты службы уже идут через каталог (N-024): служба не стартует без своих ключей; N-014 переносит в каталог английские тексты набора Fabric (403, занятый замок) или записывает, почему они остаются протокольными",
   "eventsUnreadable не утверждает, что сохранены все остальные события: обрезка по сроку при том же старте может удалить старые (проверка product N-024 круг 2)",
   "слова для машинных причин привязки: name_not_text, name_empty, name_too_long, name_digits, name_bidi, name_control, too_many_pending, too_many_requests и причин хранилища unreadable, not_json, not_a_store, bad_record; copylot_check (проверка product N-007)",
+  "ключи verb_<глагол> для каждого AnyBridgeVerb (точки как подчёркивания: verb_session_open), исчерпывающая функция verbKey как refusalKey; на странице не появляется идентификатор глагола (проверки N-013 круг 3, N-007 круг 2)",
+  "слова для причин сбоя журнала (то, что подставляется в $WHAT$ строки journalError) и хранилища (pairingStoreError, agentRevokeFailed), copylot_check (проверки N-013 круг 3, N-007 круг 2)",
   "проверка узла: python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts"
  ],
  "guards": [

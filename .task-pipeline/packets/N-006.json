@@ -15,7 +15,8 @@
  "source_scope": {
   "edit_targets": [
    "apps/agent/src/journal/journal.ts",
-   "apps/agent/src/journal/journal.test.ts"
+   "apps/agent/src/journal/journal.test.ts",
+   "tools/reachable.test.ts"
   ]
  },
  "outputs": [
@@ -26,6 +27,7 @@
   "каталог только для чтения → record бросает, и обёртка answerAfterRecord отдаёт internal, а не ответ",
   "запись с полем text или value отвергается типом и рантайм-проверкой",
   "sweep удаляет записи старше срока; срок берётся из RETENTION_DAYS журнала расширения",
+  "запись журнала несёт agentId рядом с именем агента: два агента с одинаковым именем различимы в журнале и на SCR-24 (проверки N-013 круг 3, N-007 круг 2)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/journal && pnpm -s run typecheck"
  ],
  "guards": [
@@ -36,5 +38,5 @@
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "без длинного тире в текстах для людей"
  ],
- "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/journal/journal.ts apps/agent/src/journal/journal.test.ts; затем первый непройденный тест в списке acceptance"
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/journal/journal.ts apps/agent/src/journal/journal.test.ts tools/reachable.test.ts; затем первый непройденный тест в списке acceptance"
 }

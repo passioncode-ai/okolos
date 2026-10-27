@@ -16,7 +16,11 @@
    "apps/agent/src/pairing/pairing.ts",
    "apps/agent/src/pairing/name.ts",
    "apps/agent/src/pairing/pairing.test.ts",
-   "apps/agent/src/pairing/name.test.ts"
+   "apps/agent/src/pairing/name.test.ts",
+   "apps/agent/package.json",
+   "apps/agent/tsconfig.json",
+   "pnpm-lock.yaml",
+   "tools/reachable.test.ts"
   ]
  },
  "outputs": [

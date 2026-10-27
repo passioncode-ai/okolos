@@ -264,7 +264,8 @@
    "check": "pnpm -s exec vitest run apps/agent/src/journal && pnpm -s run typecheck",
    "touches": [
     "apps/agent/src/journal/journal.ts",
-    "apps/agent/src/journal/journal.test.ts"
+    "apps/agent/src/journal/journal.test.ts",
+    "tools/reachable.test.ts"
    ],
    "risk": "R3"
   },
@@ -282,7 +283,11 @@
     "apps/agent/src/pairing/pairing.ts",
     "apps/agent/src/pairing/name.ts",
     "apps/agent/src/pairing/pairing.test.ts",
-    "apps/agent/src/pairing/name.test.ts"
+    "apps/agent/src/pairing/name.test.ts",
+    "apps/agent/package.json",
+    "apps/agent/tsconfig.json",
+    "pnpm-lock.yaml",
+    "tools/reachable.test.ts"
    ],
    "risk": "R3",
    "certification": {
