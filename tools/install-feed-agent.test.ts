@@ -213,6 +213,23 @@ describe('the agent runs from its own checkout at origin/main (F2)', () => {
     ])
   })
 
+  it('hands git and pnpm no Cloudflare credential, as the bootstrap does', async () => {
+    const h = home()
+    const envs: Array<Record<string, string | undefined> | undefined> = []
+    const tool = async (_command: string, _args: string[], options?: { env?: Record<string, string | undefined> }) => {
+      envs.push(options?.env)
+      return { code: 0, signal: null, stdout: '', stderr: '', timedOut: false }
+    }
+    const env = { PATH: '/bin', CLOUDFLARE_API_TOKEN: 't', CLOUDFLARE_API_KEY: 'k' }
+    await ensureCheckout({ repo: '/repo', checkout: h.paths.agentCheckout, tool, env, log: quiet })
+    expect(envs).toHaveLength(4)
+    for (const seen of envs) {
+      expect(seen).toMatchObject({ PATH: '/bin', GIT_TERMINAL_PROMPT: '0' })
+      expect(seen).not.toHaveProperty('CLOUDFLARE_API_TOKEN')
+      expect(seen).not.toHaveProperty('CLOUDFLARE_API_KEY')
+    }
+  })
+
   it('leaves an existing checkout to the job, which fast-forwards it', async () => {
     const h = home()
     mkdirSync(h.paths.agentCheckout, { recursive: true })

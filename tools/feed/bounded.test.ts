@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { groupSpawnOptions, killPlan, liveGroups, runBounded, sweepsAfterExit } from './bounded.mjs'
+import { groupSpawnOptions, killPlan, liveGroups, runBounded, SECRET_VARIABLES, sweepsAfterExit, withoutSecrets } from './bounded.mjs'
 
 /**
  * Every child has an owner, a deadline and a process group (LC-02).
@@ -136,5 +136,14 @@ describe('the kill, per platform', () => {
   it('sweeps the group after a normal exit on POSIX only, where a group outlives its leader', () => {
     expect(sweepsAfterExit('darwin')).toBe(true)
     expect(sweepsAfterExit('win32')).toBe(false)
+  })
+})
+
+describe('a child that does not publish gets no credential', () => {
+  it('drops every Cloudflare credential variable from a copy, and leaves the original alone', () => {
+    const env = { PATH: '/bin', CLOUDFLARE_API_TOKEN: 't', CLOUDFLARE_API_KEY: 'k', CLOUDFLARE_ACCOUNT_ID: 'a' }
+    expect(SECRET_VARIABLES).toEqual(['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY'])
+    expect(withoutSecrets(env)).toEqual({ PATH: '/bin', CLOUDFLARE_ACCOUNT_ID: 'a' })
+    expect(env.CLOUDFLARE_API_KEY).toBe('k')
   })
 })

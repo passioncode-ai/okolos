@@ -41,7 +41,13 @@ export function bootstrapDrift(options: { bin: string; from: string; files?: rea
 }
 export function originUrl(options: { repo?: string; tool?: Tool }): Promise<string>
 export function isDisabled(printDisabled: string, label?: string): boolean
-export function ensureCheckout(options: { repo?: string; checkout: string; tool?: Tool; log?: (line: string) => void }): Promise<void>
+export function ensureCheckout(options: {
+  repo?: string
+  checkout: string
+  tool?: Tool
+  env?: Record<string, string | undefined>
+  log?: (line: string) => void
+}): Promise<void>
 export function installAgent(options: {
   label?: string
   domain: string

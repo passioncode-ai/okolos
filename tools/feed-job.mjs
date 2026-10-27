@@ -40,7 +40,7 @@ import { existsSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-import { killAllGroups, runBounded } from './feed/bounded.mjs'
+import { killAllGroups, runBounded, withoutSecrets } from './feed/bounded.mjs'
 import { acquireLock, LockHeldError } from './feed/lock.mjs'
 import { capFile, cleanLine, openLog } from './feed/log.mjs'
 import { feedPaths } from './feed/paths.mjs'
@@ -77,15 +77,6 @@ export const DEADLINES = {
 
 /** Exit codes a host can tell apart. */
 export const EXIT = { ok: 0, failed: 1, lockHeld: 75, watchdog: 124, signal: 143 }
-
-/** Variables that carry the Cloudflare credential; never handed to a stage that does not publish. */
-const SECRET_VARIABLES = ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY']
-
-function withoutSecrets(env) {
-  const copy = { ...env }
-  for (const name of SECRET_VARIABLES) delete copy[name]
-  return copy
-}
 
 /**
  * Removes what older versions and dead runs left in the temp directory.

@@ -21,6 +21,21 @@ import { spawn } from 'node:child_process'
  * reused one would end an unrelated process.
  */
 
+/**
+ * Variables that carry the Cloudflare credential. Only the publish step, behind
+ * the secret runner, may see one; every other child (git, pnpm install, the
+ * ingest) gets `withoutSecrets(env)`. One list for the job, the bootstrap and the
+ * installer.
+ */
+export const SECRET_VARIABLES = ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY']
+
+/** A copy of `env` without SECRET_VARIABLES. */
+export function withoutSecrets(env) {
+  const copy = { ...env }
+  for (const name of SECRET_VARIABLES) delete copy[name]
+  return copy
+}
+
 /** Groups started here and not yet ended — what a shutdown must kill. */
 const live = new Set()
 

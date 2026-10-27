@@ -38,3 +38,7 @@ export function killPlan(pid: number, signal: 'SIGTERM' | 'SIGKILL', platform?: 
 export function groupSpawnOptions(platform?: string): { detached: boolean; windowsHide: boolean }
 /** Whether a child that exited on its own still has its group swept (POSIX only). */
 export function sweepsAfterExit(platform?: string): boolean
+/** Variables that carry the Cloudflare credential. */
+export const SECRET_VARIABLES: readonly string[]
+/** A copy of `env` without SECRET_VARIABLES. */
+export function withoutSecrets<T extends Record<string, string | undefined>>(env: T): T

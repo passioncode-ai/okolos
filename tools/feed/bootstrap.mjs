@@ -39,7 +39,7 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, realpathSync, renameSync, rmSync } from 'node:fs'
 import path from 'node:path'
 
-import { killAllGroups, runBounded } from './bounded.mjs'
+import { killAllGroups, runBounded, withoutSecrets } from './bounded.mjs'
 import { isMain } from './is-main.mjs'
 import { acquireLock, LockHeldError } from './lock.mjs'
 import { capFile, cleanLine, openLog } from './log.mjs'
@@ -96,12 +96,8 @@ export function reasonFrom(lines) {
   return kept.find((line) => ERROR_LINE.test(line)) ?? kept.at(-1) ?? ''
 }
 
-const SECRET_VARIABLES = ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY']
-
 function quietEnv(env) {
-  const copy = { ...env, GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: 'ssh -o BatchMode=yes -o ConnectTimeout=15' }
-  for (const name of SECRET_VARIABLES) delete copy[name]
-  return copy
+  return { ...withoutSecrets(env), GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: 'ssh -o BatchMode=yes -o ConnectTimeout=15' }
 }
 
 function describe(result) {

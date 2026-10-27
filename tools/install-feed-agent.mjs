@@ -17,7 +17,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { BOOTSTRAP_FILES, BOOTSTRAP_SOURCES } from './feed/bootstrap.mjs'
-import { runBounded } from './feed/bounded.mjs'
+import { runBounded, withoutSecrets } from './feed/bounded.mjs'
 import { openLog } from './feed/log.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { readStatus } from './feed/status.mjs'
@@ -131,13 +131,13 @@ export function isDisabled(printDisabled, label = LABEL) {
  * with only the publish tools installed. Left alone when it exists — the job
  * fast-forwards it before every run.
  */
-export async function ensureCheckout({ repo = root, checkout, tool = runBounded, log = console.log }) {
+export async function ensureCheckout({ repo = root, checkout, tool = runBounded, env: from = process.env, log = console.log }) {
   if (existsSync(checkout)) {
     log(`agent checkout: ${checkout} (kept; the job fast-forwards it)`)
     return
   }
-  const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' }
-  delete env.CLOUDFLARE_API_TOKEN
+  // No credential for git or pnpm: the same list the job and the bootstrap drop.
+  const env = { ...withoutSecrets(from), GIT_TERMINAL_PROMPT: '0' }
   const steps = [
     // A folder deleted under git leaves its worktree entry, and `add` refuses that
     // path until the entry is pruned (B-150).
