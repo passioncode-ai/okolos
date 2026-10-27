@@ -31,6 +31,18 @@ describe('the name an agent gives itself', () => {
     expect(checkAgentName('agent ١٢٣')).toBe('name_digits')
   })
 
+  // Fix round 1: a name reads as a code when it carries three numeric characters in total, of any
+  // kind (superscript, circled, fullwidth), whatever separates them.
+  it('refuses three or more numeric characters in total, whatever separates them', () => {
+    expect(checkAgentName('1 2 3 4 5 6')).toBe('name_digits')
+    expect(checkAgentName('12-34-56')).toBe('name_digits')
+    expect(checkAgentName('①②③④⑤⑥')).toBe('name_digits')
+    expect(checkAgentName('¹²³ ⁴⁵⁶')).toBe('name_digits')
+    expect(checkAgentName('agent ①②③')).toBe('name_digits')
+    expect(checkAgentName('a1 b2 c3')).toBe('name_digits')
+    expect(checkAgentName('agent 42')).toBeNull()
+  })
+
   it('refuses control and other invisible characters', () => {
     expect(checkAgentName('agent\u0000x')).toBe('name_control')
     expect(checkAgentName('agent\nnext line')).toBe('name_control')

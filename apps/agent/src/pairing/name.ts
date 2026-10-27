@@ -2,8 +2,8 @@
  * The rules for the name an agent gives itself (spec §11 F12).
  *
  * Nothing verifies the name: the consent page shows it as the agent's own claim, next to the
- * six-digit code the person compares. So the name may not crowd the page, may not carry a run of
- * digits that could pass for the code, and may not carry a character that moves, hides or breaks
+ * six-digit code the person compares. So the name may not crowd the page, may not carry
+ * numerals that could pass for the code, and may not carry a character that moves, hides or breaks
  * text. A refusal is a machine code; the page and the CLI map it through the catalogue.
  */
 
@@ -12,8 +12,13 @@ export const MAX_NAME_LENGTH = 40
 
 export type NameRefusal = 'name_not_text' | 'name_empty' | 'name_too_long' | 'name_digits' | 'name_bidi' | 'name_control'
 
-/** Three digits in a row, in any script: a fullwidth or Arabic-Indic run reads as digits too. */
-const DIGIT_RUN = /\p{Nd}{3}/u
+/**
+ * A name reads as a code when it carries this many numeric characters in total, whatever separates
+ * them ("1 2 3", "12-34-56"), counting every kind Unicode calls numeric (\p{N}: fullwidth,
+ * Arabic-Indic, superscript, circled, Roman). Fix round 1 of N-007, stricter than F12's "in a row".
+ */
+const MAX_NUMERIC = 2
+const NUMERIC = /\p{N}/gu
 
 /** The marks that reorder or isolate text: embeddings, overrides, isolates and the directional marks. */
 const BIDI = /[؜‎‏‪-‮⁦-⁩]/u
@@ -32,6 +37,6 @@ export function checkAgentName(name: string): NameRefusal | null {
   // Bidirectional marks are format characters too; they are named first, for a precise reason.
   if (BIDI.test(name)) return 'name_bidi'
   if (CONTROL.test(name)) return 'name_control'
-  if (DIGIT_RUN.test(name)) return 'name_digits'
+  if ((name.match(NUMERIC)?.length ?? 0) > MAX_NUMERIC) return 'name_digits'
   return null
 }
