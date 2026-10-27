@@ -640,6 +640,72 @@ describe('a notice handler that throws (fix round 1)', () => {
     expect(pairing.verify((claimed as { key: string }).key)).toMatchObject({ name: 'Claude Code' })
     expect(reported.map(([, notice]) => notice.kind)).toEqual(['requested', 'confirmed', 'paired'])
   })
+
+  // Fix round 2: the branches no test reached.
+  it('goes to process.emitWarning when no onNoticeError is given, and the change stands', () => {
+    const warn = vi.spyOn(process, 'emitWarning').mockImplementation(() => {})
+    try {
+      const pairing = Pairing.open(storeFile(), {
+        random: seeded(),
+        onNotice: (notice) => {
+          if (notice.kind === 'requested') throw new Error('journal is full')
+          throw 'not an error' // eslint-disable-line @typescript-eslint/only-throw-error -- a handler may throw anything
+        },
+      })
+      const request = asked(pairing.request('Claude Code', T0))
+      expect(pairing.list(T0 + 1).requests).toHaveLength(1)
+      expect(confirmAt(pairing, request, T0 + 2)).toBe(true)
+      expect(warn.mock.calls).toEqual([
+        [expect.objectContaining({ message: 'journal is full' }), { code: 'OKOLOS_PAIRING_NOTICE', detail: 'requested' }],
+        ['not an error', { code: 'OKOLOS_PAIRING_NOTICE', detail: 'confirmed' }],
+      ])
+      expect(pairing.claim(request.requestId, T0 + 3)).toHaveProperty('key')
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('loses neither the request nor the stored key when onNoticeError throws too', () => {
+    const file = storeFile()
+    const pairing = Pairing.open(file, {
+      random: seeded(),
+      onNotice: () => {
+        throw new Error('journal is full')
+      },
+      onNoticeError: () => {
+        throw new Error('the reporter is down too')
+      },
+    })
+    const result = pairing.request('Claude Code', T0)
+    expect(result).toEqual({ requestId: expect.stringMatching(/^[0-9a-f]{32}$/), code: expect.any(String), expiresAt: T0 + REQUEST_LIFETIME_MS })
+    const request = asked(result)
+    expect(pairing.list(T0 + 1).requests).toMatchObject([{ name: 'Claude Code', state: 'pending' }])
+    expect(confirmAt(pairing, request, T0 + 2)).toBe(true)
+    const claimed = pairing.claim(request.requestId, T0 + 3)
+    expect(claimed).toEqual({ key: expect.stringMatching(/^[0-9a-f]{64}$/) })
+    const key = (claimed as { key: string }).key
+    expect(pairing.verify(key)).toMatchObject({ name: 'Claude Code' })
+    expect(open(file).verify(key)).toMatchObject({ name: 'Claude Code' })
+  })
+})
+
+describe('confirming twice (fix round 2)', () => {
+  it('answers true again and keeps the first confirm time, with one notice', () => {
+    const notices: PairingNotice[] = []
+    const pairing = open(storeFile(), notices)
+    const request = asked(pairing.request('Claude Code', T0))
+    const handle = handleOf(pairing, request, T0)
+    expect(pairing.confirmByHandle(handle, T0 + MINUTE)).toBe(true)
+    expect(pairing.confirmByHandle(handle, T0 + 2 * MINUTE)).toBe(true)
+    expect(pairing.list(T0 + 2 * MINUTE).requests[0]).toMatchObject({
+      state: 'confirmed',
+      confirmedAt: T0 + MINUTE,
+      expiresAt: T0 + MINUTE + CLAIM_WINDOW_MS,
+    })
+    expect(notices.filter((n) => n.kind === 'confirmed')).toHaveLength(1)
+    // The claim window still runs from the first confirm.
+    expect(pairing.claim(request.requestId, T0 + MINUTE + CLAIM_WINDOW_MS)).toBeNull()
+  })
 })
 
 describe('two waiting requests under one name (spec §11 F5)', () => {
