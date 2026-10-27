@@ -74,9 +74,6 @@
       }
     }
   },
-  "pairedNever": {
-    "message": "вызовов ещё не было"
-  },
   "pairedTasks": {
     "message": "Открытых задач: $COUNT$",
     "placeholders": {
@@ -162,14 +159,6 @@
   "taskWindowClosed": {
     "message": "Окно агента закрыто"
   },
-  "tasksError": {
-    "message": "Список задач не читается: $WHAT$. Пока его не починить, новые задачи не открываются.",
-    "placeholders": {
-      "what": {
-        "content": "$1"
-      }
-    }
-  },
   "refusalsHeading": {
     "message": "Последние отказы"
   },
@@ -177,16 +166,19 @@
     "message": "Отказов не было."
   },
   "refusalLine": {
-    "message": "$AGENT$: $WHAT$, $WHEN$",
+    "message": "$WHEN$, $AGENT$ просил $ASKED$: $WHAT$",
     "placeholders": {
-      "agent": {
+      "when": {
         "content": "$1"
       },
-      "what": {
+      "agent": {
         "content": "$2"
       },
-      "when": {
+      "asked": {
         "content": "$3"
+      },
+      "what": {
+        "content": "$4"
       }
     }
   },
@@ -281,6 +273,54 @@
     "message": "Запросил в $TIME$",
     "placeholders": {
       "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairedSinceNever": {
+    "message": "Доступ с $DATE$, вызовов ещё не было",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "refusalDoorLine": {
+    "message": "$WHEN$, вызов не от агента отклонён до разбора: $WHAT$",
+    "placeholders": {
+      "when": {
+        "content": "$1"
+      },
+      "what": {
+        "content": "$2"
+      }
+    }
+  },
+  "rejection_bad_host": {
+    "message": "чужой адрес службы"
+  },
+  "rejection_bad_origin": {
+    "message": "вызов со страницы в браузере"
+  },
+  "rejection_cross_site": {
+    "message": "вызов с чужого сайта"
+  },
+  "rejection_bad_content_type": {
+    "message": "неверный формат вызова"
+  },
+  "rejection_bad_request": {
+    "message": "вызов не разобран"
+  },
+  "rejection_stopping": {
+    "message": "служба останавливалась"
+  },
+  "rejection_not_paired": {
+    "message": "вызов без ключа доступа"
+  },
+  "journalError": {
+    "message": "Журнал агентов не пишется: $WHAT$. Пока его не починить, агенты получают отказ, и ни один ответ со страницы не уходит.",
+    "placeholders": {
+      "what": {
         "content": "$1"
       }
     }

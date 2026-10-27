@@ -974,8 +974,8 @@ every rule below; where they differ, the scenario says so.
   2. The person sees the agent's name and the same six-digit code on the Okolos Agent page and confirms -> a key is issued to that agent once; the daemon keeps only its SHA-256
   3. The person later revokes the agent -> its next call is refused and any task it holds stops
 - **Expected result:** only agents the person confirmed reach the browser through the door, and each one can be taken back on its own. Code already running as the person is outside Б1's boundary (spec §11 F4)
-- **Alt paths:** the codes differ, or the person refuses or does not answer -> no key, and the attempt is recorded
-- **UI elements:** SCR-23: `[data-role=pairing-requests]` with the code, `[data-role=pairing-confirm]`, `[data-role=pairing-decline]`, `[data-role=agent-revoke]`
+- **Alt paths:** the codes differ, or the person declines or does not answer within five minutes -> no key, and the attempt is recorded; the person confirms but the agent does not collect its key within five minutes of the confirmation -> no access, the row says the key was not collected, and the agent has to ask again
+- **UI elements:** SCR-23: `[data-role=pairing-requests]`, `[data-role=pairing-code]`, `[data-role=pairing-asked]`, `[data-role=pairing-duplicate]`, `[data-role=pairing-confirm]`, `[data-role=pairing-decline]`, `[data-role=pairing-notice]`, `[data-role=paired-agents]`, `[data-role=agent-revoke]`, `[data-role=pairing-how]`
 - **States covered:** success, error, empty, expired, confirmed (the agent has not collected its key yet)
 - **Errors & recovery:** a call carrying no key or a wrong key -> refused and recorded; a call carrying any `Origin` or `Sec-Fetch-*` header (a web page) -> refused before any pairing request is made, and recorded, never treated as "local, so the person". Loopback is not a person: the research behind this feature found that every 2025–2026 bridge breach came through a door that believed it was
 - **Status:** draft
@@ -994,7 +994,7 @@ every rule below; where they differ, the scenario says so.
   4. The page is very large -> the snapshot arrives in parts the agent pages through, never as one answer
 - **Expected result:** the agent reads what the job needs, cannot be steered by text the page hid from people, and never sees a secret
 - **Alt paths:** the agent asks for a site outside the task -> refused with `origin_not_in_task`; the page has a finding -> the finding travels with the snapshot and the task's writes go to the person (SCN-046)
-- **UI elements:** SCR-24: `[data-role=agent-tasks]`, `[data-role=agent-refusals]`
+- **UI elements:** SCR-24: `[data-role=agent-tasks]`, `[data-role=agent-refusals]`, `[data-role=agent-journal-link]`
 - **States covered:** success, error, empty (SCR-24); partial (the snapshot arrives in parts, on the agent's side)
 - **Errors & recovery:** the browser is closed -> the agent is told `browser_offline`, marked retryable, not that the page is empty; nothing is queued; the snapshot could not be cleaned -> the agent receives nothing rather than an uncleaned tree
 - **Why a window and not a tab.** Measured 2026-10-06: input to a background tab never reaches the page, while a separate background window's tab is visible and receives trusted input, and an open agent window took the person's focus in none of the readings (`docs/superpowers/evidence/2026-10-06-b0-agent-window.md`)

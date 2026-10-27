@@ -711,7 +711,9 @@ flowchart TD
   K -->|yes| OK[Request handled under the agent's scope]
   K -->|no key| N
   P[Page: agent X asks for access, code 123 456]
-  P -->|person confirms, codes match| R[Key issued to the agent once; the daemon keeps only its SHA-256]
+  P -->|person confirms, codes match| C[Confirmed: the CLI collects the key within five minutes]
+  C -->|collected| R[Key issued to the agent once; the daemon keeps only its SHA-256]
+  C -->|not collected in time| N
   P -->|person refuses or no answer| N[Refused and recorded]
   R --> OK
   K -->|any Origin or Sec-Fetch header| N

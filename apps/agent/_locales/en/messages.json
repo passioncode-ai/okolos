@@ -74,9 +74,6 @@
       }
     }
   },
-  "pairedNever": {
-    "message": "no calls yet"
-  },
   "pairedTasks": {
     "message": "Open tasks: $COUNT$",
     "placeholders": {
@@ -162,14 +159,6 @@
   "taskWindowClosed": {
     "message": "Agent window closed"
   },
-  "tasksError": {
-    "message": "The task list cannot be read: $WHAT$. Until it is fixed, no new task opens.",
-    "placeholders": {
-      "what": {
-        "content": "$1"
-      }
-    }
-  },
   "refusalsHeading": {
     "message": "Recent refusals"
   },
@@ -177,16 +166,19 @@
     "message": "No refusals."
   },
   "refusalLine": {
-    "message": "$AGENT$: $WHAT$, $WHEN$",
+    "message": "$WHEN$, $AGENT$ asked to $ASKED$: $WHAT$",
     "placeholders": {
-      "agent": {
+      "when": {
         "content": "$1"
       },
-      "what": {
+      "agent": {
         "content": "$2"
       },
-      "when": {
+      "asked": {
         "content": "$3"
+      },
+      "what": {
+        "content": "$4"
       }
     }
   },
@@ -281,6 +273,54 @@
     "message": "Asked at $TIME$",
     "placeholders": {
       "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairedSinceNever": {
+    "message": "Access since $DATE$, no calls yet",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "refusalDoorLine": {
+    "message": "$WHEN$, a call not from an agent was refused before it was read: $WHAT$",
+    "placeholders": {
+      "when": {
+        "content": "$1"
+      },
+      "what": {
+        "content": "$2"
+      }
+    }
+  },
+  "rejection_bad_host": {
+    "message": "a foreign address for the service"
+  },
+  "rejection_bad_origin": {
+    "message": "a call from a page in the browser"
+  },
+  "rejection_cross_site": {
+    "message": "a call from another site"
+  },
+  "rejection_bad_content_type": {
+    "message": "a call in the wrong format"
+  },
+  "rejection_bad_request": {
+    "message": "a call that could not be read"
+  },
+  "rejection_stopping": {
+    "message": "the service was stopping"
+  },
+  "rejection_not_paired": {
+    "message": "a call without an access key"
+  },
+  "journalError": {
+    "message": "The agents' journal cannot be written: $WHAT$. Until it is fixed, agents get a refusal and no page content is sent.",
+    "placeholders": {
+      "what": {
         "content": "$1"
       }
     }

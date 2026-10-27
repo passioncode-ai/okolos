@@ -442,7 +442,27 @@
     "apps/agent/_locales/ru/messages.json",
     "apps/agent/_locales/en/messages.json"
    ],
-   "risk": "R2"
+   "risk": "R2",
+   "certification": {
+    "round": 1,
+    "tiers": {
+     "unit": "fail",
+     "seam": "fail",
+     "product": "fail"
+    },
+    "at": "fb07c61b462553e6fb2d5d91b87508b9eb6d530e",
+    "history": [
+     {
+      "unit": "fail",
+      "seam": "fail",
+      "product": "fail"
+     }
+    ],
+    "kinds": [
+     "blind"
+    ],
+    "tree": "90a0137e7961c894fd03c6a007e69f72b68afed0"
+   }
   },
   {
    "id": "N-014",
