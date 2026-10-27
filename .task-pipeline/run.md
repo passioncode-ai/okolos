@@ -1,0 +1,8 @@
+# Run ledger: bridge-b1
+
+Run: `bridge-b1` · started `2026-10-27` · module map: `docs/superpowers/specs/2026-10-06-bridge-b1-design.md` §1 · brief: `docs/superpowers/specs/2026-10-27-bridge-b1-brief.md`
+
+## Log
+
+stage: 0 intake — gate auto — verdict pass — 2026-10-27T04:45:00+01:00
+holds: 0 — 2 (retro over budget: 161645 B / 12000, owner stage 10; README «Статус» false since 2026-10-26, owner stage 9) — enumerated 8/8 classes
