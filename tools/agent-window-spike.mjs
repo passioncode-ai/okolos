@@ -34,25 +34,12 @@ import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
+// The frame splitter moved into the package the bridge uses (K1, N-002); the spike
+// reads the pipe with the same code the daemon will.
+import { splitFrames } from '../packages/cdp-pipe/src/frames.ts'
+
 /** The Native Messaging ceiling for one host → extension message (Chrome docs). */
 export const NATIVE_MESSAGE_LIMIT = 1024 * 1024
-
-/**
- * Splits the pipe's byte stream into CDP messages.
- *
- * Chrome writes each message as JSON followed by a NUL byte. A read can end in
- * the middle of a message, so whatever follows the last NUL is carried into the
- * next call rather than parsed or dropped.
- *
- * @param {string} pending text left over from the previous read
- * @param {string} chunk the text just read
- * @returns {{ messages: string[], pending: string }}
- */
-export function splitFrames(pending, chunk) {
-  const parts = (pending + chunk).split('\0')
-  const rest = parts.pop() ?? ''
-  return { messages: parts.filter((p) => p.length > 0), pending: rest }
-}
 
 /** Roles an agent acts on or reads to find its way; everything else is layout. */
 const KEPT_ROLES = new Set([
