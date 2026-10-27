@@ -13,6 +13,7 @@ export function rendered(options: {
   checkout: string
   runner: string[] | null
   logDir: string
+  stateDir?: string
   bootstrap: string
   node?: string
   sourceRepo?: string

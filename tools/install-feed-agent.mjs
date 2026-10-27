@@ -52,7 +52,17 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 export const LABEL = 'app.okolos.feed'
 const source = path.join(root, 'tools/launchd', `${LABEL}.plist`)
 
-const PLACEHOLDERS = ['{{CHECKOUT}}', '{{RUNNER}}', '{{LOG_DIR}}', '{{BOOTSTRAP}}', '{{NODE}}', '{{SOURCE_REPO}}', '{{ORIGIN}}']
+const PLACEHOLDERS = [
+  '{{CHECKOUT}}',
+  '{{RUNNER}}',
+  '{{LOG_DIR}}',
+  '{{LOGS}}',
+  '{{STATE}}',
+  '{{BOOTSTRAP}}',
+  '{{NODE}}',
+  '{{SOURCE_REPO}}',
+  '{{ORIGIN}}',
+]
 const LAUNCHCTL_TIMEOUT_MS = 15_000
 
 /** launchctl, bounded. Returns `{ code, stdout, stderr }`. */
@@ -71,6 +81,7 @@ export function rendered({
   checkout,
   runner,
   logDir,
+  stateDir = feedPaths().state,
   bootstrap,
   node = stableNode(),
   sourceRepo = root,
@@ -82,6 +93,8 @@ export function rendered({
   // Words in the shell command are shell-quoted; values of environment variables are not.
   const out = template
     .replaceAll('{{BOOTSTRAP}}', xml(quote(bootstrap)))
+    .replaceAll('{{STATE}}', xml(quote(stateDir)))
+    .replaceAll('{{LOGS}}', xml(quote(logDir)))
     .replaceAll('{{NODE}}', xml(quote(node)))
     .replaceAll('{{CHECKOUT}}', xml(checkout))
     .replaceAll('{{SOURCE_REPO}}', xml(sourceRepo))
@@ -313,6 +326,7 @@ async function main() {
     checkout: paths.agentCheckout,
     runner: runnerArgv(discover()),
     logDir: paths.logs,
+    stateDir: paths.state,
     bootstrap: paths.bootstrap,
     sourceRepo: root,
     origin: await originUrl({ repo: root }),

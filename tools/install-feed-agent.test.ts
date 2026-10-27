@@ -5,7 +5,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { feedPaths } from './feed/paths.mjs'
-import { readStatus } from './feed/status.mjs'
+import { readStatus, writeStatus } from './feed/status.mjs'
 import { filesIn } from './tree.mjs'
 import { BOOTSTRAP_FILES } from './feed/bootstrap.mjs'
 import {
@@ -238,13 +238,15 @@ describe('the plist launchd reads', () => {
 
   it('starts the bootstrap outside the checkout, never a cd into it (B-159)', () => {
     const text = program(plist())
-    expect(text).toContain("exec node '/Users/example/.okolos/bin/feed-agent/bootstrap.mjs'")
+    expect(text).toContain("b='/Users/example/.okolos/bin/feed-agent/bootstrap.mjs'")
+    expect(text).toContain('then n=node')
+    expect(text).toContain('&quot;$n&quot; &quot;$b&quot;'.replaceAll('&quot;', '"'))
     expect(text).not.toContain('cd ')
     expect(text).not.toContain('agent-checkout')
   })
 
   it('falls back to the node that installed it when the login shell has none', () => {
-    expect(program(plist())).toContain("exec '/Users/example/.fnm/node-versions/v24/bin/node' '/Users/example/.okolos/bin/feed-agent/bootstrap.mjs'")
+    expect(program(plist())).toContain("else n='/Users/example/.fnm/node-versions/v24/bin/node'; fi")
   })
 
   it('tells the bootstrap where the checkout is and what to recreate it from', () => {
@@ -356,6 +358,110 @@ describe('the bootstrap launchd starts lives outside the checkout (B-159)', () =
     expect(result.stderr).toMatch(/feed-agent: failed in checkout: .*missing/)
     expect(readStatus(h.paths.status)).toMatchObject({ outcome: 'failed', stage: 'checkout', consecutiveFailures: 1, recoveredCheckout: false })
     expect(readFileSync(h.paths.log, 'utf8')).toMatch(/is missing; recreating it/)
+  })
+})
+
+/**
+ * The launch line: what launchd runs before any of our JavaScript (B-159, fix
+ * round 2). When node cannot start, the bootstrap copy is gone, or node exits
+ * non-zero before the bootstrap wrote a record, the line itself writes a minimal
+ * status (stage "launch") and a feed.log line, with /bin/sh and coreutils only.
+ * These tests run the rendered line, so they test the plist launchd reads.
+ */
+// /bin/sh and launchd: the feed agent is a launchd agent, macOS only (ADR-0017).
+describe.skipIf(process.platform === 'win32')('the launch line records what fails before the bootstrap', () => {
+  const unxml = (text: string) =>
+    text.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&amp;', '&')
+
+  function launch(h: ReturnType<typeof home>, { node = process.execPath, bootstrap, pathEnv }: { node?: string; bootstrap?: string; pathEnv?: string } = {}) {
+    const text = rendered({
+      template: template(),
+      runner: null,
+      checkout: h.paths.agentCheckout,
+      logDir: h.paths.logs,
+      stateDir: h.paths.state,
+      bootstrap: h.paths.bootstrap,
+      node,
+      sourceRepo: '/nowhere',
+      origin: '',
+    })
+    const line = unxml(/<key>ProgramArguments<\/key>\s*<array>[\s\S]*?<string>[\s\S]*?<\/string>\s*<string>[\s\S]*?<\/string>\s*<string>([\s\S]*?)<\/string>/.exec(text)?.[1] ?? '')
+    if (bootstrap !== undefined) {
+      mkdirSync(h.paths.agentBin, { recursive: true })
+      writeFileSync(h.paths.bootstrap, bootstrap)
+    }
+    const env = {
+      HOME: h.dir,
+      PATH: pathEnv ?? [path.dirname(process.execPath), '/usr/bin', '/bin'].join(path.delimiter),
+      OKOLOS_STATE_DIR: h.paths.state,
+    }
+    return spawnSync('/bin/sh', ['-c', line], { env, encoding: 'utf8', timeout: 20_000 })
+  }
+
+  /** A stand-in bootstrap that writes the record the real one would, under the launch id. */
+  const writesItsRecord = (exit: number) => `
+import { mkdirSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+const file = path.join(process.env.OKOLOS_STATE_DIR, 'feed-status.json')
+mkdirSync(path.dirname(file), { recursive: true })
+writeFileSync(file, JSON.stringify({ outcome: 'failed', stage: 'checkout', exit: ${exit}, runId: process.env.OKOLOS_LAUNCH_ID, consecutiveFailures: 1, lastPublished: null }, null, 2) + '\\n')
+process.exit(${exit})
+`
+
+  it('records a missing bootstrap copy, counts it, and says so in feed.log and launchd’s log', () => {
+    const h = home()
+    const result = launch(h)
+    expect(result.status).toBe(1)
+    const status = readStatus(h.paths.status)
+    expect(status).toMatchObject({ outcome: 'failed', stage: 'launch', exit: 1, consecutiveFailures: 1, lastPublished: null })
+    expect(status?.reason).toMatch(/bootstrap .* is missing.*pnpm feed:agent/)
+    expect(status?.at).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/)
+    expect(readFileSync(h.paths.log, 'utf8')).toMatch(/failed in launch: the installed bootstrap/)
+    expect(result.stderr).toMatch(/feed-agent: failed in launch/)
+    expect(statSync(h.paths.status).mode & 0o777).toBe(0o600)
+  })
+
+  // On a host whose system folders carry a node, "no node on PATH" cannot be arranged.
+  it.skipIf(existsSync('/usr/bin/node') || existsSync('/bin/node'))('records a node that cannot be found', () => {
+    const h = home()
+    const result = launch(h, { node: path.join(h.dir, 'gone', 'node'), bootstrap: 'process.exit(0)\n', pathEnv: '/usr/bin:/bin' })
+    expect(result.status).toBe(127)
+    expect(readStatus(h.paths.status)).toMatchObject({ outcome: 'failed', stage: 'launch', exit: 127 })
+    expect(readStatus(h.paths.status)?.reason).toMatch(/no node/)
+  })
+
+  it('records node exiting non-zero before the bootstrap wrote anything', () => {
+    const h = home()
+    const result = launch(h, { bootstrap: 'process.exit(3)\n' })
+    expect(result.status).toBe(3)
+    expect(readStatus(h.paths.status)).toMatchObject({ outcome: 'failed', stage: 'launch', exit: 3 })
+  })
+
+  it('leaves a record the bootstrap wrote for this launch alone', () => {
+    const h = home()
+    const result = launch(h, { bootstrap: writesItsRecord(1) })
+    expect(result.status).toBe(1)
+    expect(readStatus(h.paths.status)).toMatchObject({ stage: 'checkout', consecutiveFailures: 1 })
+    expect(existsSync(h.paths.log)).toBe(false)
+  })
+
+  it('writes nothing for a success or for a run refused by the lock', () => {
+    for (const exit of [0, 75]) {
+      const h = home()
+      const result = launch(h, { bootstrap: `process.exit(${exit})\n` })
+      expect(result.status).toBe(exit)
+      expect(existsSync(h.paths.status), `exit ${exit}`).toBe(false)
+    }
+  })
+
+  it('counts on from the previous record and keeps the last publish, as JSON the host can read', () => {
+    const h = home()
+    writeStatus(h.paths.status, { startedAt: 'a', at: 'a', outcome: 'published', stage: 'done', exit: 0, version: 65, entries: 220 })
+    writeStatus(h.paths.status, { startedAt: 'b', at: 'b', outcome: 'failed', stage: 'publish', exit: 1 })
+    launch(h)
+    launch(h)
+    const status = readStatus(h.paths.status)
+    expect(status).toMatchObject({ stage: 'launch', consecutiveFailures: 3, lastPublished: { version: 65, entries: 220, at: 'a' } })
   })
 })
 
