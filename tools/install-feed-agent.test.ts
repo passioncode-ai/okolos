@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -611,6 +611,73 @@ process.exit(1)
     expect(existsSync(path.join(h.dir, '.okolos', 'state')), 'a second record under HOME').toBe(false)
     expect(existsSync(path.join(h.dir, 'Library', 'Logs', 'Okolos')), 'a second log under HOME').toBe(false)
   })
+
+  /** A job that says who it and its parent (the bootstrap) are, then hangs until it is killed. */
+  const HANGING_JOB = `
+import { writeFileSync } from 'node:fs'
+writeFileSync(process.env.OKOLOS_TEST_PIDS, JSON.stringify({ job: process.pid, bootstrap: process.ppid }))
+setInterval(() => {}, 1000)
+`
+
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async function until(check: () => boolean, ms = 15_000) {
+    const end = Date.now() + ms
+    while (!check()) {
+      if (Date.now() > end) return false
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    return true
+  }
+
+  // /bin/sh is bash on macOS and dash on Ubuntu; the line must behave the same in both.
+  it.each(['/bin/sh', '/bin/dash'].filter((shell) => existsSync(shell)))('passes launchd\'s SIGTERM on to the bootstrap, which records the stop and ends the job (%s)', async (sh) => {
+    // launchd stops a job by signalling its main pid: the /bin/sh this line runs in.
+    const h = home()
+    installBootstrap({ dir: h.paths.agentBin })
+    mkdirSync(path.join(h.paths.agentCheckout, 'tools'), { recursive: true })
+    writeFileSync(path.join(h.paths.agentCheckout, 'tools/feed-job.mjs'), HANGING_JOB)
+    expect(spawnSync('git', ['init', '--quiet', h.paths.agentCheckout]).status).toBe(0)
+    const text = rendered({
+      template: template(),
+      runner: null,
+      checkout: h.paths.agentCheckout,
+      logDir: h.paths.logs,
+      stateDir: h.paths.state,
+      bootstrap: h.paths.bootstrap,
+      node: process.execPath,
+      sourceRepo: '/nowhere',
+      origin: '',
+    })
+    const pids = path.join(h.dir, 'pids.json')
+    const shell = spawn(sh, ['-c', launchLine(text)], { env: { ...launchdEnv(text, h.dir), OKOLOS_TEST_PIDS: pids }, stdio: 'ignore' })
+    const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) =>
+      shell.on('exit', (code, signal) => resolve({ code, signal })),
+    )
+    let started: { job: number; bootstrap: number } | null = null
+    try {
+      expect(await until(() => existsSync(pids)), 'the job never started').toBe(true)
+      started = JSON.parse(readFileSync(pids, 'utf8'))
+      shell.kill('SIGTERM')
+      const end = await Promise.race([exited, new Promise<null>((resolve) => setTimeout(() => resolve(null), 15_000))])
+      expect(end, 'the launch line did not end').toEqual({ code: 143, signal: null })
+      expect(readStatus(h.paths.status)).toMatchObject({ outcome: 'failed', stage: 'job', exit: 143, reason: 'stopped by SIGTERM' })
+      expect(readStatus(h.paths.status)?.runId).toMatch(/^launch-\d+-\d+$/)
+      expect(readFileSync(h.paths.log, 'utf8')).not.toMatch(/failed in launch/)
+      expect(await until(() => !alive(started!.job) && !alive(started!.bootstrap), 10_000), 'the bootstrap or the job outlived the stop').toBe(true)
+    } finally {
+      // Only what this test started: the shell, and the two node processes it named.
+      shell.kill('SIGKILL')
+      for (const pid of started ? [started.job, started.bootstrap] : []) if (alive(pid)) process.kill(pid, 'SIGKILL')
+    }
+  }, 45_000)
 
   it('counts on from the previous record and keeps the last publish, as JSON the host can read', () => {
     const h = home()

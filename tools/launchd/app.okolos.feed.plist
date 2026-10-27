@@ -43,6 +43,10 @@
     value copied alone, never a field written after it, so the record holds one
     runId, its own; a temp file, then mv), and one line to feed.log and to this
     file's log below.
+    A stop reaches node through the line: launchd signals its main pid, this shell,
+    and the shell passes SIGTERM or SIGINT on to node (run in the background and
+    waited for, as a foreground child would not be told) and waits for it to end, so
+    the bootstrap records the stop and ends the job's group itself.
     Not recorded anywhere: launchd not starting this at all, or /bin/sh failing;
     the installer's status flag and `launchctl print` show those. No alarm reads the
     record yet: that is OBS-32 in project-observatory-dashboard, which does not read
@@ -70,7 +74,10 @@ id="launch-$$-$(date +%s)"
 if command -v node &gt;/dev/null 2&gt;&amp;1; then n=node; else n={{NODE}}; fi
 if [ ! -f "$b" ]; then c=1; why="the installed bootstrap $b is missing; reinstall with pnpm feed:agent"
 elif [ "$n" != node ] &amp;&amp; [ ! -x "$n" ]; then c=127; why="no node: none on the login PATH, and $n is gone"
-else OKOLOS_LAUNCH_ID="$id" "$n" "$b"; c=$?; why="node exited $c before the bootstrap wrote a record"; fi
+else k=''; g=''; trap 'g=1; [ -z "$k" ] || kill -TERM "$k" 2&gt;/dev/null' TERM; trap 'g=1; [ -z "$k" ] || kill -INT "$k" 2&gt;/dev/null' INT
+  OKOLOS_LAUNCH_ID="$id" "$n" "$b" &amp; k=$!; [ -z "$g" ] || kill -TERM "$k" 2&gt;/dev/null; c=127
+  while :; do wait "$k"; r=$?; [ "$r" -eq 127 ] || c=$r; [ -n "$g" ] || break; g=''; done
+  why="node exited $c before the bootstrap wrote a record"; fi
 if [ "$c" -ne 0 ] &amp;&amp; [ "$c" -ne 75 ] &amp;&amp; ! grep -q "\"runId\": \"$id\"" "$s" 2&gt;/dev/null; then
   at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   p=$(sed -n 's/^  "consecutiveFailures": \([0-9][0-9]*\),$/\1/p' "$s" 2&gt;/dev/null | head -n 1)
