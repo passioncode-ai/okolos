@@ -86,9 +86,10 @@ function describe(result) {
   return `exited ${result.code ?? result.signal}${said ? ` — ${said}` : ''}`
 }
 
+/** The canonical spelling: `.native` expands Windows 8.3 short names and forward slashes, as git prints them. */
 function real(file) {
   try {
-    return realpathSync(file)
+    return realpathSync.native(file)
   } catch {
     return path.resolve(file)
   }

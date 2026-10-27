@@ -311,15 +311,22 @@ describe('what is the agent doing', () => {
 })
 
 describe('the bootstrap launchd starts lives outside the checkout (B-159)', () => {
-  it('copies the bootstrap and every module it imports, owner-only', () => {
+  it('copies the bootstrap and every module it imports', () => {
     const h = home()
     installBootstrap({ dir: h.paths.agentBin })
     for (const file of BOOTSTRAP_FILES) {
       const copy = path.join(h.paths.agentBin, file)
       expect(readFileSync(copy, 'utf8'), file).toBe(readFileSync(path.join(repo, 'tools/feed', file), 'utf8'))
     }
-    expect(statSync(h.paths.agentBin).mode & 0o777).toBe(0o700)
     expect(existsSync(h.paths.bootstrap)).toBe(true)
+  })
+
+  // POSIX modes: Windows reports 0o666/0o444 whatever was asked. The agent is a
+  // launchd agent, macOS only (ADR-0017).
+  it.skipIf(process.platform === 'win32')('keeps the copy owner-only', () => {
+    const h = home()
+    installBootstrap({ dir: h.paths.agentBin })
+    expect(statSync(h.paths.agentBin).mode & 0o777).toBe(0o700)
   })
 
   it('replaces an older copy whole, so no stale module survives an update', () => {
@@ -369,13 +376,14 @@ describe('the node the plist falls back to', () => {
     return { dir, versioned, link: path.join(dir, 'bin/node'), other }
   }
 
-  it('is the PATH entry that leads to the running node, not its versioned realpath (a brew upgrade removes that)', () => {
+  // Symbolic links need a privilege on Windows; the plist that uses this is a launchd agent, macOS only.
+  it.skipIf(process.platform === 'win32')('is the PATH entry that leads to the running node, not its versioned realpath (a brew upgrade removes that)', () => {
     const b = brew()
     const pathEnv = [path.dirname(b.other), path.join(b.dir, 'bin')].join(path.delimiter)
     expect(stableNode({ execPath: b.versioned, pathEnv })).toBe(b.link)
   })
 
-  it('skips a different node earlier on PATH', () => {
+  it.skipIf(process.platform === 'win32')('skips a different node earlier on PATH', () => {
     const b = brew()
     expect(stableNode({ execPath: b.versioned, pathEnv: path.dirname(b.other) })).toBe(b.versioned)
   })

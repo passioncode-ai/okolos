@@ -22,9 +22,9 @@ describe('where the feed agent writes', () => {
 
   it('keeps what launchd starts outside the checkout, so a missing checkout cannot stop it (B-159)', () => {
     const paths = feedPaths({}, '/home/example')
-    expect(paths.bootstrap).toBe('/home/example/.okolos/bin/feed-agent/bootstrap.mjs')
-    expect(paths.bootstrap.startsWith(`${paths.agentCheckout}/`)).toBe(false)
-    expect(feedPaths({ OKOLOS_AGENT_BIN: '/b' }, '/h').bootstrap).toBe('/b/bootstrap.mjs')
+    expect(paths.bootstrap).toBe(path.join('/home/example', '.okolos', 'bin', 'feed-agent', 'bootstrap.mjs'))
+    expect(paths.bootstrap.startsWith(`${paths.agentCheckout}${path.sep}`)).toBe(false)
+    expect(feedPaths({ OKOLOS_AGENT_BIN: '/b' }, '/h').bootstrap).toBe(path.join('/b', 'bootstrap.mjs'))
   })
 
   it('never resolves into the repository', () => {

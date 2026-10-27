@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -29,7 +29,9 @@ const ok = (stdout = '') => ({ code: 0, signal: null, stdout, stderr: '', timedO
 const failed = (stderr: string, code = 128) => ({ code, signal: null, stdout: '', stderr, timedOut: false })
 
 function world() {
-  const base = mkdtempSync(path.join(os.tmpdir(), 'okolos-bootstrap-'))
+  // The long, real form: on Windows os.tmpdir() can be an 8.3 short name
+  // (RUNNER~1) that git never prints back.
+  const base = realpathSync.native(mkdtempSync(path.join(os.tmpdir(), 'okolos-bootstrap-')))
   const paths = feedPaths(
     {
       OKOLOS_STATE_DIR: path.join(base, 'state'),
@@ -384,6 +386,13 @@ describe('the health check', () => {
     expect(await checkoutHealth({ checkout: w.paths.agentCheckout, tool })).toMatchObject({ state: 'broken' })
   })
 
+  it('takes git’s forward-slash spelling of the same folder as the same folder', async () => {
+    const w = world()
+    plantCheckout(w.paths.agentCheckout)
+    const tool = async () => ok(`${w.paths.agentCheckout.split(path.sep).join('/')}\n`)
+    expect(await checkoutHealth({ checkout: w.paths.agentCheckout, tool })).toEqual({ state: 'ok' })
+  })
+
   it('names what it found missing', async () => {
     const w = world()
     expect(await checkoutHealth({ checkout: w.paths.agentCheckout, tool: async () => ok() })).toMatchObject({ state: 'missing' })
@@ -441,7 +450,8 @@ describe('with real git (B-150: the folder deleted, git still listing it)', () =
     const r = repos()
     git('-C', r.source, 'worktree', 'add', '--quiet', '--detach', r.paths.agentCheckout, 'origin/main')
     rmSync(r.paths.agentCheckout, { recursive: true })
-    expect(git('-C', r.source, 'worktree', 'list')).toContain(r.paths.agentCheckout)
+    // git prints forward slashes on every platform.
+    expect(git('-C', r.source, 'worktree', 'list')).toContain(r.paths.agentCheckout.split(path.sep).join('/'))
 
     const health = await checkoutHealth({ checkout: r.paths.agentCheckout, tool, env })
     expect(health.state).toBe('missing')
