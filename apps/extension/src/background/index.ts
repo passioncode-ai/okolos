@@ -65,6 +65,7 @@ import { explained, t, useResolver } from '@okolos/i18n'
 import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 
 import { recordPageRequest } from './page-requests.js'
+import { recordTrap } from './trap-journal.js'
 import { optionsPageFor } from '../options/views.js'
 
 /**
@@ -952,14 +953,6 @@ const STORAGE_KEY: Record<string, string> = {
   full: 'logStorageFull',
 }
 
-/** What each page trap is recorded as. `generic` covers one we cannot name. */
-const TRAP_KEY: Record<string, string> = {
-  clickfix: 'logTrapClickfix',
-  techsupport: 'logTrapTechsupport',
-  'outside-link': 'logTrapOutsideLink',
-  generic: 'logTrapGeneric',
-}
-
 /**
  * A state-changing request the page made while a finding was unresolved.
  *
@@ -984,19 +977,8 @@ async function journalPageRequest(
 }
 
 async function journalTrap(payload: { kind: string; signals: string }): Promise<{ ok: true }> {
-  // Table, not a ternary, because `tools/locales.test.ts` finds the keys a
-  // build asks for by reading `t('…')`, `*_KEY` tables and `…Key:` fields — and
-  // deliberately nothing looser, since a looser reader keeps dead messages
-  // alive. Written any other way these keys read as translated-and-unused.
   try {
-    const db = await openDb()
-    const now = new Date().toISOString()
-    await db.put('journal', {
-      id: `trap:${payload.kind}:${now}`,
-      createdAt: now,
-      kind: 'verdict',
-      detail: { explainKey: TRAP_KEY[payload.kind] ?? 'logTrapGeneric', signals: payload.signals },
-    })
+    await recordTrap({ db: await openDb(), now: () => new Date().toISOString() }, payload)
   } catch (cause) {
     console.warn('okolos: could not journal a page trap', cause)
   }
