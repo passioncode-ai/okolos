@@ -489,9 +489,12 @@
     "message": "Access lets the agent open and read, in the agent window, the sites it names in its own tasks, in the agent profile shared by every agent with access, and read this computer's process census, without command lines."
   },
   "verb_unknown": {
-    "message": "an unknown call"
+    "message": "an unrecognised tool"
   },
   "refusal_bad_call": {
-    "message": "the call was malformed: an unknown tool, wrong arguments or a protocol error"
+    "message": "the call was malformed (an unknown tool, wrong arguments or a protocol error)"
+  },
+  "refusal_local_answer": {
+    "message": "a site in the task answered from an address on this machine or the local network"
   }
 }

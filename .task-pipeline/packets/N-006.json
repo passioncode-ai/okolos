@@ -36,6 +36,7 @@
   "recent при сбое чтения бросает ошибку с кодом причины (no_space не бывает, no_permission, unreadable, other): из неё N-015 берёт $WHAT$ строки journalUnreadable (проверки N-013 круг 9)",
   "ответы протокола MCP привязанному агенту (initialize, tools/list, ошибка разбора) пишутся записью с outcome answered и глаголом протокола (mcp.initialize, mcp.tools_list, mcp.parse_error) или явно не пишутся с причиной в спеке §3; решение одно для N-006 и N-008 (проверки N-013 круг 9)",
   "ответы агенту «неизвестный инструмент», «неверные аргументы» и ошибки протокола пишутся в журнал как refused с кодом bad_call (журнальный код, не BridgeRefusal) и глаголом unknown, если глагол не распознан; страница показывает их строками refusal_bad_call и verb_unknown (проверка product N-013 круг 15)",
+  "журнальные коды bad_call и local_answer допустимы в записях refused наряду с BridgeRefusal; ошибка разбора пишется одним способом (refused, bad_call, глагол unknown), тесты 12 и 13 согласованы (проверки N-013 круг 16)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/journal && pnpm -s run typecheck"
  ],
  "guards": [
