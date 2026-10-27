@@ -65,7 +65,7 @@
       "id": "N-002",
       "title": "K1 packages/cdp-pipe: кадры, запросы, плоские сессии, таймауты, группа процессов",
       "owner": "implementer",
-      "status": "pending",
+      "status": "done",
       "blocked_by": [],
       "serves": "REQ-54",
       "check": "pnpm -s exec vitest run packages/cdp-pipe tools/agent-window-spike.test.ts",
@@ -74,7 +74,72 @@
         "tools/agent-window-spike.mjs",
         "tools/agent-window-spike.test.ts"
       ],
-      "risk": "R2"
+      "risk": "R2",
+      "certification": {
+        "round": 2,
+        "tiers": {
+          "unit": "pass",
+          "seam": "pass",
+          "product": "pass"
+        },
+        "at": "09bfbaab9ac04ea54050f1d8213ad309bfff28fb",
+        "history": [
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "pass"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "pass"
+          }
+        ],
+        "kinds": [
+          "blind",
+          "blind"
+        ],
+        "tree": "c028778d36aea2bb06cc00fed2ac33f84123f56f"
+      },
+      "proof": {
+        "head": "09bfbaab9ac04ea54050f1d8213ad309bfff28fb",
+        "tree": "c028778d36aea2bb06cc00fed2ac33f84123f56f",
+        "graph_revision": "3"
+      },
+      "evidence": [
+        "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-002 -s exec vitest run packages/cdp-pipe tools/agent-window-spike.test.ts -> Test Files 3 passed (3), Tests 28 passed (28): frames.test.ts 5, agent-window-spike.test.ts 6, pipe.test.ts 17",
+        "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-002 -s run typecheck (tsc -b && tsc -p tsconfig.tests.json) -> exit 0, no output",
+        "unit: pgrep -fl fake-browser after each run -> no process (exit 1)",
+        "unit: node -e import('.../tools/agent-window-spike.mjs') under v26.10.0 and v22.23.1 -> [NATIVE_MESSAGE_LIMIT, chunksNeeded, compactAxTree], exit 0",
+        "unit: scratch probe (scratchpad, not in repo): after close() that could not signal the group, a new send rejected in 3 ms with 'Fake.echo: the browser exited' (the fake leaves once fd 3 closes), so send after an incomplete close does not wait out requestTimeoutMs with the fixture",
+        "unit: git diff ed91214..6c2227c | grep '^+' | grep U+2014 -> nothing (rc 1)",
+        "unit: git ls-tree ed91214 apps/ lists apps/agent: the lockfile's new 'apps/agent: {}' importer is a sync of an existing package, not new scope",
+        "seam: git diff --stat ed91214..6c2227c -> 18 files, 713 insertions, 39 deletions",
+        "seam: pnpm -s exec vitest run packages/cdp-pipe tools/agent-window-spike.test.ts -> 3 files, 28 passed",
+        "seam: pnpm -s exec vitest run tools --exclude 'tools/gates/**' -> 62 files passed, 1027 passed, 1 skipped (includes reachable, docs, licensing, one-deadline, coverage-shape, test-quality, imports, ci)",
+        "seam: pnpm -s exec vitest run tools/gates -> bundle-scan 22 passed (runs pnpm typecheck and pnpm build)",
+        "seam: pnpm run typecheck -> exit 0 (tsc -b and tsconfig.tests.json)",
+        "seam: pnpm -s exec eslint packages/cdp-pipe tools/agent-window-spike.mjs tools/agent-window-spike.test.ts tools/reachable.test.ts -> exit 0",
+        "seam: eslint --stdin --stdin-filename packages/core-snapshot/src/probe-seam.ts with imports of @okolos/cdp-pipe, node:child_process, node:https -> exit 0 (finding 1)",
+        "seam: eslint --stdin --stdin-filename packages/cdp-pipe/src/probe-seam.ts with imports of node:https, node:net -> exit 0 (finding 2)",
+        "seam: scratch tsc probe (scratchpad, outside the repo): fake launch typed as Promise<CdpPipe> -> TS2322 missing private members; CdpPipe.launch assigned unbound -> compiles (finding 3, confirm 5)",
+        "seam: node -e import(tools/agent-window-spike.mjs) -> [NATIVE_MESSAGE_LIMIT, chunksNeeded, compactAxTree] on node v26.10.0",
+        "seam: node import of packages/cdp-pipe/src/index.ts -> ERR_MODULE_NOT_FOUND for ./frames.js: the package entry needs a bundler or vitest, like its siblings; N-011 bundles through tools/build-agent.mjs",
+        "seam: lock importers vs ls -d packages/*/ apps/*/ -> identical",
+        "seam: grep -rn splitFrames (dist and node_modules excluded) -> callers listed in scope; grep for CdpPipe outside the package -> none",
+        "product: ls -d packages/*/ | wc -l → 22; ls -d apps/*/ | wc -l → 4 (worktree at 6c2227c)",
+        "product: git grep for package counts near пакет/package → docs/README.md:16, docs/runbooks/development.md:17, tools/docs.test.ts:63-64 (comment) only",
+        "product: pnpm -s exec vitest run packages/cdp-pipe tools/agent-window-spike.test.ts tools/docs.test.ts tools/runbook.test.ts tools/licensing.test.ts tools/reachable.test.ts → 7 files, 126 tests passed",
+        "product: pnpm -s exec vitest run tools/instants.test.ts tools/journal-kinds.test.ts tools/journal-sentences.test.ts tools/marks-read.test.ts tools/no-modals.test.ts tools/one-deadline.test.ts tools/severity-words.test.ts tools/adr.test.ts → 74 tests passed",
+        "product: python3 docs/ux/lint.py → exit 0; python3 docs/brand/lint.py → exit 0",
+        "product: node (v26.10.0) and ~/.nvm/versions/node/v22.23.1/bin/node import tools/agent-window-spike.mjs → exports NATIVE_MESSAGE_LIMIT,chunksNeeded,compactAxTree, exit 0",
+        "product: git grep \"from '../(packages|apps)/...ts'\" in tools/*.mjs → tools/agent-window-spike.mjs:39 and tools/sign-feed.mjs:26 (precedent)",
+        "product: pipe.test.ts run 5 times with 28 'yes' loops on a 14-core machine → 17/17 passed each run; load processes stopped afterwards (pgrep -x yes → 0)",
+        "product: grep of packages/cdp-pipe/src/pipe.ts → imports node:child_process, node:stream, ./frames.js only; requestTimeoutMs ?? 10_000; stderr give-up line at :44",
+        "product: git diff ed91214..6c2227c -- docs | grep U+2014 on added lines → no hits",
+        "product: git -C /Users/sshlg/DATA/fabric-workspace grep for Okolos package counts or cdp-pipe in knowledge/ → no hits",
+        "proven at 09bfbaab9ac04ea54050f1d8213ad309bfff28fb (tree c028778d36aea2bb06cc00fed2ac33f84123f56f)"
+      ]
     },
     {
       "id": "N-003",
@@ -194,7 +259,7 @@
       "owner": "implementer",
       "status": "pending",
       "blocked_by": [
-        "N-002"
+        "N-022"
       ],
       "serves": "REQ-61",
       "check": "pnpm -s exec vitest run apps/agent/src/window",
@@ -391,6 +456,24 @@
       "check": "pnpm gates && pnpm test:e2e",
       "touches": [],
       "risk": "R2"
+    },
+    {
+      "id": "N-022",
+      "title": "cdp-pipe для потребителей: интерфейс CdpTransport, сигнал выхода, типизированные ошибки, срок на вызов, обработчики ошибок чтения",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [
+        "N-002"
+      ],
+      "serves": "REQ-54",
+      "check": "pnpm -s exec vitest run packages/cdp-pipe tools/agent-window-spike.test.ts && pnpm -s run typecheck",
+      "touches": [
+        "packages/cdp-pipe/**",
+        "package.json",
+        "docs/README.md",
+        "docs/superpowers/specs/2026-10-06-bridge-b1-design.md"
+      ],
+      "risk": "R2"
     }
   ],
   "edges": [
@@ -433,11 +516,6 @@
       "from": "N-001",
       "to": "N-009",
       "payload": "validateScope и отказы"
-    },
-    {
-      "from": "N-002",
-      "to": "N-010",
-      "payload": "CdpPipe"
     },
     {
       "from": "N-004",
@@ -548,6 +626,16 @@
       "from": "N-002",
       "to": "N-005",
       "payload": "resource: корневой tsconfig.json, ссылки на проекты; N-005 дописывает после N-002"
+    },
+    {
+      "from": "N-002",
+      "to": "N-022",
+      "payload": "CdpPipe и его тесты"
+    },
+    {
+      "from": "N-022",
+      "to": "N-010",
+      "payload": "CdpTransport, onExit, CdpError, timeoutMs на вызов"
     }
   ],
   "revisions": [
@@ -560,6 +648,17 @@
       "verb": "invalidate",
       "node": "N-001",
       "why": "проверка узла: pnpm 11 не принимает `pnpm -s typecheck`, только `pnpm -s run typecheck` (отчёт исполнителя N-001); смысл проверки не изменился"
+    },
+    {
+      "verb": "add",
+      "node": "N-022",
+      "why": "N-002 закрыт с рисками проверок круга 1 (unit 3, seam 9, product 3); те, что меняют API для N-010/N-011, вынесены в отдельный узел, который блокирует N-010"
+    },
+    {
+      "verb": "close",
+      "node": "N-002",
+      "why": "certified at all 3 tiers in round 2",
+      "precondition": "09bfbaab9ac04ea54050f1d8213ad309bfff28fb"
     }
   ]
 }

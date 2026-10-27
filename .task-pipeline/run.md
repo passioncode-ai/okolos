@@ -27,3 +27,5 @@ gate:  4 — command "plan_audit.py --graph .task-pipeline/graph.json --packets 
 holds: 4 — 3 (retro over budget, stage 10; README «Статус», stage 9; B-151, B-152 board rows) — enumerated 8/8 classes
 event: memory — board request a6191901 (webpilot shield copy) answered 25fd4f39; owed: post the stable bridge/b1-run2 commit in thread 5eb3f477 when N-003 and N-004 close — 2026-10-27T05:23:00+01:00
 finding: hygiene N-002 docs/README.md:122 split-table — noise — round 0 — base-repro n/a (blank line separates the packages table from the applications table; two tables, not one split)
+event: memory — N-002 verdict re-stamped at 09bfbaa after merge; node code identical to certified 6c2227c (git diff --quiet 6c2227c 09bfbaa -- packages/cdp-pipe tools/agent-window-spike.mjs) — 2026-10-27T07:40:00+01:00
+iter: 1 — item N-002 — closed at gate 5

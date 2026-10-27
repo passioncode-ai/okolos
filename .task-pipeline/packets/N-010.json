@@ -3,8 +3,8 @@
  "node": "N-010",
  "intent": "K4: окно агента",
  "inputs": [
-  "CdpPipe",
-  "N-002: CdpPipe"
+  "CdpTransport, CdpPipe.launch (N-022); launch сам добавляет --remote-debugging-pipe и --user-data-dir, AgentWindows их не передаёт (проверка seam N-002)",
+  "N-022: CdpTransport, onExit, CdpError, timeoutMs на вызов"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -20,7 +20,7 @@
   ]
  },
  "outputs": [
-  "`findChrome(): string | null`; `class AgentWindows { constructor({binary, profileDir, launch = CdpPipe.launch}); openWindow(): Promise<{targetId, sessionId}> /* targetId и есть windowId в SessionOpenResult */; closeWindow(targetId); shutdown() }` — аргументы `--remote-debugging-pipe --no-startup-window --no-first-run --no-default-browser-check --user-data-dir=<profile>` и никогда `--enable-automation`"
+  "`findChrome(): string | null`; `class AgentWindows { constructor({binary, profileDir, launch: (o) => Promise<CdpTransport> = CdpPipe.launch}); openWindow(): Promise<{targetId, sessionId}> /* targetId и есть windowId в SessionOpenResult */; closeWindow(targetId); shutdown() }` — свои аргументы `--no-startup-window --no-first-run --no-default-browser-check` и никогда `--enable-automation`"
  ],
  "acceptance": [
   "аргументы запуска: нет --enable-automation, есть --no-startup-window (фальшивый launch)",
