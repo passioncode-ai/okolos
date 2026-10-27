@@ -8,7 +8,18 @@ export const LABEL: string
 type Launchctl = (args: string[]) => Promise<{ code: number; stdout: string; stderr: string }>
 type Tool = (command: string, args: string[], options?: Partial<BoundedOptions>) => Promise<BoundedResult>
 
-export function rendered(options: { template?: string; checkout: string; runner: string[] | null; logDir: string }): string
+export function rendered(options: {
+  template?: string
+  checkout: string
+  runner: string[] | null
+  logDir: string
+  bootstrap: string
+  node?: string
+  sourceRepo?: string
+  origin?: string
+}): string
+export function installBootstrap(options: { dir: string; from?: string; files?: readonly string[]; log?: (line: string) => void }): void
+export function originUrl(options: { repo?: string; tool?: Tool }): Promise<string>
 export function isDisabled(printDisabled: string, label?: string): boolean
 export function ensureCheckout(options: { repo?: string; checkout: string; tool?: Tool; log?: (line: string) => void }): Promise<void>
 export function installAgent(options: {
@@ -23,6 +34,7 @@ export function uninstallAgent(options: {
   label?: string
   domain: string
   target: string
+  bin?: string
   launchctl?: Launchctl
   log?: (line: string) => void
   purge?: { repo: string; paths: FeedPaths; tool?: Tool }
@@ -35,6 +47,7 @@ export function agentStatus(options: {
   paths?: FeedPaths
 }): Promise<{
   plist: boolean
+  bootstrap: boolean
   loaded: boolean
   launchd: { state: string | null; runs: number | null; lastExit: number | null } | null
   lastRun: StatusRecord | null
