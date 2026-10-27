@@ -93,7 +93,8 @@ describe('the in-page warning slot', () => {
     const first = slot.claim(claim('injection', 'critical'))
     const second = slot.claim(claim('lookalike', 'major'))
 
-    expect(second, 'the caller was handed a panel nobody can see').toBe(first)
+    // The caller's `showError` must land on the panel a person can see.
+    expect(second.host, 'the caller was handed a panel nobody can see').toBe(first.host)
     expect(refused).toEqual([{ kind: 'lookalike', severity: 'major' }])
     expect(slot.waiting()).toEqual(['lookalike'])
   })
@@ -135,7 +136,7 @@ describe('the in-page warning slot', () => {
      */
     const { slot } = slotWith()
     const first = slot.claim(claim('injection', 'major'))
-    expect(slot.claim(claim('lookalike', 'major'))).toBe(first)
+    expect(slot.claim(claim('lookalike', 'major')).host).toBe(first.host)
     expect(slot.waiting()).toEqual(['lookalike'])
   })
 
@@ -201,5 +202,79 @@ describe('the in-page warning slot', () => {
     const { slot } = slotWith()
     expect(() => slot.release()).not.toThrow()
     expect(() => slot.release('download')).not.toThrow()
+  })
+})
+
+describe('a panel closed by the module that drew it (B-165, round 1)', () => {
+  /**
+   * The slot's watch puts back a panel the page removed. Every module closed its own
+   * panel with `handle.destroy()`, which only removes the host, and nothing told the
+   * slot: the watch read the person's "This is wrong" as the page attacking the
+   * warning and drew it again a quarter-second later (measured on the ClickFix,
+   * tech-support and outside-link warnings; the defect dates from 16bcaa5).
+   */
+  const realWait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+  function realSlot() {
+    const slot = createSurfaceSlot({
+      doc: document,
+      noteRefused: () => undefined,
+      escalate: vi.fn(async () => undefined),
+      alsoLine: (kinds) => `also here: ${kinds.join(', ')}`,
+      wait: realWait,
+    })
+    made.push(slot)
+    return slot
+  }
+
+  it('stays closed, and the slot is free again', async () => {
+    const slot = realSlot()
+    const handle = slot.claim(claim('trap', 'critical'))
+    handle.destroy()
+    await realWait(1000)
+
+    expect(panels()).toBe(0)
+    expect(slot.current()).toBeNull()
+    // Free means the next finding is drawn, not refused.
+    slot.claim(claim('lookalike', 'major'))
+    expect(panels()).toBe(1)
+    expect(slot.waiting()).toEqual([])
+  })
+
+  it('a handle handed out on a refusal cannot take the holder down', async () => {
+    const slot = realSlot()
+    slot.claim(claim('injection', 'critical'))
+    const refused = slot.claim(claim('lookalike', 'major'))
+    refused.destroy()
+    await realWait(400)
+
+    expect(panels()).toBe(1)
+    expect(slot.current()?.root.querySelector('[data-role=headline]')?.textContent).toBe('injection headline')
+    // Its own line goes with it.
+    expect(slot.waiting()).toEqual([])
+  })
+
+  it('tells a module whose claim was refused that it holds nothing', () => {
+    const slot = realSlot()
+    slot.claim(claim('injection', 'critical'))
+    const mount = slot.mountFor('trap', 'critical')
+    const lower = claim('trap', 'critical')
+
+    expect(mount(lower.props, lower.handlers)).toBeNull()
+    expect(slot.waiting()).toEqual(['trap'])
+
+    slot.release()
+    expect(mount(lower.props, lower.handlers)).not.toBeNull()
+    expect(panels()).toBe(1)
+  })
+
+  it('a handle displaced by a worse finding closes nothing', () => {
+    const slot = realSlot()
+    const first = slot.claim(claim('lookalike', 'major'))
+    slot.claim(claim('injection', 'critical'))
+    first.destroy()
+
+    expect(panels()).toBe(1)
+    expect(slot.current()?.root.querySelector('[data-role=headline]')?.textContent).toBe('injection headline')
   })
 })

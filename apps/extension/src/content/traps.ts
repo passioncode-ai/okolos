@@ -26,7 +26,11 @@ export interface TrapDeps {
   leave(): void
   recover(kind: 'clickfix' | 'techsupport'): void
   exitFullscreen(): void
-  /** Called once when a warning is raised, with what it rests on. */
+  /**
+   * Called when a warning is raised, with what it rests on: once per panel for ClickFix
+   * and tech-support, and once per link per page for a link that leaves the browser,
+   * however often it is clicked, so a page cannot fill the journal by clicking.
+   */
   warned?: (kind: TrapKind, signals: readonly string[]) => void
   /**
    * How a warning reaches the screen.
@@ -39,8 +43,19 @@ export interface TrapDeps {
    *
    * Optional so a test can leave it out and get the real thing; the entry point always
    * supplies the slot.
+   *
+   * Null when another module's warning holds the panel and this one was not drawn (the
+   * slot puts it on that panel as an "also here" line). The watcher must not keep that
+   * panel as its own: it decides from its own panel what else may be raised.
    */
-  mountWarning?: (props: BannerProps, handlers: BannerHandlers) => BannerHandle
+  mountWarning?: (props: BannerProps, handlers: BannerHandlers) => BannerHandle | null
+  /**
+   * The shadow root behind an element, closed ones included, where the browser lends it
+   * to an extension (`chrome.dom.openOrClosedShadowRoot`, `Element.openOrClosedShadowRoot`
+   * in Firefox). A click on a link inside a closed root reaches the document with the
+   * host as its target and the link missing from the composed path too.
+   */
+  shadowRootOf?: (element: Element) => ShadowRoot | null
 }
 
 export interface TrapWatcher {
@@ -50,14 +65,29 @@ export interface TrapWatcher {
 const RECHECK_MS = 400
 
 /** The injected mount, or the real one when a caller did not supply a slot. */
-function mounting(deps: { readonly doc: Document; mountWarning?: (p: BannerProps, h: BannerHandlers) => BannerHandle }) {
-  return (props: BannerProps, handlers: BannerHandlers): BannerHandle =>
+function mounting(deps: {
+  readonly doc: Document
+  mountWarning?: (p: BannerProps, h: BannerHandlers) => BannerHandle | null
+}) {
+  return (props: BannerProps, handlers: BannerHandlers): BannerHandle | null =>
     (deps.mountWarning ?? ((p, h) => mountBanner(deps.doc, p, h)))(props, handlers)
 }
 
+const LINK = 'a[href], area[href]'
+
 export function watchForTraps(deps: TrapDeps): TrapWatcher {
   const mount = mounting(deps)
+  /** The panel this watcher drew and still holds; never another module's. */
   let banner: BannerHandle | null = null
+  /** Which warning `banner` is. */
+  let holding: TrapKind | null = null
+  /** Where the person's focus was when the link warning opened, to give it back. */
+  let returnFocus: HTMLElement | null = null
+  /**
+   * ClickFix or tech-support verdicts raised while another module's panel held the
+   * slot: journalled once, not on every copy that re-runs the check.
+   */
+  const raisedAside = new Set<TrapKind>()
   let scriptedCopy = false
   let copied: string | null = null
   let forcedFullscreen = false
@@ -70,11 +100,25 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
   }
   const recently = () => Date.now() - lastGesture < 1000
 
+  /**
+   * True while a held link click is being dispatched.
+   *
+   * `execCommand('copy')` in the page's own click handler fires a trusted copy event in
+   * Chromium, so the FileFix page (one click opens `search-ms:` and copies the command)
+   * read as the person's own copy and ended on the link warning (round 1 of the B-165
+   * certification, e2e). The person clicked a link, not Copy; a copy inside that click
+   * is the page's doing. Cleared after the dispatch, by a task rather than a microtask:
+   * a browser runs microtasks between the listeners of a trusted event.
+   */
+  let insideHeldClick = false
+
   const onCopy = (event: Event) => {
-    if (event.isTrusted) return
+    if (event.isTrusted && !insideHeldClick) return
     scriptedCopy = true
     try {
-      copied = (event as ClipboardEvent).clipboardData?.getData('text/plain') ?? null
+      // An execCommand copy carries no data of its own yet: empty is unreadable, and
+      // the warning says so rather than showing an empty box.
+      copied = (event as ClipboardEvent).clipboardData?.getData('text/plain') || null
     } catch {
       // Reading the clipboard through the event is best-effort. The warning
       // stands on the write itself; it just cannot show the payload.
@@ -102,6 +146,12 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
    * One link, not the scheme: agreeing to one saved search is not agreeing to the next.
    */
   const allowedLinks = new Set<string>()
+  /**
+   * Addresses already journalled on this page. Every click on them is still stopped;
+   * only the journal line is once, because a page looping `element.click()` wrote one
+   * "What changed" row per click (round 1 of the B-165 certification).
+   */
+  const journalledLinks = new Set<string>()
 
   /**
    * A click on a link that hands its address to a program outside the browser (B-165).
@@ -115,9 +165,12 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
    */
   const onLinkClick = (event: Event) => {
     if (event.defaultPrevented) return
-    const target = event.target
-    if (!(target instanceof Element)) return
-    const anchor = target.closest('a[href], area[href]')
+    // The left button and the middle one open a link. A right click opens a menu, and
+    // Chromium fires auxclick with button 2 for it: holding that put a blocking
+    // warning and a false journal line on a person copying the address.
+    const button = 'button' in event ? (event as MouseEvent).button : 0
+    if (button !== 0 && button !== 1) return
+    const anchor = linkOf(event, deps.shadowRootOf)
     if (anchor === null) return
     const href = linkAddress(anchor)
     if (href === null || allowedLinks.has(href)) return
@@ -125,7 +178,16 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
     if (verdict === null) return
 
     event.preventDefault()
-    deps.warned?.('outside-link', verdict.signals)
+    if (!insideHeldClick) {
+      insideHeldClick = true
+      setTimeout(() => {
+        insideHeldClick = false
+      }, 0)
+    }
+    if (!journalledLinks.has(href)) {
+      journalledLinks.add(href)
+      deps.warned?.('outside-link', verdict.signals)
+    }
     // One panel: a ClickFix or tech-support warning already up is the more urgent
     // sentence, and the click is stopped either way.
     if (banner) return
@@ -141,12 +203,16 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
   }
 
   function check(): void {
-    if (banner) return
+    // A link warning gives way: ClickFix and tech-support are the more urgent sentence
+    // (the FileFix page opens search-ms: and copies the command with one click), so the
+    // check runs under it and its verdict takes the panel.
+    if (banner && holding !== 'outside-link') return
     const text = deps.text()
 
     const clickfix = detectClickFix({ text, scriptedCopy, copied })
     if (clickfix) {
-      banner = mount(
+      raise(
+        'clickfix',
         {
           variant: 'clickfix',
           severity: 'critical',
@@ -166,20 +232,16 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
           ].join(' '),
           sourceLine: t('warnFoundBy', clickfix.signals.join(', ')),
         },
-        {
-          onPrimary: deps.leave,
-          onRetry: () => deps.recover('clickfix'),
-          onDispute: dismiss,
-          onDismiss: dismiss,
-        },
+        () => deps.recover('clickfix'),
+        clickfix.signals,
       )
-      deps.warned?.('clickfix', clickfix.signals)
       return
     }
 
     const techsupport = detectTechSupport({ text, forcedFullscreen, dialogLoop })
     if (techsupport) {
-      banner = mount(
+      raise(
+        'techsupport',
         {
           variant: 'techsupport',
           severity: 'critical',
@@ -195,19 +257,47 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
             .join(' '),
           sourceLine: t('warnFoundBy', techsupport.signals.join(', ')),
         },
-        {
-          onPrimary: deps.leave,
-          onRetry: () => deps.recover('techsupport'),
-          onDispute: dismiss,
-          onDismiss: dismiss,
-        },
+        () => deps.recover('techsupport'),
+        techsupport.signals,
       )
-      deps.warned?.('techsupport', techsupport.signals)
     }
   }
 
+  /** Raises a ClickFix or tech-support warning, taking the panel from a link warning. */
+  function raise(
+    kind: 'clickfix' | 'techsupport',
+    props: BannerProps,
+    onRetry: () => void,
+    signals: readonly string[],
+  ): void {
+    // The link warning's click stays stopped; its panel gives way. Focus is not handed
+    // back to the page, because the page is covered again at once.
+    if (holding === 'outside-link') close(banner, false)
+    let mine: BannerHandle | null = null
+    mine = mount(props, {
+      onPrimary: deps.leave,
+      onRetry,
+      onDispute: () => close(mine, false),
+      onDismiss: () => close(mine, false),
+    })
+    if (mine === null) {
+      // Another module's panel holds the slot, which has put this on it as an "also
+      // here" line. Journalled once, not on every copy that runs the check again.
+      if (!raisedAside.has(kind)) {
+        raisedAside.add(kind)
+        deps.warned?.(kind, signals)
+      }
+      return
+    }
+    banner = mine
+    holding = kind
+    deps.warned?.(kind, signals)
+  }
+
   function showOutsideLink(href: string, verdict: OutsideLinkVerdict): void {
-    banner = mount(
+    const focused = deepActive(deps.doc, deps.shadowRootOf)
+    let mine: BannerHandle | null = null
+    mine = mount(
       {
         // The ClickFix variant on purpose: the same trap by another road. The page wants
         // something run outside the browser, and the panel interrupts for the same reason.
@@ -228,16 +318,38 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
         onRetry: deps.leave,
         onDispute: () => {
           allowedLinks.add(href)
-          dismiss()
+          close(mine, true)
         },
-        onDismiss: dismiss,
+        onDismiss: () => close(mine, true),
       },
     )
+    // Another module's warning holds the panel: the click is stopped and journalled,
+    // and the fact is a line on that panel. Nothing here is this watcher's to hold.
+    if (mine === null) return
+    banner = mine
+    holding = 'outside-link'
+    returnFocus = isFocusable(focused) ? focused : null
+    // The panel covers the page, so the person's focus must not stay on the link under
+    // it: a keyboard user otherwise tabbed through every covered link first, and Enter
+    // on one of them acted on the page behind the warning (design review, step 1).
+    ;(mine.root.querySelector('[data-role=primary]') as HTMLElement | null)?.focus()
   }
 
-  function dismiss(): void {
-    banner?.destroy()
+  /**
+   * Takes down the panel this watcher holds, when `handle` is still it.
+   *
+   * Through the handle the slot gave, so the slot is released and its watch does not
+   * read the close as the page removing the warning. `giveFocusBack` returns the person
+   * to where they were when the link warning opened.
+   */
+  function close(handle: BannerHandle | null, giveFocusBack: boolean): void {
+    if (handle === null || handle !== banner) return
+    const back = returnFocus
     banner = null
+    holding = null
+    returnFocus = null
+    handle.destroy()
+    if (giveFocusBack && back !== null && back.isConnected) back.focus({ preventScroll: true })
   }
 
   for (const type of ['pointerdown', 'keydown']) {
@@ -264,9 +376,104 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
       deps.doc.removeEventListener('click', onLinkClick, true)
       deps.doc.removeEventListener('auxclick', onLinkClick, true)
       deps.doc.defaultView?.removeEventListener('beforeunload', onBeforeUnload)
-      dismiss()
+      close(banner, false)
     },
   }
+}
+
+/**
+ * The link a click landed on, wherever it sits.
+ *
+ * A listener on the document sees a click from inside a shadow root retargeted to the
+ * root's host, so `target.closest` found nothing for a link in any web component, open
+ * or closed (round 1 of the B-165 certification, measured in WebKit and Chromium). An
+ * open root still lists the link in the composed path. A closed one hides it there too,
+ * so the root is borrowed from the browser where it lends it to an extension, and the
+ * link is the one under the pointer or, for a click the keyboard made, the focused one.
+ * A script calling `click()` on a link inside a closed root is still not seen: no
+ * pointer, no focus, and nothing else names the element.
+ */
+function linkOf(event: Event, shadowRootOf: TrapDeps['shadowRootOf']): Element | null {
+  const path = event.composedPath()
+  for (const node of path) {
+    if (isElement(node) && node.matches(LINK)) return node
+  }
+  const target = event.target
+  if (!isElement(target)) return null
+  const outer = target.closest(LINK)
+  if (outer !== null) return outer
+  if (shadowRootOf === undefined) return null
+
+  // Down through closed roots, one host at a time.
+  let host: Element = target
+  for (let depth = 0; depth < 8; depth += 1) {
+    const root = shadowRootOf(host)
+    if (root === null) return null
+    const inner = pointed(event, root) ?? root.activeElement
+    if (inner === null) return null
+    const link = inner.closest(LINK)
+    if (link !== null) return link
+    host = inner
+  }
+  return null
+}
+
+/**
+ * The shadow root an extension may read behind a host, closed ones included.
+ *
+ * Chromium lends it through `chrome.dom.openOrClosedShadowRoot` (Chrome 88 and Edge, to
+ * content scripts, no permission); Firefox through `Element.openOrClosedShadowRoot` in a
+ * content script. Anywhere else only an open root is readable.
+ */
+export function lentShadowRoot(element: Element): ShadowRoot | null {
+  const lend = (globalThis as unknown as { chrome?: { dom?: { openOrClosedShadowRoot?: (e: Element) => ShadowRoot | null } } })
+    .chrome?.dom?.openOrClosedShadowRoot
+  if (typeof lend === 'function') {
+    try {
+      return lend(element) ?? null
+    } catch {
+      return null
+    }
+  }
+  const firefox = (element as Element & { openOrClosedShadowRoot?: ShadowRoot | null }).openOrClosedShadowRoot
+  return firefox ?? element.shadowRoot ?? null
+}
+
+/** What is under the pointer inside a root, for a click a pointer made. */
+function pointed(event: Event, root: ShadowRoot): Element | null {
+  if (!('clientX' in event)) return null
+  const { clientX, clientY, detail } = event as MouseEvent
+  // A click the keyboard made (or a script) carries no position.
+  if (detail === 0 && clientX === 0 && clientY === 0) return null
+  try {
+    return root.elementFromPoint(clientX, clientY)
+  } catch {
+    return null
+  }
+}
+
+/** `instanceof Element` is not safe across the content world's wrappers in Firefox. */
+function isElement(node: unknown): node is Element {
+  return typeof node === 'object' && node !== null && (node as Node).nodeType === 1
+}
+
+/**
+ * The focused element, inside shadow roots too: the document reports only the host, and
+ * focus handed back to a host that cannot take it goes nowhere.
+ */
+function deepActive(doc: Document, shadowRootOf: TrapDeps['shadowRootOf']): Element | null {
+  let active = doc.activeElement
+  for (let depth = 0; active !== null && depth < 8; depth += 1) {
+    const root = shadowRootOf?.(active) ?? active.shadowRoot
+    const inner = root?.activeElement ?? null
+    if (inner === null) break
+    active = inner
+  }
+  return active
+}
+
+function isFocusable(node: Element | null): node is HTMLElement {
+  return node !== null && typeof (node as HTMLElement).focus === 'function' && node !== node.ownerDocument.body
 }
 
 /**

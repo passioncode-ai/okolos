@@ -161,7 +161,7 @@ flowchart TD
 - **Traces:** ST-007 (JTBD-02, JRN-03/#3)
 - **Goal:** interrupt between the clipboard write and the user pasting into a system dialog — the last moment we can reach
 - **Entry points:** script-initiated clipboard write containing a shell-like payload, with no genuine user copy action; a click on a link whose address may open a program on the computer (SCN-049, added 2026-10-27)
-- **Success exit:** user does not run the command; clipboard content is flagged; a link that would start a program is stopped before the browser passes it on
+- **Success exit:** user does not run the command; clipboard content is flagged; a link that would start a program is stopped before the browser passes it on. When both happen in one click (the FileFix page), the ClickFix warning takes the panel from the link warning
 - **Task analysis:**
   1. Stop before switching windows
   2. Understand in one sentence why this is fake

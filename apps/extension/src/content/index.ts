@@ -33,7 +33,7 @@ import { credentialDetail } from './credential-words.js'
 import { passwordDetail, passwordLines, passwordSourceKey } from './password-words.js'
 import { watchCredentialFields } from './credential.js'
 import { showDownloadVerdict } from './download.js'
-import { watchForTraps } from './traps.js'
+import { lentShadowRoot, watchForTraps } from './traps.js'
 import { Sanitiser } from './sanitize.js'
 import { createSurfaceSlot } from './surface-slot.js'
 import { failOpen } from './fail-open.js'
@@ -1001,7 +1001,10 @@ if (isTopFrame) {
  */
 if (isTopFrame) {
   watchForTraps({
-    mountWarning: warningMount('trap', 'critical'),
+    // `mountFor`, not `warningMount`: the watcher must know when the panel is not its
+    // own, or it keeps another module's panel and stops raising its own (B-165 round 1).
+    mountWarning: slot.mountFor('trap', 'critical'),
+    shadowRootOf: lentShadowRoot,
     doc: document,
     text: () => document.body?.innerText ?? '',
     leave: () => history.back(),

@@ -141,8 +141,12 @@ includes a redirect from `*.workers.dev`, not just a CNAME.
   2.2 AA, foundation → Product mechanics).
 - Every verdict shows its source: which check fired, which feed or stage, and
   when the data was last updated.
-- Every verdict is disputable in one click ("this is wrong"), and the
-  disagreement is remembered.
+- Every verdict is disputable in one click ("this is wrong"). How long the
+  disagreement is remembered depends on the surface: on a lookalike or a
+  login form on a new domain (in the page or in a frame) it adds the site to
+  trusted domains and outlives the page; the in-page trap panels (ClickFix
+  SCN-008, tech-support SCN-009, a link that may open a program SCN-049)
+  remember it for the life of the page only and journal nothing.
 - No counters of "threats blocked", no protection score, no streaks.
 - In-page surfaces render inside a closed Shadow DOM so page CSS cannot
   restyle or hide them.
@@ -206,7 +210,8 @@ generator, and the sheet declares no colour of its own.
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
-  | success | a finding is raised | - | banner appears in the corner; blocking variants (clickfix) overlay and require a deliberate dismiss |
+  | success | a finding is raised | - | banner appears in the corner; blocking variants (clickfix) overlay and require a deliberate dismiss. The link warning (SCN-049) moves focus to its first action, "Leave this page", when it opens, and back to the link when "This is wrong" closes it |
+  | closed by the person | "This is wrong" or dismiss | - | the panel goes and stays gone: the slot is released with it. Until 2026-10-27 the slot's watch read this close as the page deleting the warning and drew it again (B-165 round 1) |
   | error | detail view or action failed | - | inline failure text with retry; the warning itself never disappears on error |
   | removed by the page | the page deletes the host from the document | - | put back up to three times, a quarter-second apart; after that the extension's **icon** carries a badge and the journal records the count. The banner is not on the page any more, and the product says so rather than going quiet |
   | more than one kind of finding | a second detector finds something on the same page | - | **one panel, never two.** The worst finding holds it, a tie leaves it where it is, and the rest become a single line naming how many other kinds are here. Two panels at the same `inset` drew one warning on top of another until 2026-08-20 (B-69) |
