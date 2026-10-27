@@ -4,13 +4,22 @@
  * ADR-0019 promises the person that everything an agent received through the bridge is in the
  * journal. So an answer is recorded (appended and fsynced) before it is sent, and an answer the
  * journal could not record is not sent at all: the agent gets the `internal` refusal instead.
- * `answerAfterRecord` is the one wrapper that does this; the door (N-008) sends every answer,
- * its own refusals and parse errors included, through it.
+ * `answerAfterRecord` is the one wrapper that does this; the door (N-008) sends every answer to
+ * a tool call, its own refusals and parse errors included, through it.
  *
- * What an entry holds is closed: who asked (the paired agent and its task), which verb, which
- * origin, how it ended, the refusal code, the size of the answer and the snapshot's verdict
- * level. Never the text of a page and never the value of a field: an entry with any other member
- * is refused by its type and again at run time, before anything is written.
+ * MCP protocol answers are not journaled (one decision for N-006 and N-008). `initialize`,
+ * `tools/list`, `ping` and notifications name no verb of the contract, reach no page and carry
+ * nothing of one, so the journal has no protocol verb (`mcp.initialize` and the like are refused
+ * as any other unknown verb). Only `tools/call` is journaled, and so is every request the door
+ * could not take from a paired agent: a body that does not parse, an unknown tool or wrong
+ * arguments is one entry, `refused` with the journal code `bad_call`, its verb `unknown` when
+ * the tool is no verb's (`journalVerbOf`). A parse error is written that one way only.
+ *
+ * What an entry holds is closed: who asked (the paired agent's name, id and the date it was given
+ * access, and its task), which verb, which origin, how it ended, the refusal code, the size of
+ * the answer and the snapshot's verdict level. Never the text of a page and never the value of a
+ * field: an entry with any other member is refused by its type and again at run time, before
+ * anything is written.
  *
  * Layout: JSON lines under `<data>/journal/`, one file per UTC day (`2026-10-27.jsonl`), each
  * 0600 in a 0700 folder. The retention sweep drops whole days past the window and rewrites the
@@ -20,7 +29,16 @@ import { mkdirSync, readdirSync, readFileSync, unlinkSync } from 'node:fs'
 import { open } from 'node:fs/promises'
 import path from 'node:path'
 
-import { BRIDGE_REFUSALS, originOf, refuse, type BridgeRefusal, type BridgeVerb } from '@okolos/contracts'
+import {
+  BRIDGE_REFUSALS,
+  BRIDGE_SESSION_VERBS,
+  BRIDGE_VERBS,
+  canonicalVerb,
+  originOf,
+  refuse,
+  type AnyBridgeVerb,
+  type BridgeRefusal,
+} from '@okolos/contracts'
 
 import { atomicWrite } from '../fabric/fabric-service.mjs'
 import type { RefusalReason } from '../service/http.js'
@@ -36,32 +54,61 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const DAY_FILE = /^(\d{4}-\d{2}-\d{2})\.jsonl$/
 
 /**
- * Calls that live outside any task. Named and spelled as `BridgeSessionVerb` in
- * @okolos/contracts on branch b1/n-023 (node N-023), which this branch does not have yet; when
- * N-023 lands, this alias and the one below become imports of the same names.
+ * Why the door turned a request away before it knew the agent: the shell's reasons, a body that
+ * is not JSON, and an access list that could not be read (so the key was not checked).
  */
-export type BridgeSessionVerb = 'session.open' | 'hygiene.census'
+export type DoorRejection = RefusalReason | 'bad_content_type' | 'store_unreadable'
+
+/** What a `rejected` entry may carry: a door rejection, or a key that matches no paired agent. */
+export type RejectionCode = DoorRejection | Extract<BridgeRefusal, 'not_paired'>
+
+/** Every rejection code; the page has a `rejection_<code>` line for each. */
+export const REJECTION_CODES = [
+  'bad_host',
+  'bad_origin',
+  'cross_site',
+  'bad_request',
+  'stopping',
+  'bad_content_type',
+  'store_unreadable',
+  'not_paired',
+] as const satisfies readonly RejectionCode[]
 
 /**
- * Every call the bridge answers, in its canonical spelling (`session.open`, with the dot, never
- * the MCP tool name `session_open`). The same name and union as `AnyBridgeVerb` in N-023.
+ * Codes only the journal has, beside the contract's refusals, in `refused` entries:
+ * `bad_call` is a call the door could not take (a body that does not parse, an unknown tool,
+ * wrong arguments); `local_answer` is a site in the task that answered from an address on this
+ * device or the local network. The page has a `refusal_<code>` line for each.
  */
-export type AnyBridgeVerb = BridgeVerb | BridgeSessionVerb
+export const JOURNAL_REFUSAL_CODES = ['bad_call', 'local_answer'] as const
+export type JournalRefusalCode = (typeof JOURNAL_REFUSAL_CODES)[number]
 
-/** Why the door turned a request away before reading it: the shell's reasons, plus a body that is not JSON. */
-export type DoorRejection = RefusalReason | 'bad_content_type'
+/** The verb an entry names: a canonical verb of the contract, or `unknown` for a `bad_call`. */
+export type JournalVerb = AnyBridgeVerb | 'unknown'
 
-/** The level of the snapshot's verdict (`SnapshotVerdict['level']` in N-023); its findings stay out. */
+/**
+ * The verb to journal for an MCP tool name: its canonical spelling (`session_open` is
+ * `session.open`), or `unknown` for a name that is no verb's tool. The door journals what this
+ * returns, so the journal and the page never see a tool name.
+ */
+export function journalVerbOf(tool: string): JournalVerb {
+  return canonicalVerb(tool) ?? 'unknown'
+}
+
+/** The level of the snapshot's verdict (`SnapshotVerdict['level']`); its findings stay out. */
 export type JournalVerdict = 'clean' | 'finding'
 
 /** A call a paired agent made: answered, or refused by the bridge's policy. */
 interface AgentCall {
   /** When the answer was recorded, ISO 8601. */
   readonly at: string
-  /** The paired agent, by the name it was paired under. */
+  /** The paired agent, by the name it was paired under. Two agents may share it. */
   readonly agent: string
+  /** The paired agent's id: what tells two agents of the same name apart. */
+  readonly agentId: string
+  /** When the agent was given access, ISO 8601: the page names a revoked agent by it. */
+  readonly pairedAt: string
   readonly task?: string
-  readonly verb: AnyBridgeVerb
   /** The origin the call reached: scheme, host and port, no path and no query. */
   readonly origin?: string
   /** The size of the answer sent, in bytes. */
@@ -70,45 +117,28 @@ interface AgentCall {
 }
 
 export type JournalEntry =
-  | (AgentCall & { readonly outcome: 'answered' })
-  | (AgentCall & { readonly outcome: 'refused'; readonly code: BridgeRefusal })
+  | (AgentCall & { readonly outcome: 'answered'; readonly verb: AnyBridgeVerb })
+  | (AgentCall & {
+      readonly outcome: 'refused'
+      readonly verb: AnyBridgeVerb
+      readonly code: BridgeRefusal | JournalRefusalCode
+    })
+  | (AgentCall & { readonly outcome: 'refused'; readonly verb: 'unknown'; readonly code: 'bad_call' })
   | {
       /** A request the door turned away before it knew the agent or the verb. */
       readonly at: string
       readonly outcome: 'rejected'
-      readonly code: DoorRejection | BridgeRefusal
+      readonly code: RejectionCode
       readonly origin?: string
       readonly bytes?: number
     }
 
 /** Members each outcome may carry, in the order they are written. */
 const FIELDS = {
-  answered: ['at', 'agent', 'task', 'verb', 'origin', 'outcome', 'bytes', 'verdict'],
-  refused: ['at', 'agent', 'task', 'verb', 'origin', 'outcome', 'code', 'bytes', 'verdict'],
+  answered: ['at', 'agent', 'agentId', 'pairedAt', 'task', 'verb', 'origin', 'outcome', 'bytes', 'verdict'],
+  refused: ['at', 'agent', 'agentId', 'pairedAt', 'task', 'verb', 'origin', 'outcome', 'code', 'bytes', 'verdict'],
   rejected: ['at', 'outcome', 'code', 'origin', 'bytes'],
 } as const satisfies Record<JournalEntry['outcome'], readonly string[]>
-
-/** Every canonical verb; a key missing here, or one too many, is a type error. */
-const VERBS: Readonly<Record<AnyBridgeVerb, true>> = {
-  open: true,
-  snapshot: true,
-  read: true,
-  get: true,
-  waitFor: true,
-  screenshot: true,
-  close: true,
-  'session.open': true,
-  'hygiene.census': true,
-}
-
-const DOOR_REJECTIONS: Readonly<Record<DoorRejection, true>> = {
-  bad_host: true,
-  bad_origin: true,
-  cross_site: true,
-  bad_request: true,
-  stopping: true,
-  bad_content_type: true,
-}
 
 /** Longer than any agent name or task id; a page's text would not fit. */
 const MAX_NAME = 256
@@ -137,7 +167,7 @@ export function checkEntry(input: JournalEntry): JournalEntry {
   if (outcome !== 'answered' && outcome !== 'refused' && outcome !== 'rejected') throw new InvalidJournalEntry('outcome')
   const allowed: readonly string[] = FIELDS[outcome]
   for (const key of Object.keys(raw)) if (!allowed.includes(key)) throw new InvalidJournalEntry(key)
-  if (typeof raw.at !== 'string' || Number.isNaN(Date.parse(raw.at))) throw new InvalidJournalEntry('at')
+  if (!isDate(raw.at)) throw new InvalidJournalEntry('at')
   if (raw.origin !== undefined && (typeof raw.origin !== 'string' || originOf(raw.origin) !== raw.origin)) {
     throw new InvalidJournalEntry('origin')
   }
@@ -145,15 +175,21 @@ export function checkEntry(input: JournalEntry): JournalEntry {
     throw new InvalidJournalEntry('bytes')
   }
   if (outcome === 'rejected') {
-    if (!isCode(raw.code, true)) throw new InvalidJournalEntry('code')
+    if (!includes(REJECTION_CODES, raw.code)) throw new InvalidJournalEntry('code')
   } else {
     if (!isName(raw.agent)) throw new InvalidJournalEntry('agent')
+    if (!isName(raw.agentId)) throw new InvalidJournalEntry('agentId')
+    if (!isDate(raw.pairedAt)) throw new InvalidJournalEntry('pairedAt')
     if (raw.task !== undefined && !isName(raw.task)) throw new InvalidJournalEntry('task')
-    if (typeof raw.verb !== 'string' || !Object.hasOwn(VERBS, raw.verb)) throw new InvalidJournalEntry('verb')
     if (raw.verdict !== undefined && raw.verdict !== 'clean' && raw.verdict !== 'finding') {
       throw new InvalidJournalEntry('verdict')
     }
-    if (outcome === 'refused' && !isCode(raw.code, false)) throw new InvalidJournalEntry('code')
+    if (outcome === 'refused' && !includes(BRIDGE_REFUSALS, raw.code) && !includes(JOURNAL_REFUSAL_CODES, raw.code)) {
+      throw new InvalidJournalEntry('code')
+    }
+    // `unknown` is the verb of a call the door could not take, and of nothing else.
+    const known = includes(BRIDGE_VERBS, raw.verb) || includes(BRIDGE_SESSION_VERBS, raw.verb)
+    if (!known && !(raw.verb === 'unknown' && raw.code === 'bad_call')) throw new InvalidJournalEntry('verb')
   }
   const written: Record<string, unknown> = {}
   for (const key of allowed) if (raw[key] !== undefined) written[key] = raw[key]
@@ -164,9 +200,12 @@ function isName(value: unknown): boolean {
   return typeof value === 'string' && value !== '' && value.length <= MAX_NAME
 }
 
-function isCode(value: unknown, door: boolean): boolean {
-  if (typeof value !== 'string') return false
-  return (BRIDGE_REFUSALS as readonly string[]).includes(value) || (door && Object.hasOwn(DOOR_REJECTIONS, value))
+function isDate(value: unknown): boolean {
+  return typeof value === 'string' && !Number.isNaN(Date.parse(value))
+}
+
+function includes(list: readonly string[], value: unknown): boolean {
+  return typeof value === 'string' && list.includes(value)
 }
 
 export class Journal {

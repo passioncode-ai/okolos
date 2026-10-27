@@ -7,16 +7,23 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 // Test-only: the daemon does not import the extension's storage; this pins the two windows together.
 import { RETENTION_DAYS } from '@okolos/storage'
 
+import { BRIDGE_REFUSALS, BRIDGE_SESSION_VERBS, BRIDGE_VERBS, toolName, type AnyBridgeVerb, type BridgeSessionVerb } from '@okolos/contracts'
+
 import {
   answerAfterRecord,
   Journal,
+  JOURNAL_REFUSAL_CODES,
+  journalVerbOf,
+  REJECTION_CODES,
   RETENTION_DAYS_JOURNAL,
-  type AnyBridgeVerb,
-  type BridgeSessionVerb,
   type JournalEntry,
+  type JournalVerb,
 } from './journal.js'
 
 const temps: string[] = []
+/** Who called: the paired agent's name, its id and when it was given access. */
+const who = { agent: 'claude-code', agentId: '9f2c4e1a7b3d5f60', pairedAt: '2026-10-20T08:30:00.000Z' } as const
+
 afterEach(() => {
   vi.restoreAllMocks()
   for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true })
@@ -50,6 +57,8 @@ async function fileHandlePrototype(): Promise<{ sync: () => Promise<void> }> {
 const answered: JournalEntry = {
   at: '2026-10-27T10:00:00.000Z',
   agent: 'claude-code',
+  agentId: '9f2c4e1a7b3d5f60',
+  pairedAt: '2026-10-20T08:30:00.000Z',
   task: 'task-1',
   verb: 'snapshot',
   origin: 'https://example.com',
@@ -164,12 +173,12 @@ describe('the journal holds no page text and no field value', () => {
     expect(onDisk(dir)).toEqual([rejected])
   })
 
-  it('stores the canonical verb (AnyBridgeVerb, as N-023 names it), never the MCP tool name', async () => {
+  it('stores the canonical verb (AnyBridgeVerb from @okolos/contracts), never the MCP tool name', async () => {
     const dir = temp()
     const journal = Journal.open(dir, { retentionDays: 90 })
     const sessionVerb: BridgeSessionVerb = 'session.open'
     const opened: JournalEntry = { ...answered, verb: sessionVerb }
-    const census: JournalEntry = { at: answered.at, agent: 'claude-code', verb: 'hygiene.census', outcome: 'answered' }
+    const census: JournalEntry = { ...who, at: answered.at, verb: 'hygiene.census', outcome: 'answered' }
     await journal.record(opened)
     await journal.record(census)
 
@@ -256,5 +265,137 @@ describe('the journal on disk', () => {
     await journal.record(next)
 
     expect(journal.recent(10)).toEqual([answered, next])
+  })
+})
+
+describe('the verb is the contract’s, never a local table', () => {
+  it('accepts every verb of @okolos/contracts and refuses screenshot, which Б1 does not answer', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const verbs: AnyBridgeVerb[] = [...BRIDGE_VERBS, ...BRIDGE_SESSION_VERBS]
+    for (const verb of verbs) await journal.record({ ...answered, verb })
+
+    // @ts-expect-error: screenshot waits for field masking (Б2); it is not a verb of the contract
+    const screenshot: JournalEntry = { ...answered, verb: 'screenshot' }
+    await expect(journal.record(screenshot)).rejects.toThrow(/verb/)
+    expect(onDisk(dir)).toHaveLength(verbs.length)
+  })
+
+  it('journalVerbOf turns a tool name into its canonical verb, and anything else into unknown', () => {
+    expect(journalVerbOf('session_open')).toBe('session.open')
+    expect(journalVerbOf('hygiene_census')).toBe('hygiene.census')
+    expect(journalVerbOf('snapshot')).toBe('snapshot')
+    expect(journalVerbOf('session.open')).toBe('unknown')
+    expect(journalVerbOf('screenshot')).toBe('unknown')
+    expect(journalVerbOf('')).toBe('unknown')
+  })
+})
+
+describe('an entry names the agent by id and by when it was given access (SCR-24)', () => {
+  it('two agents with the same name stay two agents in the journal', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const second: JournalEntry = { ...answered, agentId: '0a1b2c3d4e5f6071', pairedAt: '2026-10-25T09:00:00.000Z' }
+    await journal.record(answered)
+    await journal.record(second)
+
+    const ids = onDisk(dir).map((entry) => (entry as { agentId: string }).agentId)
+    expect(ids).toEqual(['9f2c4e1a7b3d5f60', '0a1b2c3d4e5f6071'])
+    expect(onDisk(dir)).toEqual([answered, second])
+  })
+
+  it('refuses an agent call without agentId or pairedAt, by type and at run time', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    // @ts-expect-error: an agent call names the agent by id
+    const withoutId: JournalEntry = { at: answered.at, agent: 'claude-code', pairedAt: who.pairedAt, verb: 'read', outcome: 'answered' }
+    // @ts-expect-error: an agent call says when its access was given
+    const withoutDate: JournalEntry = { at: answered.at, agent: 'claude-code', agentId: who.agentId, verb: 'read', outcome: 'answered' }
+    await expect(journal.record(withoutId)).rejects.toThrow(/agentId/)
+    await expect(journal.record(withoutDate)).rejects.toThrow(/pairedAt/)
+    await expect(journal.record({ ...answered, pairedAt: 'last week' })).rejects.toThrow(/pairedAt/)
+    expect(onDisk(dir)).toEqual([])
+  })
+})
+
+describe('codes: every one the journal takes has a line on the page', () => {
+  type Catalogue = Record<string, { message: string }>
+  const catalogue = (lang: string): Catalogue =>
+    JSON.parse(readFileSync(path.join(import.meta.dirname, '../../_locales', lang, 'messages.json'), 'utf8')) as Catalogue
+
+  it('a rejected entry takes a door rejection, store_unreadable included, or not_paired, and nothing else', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    expect([...REJECTION_CODES].sort()).toEqual(
+      ['bad_content_type', 'bad_host', 'bad_origin', 'bad_request', 'cross_site', 'not_paired', 'stopping', 'store_unreadable'],
+    )
+    for (const code of REJECTION_CODES) await journal.record({ at: answered.at, outcome: 'rejected', code })
+
+    // @ts-expect-error: a policy refusal is given to a paired agent, not at the door
+    const busy: JournalEntry = { at: answered.at, outcome: 'rejected', code: 'busy' }
+    await expect(journal.record(busy)).rejects.toThrow(/code/)
+    expect(onDisk(dir)).toHaveLength(REJECTION_CODES.length)
+  })
+
+  it('has rejection_<code>, refusal_<code> and verb_<verb> in both catalogues of the daemon', () => {
+    const verbs: JournalVerb[] = [...BRIDGE_VERBS, ...BRIDGE_SESSION_VERBS, 'unknown']
+    for (const lang of ['en', 'ru']) {
+      const keys = Object.keys(catalogue(lang))
+      for (const code of REJECTION_CODES) expect(keys).toContain(`rejection_${code}`)
+      for (const code of [...BRIDGE_REFUSALS, ...JOURNAL_REFUSAL_CODES]) expect(keys).toContain(`refusal_${code}`)
+      for (const verb of verbs) expect(keys).toContain(`verb_${verb === 'unknown' ? verb : toolName(verb)}`)
+    }
+  })
+
+  it('a refused entry takes a BridgeRefusal or the journal codes bad_call and local_answer', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const localAnswer: JournalEntry = { ...answered, outcome: 'refused', code: 'local_answer' }
+    const wrongArgs: JournalEntry = { ...answered, outcome: 'refused', code: 'bad_call' }
+    await journal.record(localAnswer)
+    await journal.record(wrongArgs)
+
+    // @ts-expect-error: a door rejection is not a refusal given to a paired agent
+    const doorCode: JournalEntry = { ...answered, outcome: 'refused', code: 'bad_origin' }
+    await expect(journal.record(doorCode)).rejects.toThrow(/code/)
+    expect(onDisk(dir)).toEqual([localAnswer, wrongArgs])
+  })
+})
+
+describe('MCP protocol answers: one way for the journal and the door (N-008)', () => {
+  it('a parse error, an unknown tool and wrong arguments are refused, bad_call; an unrecognised verb is unknown', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const parseError: JournalEntry = { ...who, at: answered.at, verb: journalVerbOf('not json'), outcome: 'refused', code: 'bad_call' }
+    const unknownTool: JournalEntry = { ...who, at: answered.at, verb: journalVerbOf('click'), outcome: 'refused', code: 'bad_call' }
+    const badArgs: JournalEntry = { ...who, at: answered.at, verb: journalVerbOf('snapshot'), outcome: 'refused', code: 'bad_call' }
+    for (const entry of [parseError, unknownTool, badArgs]) await journal.record(entry)
+
+    expect(onDisk(dir)).toEqual([
+      { ...who, at: answered.at, verb: 'unknown', outcome: 'refused', code: 'bad_call' },
+      { ...who, at: answered.at, verb: 'unknown', outcome: 'refused', code: 'bad_call' },
+      { ...who, at: answered.at, verb: 'snapshot', outcome: 'refused', code: 'bad_call' },
+    ])
+  })
+
+  it('verb unknown goes only with bad_call, and never with an answer', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    // @ts-expect-error: an answer is to a verb the bridge knows
+    const answeredUnknown: JournalEntry = { ...answered, verb: 'unknown' }
+    // @ts-expect-error: a policy refusal is to a verb the bridge knows
+    const busyUnknown: JournalEntry = { ...who, at: answered.at, verb: 'unknown', outcome: 'refused', code: 'busy' }
+    await expect(journal.record(answeredUnknown)).rejects.toThrow(/verb/)
+    await expect(journal.record(busyUnknown)).rejects.toThrow(/verb/)
+    expect(onDisk(dir)).toEqual([])
+  })
+
+  it('initialize and tools/list are not journaled: there is no protocol verb an entry can name', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    for (const verb of ['mcp.initialize', 'mcp.tools_list', 'mcp.parse_error', 'initialize', 'tools/list']) {
+      await expect(journal.record({ ...answered, verb } as unknown as JournalEntry)).rejects.toThrow(/verb/)
+    }
+    expect(onDisk(dir)).toEqual([])
   })
 })
