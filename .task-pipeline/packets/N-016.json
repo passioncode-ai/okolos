@@ -33,6 +33,7 @@
   "релиз содержит бандл, apps/agent/src/fabric и apps/agent/static (аудит #37)",
   "install пишет plist через launchdPlist набора и зовёт capStdoutLog при старте",
   "дескриптор берёт auth.tokenFile из servicePaths(dirs) N-005, а не из своей копии пути (проверка seam N-005)",
+  "релиз содержит apps/agent/_locales; buildIdentity от корня релиза даёт digest, не коммит чужого git (отчёт N-005, fix 1)",
   "проверка узла: pnpm -s exec vitest run tools/install-agent.test.ts tools/runbook.test.ts"
  ],
  "guards": [

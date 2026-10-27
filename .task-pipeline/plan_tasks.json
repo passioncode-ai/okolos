@@ -375,7 +375,8 @@
    "тот же таймер раз в сутки обрезает events.jsonl по правилу N-005 (7 дней или 1000 событий), а не только при старте (отчёт N-005, fix 0)",
    "вторая копия демона на том же home выходит с 75, не открыв журнал, хранилище привязок и Chrome (setup после замка, проверка seam N-005)",
    "отказы двери до разбора пишутся в журнал через onRefused оболочки N-005 с DoorRejection (проверка seam N-005)",
-   "CdpError превращается в отказ контракта: kind exited/closed → browser_offline, ошибка CDP о пропавшей цели (cdpCode) → tab_gone, timeout → internal; тест на каждый (проверка seam N-022)"
+   "CdpError превращается в отказ контракта: kind exited/closed → browser_offline, ошибка CDP о пропавшей цели (cdpCode) → tab_gone, timeout → internal; тест на каждый (проверка seam N-022)",
+   "createAgent передаёт оболочке N-005 version, buildRoot и localesDir; при неизвестном каталоге строк служба не стартует молча с ключами вместо фраз (отчёт N-005, fix 1)"
   ],
   "dod": "vitest apps/agent/src/verbs зелёный на Chrome stable"
  },
@@ -508,7 +509,8 @@
    "фальшивый launchctl первым в PATH: install зовёт bootout, ждёт, bootstrap",
    "релиз содержит бандл, apps/agent/src/fabric и apps/agent/static (аудит #37)",
    "install пишет plist через launchdPlist набора и зовёт capStdoutLog при старте",
-   "дескриптор берёт auth.tokenFile из servicePaths(dirs) N-005, а не из своей копии пути (проверка seam N-005)"
+   "дескриптор берёт auth.tokenFile из servicePaths(dirs) N-005, а не из своей копии пути (проверка seam N-005)",
+   "релиз содержит apps/agent/_locales; buildIdentity от корня релиза даёт digest, не коммит чужого git (отчёт N-005, fix 1)"
   ],
   "dod": "vitest tools/install-agent.test.ts tools/runbook.test.ts зелёные"
  },
