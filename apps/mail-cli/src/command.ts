@@ -74,13 +74,11 @@ export interface ScriptResult {
 /** Where `run` writes and how it ends; the process by default, a fake in a test. */
 export interface RunIo {
   readonly write: (text: string) => void
-  readonly fail: (error: unknown) => void
   readonly exit: (code: number) => void
 }
 
 const processIo: RunIo = {
   write: (text) => process.stdout.write(text),
-  fail: (error) => console.error(error),
   exit: (code) => {
     process.exitCode = code
   },
@@ -90,24 +88,19 @@ const processIo: RunIo = {
  * The command, as `index.ts` hands it over: from `bin/okolos-mail.mjs` through
  * the launcher, or from a direct start of `index.ts` through the same launcher.
  *
- * A `main` that throws ends with `EXIT.unreadable` and the error on stderr. A
- * throw left to node exits 1, which is `EXIT.signalsFound`: a crash would read
- * as a finding to a script, and it is neither a finding nor a clean message.
+ * A `main` that throws is not caught here. The launcher catches it, writes one
+ * line that starts with `okolos-mail:` and ends with `EXIT.unreadable`: a throw
+ * left to node exits 1, which is `EXIT.signalsFound`, and a crash is neither a
+ * finding nor a clean message. One place formats every failure, so the prefix
+ * the launcher promises cannot be missing from one of them.
  */
-export function run(
+export async function run(
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
   io: RunIo = processIo,
   command: typeof main = main,
-): void {
-  let result: ScriptResult
-  try {
-    result = command(argv, env)
-  } catch (error) {
-    io.fail(error)
-    io.exit(EXIT.unreadable)
-    return
-  }
+): Promise<void> {
+  const result = command(argv, env)
   io.write(`${result.text}\n`)
   io.exit(result.code)
 }

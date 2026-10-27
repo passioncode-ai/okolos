@@ -103,8 +103,9 @@ export async function loadSources() {
 }
 
 /**
- * Start the command. Returns `FAILED` when it could not start, and `undefined`
- * when `run` did, because then `run` has set the exit code itself.
+ * Start the command. Returns `FAILED` when it could not start or when it threw,
+ * and `undefined` when `run` finished, because then `run` has set the exit code
+ * itself.
  *
  * @param {{
  *   argv: readonly string[]
@@ -132,14 +133,31 @@ export async function launch({
     )
     return FAILED
   }
+  let command
   try {
-    const { run } = await load()
-    await run(argv, env)
-    return undefined
+    command = await load()
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    write(line(`the command could not start: ${message}`))
-    if (error instanceof Error && error.stack !== undefined) write(`${error.stack}\n`)
+    report(write, 'the command could not start', error)
     return FAILED
   }
+  try {
+    await command.run(argv, env)
+    return undefined
+  } catch (error) {
+    report(write, 'the command failed', error)
+    return FAILED
+  }
+}
+
+/**
+ * One `okolos-mail:` line a script can grep, then the stack a person can read.
+ *
+ * @param {(text: string) => void} write
+ * @param {string} what
+ * @param {unknown} error
+ */
+function report(write, what, error) {
+  const message = error instanceof Error ? error.message : String(error)
+  write(line(`${what}: ${message}`))
+  if (error instanceof Error && error.stack !== undefined) write(`${error.stack}\n`)
 }

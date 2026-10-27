@@ -98,7 +98,39 @@ describe('the launcher, with the node it runs on injected', () => {
       write: out.write,
     })
     expect(code).toBe(EXIT.unreadable)
-    expect(out.lines[0]).toMatch(/^okolos-mail: .*planted/)
+    expect(out.lines[0]).toMatch(/^okolos-mail: the command could not start: planted\n$/)
+  })
+
+  it('ends with 2 and an okolos-mail: line when the command throws', async () => {
+    const out = quiet()
+    const code = await launch({
+      argv: ['scan', 'x'],
+      env: {},
+      node: '26.10.0',
+      typescript: 'strip',
+      load: async () => ({
+        run: () => {
+          throw new Error('planted in main')
+        },
+      }),
+      write: out.write,
+    })
+    expect(code).toBe(EXIT.unreadable)
+    expect(out.lines[0]).toMatch(/^okolos-mail: the command failed: planted in main\n$/)
+  })
+
+  it('ends with 2 and an okolos-mail: line when the command rejects', async () => {
+    const out = quiet()
+    const code = await launch({
+      argv: ['scan', 'x'],
+      env: {},
+      node: '26.10.0',
+      typescript: 'strip',
+      load: async () => ({ run: async () => Promise.reject(new Error('planted later')) }),
+      write: out.write,
+    })
+    expect(code).toBe(EXIT.unreadable)
+    expect(out.lines[0]).toMatch(/^okolos-mail: the command failed: planted later\n$/)
   })
 
   it('hands the arguments to run and leaves the exit code to it', async () => {

@@ -113,7 +113,8 @@ describe('okolos-mail, started the way a person starts it', () => {
    * `argv[1]` names neither the file nor its extension. The command must not
    * care: the old check would have run nothing here too. Windows gets a `.cmd`
    * shim instead of a link and creating one needs privileges, so this case is
-   * POSIX; the Windows argv shape is `entry.test.ts`.
+   * POSIX. Windows spellings of the path cannot matter: nothing reads `argv[1]`,
+   * which `index.test.ts` holds.
    */
   it.skipIf(process.platform === 'win32')('runs when started through a link with another name', () => {
     const link = path.join(dir, 'okolos-mail')
@@ -125,20 +126,21 @@ describe('okolos-mail, started the way a person starts it', () => {
 
   /**
    * The guarantee B-161 lacked: whatever goes wrong before a verdict, the
-   * process does not end with the 0 that means "nothing found". The plant
-   * replaces `index.ts` with a module that throws as it loads, which is the
-   * earliest point the command's own code can fail.
+   * process does not end with the 0 that means "nothing found", nor node's 1,
+   * which means "signals found" here. Each plant replaces one module with one
+   * that throws: `index.ts` as it loads, the earliest point the command's own
+   * code can fail, and `scan.ts` inside `main`, the latest.
    */
-  it('exits 2, not 0, when the command fails before it can scan', () => {
-    const plant = path.join(dir, 'plant.mjs')
+  function plant(module: string, source: string): string[] {
+    const file = path.join(dir, `plant-${module.replace(/\W/g, '-')}.mjs`)
     writeFileSync(
-      plant,
+      file,
       [
         "import { registerHooks } from 'node:module'",
         'registerHooks({',
         '  load(url, context, next) {',
-        "    if (url.endsWith('/apps/mail-cli/src/index.ts')) {",
-        "      return { format: 'module', source: 'throw new Error(\"planted\")', shortCircuit: true }",
+        `    if (url.endsWith(${JSON.stringify(`/apps/mail-cli/src/${module}`)})) {`,
+        `      return { format: 'module', source: ${JSON.stringify(source)}, shortCircuit: true }`,
         '    }',
         '    return next(url, context)',
         '  },',
@@ -146,8 +148,25 @@ describe('okolos-mail, started the way a person starts it', () => {
         '',
       ].join('\n'),
     )
-    const out = okolosMail(['scan', clean], { before: ['--import', pathToFileURL(plant).href] })
-    expect(out.stderr).toContain('planted')
+    return ['--import', pathToFileURL(file).href]
+  }
+
+  it('exits 2 with an okolos-mail: line when the command fails before it can scan', () => {
+    const out = okolosMail(['scan', clean], { before: plant('index.ts', 'throw new Error("planted in load")') })
+    expect(out.stderr).toMatch(/^okolos-mail: .*planted in load/)
+    expect(out.stdout).not.toContain(word('mailVerdictNone'))
+    expect(out.code).toBe(EXIT.unreadable)
+  })
+
+  it('exits 2 with an okolos-mail: line when main itself throws', () => {
+    const out = okolosMail(['scan', clean], {
+      before: plant(
+        'scan.ts',
+        'export const EXIT = { nothingFound: 0, signalsFound: 1, unreadable: 2 }\n' +
+          'export function scan() { throw new Error("planted in main") }\n',
+      ),
+    })
+    expect(out.stderr).toMatch(/^okolos-mail: .*planted in main/)
     expect(out.stdout).not.toContain(word('mailVerdictNone'))
     expect(out.code).toBe(EXIT.unreadable)
   })

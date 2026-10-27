@@ -26,7 +26,7 @@ import { LAUNCHED, installHook, launch } from '../src/launch.mjs'
 /** What the launcher calls: the command, imported once the hook exists. */
 export async function run(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<void> {
   const command = await import('./command.js')
-  command.run(argv, env)
+  await command.run(argv, env)
 }
 
 if (Reflect.get(globalThis, LAUNCHED) !== true) {

@@ -30,37 +30,36 @@ describe('the language the command speaks', () => {
 
 /** A `RunIo` that records instead of touching the process. */
 function recorder() {
-  const seen = { written: [] as string[], failed: [] as unknown[], codes: [] as number[] }
+  const seen = { written: [] as string[], codes: [] as number[] }
   const io: RunIo = {
     write: (text) => seen.written.push(text),
-    fail: (error) => seen.failed.push(error),
     exit: (code) => seen.codes.push(code),
   }
   return { io, seen }
 }
 
 describe('how the command ends', () => {
-  it('writes the verdict and ends with its code', () => {
+  it('writes the verdict and ends with its code', async () => {
     const { io, seen } = recorder()
-    run(['scan', 'x'], {}, io, () => ({ text: 'verdict', code: EXIT.signalsFound }))
+    await run(['scan', 'x'], {}, io, () => ({ text: 'verdict', code: EXIT.signalsFound }))
     expect(seen.written).toEqual(['verdict\n'])
-    expect(seen.failed).toEqual([])
     expect(seen.codes).toEqual([EXIT.signalsFound])
   })
 
   /**
-   * Left to node, a throw exits 1, and 1 is `EXIT.signalsFound`: a crash would
-   * read as a finding. It is neither a finding nor a clean message, so it ends
-   * the way an unread message does.
+   * A crash is the launcher's to report: it prefixes the line with
+   * `okolos-mail:` and ends with 2. `run` neither swallows it nor half-reports
+   * it, so the crash reaches the one place that formats every failure.
    */
-  it('ends a crash with the unread code, never 0 and never 1', () => {
+  it('lets a crash reach the launcher, with nothing written and no exit code set', async () => {
     const { io, seen } = recorder()
     const planted = new Error('planted')
-    run(['scan', 'x'], {}, io, () => {
-      throw planted
-    })
+    await expect(
+      run(['scan', 'x'], {}, io, () => {
+        throw planted
+      }),
+    ).rejects.toBe(planted)
     expect(seen.written).toEqual([])
-    expect(seen.failed).toEqual([planted])
-    expect(seen.codes).toEqual([EXIT.unreadable])
+    expect(seen.codes).toEqual([])
   })
 })
