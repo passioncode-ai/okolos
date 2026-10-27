@@ -78,6 +78,15 @@ describe('launching a browser on a pipe', () => {
     expect(alive(-pipe.pid)).toBe(true)
   })
 
+  it('rejects a request with no answer within requestTimeoutMs, naming the method', async () => {
+    const pipe = await fake([], 300)
+    const started = Date.now()
+    await expect(pipe.send('Fake.silence')).rejects.toThrow(/Fake\.silence/)
+    expect(Date.now() - started).toBeGreaterThanOrEqual(250)
+    // The pipe is still usable after a request timed out.
+    expect(await pipe.send('Fake.echo', { after: 'timeout' })).toEqual({ after: 'timeout' })
+  })
+
   it('refuses a binary that does not exist', async () => {
     await expect(
       CdpPipe.launch({ binary: path.join(tmpdir(), 'okolos-no-such-browser'), args: [], userDataDir: PROFILE }),

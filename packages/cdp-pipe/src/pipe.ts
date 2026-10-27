@@ -22,22 +22,27 @@ export interface LaunchOptions {
   readonly args: readonly string[]
   /** The profile directory, passed as `--user-data-dir`. */
   readonly userDataDir: string
+  /** How long a request may wait for its answer before it is rejected. */
+  readonly requestTimeoutMs?: number
 }
 
 interface Waiting {
   readonly resolve: (result: unknown) => void
+  readonly reject: (error: Error) => void
 }
 
 export class CdpPipe {
   readonly pid: number
 
   private readonly toBrowser: Writable
+  private readonly requestTimeoutMs: number
   private nextId = 1
   private pending = ''
   private readonly waiting = new Map<number, Waiting>()
 
-  private constructor(child: ChildProcess) {
+  private constructor(child: ChildProcess, requestTimeoutMs: number) {
     this.pid = child.pid as number
+    this.requestTimeoutMs = requestTimeoutMs
     this.toBrowser = child.stdio[3] as Writable
     const fromBrowser = child.stdio[4] as Readable
     fromBrowser.setEncoding('utf8')
@@ -55,7 +60,7 @@ export class CdpPipe {
     )
     return new Promise((resolve, reject) => {
       child.once('error', (cause) => reject(new Error(`cannot start ${options.binary}: ${cause.message}`)))
-      child.once('spawn', () => resolve(new CdpPipe(child)))
+      child.once('spawn', () => resolve(new CdpPipe(child, options.requestTimeoutMs ?? 10_000)))
     })
   }
 
@@ -63,8 +68,21 @@ export class CdpPipe {
   send<T = unknown>(method: string, params?: object, sessionId?: string): Promise<T> {
     const id = this.nextId++
     const message = { id, method, params: params ?? {}, ...(sessionId === undefined ? {} : { sessionId }) }
-    return new Promise<T>((resolve) => {
-      this.waiting.set(id, { resolve: resolve as (result: unknown) => void })
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.waiting.delete(id)
+        reject(new Error(`${method}: no answer within ${this.requestTimeoutMs} ms`))
+      }, this.requestTimeoutMs)
+      this.waiting.set(id, {
+        resolve: (result) => {
+          clearTimeout(timer)
+          resolve(result as T)
+        },
+        reject: (error) => {
+          clearTimeout(timer)
+          reject(error)
+        },
+      })
       this.toBrowser.write(`${JSON.stringify(message)}\0`)
     })
   }
