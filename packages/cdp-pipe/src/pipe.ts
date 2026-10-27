@@ -26,9 +26,10 @@ export interface LaunchOptions {
   /** How long a request may wait for its answer before it is rejected. */
   readonly requestTimeoutMs?: number
   /**
-   * Hears a listener registered with on() that threw. The other listeners and
-   * the pipe go on either way. Default: one stderr line naming the event and
-   * the error's class, never the params (they can carry page content).
+   * Hears a listener registered with on() or onExit() that threw (event is the
+   * CDP event, or `exit`). The other listeners and the pipe go on either way.
+   * Default: one stderr line naming the event and the error's class, never the
+   * params (they can carry page content).
    */
   readonly onListenerError?: (error: unknown, event: string) => void
   /**
@@ -101,6 +102,14 @@ interface Waiting {
 /** How often close() looks whether the browser and its group are gone. */
 const POLL_MS = 25
 
+/**
+ * How long a pipe that ended waits for the browser's exit before it calls the
+ * pipe closed. The exit follows the pipes within milliseconds (measured on the
+ * fake browser: the same millisecond); this is two orders of magnitude more,
+ * and costs only a broken pipe on a live browser half a second.
+ */
+const EXIT_AFTER_PIPE_MS = 500
+
 export class CdpPipe {
   readonly pid: number
 
@@ -116,7 +125,9 @@ export class CdpPipe {
   private readonly listeners = new Map<string, Set<EventListener>>()
   /** Why no further answer can arrive; set once the pipe or the process is gone. */
   private closedBecause: { readonly kind: CdpErrorKind; readonly reason: string } | undefined
-  private exited = false
+  /** How the browser ended; set once its process is gone. */
+  private exitInfo: ExitInfo | undefined
+  private readonly exitListeners = new Set<(info: ExitInfo) => void>()
   private closing: Promise<void> | undefined
 
   private constructor(child: ChildProcess, options: LaunchOptions) {
@@ -130,24 +141,53 @@ export class CdpPipe {
     const fromBrowser = child.stdio[4] as Readable
     fromBrowser.setEncoding('utf8')
     fromBrowser.on('data', (chunk: string) => this.read(chunk))
-    fromBrowser.on('end', () => this.fail('closed', 'the pipe from the browser closed'))
+    fromBrowser.on('end', () => this.lost('the pipe from the browser closed'))
     // An unhandled 'error' on any of the browser's streams would take the
     // owner's process down with it, and every session on the pipe. A write after
     // the browser is gone fails with EPIPE; a read can fail too (EIO).
-    fromBrowser.on('error', (cause) => this.fail('closed', `the pipe from the browser broke (${cause.message})`))
-    this.toBrowser.on('error', (cause) => this.fail('closed', `the pipe to the browser broke (${cause.message})`))
+    fromBrowser.on('error', (cause) => this.lost(`the pipe from the browser broke (${cause.message})`))
+    this.toBrowser.on('error', (cause) => this.lost(`the pipe to the browser broke (${cause.message})`))
     // A browser that stops reading fd 3 ends our side of it too, and a write to
     // a stream already closed fails in its callback only, with no 'error': without
     // this, the request would wait out its whole deadline.
-    this.toBrowser.on('close', () => this.fail('closed', 'the pipe to the browser closed'))
+    this.toBrowser.on('close', () => this.lost('the pipe to the browser closed'))
     const stderr = child.stdio[2] as Readable
-    stderr.on('error', (cause) => this.fail('closed', `the browser's stderr broke (${cause.message})`))
+    stderr.on('error', (cause) => this.lost(`the browser's stderr broke (${cause.message})`))
     // Unread stderr would fill the pipe and stall the browser.
     stderr.resume()
-    child.once('exit', () => {
-      this.exited = true
-      this.fail('exited', 'the browser exited')
+    child.once('exit', (code, signal) => {
+      const info = { code, signal }
+      this.exitInfo = info
+      this.fail('exited', `the browser exited (${signal ?? `code ${code}`})`)
+      for (const listener of [...this.exitListeners]) this.tellExit(listener, info)
     })
+  }
+
+  /**
+   * Hears the browser process end, whoever ended it: on its own, a signal, or
+   * close(). A listener that subscribes after the end hears it too, on the next
+   * microtask. Returns the function that unsubscribes.
+   */
+  onExit(listener: (info: ExitInfo) => void): () => void {
+    this.exitListeners.add(listener)
+    const info = this.exitInfo
+    if (info !== undefined) {
+      queueMicrotask(() => {
+        if (this.exitListeners.has(listener)) this.tellExit(listener, info)
+      })
+    }
+    return () => {
+      this.exitListeners.delete(listener)
+    }
+  }
+
+  /** Calls one exit listener; one that throws is reported, as on() listeners are. */
+  private tellExit(listener: (info: ExitInfo) => void, info: ExitInfo): void {
+    try {
+      listener(info)
+    } catch (error) {
+      this.onListenerError(error, 'exit')
+    }
   }
 
   /** Starts the browser on a pipe; resolves once the process exists. */
@@ -219,11 +259,12 @@ export class CdpPipe {
   private async shutdown(graceMs: number): Promise<void> {
     // The whole close has a hard deadline: ask, SIGTERM, SIGKILL, one grace each.
     const deadline = Date.now() + 3 * graceMs
-    if (!this.exited) {
+    const exited = (): boolean => this.exitInfo !== undefined
+    if (!exited()) {
       // The answer does not matter: the process leaving is the answer, and
       // the signals below are the guarantee.
       this.send('Browser.close').catch(() => undefined)
-      await until(() => this.exited, graceMs)
+      await until(exited, graceMs)
     }
     for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
       if (!this.groupAlive()) break
@@ -232,7 +273,7 @@ export class CdpPipe {
     }
     // A group that is gone has an exit event on its way; a group that could
     // not be signalled (EPERM) may never give one, and close() must not hang.
-    if (!(await until(() => this.exited, Math.max(deadline - Date.now(), POLL_MS)))) {
+    if (!(await until(exited, Math.max(deadline - Date.now(), POLL_MS)))) {
       this.onCloseIncomplete(this.pid)
     }
     for (const stream of this.child.stdio) stream?.destroy()
@@ -256,6 +297,19 @@ export class CdpPipe {
     } catch {
       // the group left between the check and the signal, or may not be signalled
     }
+  }
+
+  /**
+   * A stream of the browser ended or broke. A browser that exits closes its
+   * pipes too, and Node reports the pipes first (measured: every time, on the
+   * fake browser), so the requests waiting are failed only if no exit follows
+   * within EXIT_AFTER_PIPE_MS: a caller then learns `exited`, the true reason,
+   * and `closed` means a browser still running behind a broken pipe.
+   */
+  private lost(reason: string): void {
+    if (this.closedBecause !== undefined) return
+    const timer = setTimeout(() => this.fail('closed', reason), EXIT_AFTER_PIPE_MS)
+    this.child.once('exit', () => clearTimeout(timer))
   }
 
   private fail(kind: CdpErrorKind, reason: string): void {

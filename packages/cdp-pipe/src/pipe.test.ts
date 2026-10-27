@@ -218,6 +218,67 @@ describe('the transport a consumer depends on', () => {
   })
 })
 
+describe('a browser that exits on its own', () => {
+  it('is heard by onExit with its exit code, and requests waiting are rejected as exited', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    const exits: unknown[] = []
+    pipe.onExit((info) => exits.push(info))
+    const waiting = rejectionOf(pipe.send('Fake.silence'))
+
+    const error = await rejectionOf(pipe.send('Fake.exit', { code: 3 }))
+
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('exited')
+    expect(error.method).toBe('Fake.exit')
+    expect((await waiting).kind).toBe('exited')
+    expect(exits).toEqual([{ code: 3, signal: null }])
+    // A request after the exit is refused at once, with the same kind.
+    expect((await rejectionOf(pipe.send('Fake.echo'))).kind).toBe('exited')
+  })
+
+  it('is heard by onExit with the signal that ended it', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    const exits: unknown[] = []
+    pipe.onExit((info) => exits.push(info))
+    const waiting = rejectionOf(pipe.send('Fake.silence'))
+
+    process.kill(pipe.pid, 'SIGKILL')
+
+    expect((await waiting).kind).toBe('exited')
+    expect(exits).toEqual([{ code: null, signal: 'SIGKILL' }])
+  })
+
+  it('is heard by a listener that subscribed after the exit, and not by one that unsubscribed', async () => {
+    const pipe = await fake()
+    const before: unknown[] = []
+    pipe.onExit((info) => before.push(info))()
+    await rejectionOf(pipe.send('Fake.exit', { code: 0 }))
+
+    const after: unknown[] = []
+    pipe.onExit((info) => after.push(info))
+
+    expect(await eventually(() => after.length > 0)).toBe(true)
+    expect(after).toEqual([{ code: 0, signal: null }])
+    expect(before).toEqual([])
+  })
+
+  it('a listener of onExit that throws does not end the owner nor stop the others, and is reported', async () => {
+    const reported: Array<{ error: unknown; event: string }> = []
+    const pipe = await fake([], { onListenerError: (error, event) => reported.push({ error, event }) })
+    const boom = new Error('exit listener bug')
+    pipe.onExit(() => {
+      throw boom
+    })
+    const exits: unknown[] = []
+    pipe.onExit((info) => exits.push(info))
+
+    await rejectionOf(pipe.send('Fake.exit', { code: 0 }))
+
+    expect(await eventually(() => exits.length > 0)).toBe(true)
+    expect(reported).toEqual([{ error: boom, event: 'exit' }])
+  })
+})
+
 describe('a stream of the browser that breaks', () => {
   it('a read error on fd 4 does not end the owner: requests waiting are rejected as closed', async () => {
     const pipe = await fake([], { requestTimeoutMs: 60_000 })
@@ -247,7 +308,8 @@ describe('a stream of the browser that breaks', () => {
   })
 
   it('a write that fails with EPIPE does not end the owner: requests waiting are rejected as closed', async () => {
-    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    // A browser still running behind the broken pipe; one that exits is `exited`.
+    const pipe = await fake(['--stay-after-eof'], { requestTimeoutMs: 60_000 })
     const waiting = rejectionOf(pipe.send('Fake.silence'))
 
     streamOf(pipe, 3).destroy(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }))

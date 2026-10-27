@@ -15,6 +15,8 @@
  *   Fake.spawnGrandchild -> starts a process in this process's group (as Chrome's
  *                           helpers are) and answers { pid }, so a test can see
  *                           whether close() ends the whole group
+ *   Fake.exit            -> exits with params.code without answering, as a browser
+ *                           that crashes or quits on its own
  *   Fake.closeInput      -> closes its fd 3 and stays, then answers {}: the owner's
  *                           next write meets a pipe with no reader (EPIPE)
  *   Browser.close        -> answers {} and exits, like Chrome; with --ignore-close it
@@ -22,7 +24,8 @@
  *   anything else        -> the error Chrome gives for an unknown method
  *
  * Flags: --ignore-close (see above), --ignore-term (SIGTERM does nothing, so only
- * SIGKILL ends it).
+ * SIGKILL ends it), --stay-after-eof (fd 3 closing does not end it: a browser
+ * still running behind a broken pipe).
  *
  * Every process it leaves has a deadline: it exits when fd 3 closes (its owner
  * is gone) or after 60 s, whichever comes first, and a grandchild lives at most
@@ -78,6 +81,8 @@ function handle(message) {
       })
       return write({ id, result: { pid: grandchild.pid } })
     }
+    case 'Fake.exit':
+      return process.exit(params.code)
     case 'Fake.closeInput':
       // Destroyed, not ended: no 'end' event. A ref'd timer holds the process
       // (an idle fd 4 does not), up to its lifetime or its owner's kill, and the
@@ -99,4 +104,8 @@ fromOwner.on('data', (chunk) => {
   pending = parts.pop() ?? ''
   for (const part of parts) if (part.length > 0) handle(JSON.parse(part))
 })
-fromOwner.on('end', () => process.exit(0))
+fromOwner.on('end', () => {
+  // Held by a ref'd timer instead, up to its lifetime or its owner's kill.
+  if (argv.includes('--stay-after-eof')) setTimeout(() => {}, LIFETIME_MS)
+  else process.exit(0)
+})
