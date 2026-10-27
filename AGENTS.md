@@ -143,7 +143,8 @@ name `~/.okolos/bin/feed-agent/bootstrap.mjs`. B-159 closes only after that chec
 `rm -rf apps/extension/dist/chrome* apps/extension/dist/firefox* apps/extension/.tsc packages/*/dist test-results playwright-report node_modules/.vite`
 before ending its run. It leaves `dist/release/` and every `node_modules` alone, and
 `pnpm build` restores what a gate needs. (Not `git clean -X` with pathspecs: measured
-2026-10-03, its dry run would remove the whole `node_modules` tree.)
+2026-10-03, its dry run would remove the whole `node_modules` tree.) Both commands are POSIX
+shell: on Windows run them in Git Bash, not PowerShell or `cmd.exe`.
 
 ## Organisation
 

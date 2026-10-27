@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -235,6 +236,77 @@ describe('line endings are LF on every checkout', () => {
     // `-text` in the index column is Git's own reading: the content is not text.
     const unmarked = entries.filter((e) => e.index === '-text' && !e.attr.includes('-text')).map((e) => e.file)
     expect(unmarked, `add their extension to .gitattributes as binary: ${unmarked.join(', ')}`).toEqual([])
+  })
+})
+
+describe('a clone made before .gitattributes is converted by the runbook\'s own commands', () => {
+  /**
+   * `git add --renormalize .` rewrites the index only: a clone checked out with
+   * `core.autocrlf=true` kept `\r` on every line of its hook and docs while git status
+   * read clean (B-162, fix round 2). This runs the commands the runbook prints, read
+   * from its block rather than copied here, in a throwaway repository in that state.
+   */
+  const runbook = readFileSync(path.join(root, 'docs/runbooks/development.md'), 'utf8')
+  const anchor = runbook.indexOf('Клон, сделанный до появления `.gitattributes`')
+  const block = /```bash\r?\n([\s\S]*?)```/.exec(runbook.slice(anchor))?.[1] ?? ''
+  const lines = block
+    .split(/\r?\n/)
+    .map((line) => line.replace(/#.*$/, '').trim())
+    .filter(Boolean)
+
+  /** `git …`, `a && b`, and `git … | grep <word>`: all the block may use, run without a shell. */
+  function run(line: string, cwd: string): string {
+    return line
+      .split('&&')
+      .map((part) => {
+        const [command, filter] = part.split('|').map((piece) => piece.trim())
+        const words = (command as string).split(/\s+/)
+        if (words[0] !== 'git') throw new Error(`the block runs something other than git: ${command}`)
+        const out = execFileSync('git', words.slice(1), { cwd, encoding: 'utf8' })
+        if (filter === undefined) return out
+        const grep = /^grep\s+(\S+)$/.exec(filter)
+        if (!grep) throw new Error(`the block filters with something other than grep <word>: ${filter}`)
+        return out
+          .split(/\r?\n/)
+          .filter((entry) => entry.includes(grep[1] as string))
+          .join('\n')
+      })
+      .join('')
+  }
+
+  it('finds the block after its paragraph', () => {
+    expect(anchor, 'the paragraph about a clone made before .gitattributes is gone').toBeGreaterThan(-1)
+    expect(lines.length).toBeGreaterThan(0)
+  })
+
+  it('leaves no CRLF on disk, and every line it prints is empty, as the runbook says', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-crlf-'))
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-c', 'user.email=t@example.test', '-c', 'user.name=t', ...args], { cwd: dir, encoding: 'utf8' })
+    const hook = path.join(dir, '.githooks', 'pre-push')
+    git('init', '--quiet')
+    git('config', 'core.autocrlf', 'true')
+    mkdirSync(path.dirname(hook))
+    writeFileSync(hook, readFileSync(path.join(root, '.githooks/pre-push'), 'utf8').replaceAll('\r\n', '\n'))
+    writeFileSync(path.join(dir, 'README.md'), 'a\nb\n')
+    git('add', '.')
+    git('commit', '--quiet', '-m', 'before .gitattributes')
+    // Checked out with autocrlf=true and no attributes: CRLF on disk, LF in the index.
+    rmSync(path.dirname(hook), { recursive: true })
+    rmSync(path.join(dir, 'README.md'))
+    git('checkout', '--', '.')
+    expect(readFileSync(hook, 'utf8'), 'the fixture did not produce a CRLF checkout').toContain('\r\n')
+    // .gitattributes arrives, as a pull brings it; the files on disk stay as they were.
+    writeFileSync(path.join(dir, '.gitattributes'), readFileSync(path.join(root, '.gitattributes')))
+    git('add', '.gitattributes')
+    git('commit', '--quiet', '-m', 'attributes')
+    expect(readFileSync(hook, 'utf8')).toContain('\r\n')
+
+    const printed = lines.map((line) => [line, run(line, dir).trim()] as const).filter(([, out]) => out !== '')
+    expect(printed, 'the runbook says these print nothing').toEqual([])
+    expect(readFileSync(hook, 'utf8').includes('\r'), 'the hook still has CR on disk').toBe(false)
+    expect(readFileSync(path.join(dir, 'README.md'), 'utf8')).toBe('a\nb\n')
+    expect(git('ls-files', '--eol')).not.toMatch(/w\/crlf/)
   })
 })
 
