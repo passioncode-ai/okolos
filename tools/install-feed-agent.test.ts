@@ -285,6 +285,11 @@ describe('the plist launchd reads', () => {
     expect(plist()).not.toContain('/tmp/')
   })
 
+  it('holds no "--" inside a comment, which XML forbids', () => {
+    const bad = (template().match(/<!--([\s\S]*?)-->/g) ?? []).filter((comment) => comment.slice(4, -3).includes('--'))
+    expect(bad.map((comment) => comment.slice(0, 60))).toEqual([])
+  })
+
   it('leaves no placeholder behind, and rewrites no comment', () => {
     expect(plist()).not.toContain('{{')
     const comments = (text: string) => (text.match(/<!--[\s\S]*?-->/g) ?? []).join('\n')

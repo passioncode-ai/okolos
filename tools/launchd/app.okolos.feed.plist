@@ -30,11 +30,19 @@
     feed while the failure count read 0 (B-149). The installer copies
     tools/feed/bootstrap.mjs and the modules it imports to ~/.okolos/bin/feed-agent;
     it recreates a missing or broken checkout at origin/main, runs the job from it,
-    and writes the status record for every failure that reaches it, a checkout it
-    cannot recreate and a job that dies without a record included. What fails
-    before it runs (no node at all, the installed copy gone) writes no status:
-    only this file's log below and the "lastPublished older than 26 h" alarm
-    (B-135) show that.
+    and writes the status record for every failure that reaches it: stage
+    checkout (no checkout, or its repair outlived the run's 45-minute deadline),
+    stage job (the job died without its own record), the job's own stages.
+
+    The shell line around it covers what fails before any of that: node not found,
+    the installed copy gone, or node exiting non-zero (not 75, a run refused by the
+    lock) without a record carrying this launch's id (OKOLOS_LAUNCH_ID). It writes
+    feed-status.json itself with /bin/sh and coreutils only (outcome failed, stage
+    launch, exit, reason, time; consecutiveFailures counted on, lastPublished kept;
+    a temp file, then mv), and one line to feed.log and to this file's log below.
+    Not recorded anywhere: launchd not starting this at all, or /bin/sh failing;
+    the installer's status flag and `launchctl print` show those. No alarm reads the record yet
+    (B-135, blocked on OBS-32).
 
     Production publishes still run only from origin/main: the job fast-forwards the
     checkout itself (tools/feed-job.mjs, F2). Through a login shell because `node`
@@ -100,8 +108,9 @@ exit "$c"</string>
     ADR-0010. launchd runs a missed StartInterval as soon as it can after a wake,
     which is the behaviour this wants: a laptop that was closed overnight
     refreshes on opening rather than waiting for the next slot. A run is bounded
-    by the job's own watchdog (thirty minutes), so launchd never skips a slot
-    behind a hung one.
+    by one deadline, 45 minutes from the bootstrap's start with the checkout repair
+    included (the job's own thirty-minute watchdog sits inside it), so launchd
+    never skips a slot behind a hung one.
   -->
   <key>StartInterval</key>
   <integer>43200</integer>
@@ -117,11 +126,11 @@ exit "$c"</string>
   <!--
     Not `KeepAlive`: this is a task that finishes, and keeping it alive would
     restart it in a loop. The job writes its own rotated, owner-only log and a
-    status record next to its state. launchd's streams catch what the shell says
-    (node not found, the bootstrap copy gone), one summary line per failed run,
-    and the job's own stderr, which the bootstrap passes through as it arrives (a
-    crash's error and stack; feed.log gets them too). The bootstrap and the job
-    cap that file at start.
+    status record next to its state. launchd's streams catch the launch line's
+    one line when node or the bootstrap cannot start, one summary line per failed
+    run, and the job's own stderr, which the bootstrap passes through as it
+    arrives (a crash's error and stack; feed.log gets them too). The bootstrap and
+    the job cap that file at start.
   -->
   <key>StandardOutPath</key>
   <string>{{LOG_DIR}}/feed.launchd.log</string>
