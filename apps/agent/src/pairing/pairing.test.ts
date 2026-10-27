@@ -124,7 +124,7 @@ describe('the pairing request id (spec §11 F5)', () => {
     expect(notices.map((n) => n.kind)).toEqual(['requested', 'requested', 'requested', 'confirmed', 'declined', 'paired', 'expired', 'revoked'])
   })
 
-  it('is forgotten once the key is given out: a second claim and a late confirm find nothing', () => {
+  it('is forgotten once the key is given out: a second claim is told so, and a late confirm finds nothing', () => {
     const pairing = open()
     const request = asked(pairing.request('Claude Code', T0))
     const { requestId } = request
@@ -132,7 +132,7 @@ describe('the pairing request id (spec §11 F5)', () => {
     expect(pairing.confirmByHandle(handle, T0 + 1)).toBe(true)
     expect(pairing.claim(requestId, T0 + 2)).toHaveProperty('key')
     expect(pairing.confirmByHandle(handle, T0 + 3)).toBe(false)
-    expect(pairing.claim(requestId, T0 + 4)).toBeNull()
+    expect(pairing.claim(requestId, T0 + 4)).toEqual({ refused: 'claimed' })
     expect(pairing.list(T0 + 5).requests).toEqual([])
   })
 })
@@ -147,14 +147,14 @@ describe('claiming the key (spec §11 F5)', () => {
     expect(pairing.list(T0 + 2000).agents).toEqual([])
   })
 
-  it('after the confirm gives a 256-bit key once; a second claim finds nothing', () => {
+  it('after the confirm gives a 256-bit key once; a second claim is refused as claimed', () => {
     const pairing = open()
     const request = asked(pairing.request('Claude Code', T0))
     const { requestId } = request
     expect(confirmAt(pairing, request, T0 + MINUTE)).toBe(true)
     const first = pairing.claim(requestId, T0 + MINUTE + 1)
     expect(first).toEqual({ key: expect.stringMatching(/^[0-9a-f]{64}$/) })
-    expect(pairing.claim(requestId, T0 + MINUTE + 2)).toBeNull()
+    expect(pairing.claim(requestId, T0 + MINUTE + 2)).toEqual({ refused: 'claimed' })
     expect(pairing.list(T0 + MINUTE + 3).agents.map((a) => a.name)).toEqual(['Claude Code'])
   })
 
@@ -169,7 +169,7 @@ describe('claiming the key (spec §11 F5)', () => {
 
     const missed = asked(pairing.request('Codex', T0))
     expect(confirmAt(pairing, missed, confirmedAt)).toBe(true)
-    expect(pairing.claim(missed.requestId, confirmedAt + CLAIM_WINDOW_MS)).toBeNull()
+    expect(pairing.claim(missed.requestId, confirmedAt + CLAIM_WINDOW_MS)).toEqual({ refused: 'claim_expired' })
     expect(pairing.list(confirmedAt + CLAIM_WINDOW_MS).agents.map((a) => a.name)).toEqual(['Claude Code'])
   })
 
@@ -178,16 +178,67 @@ describe('claiming the key (spec §11 F5)', () => {
     const request = asked(pairing.request('Claude Code', T0))
     const handle = handleOf(pairing, request, T0)
     expect(pairing.declineByHandle(handle, T0)).toBe(true)
-    expect(pairing.claim(request.requestId, T0 + 1)).toBeNull()
+    expect(pairing.claim(request.requestId, T0 + 1)).toEqual({ refused: 'declined' })
     expect(pairing.confirmByHandle(handle, T0 + 2)).toBe(false)
     expect(pairing.list(T0 + 3).requests).toEqual([])
   })
 
-  it('finds nothing for an id it never gave out', () => {
+  it('answers unknown for an id it never gave out', () => {
     const pairing = open()
-    expect(pairing.claim('0'.repeat(32), T0)).toBeNull()
+    expect(pairing.claim('0'.repeat(32), T0)).toEqual({ refused: 'unknown' })
     expect(pairing.confirmByHandle('0'.repeat(16), T0)).toBe(false)
     expect(pairing.declineByHandle('0'.repeat(16), T0)).toBe(false)
+  })
+})
+
+// Fix round 3: a claim that gets no key says why, so the CLI can tell the person the true reason.
+describe('why a claim gets no key (fix round 3)', () => {
+  it('says declined, expired, claim_expired or claimed while the end is recent, then unknown', () => {
+    const pairing = open()
+    const declined = asked(pairing.request('Declined', T0))
+    const expired = asked(pairing.request('Expired', T0))
+    const missed = asked(pairing.request('Missed', T0))
+    expect(confirmAt(pairing, missed, T0 + 1)).toBe(true)
+    const declinedAt = T0 + 4 * MINUTE
+    expect(declineAt(pairing, declined, declinedAt)).toBe(true)
+    // The decline frees a place for a fourth request (MAX_PENDING), which is paired at once.
+    const claimed = asked(pairing.request('Claimed', declinedAt))
+    expect(confirmAt(pairing, claimed, declinedAt)).toBe(true)
+    expect(pairing.claim(claimed.requestId, declinedAt)).toHaveProperty('key')
+
+    // Past the request's five minutes and the missed claim window: all four have ended.
+    const at = T0 + 1 + CLAIM_WINDOW_MS
+    expect(pairing.claim(declined.requestId, at)).toEqual({ refused: 'declined' })
+    expect(pairing.claim(expired.requestId, at)).toEqual({ refused: 'expired' })
+    expect(pairing.claim(missed.requestId, at)).toEqual({ refused: 'claim_expired' })
+    expect(pairing.claim(claimed.requestId, at)).toEqual({ refused: 'claimed' })
+    // The answer does not change on asking again, and makes no request.
+    expect(pairing.claim(expired.requestId, at + 1)).toEqual({ refused: 'expired' })
+    expect(pairing.list(at + 1).requests.map((row) => [row.name, row.state])).toEqual([
+      ['Expired', 'expired'],
+      ['Missed', 'claim_expired'],
+    ])
+
+    // Each answer is kept as long as an ended row is shown, counted from its end; then unknown.
+    // (The clock only moves forward: a later sweep has already dropped what an earlier time kept.)
+    expect(pairing.claim(declined.requestId, declinedAt + EXPIRED_SHOWN_MS - 1)).toEqual({ refused: 'declined' })
+    expect(pairing.claim(claimed.requestId, declinedAt + EXPIRED_SHOWN_MS - 1)).toEqual({ refused: 'claimed' })
+    expect(pairing.claim(declined.requestId, declinedAt + EXPIRED_SHOWN_MS)).toEqual({ refused: 'unknown' })
+    expect(pairing.claim(claimed.requestId, declinedAt + EXPIRED_SHOWN_MS)).toEqual({ refused: 'unknown' })
+    expect(pairing.claim(expired.requestId, T0 + REQUEST_LIFETIME_MS + EXPIRED_SHOWN_MS - 1)).toEqual({ refused: 'expired' })
+    expect(pairing.claim(expired.requestId, T0 + REQUEST_LIFETIME_MS + EXPIRED_SHOWN_MS)).toEqual({ refused: 'unknown' })
+    expect(pairing.claim(missed.requestId, at + EXPIRED_SHOWN_MS - 1)).toEqual({ refused: 'claim_expired' })
+    expect(pairing.claim(missed.requestId, at + EXPIRED_SHOWN_MS)).toEqual({ refused: 'unknown' })
+  })
+
+  it('keeps no request id to answer with: only its SHA-256, in memory', () => {
+    const pairing = open()
+    const request = asked(pairing.request('Claude Code', T0))
+    expect(declineAt(pairing, request, T0 + 1)).toBe(true)
+    // What the instance holds, as JSON, never carries the request id itself.
+    const held = JSON.stringify(pairing, (_key, value: unknown) => (value instanceof Map ? [...value.entries()] : value))
+    expect(held).not.toContain(request.requestId)
+    expect(pairing.claim(request.requestId, T0 + 2)).toEqual({ refused: 'declined' })
   })
 })
 
@@ -198,7 +249,7 @@ describe('how long a request lives and how many there may be (spec §11 F5)', ()
     const request = asked(pairing.request('Claude Code', T0))
     const { requestId } = request
     expect(pairing.claim(requestId, T0 + REQUEST_LIFETIME_MS - 1)).toEqual({ pending: true })
-    expect(pairing.claim(requestId, T0 + REQUEST_LIFETIME_MS)).toBeNull()
+    expect(pairing.claim(requestId, T0 + REQUEST_LIFETIME_MS)).toEqual({ refused: 'expired' })
     // The ended row keeps its handle on the page, and that handle confirms nothing.
     expect(confirmAt(pairing, request, T0 + REQUEST_LIFETIME_MS)).toBe(false)
     expect(notices.filter((n) => n.kind === 'expired')).toHaveLength(1)
@@ -240,7 +291,7 @@ describe('how long a request lives and how many there may be (spec §11 F5)', ()
       expiresAt: end,
       duplicateName: false,
     })
-    expect(pairing.claim(late.requestId, end)).toBeNull()
+    expect(pairing.claim(late.requestId, end)).toEqual({ refused: 'claim_expired' })
     expect(pairing.list(end + EXPIRED_SHOWN_MS).requests).toEqual([])
     expect(notices.filter((n) => n.kind === 'expired' || n.kind === 'claim_expired').map((n) => [n.kind, n.name])).toEqual([
       ['expired', 'Never confirmed'],
@@ -292,7 +343,7 @@ function pair(pairing: Pairing, name: string, now: number): string {
   const request = asked(pairing.request(name, now))
   expect(confirmAt(pairing, request, now + 1)).toBe(true)
   const claimed = pairing.claim(request.requestId, now + 2)
-  if (claimed === null || !('key' in claimed)) throw new Error('no key')
+  if (!('key' in claimed)) throw new Error('no key')
   return claimed.key
 }
 
@@ -621,7 +672,7 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
     expect(() => open(file)).toThrow(expect.objectContaining({ reason: 'unreadable' }))
   })
 
-  it('ends every open request at a restart: pending and confirmed ones leave no row, agents stay (fix round 1)', () => {
+  it('ends every open request at a restart: pending and confirmed ones leave no row and are unknown, agents stay (fix round 1)', () => {
     const file = storeFile()
     const before = open(file)
     pair(before, 'Claude Code', T0)
@@ -633,8 +684,8 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
     const page = after.list(T0 + 13)
     expect(page.requests).toEqual([])
     expect(page.agents.map((a) => a.name)).toEqual(['Claude Code'])
-    expect(after.claim(pending.requestId, T0 + 14)).toBeNull()
-    expect(after.claim(confirmed.requestId, T0 + 14)).toBeNull()
+    expect(after.claim(pending.requestId, T0 + 14)).toEqual({ refused: 'unknown' })
+    expect(after.claim(confirmed.requestId, T0 + 14)).toEqual({ refused: 'unknown' })
   })
 
   it('opens a missing file as an empty store and writes nothing until a pairing', () => {
@@ -779,7 +830,7 @@ describe('confirming twice (fix round 2)', () => {
     })
     expect(notices.filter((n) => n.kind === 'confirmed')).toHaveLength(1)
     // The claim window still runs from the first confirm.
-    expect(pairing.claim(request.requestId, T0 + MINUTE + CLAIM_WINDOW_MS)).toBeNull()
+    expect(pairing.claim(request.requestId, T0 + MINUTE + CLAIM_WINDOW_MS)).toEqual({ refused: 'claim_expired' })
   })
 })
 
@@ -910,7 +961,7 @@ describe('the page acts by handle, never by request id (audit #9)', () => {
     const { requestId } = asked(pairing.request('Claude Code', T0))
     const [row] = pairing.list(T0 + 1).requests
     expect(pairing.declineByHandle(row!.handle, T0 + 1)).toBe(true)
-    expect(pairing.claim(requestId, T0 + 2)).toBeNull()
+    expect(pairing.claim(requestId, T0 + 2)).toEqual({ refused: 'declined' })
     expect(pairing.list(T0 + 3).requests).toEqual([])
   })
 
@@ -921,7 +972,7 @@ describe('the page acts by handle, never by request id (audit #9)', () => {
     expect(row!.handle).not.toBe(requestId)
     expect(pairing.confirmByHandle(requestId, T0 + 2)).toBe(false)
     expect(pairing.declineByHandle(requestId, T0 + 2)).toBe(false)
-    expect(pairing.claim(row!.handle, T0 + 2)).toBeNull()
+    expect(pairing.claim(row!.handle, T0 + 2)).toEqual({ refused: 'unknown' })
     expect(pairing.claim(requestId, T0 + 3)).toEqual({ pending: true })
     expect(pairing.list(T0 + 3).requests[0]).toMatchObject({ state: 'pending' })
   })
@@ -948,6 +999,6 @@ describe('the page acts by handle, never by request id (audit #9)', () => {
     const { requestId } = asked(pairing.request('Claude Code', T0))
     const [row] = pairing.list(T0 + 1).requests
     expect(pairing.confirmByHandle(row!.handle, T0 + REQUEST_LIFETIME_MS)).toBe(false)
-    expect(pairing.claim(requestId, T0 + REQUEST_LIFETIME_MS)).toBeNull()
+    expect(pairing.claim(requestId, T0 + REQUEST_LIFETIME_MS)).toEqual({ refused: 'expired' })
   })
 })

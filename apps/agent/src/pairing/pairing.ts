@@ -9,13 +9,15 @@
  *
  * The request id is the CLI's secret for the claim. It is never listed for the page, never stored
  * and never in a notice, which is all the journal and the events are written from; it is forgotten
- * when the key is given out or the request ends. The page's handle is a different random value, so
- * a request id offered to the page's actions finds nothing (audit #9).
+ * when the key is given out or the request ends. Only its SHA-256 stays in memory after the end, for
+ * EXPIRED_SHOWN_MS, so a late claim is told why it gets no key (`ClaimRefusal`, fix round 3). The
+ * page's handle is a different random value, so a request id offered to the page's actions finds
+ * nothing (audit #9).
  *
  * Requests live in memory only, by design: they last five minutes, and the request id is a secret
  * that should never reach the disk. So a restart of the daemon ends every open request, pending or
- * confirmed: after it list() shows no row for them (not even an expired one), a claim finds
- * nothing, and the agent has to ask again with `okolos-agent pair`. SCR-23 says so to the person.
+ * confirmed: after it list() shows no row for them (not even an expired one), a claim is told
+ * `unknown`, and the agent has to ask again with `okolos-agent pair`. SCR-23 says so to the person.
  * Agents with access live in the store and survive the restart, each with its last call as it was
  * last written: at most a minute older than its newest call (see `touch`), or exactly that call
  * when the daemon ran `flush` before it stopped.
@@ -71,6 +73,15 @@ export const MAX_NEW_PER_MINUTE = 6
 export type RandomSource = (size: number) => Buffer
 
 export type RequestRefusal = NameRefusal | 'too_many_pending' | 'too_many_requests'
+
+/**
+ * Why a claim gets no key (fix round 3), so the CLI can tell the person the true reason: the person
+ * `declined` the request; it `expired` before anyone confirmed it; it was confirmed but the key was
+ * not collected within CLAIM_WINDOW_MS (`claim_expired`); the key was already given out (`claimed`).
+ * Each is answered for EXPIRED_SHOWN_MS after the end; after that, and for an id the daemon never
+ * gave out or gave out before a restart, the answer is `unknown`.
+ */
+export type ClaimRefusal = 'declined' | 'expired' | 'claim_expired' | 'claimed' | 'unknown'
 
 /** A paired agent as the page and the door see it. The key's hash stays inside this module. */
 export interface AgentRecord {
@@ -186,6 +197,8 @@ export class Pairing {
   private readonly byRequestId = new Map<string, Entry>()
   private readonly byHandle = new Map<string, Entry>()
   private readonly ended = new Map<string, Ended>()
+  /** Why each recently ended request gets no key, by the SHA-256 of its request id, never the id. */
+  private readonly refusals = new Map<string, { readonly refused: Exclude<ClaimRefusal, 'unknown'>; readonly endedAt: number }>()
   /** When each request of the last minute was created. */
   private created: number[] = []
   /** Per agent, when `touch` last wrote the store for that agent's call. */
@@ -295,16 +308,20 @@ export class Pairing {
     return this.declineEntry(this.byHandle.get(handle), now)
   }
 
-  claim(requestId: string, now: number): { key: string } | { pending: true } | null {
+  /**
+   * The agent's claim, by its request id: the key once the person confirmed, `pending` before that,
+   * and otherwise the reason it gets none (`ClaimRefusal`). A claim never makes a new request.
+   */
+  claim(requestId: string, now: number): { key: string } | { pending: true } | { refused: ClaimRefusal } {
     this.sweep(now)
     const entry = this.byRequestId.get(requestId)
-    if (entry === undefined) return null
+    if (entry === undefined) return { refused: this.refusals.get(sha256(requestId))?.refused ?? 'unknown' }
     if (entry.confirmedAt === null) return { pending: true }
     const key = this.hex(32)
     const agent: StoredAgent = { agentId: this.hex(8), name: entry.name, pairedAt: now, lastCallAt: null, keyHash: sha256(key) }
     // The key is given out only once the store holds its hash.
     this.save([...this.agents, agent])
-    this.forget(entry)
+    this.forget(entry, 'claimed', now)
     this.notify({ kind: 'paired', handle: entry.handle, agentId: agent.agentId, name: agent.name, at: now })
     return { key }
   }
@@ -373,7 +390,7 @@ export class Pairing {
 
   private declineEntry(entry: Entry | undefined, now: number): boolean {
     if (entry === undefined) return false
-    this.forget(entry)
+    this.forget(entry, 'declined', now)
     this.notify({ kind: 'declined', handle: entry.handle, name: entry.name, at: now })
     return true
   }
@@ -386,7 +403,7 @@ export class Pairing {
     for (const entry of [...this.byHandle.values()]) {
       const endedAt = deadline(entry)
       if (now < endedAt) continue
-      this.forget(entry)
+      this.forget(entry, entry.confirmedAt === null ? 'expired' : 'claim_expired', endedAt)
       const { handle, name, code, createdAt, confirmedAt } = entry
       this.ended.set(handle, { handle, name, code, createdAt, confirmedAt, endedAt })
       this.notify({ kind: confirmedAt === null ? 'expired' : 'claim_expired', handle, name, at: endedAt })
@@ -394,11 +411,16 @@ export class Pairing {
     for (const row of [...this.ended.values()]) {
       if (now - row.endedAt >= EXPIRED_SHOWN_MS) this.ended.delete(row.handle)
     }
+    for (const [idHash, { endedAt }] of [...this.refusals]) {
+      if (now - endedAt >= EXPIRED_SHOWN_MS) this.refusals.delete(idHash)
+    }
   }
 
-  private forget(entry: Entry): void {
+  /** Ends a request: its id is dropped, and only the id's SHA-256 is kept with why it ended. */
+  private forget(entry: Entry, refused: Exclude<ClaimRefusal, 'unknown'>, endedAt: number): void {
     this.byRequestId.delete(entry.requestId)
     this.byHandle.delete(entry.handle)
+    this.refusals.set(sha256(entry.requestId), { refused, endedAt })
   }
 
   /** Writes `agents` and only then takes them as the agents in memory; throws PairingStoreError. */
