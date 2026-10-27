@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -168,6 +168,47 @@ describe('okolos-mail, started the way a person starts it', () => {
     })
     expect(out.stderr).toMatch(/^okolos-mail: .*planted in main/)
     expect(out.stdout).not.toContain(word('mailVerdictNone'))
+    expect(out.code).toBe(EXIT.unreadable)
+  })
+
+  /**
+   * B-161 round 2: a reader that goes away (`| head -1`, `| grep -q`) closes
+   * the pipe, the write fails with EPIPE, and node with no listener for that
+   * error exits 1, which here means "signals found", for a message in which
+   * nothing was found. The reader leaving does not change the verdict, so the
+   * code is the verdict's. A closed stderr must not turn a 2 into a 1 either.
+   */
+  async function withClosed(
+    streams: readonly ('stdout' | 'stderr')[],
+    args: readonly string[],
+    before: readonly string[] = [],
+  ): Promise<{ code: number | null; stderr: string }> {
+    const child = spawn(process.execPath, [...before, bin, ...args], {
+      cwd: root,
+      env: { ...process.env, OKOLOS_LOCALE: 'ru' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    let stderr = ''
+    for (const name of streams) child[name].destroy()
+    if (!streams.includes('stderr')) child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString()))
+    const code = await new Promise<number | null>((resolve) => child.on('close', (status) => resolve(status)))
+    return { code, stderr }
+  }
+
+  it('ends with the verdict, not 1, when the reader has closed stdout', async () => {
+    const out = await withClosed(['stdout'], ['scan', clean])
+    expect(out.stderr).toBe('')
+    expect(out.code).toBe(EXIT.nothingFound)
+  })
+
+  it('ends an unread message with 2 when the reader has closed stdout', async () => {
+    const out = await withClosed(['stdout'], ['scan', empty])
+    expect(out.stderr).toBe('')
+    expect(out.code).toBe(EXIT.unreadable)
+  })
+
+  it('ends a failure with 2, not 1, when stderr is closed too', async () => {
+    const out = await withClosed(['stdout', 'stderr'], ['scan', clean], plant('scan.ts', 'export const EXIT = {}\nexport function scan() { throw new Error("planted") }\n'))
     expect(out.code).toBe(EXIT.unreadable)
   })
 })

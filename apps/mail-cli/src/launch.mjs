@@ -123,7 +123,7 @@ export async function launch({
   node = process.versions.node,
   typescript = process.features.typescript,
   load = loadSources,
-  write = (text) => void process.stderr.write(text),
+  write = writeStderr,
 }) {
   if (!runsFromSources(node, typescript)) {
     write(
@@ -147,6 +147,21 @@ export async function launch({
     report(write, 'the command failed', error)
     return FAILED
   }
+}
+
+/** See `writeStderr`. */
+const ignore = () => undefined
+
+/**
+ * A closed stderr reports EPIPE as an `error` event, and with no listener node
+ * exits 1, "signals found", over the 2 this launcher was about to set. The line
+ * is lost either way; the exit code is not.
+ *
+ * @param {string} text
+ */
+function writeStderr(text) {
+  if (!process.stderr.listeners('error').includes(ignore)) process.stderr.on('error', ignore)
+  process.stderr.write(text)
 }
 
 /**

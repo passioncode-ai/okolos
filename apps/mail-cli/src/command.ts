@@ -73,12 +73,24 @@ export interface ScriptResult {
 
 /** Where `run` writes and how it ends; the process by default, a fake in a test. */
 export interface RunIo {
-  readonly write: (text: string) => void
+  /** Resolves with the error the write ended with, or `undefined` when it was written. */
+  readonly write: (text: string) => Promise<NodeJS.ErrnoException | undefined>
   readonly exit: (code: number) => void
 }
 
+/**
+ * A failed write to stdout is reported twice: to the write's callback, and as
+ * an `error` event a tick later. With no listener for the event node exits 1,
+ * which here means "signals found"; the callback is where it is handled.
+ */
+const ignore = (): void => undefined
+
 const processIo: RunIo = {
-  write: (text) => process.stdout.write(text),
+  write: (text) =>
+    new Promise((resolve) => {
+      if (!process.stdout.listeners('error').includes(ignore)) process.stdout.on('error', ignore)
+      process.stdout.write(text, (error) => resolve(error ?? undefined))
+    }),
   exit: (code) => {
     process.exitCode = code
   },
@@ -93,6 +105,11 @@ const processIo: RunIo = {
  * left to node exits 1, which is `EXIT.signalsFound`, and a crash is neither a
  * finding nor a clean message. One place formats every failure, so the prefix
  * the launcher promises cannot be missing from one of them.
+ *
+ * A reader that closed the pipe (`| head -1`, `| grep -q`) does not change the
+ * verdict, so EPIPE ends with the verdict's code. Any other failed write lost
+ * the verdict by accident, and a caller cannot tell an empty report from a
+ * clean one: it goes to the launcher like a crash.
  */
 export async function run(
   argv: readonly string[],
@@ -101,6 +118,7 @@ export async function run(
   command: typeof main = main,
 ): Promise<void> {
   const result = command(argv, env)
-  io.write(`${result.text}\n`)
+  const failure = await io.write(`${result.text}\n`)
+  if (failure !== undefined && failure.code !== 'EPIPE') throw failure
   io.exit(result.code)
 }

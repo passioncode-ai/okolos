@@ -32,7 +32,10 @@ describe('the language the command speaks', () => {
 function recorder() {
   const seen = { written: [] as string[], codes: [] as number[] }
   const io: RunIo = {
-    write: (text) => seen.written.push(text),
+    write: async (text) => {
+      seen.written.push(text)
+      return undefined
+    },
     exit: (code) => seen.codes.push(code),
   }
   return { io, seen }
@@ -61,5 +64,34 @@ describe('how the command ends', () => {
     ).rejects.toBe(planted)
     expect(seen.written).toEqual([])
     expect(seen.codes).toEqual([])
+  })
+
+  /** A write that ends with this error, the way node reports one. */
+  const failing = (code: string): RunIo['write'] => async () =>
+    Object.assign(new Error(`write ${code}`), { code }) as NodeJS.ErrnoException
+
+  it('ends with the verdict when the reader closed the pipe', async () => {
+    const codes: number[] = []
+    await run(['scan', 'x'], {}, { write: failing('EPIPE'), exit: (code) => codes.push(code) }, () => ({
+      text: 'verdict',
+      code: EXIT.nothingFound,
+    }))
+    expect(codes).toEqual([EXIT.nothingFound])
+  })
+
+  /**
+   * Any other failed write lost the verdict by accident (a full disk, a broken
+   * device), and the caller cannot tell an empty report from a clean one. That
+   * goes to the launcher: one `okolos-mail:` line and 2.
+   */
+  it('hands any other failed write to the launcher instead of ending with the verdict', async () => {
+    const codes: number[] = []
+    await expect(
+      run(['scan', 'x'], {}, { write: failing('ENOSPC'), exit: (code) => codes.push(code) }, () => ({
+        text: 'verdict',
+        code: EXIT.nothingFound,
+      })),
+    ).rejects.toMatchObject({ code: 'ENOSPC' })
+    expect(codes).toEqual([])
   })
 })
