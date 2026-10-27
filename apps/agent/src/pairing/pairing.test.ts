@@ -359,6 +359,106 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
     expect(open(file).verify('f'.repeat(64))).toBeNull()
   })
 
+  describe('last calls of several agents (fix round 2)', () => {
+    function stored(file: string): Record<string, unknown> {
+      const agents = (JSON.parse(readFileSync(file, 'utf8')) as { agents: Array<{ name: string; lastCallAt: unknown }> }).agents
+      return Object.fromEntries(agents.map((a) => [a.name, a.lastCallAt]))
+    }
+
+    it('keeps each agent stored value at most a minute old, without a flush', () => {
+      const file = storeFile()
+      const pairing = open(file)
+      const a = pairing.verify(pair(pairing, 'Claude Code', T0))!
+      const b = pairing.verify(pair(pairing, 'Codex', T0 + 10))!
+      const t1 = T0 + 10_000
+      const calls: Array<[string, number]> = [
+        [a.agentId, t1],
+        [b.agentId, t1 + 10_000],
+        [a.agentId, t1 + 30_000],
+        [b.agentId, t1 + 40_000],
+        [a.agentId, t1 + 55_000],
+        [a.agentId, t1 + 61_000],
+        [b.agentId, t1 + 69_000],
+        [b.agentId, t1 + 75_000],
+        [a.agentId, t1 + 130_000],
+      ]
+      const latest = new Map<string, number>()
+      for (const [agentId, at] of calls) {
+        expect(pairing.touch(agentId, at)).toBe(true)
+        latest.set(agentId, at)
+        const now = stored(file)
+        for (const [id, name] of [[a.agentId, 'Claude Code'], [b.agentId, 'Codex']] as const) {
+          const last = latest.get(id)
+          if (last === undefined) continue
+          const value = now[name]
+          expect(value, `${name} after a call at ${at - T0}`).toEqual(expect.any(Number))
+          expect(last - (value as number), `${name} after a call at ${at - T0}`).toBeLessThanOrEqual(MINUTE)
+        }
+      }
+      // The first call of each agent is written at once, whoever wrote last.
+      expect(open(file).list(t1 + 10_000).agents.map((x) => x.lastCallAt)).not.toContain(null)
+    })
+
+    it('writes what is not yet saved on flush, so two agents touched 10 s apart both survive a reopen', () => {
+      const file = storeFile()
+      const pairing = open(file)
+      const a = pairing.verify(pair(pairing, 'Claude Code', T0))!
+      const b = pairing.verify(pair(pairing, 'Codex', T0 + 10))!
+      const t1 = T0 + 10_000
+      pairing.touch(a.agentId, t1)
+      pairing.touch(b.agentId, t1 + 10_000)
+      pairing.touch(a.agentId, t1 + 20_000)
+      pairing.touch(b.agentId, t1 + 30_000)
+      expect(stored(file)).toEqual({ 'Claude Code': t1, Codex: t1 + 10_000 })
+
+      const inode = statSync(file).ino
+      pairing.flush()
+      expect(statSync(file).ino).not.toBe(inode)
+      expect(statSync(file).mode & 0o777).toBe(0o600)
+      expect(readdirSync(path.dirname(file))).toEqual(['pairings.json'])
+      expect(open(file).list(t1 + 30_000).agents.map((x) => [x.name, x.lastCallAt])).toEqual([
+        ['Claude Code', t1 + 20_000],
+        ['Codex', t1 + 30_000],
+      ])
+    })
+
+    it('writes nothing on flush when nothing is waiting to be saved', () => {
+      const empty = storeFile()
+      open(empty).flush()
+      expect(readdirSync(path.dirname(empty))).toEqual([])
+
+      const file = storeFile()
+      const pairing = open(file)
+      const a = pairing.verify(pair(pairing, 'Claude Code', T0))!
+      pairing.touch(a.agentId, T0 + 10_000)
+      const inode = statSync(file).ino
+      pairing.flush()
+      expect(statSync(file).ino).toBe(inode)
+
+      // A pending call saved by another write (here a pairing) leaves flush nothing to do.
+      pairing.touch(a.agentId, T0 + 20_000)
+      pair(pairing, 'Codex', T0 + 30_000)
+      expect(stored(file)).toMatchObject({ 'Claude Code': T0 + 20_000 })
+      const after = statSync(file).ino
+      pairing.flush()
+      expect(statSync(file).ino).toBe(after)
+    })
+
+    it('throws a store error when flush cannot write, and keeps the call for the next flush', () => {
+      const file = storeFile()
+      const pairing = open(file)
+      const a = pairing.verify(pair(pairing, 'Claude Code', T0))!
+      pairing.touch(a.agentId, T0 + 10_000)
+      pairing.touch(a.agentId, T0 + 20_000)
+      chmodSync(path.dirname(file), 0o500)
+      expect(() => pairing.flush()).toThrow(expect.objectContaining({ name: 'PairingStoreError', reason: 'unwritable' }))
+      chmodSync(path.dirname(file), 0o700)
+      expect(stored(file)).toEqual({ 'Claude Code': T0 + 10_000 })
+      pairing.flush()
+      expect(stored(file)).toEqual({ 'Claude Code': T0 + 20_000 })
+    })
+  })
+
   it('touches nothing for an agent it does not know', () => {
     const file = storeFile()
     const pairing = open(file)

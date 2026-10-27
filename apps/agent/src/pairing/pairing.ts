@@ -16,8 +16,9 @@
  * that should never reach the disk. So a restart of the daemon ends every open request, pending or
  * confirmed: after it list() shows no row for them (not even an expired one), a claim finds
  * nothing, and the agent has to ask again with `okolos-agent pair`. SCR-23 says so to the person.
- * Agents with access live in the store and survive the restart, with their last call as it was
- * last written (at most a minute old, see `touch`).
+ * Agents with access live in the store and survive the restart, each with its last call as it was
+ * last written: at most a minute older than its newest call (see `touch`), or exactly that call
+ * when the daemon ran `flush` before it stopped.
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { readFileSync } from 'node:fs'
@@ -83,7 +84,7 @@ export interface AgentRecord {
   readonly lastCallAt: number | null
 }
 
-/** A last call is written to the store at most this often; the newer value is kept in memory. */
+/** An agent's last call is written to the store at most this often; the newer value is kept in memory. */
 export const LAST_CALL_WRITE_MS = 60_000
 
 /** A request as the page sees it: a handle for its buttons, never the request id. */
@@ -177,8 +178,10 @@ export class Pairing {
   private readonly ended = new Map<string, Ended>()
   /** When each request of the last minute was created. */
   private created: number[] = []
-  /** When `touch` last wrote the store. */
-  private lastCallWrite = Number.NEGATIVE_INFINITY
+  /** Per agent, when `touch` last wrote the store for that agent's call. */
+  private readonly lastCallWrite = new Map<string, number>()
+  /** Some agent's last call is in memory only; `flush` writes it. Any write of the store clears it. */
+  private callsUnsaved = false
 
   private constructor(file: string, agents: StoredAgent[], options: PairingOptions) {
     this.file = file
@@ -219,18 +222,28 @@ export class Pairing {
 
   /**
    * Records the agent's last call; false when no such agent has access. The value is kept in
-   * memory and written to the store (atomically, like every write) at most once a minute.
+   * memory and written to the store (atomically, like every write) at most once a minute per agent,
+   * so each agent's stored call is at most LAST_CALL_WRITE_MS older than its newest one, whatever
+   * the other agents do. A write that fails throws PairingStoreError; the call stays in memory for
+   * the next write or `flush`.
    */
   touch(agentId: string, now: number): boolean {
     if (!this.agents.some((a) => a.agentId === agentId)) return false
-    const agents = this.agents.map((a) => (a.agentId === agentId ? { ...a, lastCallAt: now } : a))
-    if (now - this.lastCallWrite >= LAST_CALL_WRITE_MS) {
-      this.save(agents)
-      this.lastCallWrite = now
-    } else {
-      this.agents = agents
+    this.agents = this.agents.map((a) => (a.agentId === agentId ? { ...a, lastCallAt: now } : a))
+    this.callsUnsaved = true
+    if (now - (this.lastCallWrite.get(agentId) ?? Number.NEGATIVE_INFINITY) >= LAST_CALL_WRITE_MS) {
+      this.save(this.agents)
+      this.lastCallWrite.set(agentId, now)
     }
     return true
+  }
+
+  /**
+   * Writes every last call that is still in memory only, for the daemon to run before it stops;
+   * writes nothing when there is none. A write that fails throws PairingStoreError and keeps them.
+   */
+  flush(): void {
+    if (this.callsUnsaved) this.save(this.agents)
   }
 
   request(agentName: string, now: number): { requestId: string; code: string; expiresAt: number } | { refused: RequestRefusal } {
@@ -298,6 +311,7 @@ export class Pairing {
     const agent = this.agents.find((a) => a.agentId === agentId)
     if (agent === undefined) return null
     this.save(this.agents.filter((a) => a !== agent))
+    this.lastCallWrite.delete(agent.agentId)
     this.notify({ kind: 'revoked', agentId: agent.agentId, name: agent.name })
     return record(agent)
   }
@@ -389,6 +403,8 @@ export class Pairing {
       throw new PairingStoreError(this.file, 'unwritable', { cause: error })
     }
     this.agents = agents
+    // The file now holds every agent as it is in memory, last calls included.
+    this.callsUnsaved = false
   }
 
   private hex(bytes: number): string {
