@@ -850,7 +850,7 @@
       "id": "N-023",
       "title": "K0 контракты, замена запаркованного N-001: общее правило isLocalHost (с 100.64.0.0/10), типы входа и выхода каждого глагола, каноническое написание глагола в журнале",
       "owner": "implementer",
-      "status": "pending",
+      "status": "done",
       "blocked_by": [],
       "serves": "REQ-53",
       "check": "pnpm -s exec vitest run packages/contracts && pnpm -s run typecheck && pnpm -s run gates",
@@ -861,13 +861,13 @@
       ],
       "risk": "R2",
       "certification": {
-        "round": 5,
+        "round": 6,
         "tiers": {
           "unit": "pass",
-          "seam": "fail",
-          "product": "fail"
+          "seam": "pass",
+          "product": "pass"
         },
-        "at": "ece1a421895e715840961f3b513d2c78d82bff89",
+        "at": "3623ca51150c87b485a2ab51f08c7b1ab3cef6f7",
         "history": [
           {
             "unit": "fail",
@@ -893,6 +893,11 @@
             "unit": "pass",
             "seam": "fail",
             "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "pass"
           }
         ],
         "kinds": [
@@ -900,10 +905,42 @@
           "blind",
           "blind",
           "blind",
+          "blind",
           "blind"
         ],
-        "tree": "27fdf534ac20bff0e3fdead07ae34525c4244336"
-      }
+        "tree": "d5477d29e6e0ca2bee4e21cf10c099648c8b8d34"
+      },
+      "proof": {
+        "head": "3623ca51150c87b485a2ab51f08c7b1ab3cef6f7",
+        "tree": "d5477d29e6e0ca2bee4e21cf10c099648c8b8d34",
+        "graph_revision": "22"
+      },
+      "evidence": [
+        "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-023 -s exec vitest run packages/contracts -> 3 files passed, 57 tests passed (bridge.test.ts 41), exit 0",
+        "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-023 -s run typecheck -> exit 0, no output",
+        "unit: scratch copy of bridge.ts with 'session.list' added to BRIDGE_SESSION_VERBS, tsc --noEmit --strict -> error TS2536: Type 'V' cannot be used to index type 'VerbIOEntries' at bridge.ts(440,55); the unmodified copy has no bridge.ts error",
+        "unit: node --experimental-strip-types probe on a scratch copy: [::FFFF:127.0.0.1], [::ffff:a9fe:a9fe], [2002:a9fe:a9fe::], [64:ff9b::a9fe:a9fe], 100.100.100.200, 0, 0x0, 017700000001, 'localhost。', 127.0.0.1.. are local; validateScope refuses http://169.254.169.254., http://[::ffff:169.254.169.254], http://0, https://user:pw@10.0.0.1/, http://metadata.google.internal; accepts http://224.0.0.1 and http://255.255.255.255",
+        "unit: git diff bridge/b1-run2..HEAD -- packages/contracts | grep '^+' | grep -c U+2014 -> 0",
+        "seam: git diff --stat 392e48c 16ce36e -> only packages/contracts/src/{bridge.test.ts,bridge.ts,index.ts}",
+        "seam: grep of every exported bridge symbol over apps/ packages/ tools/ -> only apps/agent/src/service/deps.test.ts:12 outside contracts",
+        "seam: vitest run packages/contracts apps/agent/src/service/deps.test.ts tools/agent-locales.test.ts tools/gates/bundle-scan.test.ts -> 6 files, 87 passed",
+        "seam: scratch copy of 16ce36e: tsc -b -> exit 0; tsc -p tsconfig.tests.json -> exit 0",
+        "seam: git merge-tree --write-tree b1/n-023 b1/n-006 -> clean (7a613da); tsc -b apps/agent on it -> journal.ts(98,3) TS2353 'screenshot', exit 2",
+        "seam: git merge-tree --write-tree b1/n-023 b1/n-007 -> clean (9f909b1); tsc -b apps/agent -> exit 0",
+        "seam: probe under --exactOptionalPropertyTypes: {sessionId; ref?: string|undefined; ...} vs SnapshotInput -> TS2322",
+        "seam: grep -c on dist/{chrome,firefox}/content.js: \"open\" 0, home.arpa 0, session.open 0, refusal_ 0",
+        "seam: python read of apps/agent/_locales/{en,ru}: 15 refusal_* keys = BRIDGE_REFUSALS; 8 verb_* keys = toolName spelling of AnyBridgeVerb",
+        "seam: core-injection stage1.ts:132-133, stage3.ts:110-111 write concealment as join(',') and carrier as a string",
+        "product: read /Users/sshlg/DATA/_worktrees/okolos-b1-n-023/packages/contracts/src/bridge.ts in full (743 lines) at HEAD 16ce36e",
+        "product: node: Object.keys of apps/agent/_locales/{ru,en}/messages.json → 95 each; refusal_* x15, verb_* x8 printed with their text",
+        "product: python3 docs/ux/lint.py /Users/sshlg/DATA/_worktrees/okolos-b1-n-023 → exit 0 ('docs/ux is consistent'); python3 docs/brand/lint.py /Users/sshlg/DATA/_worktrees/okolos-b1-n-023/docs/brand → exit 0",
+        "product: vitest run --root /Users/sshlg/DATA/_worktrees/okolos-b1-n-023 tools/flows-diagrams.test.ts tools/agent-locales.test.ts packages/contracts → 5 files, 63 tests passed",
+        "product: grep -rl 'session\\.open|hygiene|home\\.arpa|not_paired|isLocalName' apps/extension/dist/{chrome,firefox} → no file (dist built 14:50, HEAD merge 14:55)",
+        "product: grep -n agent/bridge/MCP in docs/privacy.md → only an unrelated user-agent line; docs/privacy.md:69-73 'их девять'",
+        "product: plan_tasks.json rows N-009, N-011, N-015, N-016, N-018, N-020 read for the tests that keep later promises; grep CHANGELOG plan_tasks.json → no hit",
+        "product: git ls-files apps/agent → service shell and _locales only; tasks, verbs, pairing and census are not on this branch yet",
+        "proven at 3623ca51150c87b485a2ab51f08c7b1ab3cef6f7 (tree d5477d29e6e0ca2bee4e21cf10c099648c8b8d34)"
+      ]
     },
     {
       "id": "N-024",
@@ -1426,6 +1463,12 @@
       "verb": "resume",
       "node": "N-013",
       "why": "operator 2026-10-27 in chat: «проверим все долги … И давай все доделаем» (taken as the explicit request loop-guard.md requires for further rounds after the cap; B-157). Certification history rewritten from the tier reports in .task-pipeline/build/cert-N-013-r*-*.json so the graph holds every round, including those not passed to certify before (process violation recorded in run.md). Further rounds run with an explicit --ceiling raised for this request only."
+    },
+    {
+      "verb": "close",
+      "node": "N-023",
+      "why": "certified at all 3 tiers in round 6",
+      "precondition": "3623ca51150c87b485a2ab51f08c7b1ab3cef6f7"
     }
   ]
 }
