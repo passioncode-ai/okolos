@@ -198,10 +198,22 @@ describe('the pre-push hook exists and runs the gates', () => {
    */
   const hook = path.join(root, '.githooks/pre-push')
 
-  it('is present and executable', () => {
+  it('is present', () => {
     expect(existsSync(hook), '.githooks/pre-push is missing').toBe(true)
+  })
+
+  it('is committed executable, so every clone gets the bit', () => {
     // A hook without the bit set is a hook git silently never runs — the exact
-    // failure mode this is meant to remove.
+    // failure mode this is meant to remove. The index is read rather than the disk:
+    // it is what a clone checks out, on every platform, Windows included.
+    const staged = execFileSync('git', ['ls-files', '-s', '.githooks/pre-push'], { cwd: root, encoding: 'utf8' })
+    expect(staged.split(' ')[0]).toBe('100755')
+  })
+
+  // Windows has no execute bit on disk (`stat().mode & 0o111` is 0 there, and Git
+  // for Windows runs a hook by its shebang), so the working-tree check runs on macOS
+  // and Linux and is skipped on win32; the index check above covers it there (B-162).
+  it.skipIf(process.platform === 'win32')('is executable in this working tree', () => {
     expect(statSync(hook).mode & 0o111).toBeGreaterThan(0)
   })
 

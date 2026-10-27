@@ -411,12 +411,20 @@ describe('the version comes from what is served, not from the worktree (F1)', ()
     expect(existsSync(out)).toBe(false)
   })
 
-  it('writes the file whole and owner-only, leaving no temporary beside it', async () => {
+  it('writes the file whole, leaving no temporary beside it', async () => {
+    const out = planted(0, 0)
+    await ingest({ out, seed: null, fetchImpl: world({ served: { status: 404 } }), log: quiet })
+    expect(filesIn(path.dirname(out), '.json')).toEqual(['phishing.json'])
+    expect(filesIn(path.dirname(out), '.tmp')).toEqual([])
+  })
+
+  // Windows has no POSIX mode bits (`stat().mode & 0o777` reads 0o666 there whatever
+  // was asked), so this runs on macOS and Linux, where the feed agent runs, and is
+  // skipped on win32 rather than loosened everywhere (B-162).
+  it.skipIf(process.platform === 'win32')('writes the file owner-only', async () => {
     const out = planted(0, 0)
     await ingest({ out, seed: null, fetchImpl: world({ served: { status: 404 } }), log: quiet })
     expect(statSync(out).mode & 0o777).toBe(0o600)
-    expect(filesIn(path.dirname(out), '.json')).toEqual(['phishing.json'])
-    expect(filesIn(path.dirname(out), '.tmp')).toEqual([])
   })
 
   it('writes nothing on a dry run', async () => {
