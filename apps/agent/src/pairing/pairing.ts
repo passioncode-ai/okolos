@@ -792,10 +792,11 @@ function isTime(value: unknown): value is number {
 
 /**
  * Refuses a clock the store would refuse at open (fix round 6): every method that takes `now` runs
- * this first, before it acts, so no time but a whole non-negative ms is ever kept or written.
+ * this first, before it acts, so no time but a whole non-negative ms is ever kept or written. The
+ * message is a programming error in the daemon, thrown to its caller and never shown to a person.
  */
 function checkClock(now: number, method: string): void {
-  if (!isTime(now)) throw new TypeError(`Pairing.${method}: now must be a safe integer >= 0, got ${String(now)}`) // i18n-exempt: a programming error in the daemon, thrown to its caller, never shown to a person
+  if (!isTime(now)) throw new TypeError(`Pairing.${method}: now must be a safe integer >= 0, got ${String(now)}`)
 }
 
 function isStoredAgent(value: unknown): value is StoredAgent {
