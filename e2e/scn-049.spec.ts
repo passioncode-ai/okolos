@@ -1,3 +1,4 @@
+import { SURFACE_MOUNT_MS } from './budgets.js'
 import { expect, serve, test } from './hooks.js'
 import { expectBanner, expectJournalLine } from './surfaces.js'
 
@@ -161,7 +162,7 @@ test('SCN-049 with SCN-008: a fake check that opens search-ms: and copies a comm
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 
   await page.locator('#open').click()
-  await expect(headline(page)).toContainText('copied a command', { timeout: 5000 })
+  await expect(headline(page)).toContainText('copied a command', { timeout: SURFACE_MOUNT_MS })
   expect(await page.evaluate(() => (window as unknown as { __held: boolean[] }).__held)).toEqual([true])
 
   const journal = await context.newPage()
