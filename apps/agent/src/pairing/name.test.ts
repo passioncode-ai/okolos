@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { MAX_NAME_LENGTH, checkAgentName, nameSkeleton } from './name.js'
 
 // Spec §11 F12: the name an agent gives itself is shown on the consent page next to a six-digit
-// code, so it may not be long enough to crowd the page, carry a run of digits that could pass for
-// the code, or carry characters that move or hide text. A refusal is a machine code; the page maps
-// it through the catalogue.
+// code, so it may not be long enough to crowd the page, carry numerals that could pass for the
+// code, carry characters that move or hide text, or pass itself off as Okolos. A refusal is a
+// machine code; the page maps it through the catalogue.
 describe('the name an agent gives itself', () => {
   it('accepts an ordinary name, in any script, up to 40 characters', () => {
     expect(MAX_NAME_LENGTH).toBe(40)
@@ -14,7 +14,8 @@ describe('the name an agent gives itself', () => {
     expect(checkAgentName('a'.repeat(40))).toBeNull()
     // Characters, not UTF-16 units: forty emoji are forty characters.
     expect(checkAgentName('🦊'.repeat(40))).toBeNull()
-    // Two digits in a row are fine; only a run of three can pass for part of the code.
+    // At most two numeric characters in total, of any script and wherever they stand: a third,
+    // even apart from the others, could pass for part of the code.
     expect(checkAgentName('gpt 45 helper')).toBeNull()
   })
 
