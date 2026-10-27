@@ -190,12 +190,25 @@ function lowerNfc(name: string): string {
 }
 
 /**
+ * Signs whose shape reads as a letter (fix round 6), for the reserved name only: "()" as o; "/", "\\"
+ * and "|" as l. The allowlist admits neither "\\" nor "|", so a name never reaches this with one;
+ * they are folded anyway, so the table does not depend on the allowlist.
+ */
+const SIGN_SHAPES: readonly (readonly [RegExp, string])[] = [
+  [/\(\)/g, 'o'],
+  [/[/\\|]/g, 'l'],
+]
+
+/**
  * The keys the reserved name is tested on (fix round 5): by sound and by look for Cyrillic, every
- * digit read as the letter it resembles, i as l; no two-letter shapes ("okolos" holds none).
+ * digit read as the letter it resembles, i as l; no two-letter shapes ("okolos" holds none). Each
+ * twice (fix round 6): once with the signs dropped, and once with their shapes read as letters
+ * first (`SIGN_SHAPES`), so both "Okolo/s" and "Oko/os" are refused.
  */
 function reservedKeys(name: string): string[] {
   const lower = lowerNfc(name)
-  return [letters(lower, TRANSLITERATION, 'asLetter'), letters(lower, LOOK, 'asLetter')]
+  const signsRead = SIGN_SHAPES.reduce((text, [shape, letter]) => text.replace(shape, letter), lower)
+  return [lower, signsRead].flatMap((text) => [letters(text, TRANSLITERATION, 'asLetter'), letters(text, LOOK, 'asLetter')])
 }
 
 /**

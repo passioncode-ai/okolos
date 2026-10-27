@@ -164,6 +164,24 @@ describe('the name an agent gives itself', () => {
     }
   })
 
+  // Fix round 6: before the signs are dropped, the reserved key reads their shapes as letters: "()"
+  // as o, "/" as l (and "\\" and "|" as l too, though the allowlist refuses them first).
+  it('reads the shapes of signs as letters before the reserved test (fix round 6)', () => {
+    for (const name of ['Okol()s', 'Oko/os', '()kolos', 'Ok()l()s', '0ko/()s', 'Око/ос']) {
+      expect(checkAgentName(name), name).toBe('name_reserved')
+    }
+    // Still refused by what drops the signs: a sign inside the name is not read into a new letter only.
+    expect(checkAgentName('Oko(l)os')).toBe('name_reserved')
+    expect(checkAgentName('Okolo/s')).toBe('name_reserved')
+    // The allowlist answers first for the signs it does not admit.
+    expect(checkAgentName('Oko\\os')).toBe('name_script')
+    expect(checkAgentName('Oko|os')).toBe('name_script')
+    // Ordinary names with these signs stay accepted.
+    for (const name of ["O'Brien (bot)", 'a/b+c_d.e', 'Kolos ()', 'ok/os', 'Claude (Code)']) {
+      expect(checkAgentName(name), name).toBeNull()
+    }
+  })
+
   // Known false positives of the rule, recorded on purpose: spaces are dropped from the key, so a
   // name that runs "okolos" across two words is refused too.
   it('refuses "Joko Lost" and "Echo Kolos" as reserved: the rule knows it errs here', () => {
