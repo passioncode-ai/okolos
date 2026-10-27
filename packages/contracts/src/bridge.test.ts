@@ -42,6 +42,7 @@ import {
   BRIDGE_VERBS,
   REFUSAL_RETRYABLE,
   SCOPE_LIMITS,
+  canonicalVerb,
   inScope,
   isLocalHost,
   originOf,
@@ -354,6 +355,23 @@ describe('the verbs', () => {
     expect(toolName('session.open')).toBe('session_open')
     expect(toolName('hygiene.census')).toBe('hygiene_census')
     expect(toolName('snapshot')).toBe('snapshot')
+  })
+
+  it('come back from a tool name to their one canonical spelling, which the journal stores', () => {
+    // The client calls session_open; the journal and the page say session.open.
+    // Without the way back, each caller would undo the underscore its own way.
+    for (const verb of [...BRIDGE_VERBS, ...BRIDGE_SESSION_VERBS]) {
+      expect(canonicalVerb(toolName(verb)), verb).toBe(verb)
+    }
+    expect(canonicalVerb('session_open')).toBe('session.open')
+    // Only a tool name is accepted: the dotted spelling is not one, and neither is a stranger.
+    for (const name of ['session.open', 'eval', 'screenshot', 'Snapshot', '', 'hygiene_census_']) {
+      expect(canonicalVerb(name), name).toBeNull()
+    }
+    expect(contracts.canonicalVerb).toBe(canonicalVerb)
+    // toolName is only for verbs: over any string two names could collapse into one.
+    // @ts-expect-error a string that is not a verb has no tool name
+    toolName('x.y')
   })
 
   it('are the ones the task named, and close, which is never refused', () => {

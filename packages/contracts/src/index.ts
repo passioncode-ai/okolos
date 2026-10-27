@@ -84,6 +84,7 @@ export {
   BRIDGE_VERBS,
   REFUSAL_RETRYABLE,
   SCOPE_LIMITS,
+  canonicalVerb,
   inScope,
   isLocalHost,
   originOf,

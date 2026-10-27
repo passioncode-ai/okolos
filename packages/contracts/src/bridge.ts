@@ -46,10 +46,29 @@ export type AnyBridgeVerb = BridgeVerb | BridgeSessionVerb
  * The MCP tool name of a verb. Dots become underscores: the Anthropic API takes
  * only `[a-zA-Z0-9_-]` in a tool name, and a client that refuses `session.open`
  * refuses it before the agent ever reaches the bridge. The test holds that no
- * two verbs collapse into one name.
+ * two verbs collapse into one name; over any string two would (`x.y` and `x_y`),
+ * so only a verb has a tool name. The name is for the MCP tool list alone: the
+ * journal and the page keep the canonical spelling.
  */
-export function toolName(verb: string): string {
+export function toolName(verb: AnyBridgeVerb): string {
   return verb.replaceAll('.', '_')
+}
+
+/*
+ * Built from the lists, not written out, so a new verb has its way back the
+ * moment it has a tool name.
+ */
+const VERB_BY_TOOL_NAME: ReadonlyMap<string, AnyBridgeVerb> = new Map(
+  [...BRIDGE_VERBS, ...BRIDGE_SESSION_VERBS].map((verb) => [toolName(verb), verb]),
+)
+
+/**
+ * The verb a tool call names, in its canonical spelling, or `null` for a name
+ * that is no verb's tool. The door calls this on every tool call and journals
+ * what it returns, so each caller does not undo the underscore its own way.
+ */
+export function canonicalVerb(name: string): AnyBridgeVerb | null {
+  return VERB_BY_TOOL_NAME.get(name) ?? null
 }
 
 /** Every way the bridge says no. Closed: an unlisted refusal is a bug. */
