@@ -131,6 +131,16 @@ describe('a task scope', () => {
   })
 
   it('holds the limits on time, steps and reach', () => {
+    expect(SCOPE_LIMITS).toMatchObject({ maxTtlSeconds: 3600, maxStepBudget: 500 })
+    expect(validateScope({ ...base, ttlSeconds: 3601 })).toEqual({
+      ok: false,
+      reason: 'ttlSeconds must be an integer from 1 to 3600',
+    })
+    expect(validateScope({ ...base, stepBudget: 501 })).toEqual({
+      ok: false,
+      reason: 'stepBudget must be an integer from 1 to 500',
+    })
+    expect(validateScope({ ...base, ttlSeconds: 3600, stepBudget: 500 }).ok).toBe(true)
     expect(validateScope({ ...base, ttlSeconds: SCOPE_LIMITS.maxTtlSeconds + 1 }).ok).toBe(false)
     expect(validateScope({ ...base, stepBudget: 0 }).ok).toBe(false)
     expect(validateScope({ ...base, stepBudget: 1.5 }).ok).toBe(false)
