@@ -79,7 +79,7 @@ run typecheck 'pnpm -s run typecheck'
 # source was green (B-36).
 run build     'pnpm -s run build'
 run unit      'pnpm -s run test'
-run ux        'python3 docs/ux/lint.py'
+run ux        'node tools/python.mjs docs/ux/lint.py'
 run brand     'node tools/brand-gate.mjs'
 run i18n      'node tools/i18n-sweep.mjs'
 # After the build, for the same reason the unit step is: it reads what `dist/`

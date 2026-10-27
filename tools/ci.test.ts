@@ -29,6 +29,9 @@ function gateSteps(): string[] {
   return steps
 }
 
+/** Files that start another file and check nothing themselves. */
+const LAUNCHERS = new Set(['tools/python.mjs'])
+
 /** Fails with the script's name rather than on `undefined` three lines later. */
 function script(name: string): string {
   const value = scripts[name]
@@ -49,8 +52,12 @@ function shares(body: string, command: string): boolean {
   if (body.includes(command)) return true
   // `python3 docs/ux/lint.py` and `node tools/i18n-sweep.mjs` are the same gate
   // whether reached through pnpm or called directly; the file is the identity.
-  const file = /([\w./-]+\.(?:py|mjs|js|ts))/.exec(command)
-  return file !== null && body.includes(file[1] as string)
+  // A launcher is not the gate: `node tools/python.mjs docs/ux/lint.py` runs the
+  // linter through the Python finder (B-162), and the linter is what CI must run.
+  const file = [...command.matchAll(/([\w./-]+\.(?:py|mjs|js|ts))/g)]
+    .map((match) => match[1] as string)
+    .find((name) => !LAUNCHERS.has(name))
+  return file !== undefined && body.includes(file)
 }
 
 /** The `run:` values of a workflow — what it executes, without what it says about it. */
