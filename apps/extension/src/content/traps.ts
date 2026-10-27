@@ -47,8 +47,17 @@ export interface TrapDeps {
    * Null when another module's warning holds the panel and this one was not drawn (the
    * slot puts it on that panel as an "also here" line). The watcher must not keep that
    * panel as its own: it decides from its own panel what else may be raised.
+   *
+   * `onReleased` is called when the panel goes by another hand (the inspector's "This
+   * is wrong" releases the whole slot): the watcher then forgets it held anything, or it
+   * stopped every later outside link with no panel and left ClickFix silent (round 2 of
+   * the B-165 certification).
    */
-  mountWarning?: (props: BannerProps, handlers: BannerHandlers) => BannerHandle | null
+  mountWarning?: (
+    props: BannerProps,
+    handlers: BannerHandlers,
+    onReleased?: () => void,
+  ) => BannerHandle | null
   /**
    * The shadow root behind an element, closed ones included, where the browser lends it
    * to an extension (`chrome.dom.openOrClosedShadowRoot`, `Element.openOrClosedShadowRoot`
@@ -56,6 +65,15 @@ export interface TrapDeps {
    * host as its target and the link missing from the composed path too.
    */
   shadowRootOf?: (element: Element) => ShadowRoot | null
+  /**
+   * Whether this site is in Trusted sites, the person's own list the lookalike and
+   * login-form warnings already obey. A trusted site's links go through unstopped
+   * (round 2: an intranet serving Office documents over http met the warning on every
+   * "open in the desktop app" link). Read at start and again after each stopped click,
+   * because the click itself cannot wait for an answer; until the first answer, and
+   * when it fails, the site counts as not trusted.
+   */
+  trusted?: () => Promise<boolean>
 }
 
 export interface TrapWatcher {
@@ -67,13 +85,23 @@ const RECHECK_MS = 400
 /** The injected mount, or the real one when a caller did not supply a slot. */
 function mounting(deps: {
   readonly doc: Document
-  mountWarning?: (p: BannerProps, h: BannerHandlers) => BannerHandle | null
+  mountWarning?: TrapDeps['mountWarning']
 }) {
-  return (props: BannerProps, handlers: BannerHandlers): BannerHandle | null =>
-    (deps.mountWarning ?? ((p, h) => mountBanner(deps.doc, p, h)))(props, handlers)
+  return (props: BannerProps, handlers: BannerHandlers, onReleased: () => void): BannerHandle | null =>
+    deps.mountWarning === undefined
+      ? mountBanner(deps.doc, props, handlers)
+      : deps.mountWarning(props, handlers, onReleased)
 }
 
 const LINK = 'a[href], area[href]'
+
+/**
+ * Different outside links journalled per page. Every click is still stopped; a page
+ * clicking `search-ms:query=1`, `=2`, … wrote one "What changed" row per address
+ * (product reading, round 2). Past this the journal stays quiet for the page, with no
+ * summary row: SCN-049 says so.
+ */
+const JOURNAL_LINKS_MAX = 5
 
 export function watchForTraps(deps: TrapDeps): TrapWatcher {
   const mount = mounting(deps)
@@ -88,6 +116,26 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
    * slot: journalled once, not on every copy that re-runs the check.
    */
   const raisedAside = new Set<TrapKind>()
+  /**
+   * ClickFix and tech-support warnings the person answered "This is wrong" to, for the
+   * life of this page. The next scripted copy raised the same warning again and wrote a
+   * second journal line, while SCN-008 and SCN-009 said it closes for the page (round 2
+   * of the B-165 certification).
+   */
+  const disputed = new Set<'clickfix' | 'techsupport'>()
+  /** The last answer from Trusted sites; see `TrapDeps.trusted`. */
+  let siteTrusted = false
+  const readTrust = () => {
+    if (deps.trusted === undefined) return
+    deps
+      .trusted()
+      .then((answer) => {
+        siteTrusted = answer === true
+      })
+      .catch(() => {
+        siteTrusted = false
+      })
+  }
   let scriptedCopy = false
   let copied: string | null = null
   let forcedFullscreen = false
@@ -176,15 +224,18 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
     if (href === null || allowedLinks.has(href)) return
     const verdict = classifyOutsideLink(href)
     if (verdict === null) return
+    if (siteTrusted) return
 
     event.preventDefault()
+    // Asked again after each stopped click: a person may have trusted the site since.
+    readTrust()
     if (!insideHeldClick) {
       insideHeldClick = true
       setTimeout(() => {
         insideHeldClick = false
       }, 0)
     }
-    if (!journalledLinks.has(href)) {
+    if (!journalledLinks.has(href) && journalledLinks.size < JOURNAL_LINKS_MAX) {
       journalledLinks.add(href)
       deps.warned?.('outside-link', verdict.signals)
     }
@@ -209,7 +260,7 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
     if (banner && holding !== 'outside-link') return
     const text = deps.text()
 
-    const clickfix = detectClickFix({ text, scriptedCopy, copied })
+    const clickfix = disputed.has('clickfix') ? null : detectClickFix({ text, scriptedCopy, copied })
     if (clickfix) {
       raise(
         'clickfix',
@@ -238,7 +289,9 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
       return
     }
 
-    const techsupport = detectTechSupport({ text, forcedFullscreen, dialogLoop })
+    const techsupport = disputed.has('techsupport')
+      ? null
+      : detectTechSupport({ text, forcedFullscreen, dialogLoop })
     if (techsupport) {
       raise(
         'techsupport',
@@ -274,12 +327,19 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
     // back to the page, because the page is covered again at once.
     if (holding === 'outside-link') close(banner, false)
     let mine: BannerHandle | null = null
-    mine = mount(props, {
-      onPrimary: deps.leave,
-      onRetry,
-      onDispute: () => close(mine, false),
-      onDismiss: () => close(mine, false),
-    })
+    mine = mount(
+      props,
+      {
+        onPrimary: deps.leave,
+        onRetry,
+        onDispute: () => {
+          disputed.add(kind)
+          close(mine, false)
+        },
+        onDismiss: () => close(mine, false),
+      },
+      () => forget(mine),
+    )
     if (mine === null) {
       // Another module's panel holds the slot, which has put this on it as an "also
       // here" line. Journalled once, not on every copy that runs the check again.
@@ -322,6 +382,7 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
         },
         onDismiss: () => close(mine, true),
       },
+      () => forget(mine),
     )
     // Another module's warning holds the panel: the click is stopped and journalled,
     // and the fact is a line on that panel. Nothing here is this watcher's to hold.
@@ -342,6 +403,18 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
    * read the close as the page removing the warning. `giveFocusBack` returns the person
    * to where they were when the link warning opened.
    */
+  /**
+   * The slot took `handle`'s panel down by another hand. Nothing to destroy; the watcher
+   * only stops believing it holds a panel, so the next link is drawn and the next copy
+   * checked. Focus is not moved: whoever released the slot owns that moment.
+   */
+  function forget(handle: BannerHandle | null): void {
+    if (handle === null || handle !== banner) return
+    banner = null
+    holding = null
+    returnFocus = null
+  }
+
   function close(handle: BannerHandle | null, giveFocusBack: boolean): void {
     if (handle === null || handle !== banner) return
     const back = returnFocus
@@ -364,6 +437,7 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
   // The page's wording is enough on its own for the tech-support case, so one
   // pass runs without waiting for an event that may never come.
   schedule()
+  readTrust()
 
   return {
     stop() {

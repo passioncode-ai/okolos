@@ -146,7 +146,10 @@ includes a redirect from `*.workers.dev`, not just a CNAME.
   login form on a new domain (in the page or in a frame) it adds the site to
   trusted domains and outlives the page; the in-page trap panels (ClickFix
   SCN-008, tech-support SCN-009, a link that may open a program SCN-049)
-  remember it for the life of the page only and journal nothing.
+  remember it for the life of the page only and journal nothing: after it
+  the same ClickFix or tech-support warning does not come back on that page
+  and writes no second journal line, and that one link goes through. The
+  link warning also obeys Trusted sites: on a trusted site it is not raised.
 - No counters of "threats blocked", no protection score, no streaks.
 - In-page surfaces render inside a closed Shadow DOM so page CSS cannot
   restyle or hide them.

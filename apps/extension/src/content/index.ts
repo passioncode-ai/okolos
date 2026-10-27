@@ -1005,6 +1005,10 @@ if (isTopFrame) {
     // own, or it keeps another module's panel and stops raising its own (B-165 round 1).
     mountWarning: slot.mountFor('trap', 'critical'),
     shadowRootOf: lentShadowRoot,
+    // Trusted sites, the list the lookalike and login-form warnings obey: a link on a
+    // trusted site is not stopped (SCN-049, round 2 of the B-165 certification).
+    trusted: async () =>
+      ((await platform.runtime.send('trust/list', {}))?.domains ?? []).includes(location.hostname),
     doc: document,
     text: () => document.body?.innerText ?? '',
     leave: () => history.back(),

