@@ -1,0 +1,235 @@
+{
+  "agentPageTitle": {
+    "message": "Agents in the browser"
+  },
+  "agentPageLoading": {
+    "message": "Reading the list of agents and tasks."
+  },
+  "pairingHeading": {
+    "message": "Asking for access"
+  },
+  "pairingAgentName": {
+    "message": "$NAME$ (the name the agent gave itself)",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingCode": {
+    "message": "Code $CODE$",
+    "placeholders": {
+      "code": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingCompare": {
+    "message": "Confirm only if the agent shows the same code. A different code: decline."
+  },
+  "pairingOpenUntil": {
+    "message": "Open until $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingExpired": {
+    "message": "This request expired. The agent has to ask again."
+  },
+  "pairingConfirm": {
+    "message": "Confirm"
+  },
+  "pairingDecline": {
+    "message": "Decline"
+  },
+  "pairingConfirmed": {
+    "message": "$NAME$ has access now.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingDeclined": {
+    "message": "$NAME$'s request was declined.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairedHeading": {
+    "message": "Agents with access"
+  },
+  "pairedSince": {
+    "message": "Access since $DATE$, last call $LAST$",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      },
+      "last": {
+        "content": "$2"
+      }
+    }
+  },
+  "pairedNever": {
+    "message": "no calls yet"
+  },
+  "pairedTasks": {
+    "message": "Open tasks: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "agentRevoke": {
+    "message": "Revoke access"
+  },
+  "agentRevoked": {
+    "message": "$NAME$'s access was revoked and its tasks closed.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingEmpty": {
+    "message": "No agent is connected."
+  },
+  "pairingHow": {
+    "message": "An agent connects to $URL$. Its first call shows a code here.",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingStoreError": {
+    "message": "The access list cannot be read: $WHAT$. Until it is fixed, the door refuses every agent.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
+  },
+  "tasksHeading": {
+    "message": "Agents' tasks now"
+  },
+  "tasksEmpty": {
+    "message": "No agent is working in the browser now."
+  },
+  "taskGoal": {
+    "message": "Goal, in the agent's words: $GOAL$",
+    "placeholders": {
+      "goal": {
+        "content": "$1"
+      }
+    }
+  },
+  "taskSites": {
+    "message": "Sites: $SITES$",
+    "placeholders": {
+      "sites": {
+        "content": "$1"
+      }
+    }
+  },
+  "taskSteps": {
+    "message": "$USED$ of $BUDGET$ steps",
+    "placeholders": {
+      "used": {
+        "content": "$1"
+      },
+      "budget": {
+        "content": "$2"
+      }
+    }
+  },
+  "taskTimeLeft": {
+    "message": "$MINUTES$ min left",
+    "placeholders": {
+      "minutes": {
+        "content": "$1"
+      }
+    }
+  },
+  "taskWindowOpen": {
+    "message": "Agent window open"
+  },
+  "taskWindowClosed": {
+    "message": "Agent window closed"
+  },
+  "tasksError": {
+    "message": "The task list cannot be read: $WHAT$. Until it is fixed, no new task opens.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
+  },
+  "refusalsHeading": {
+    "message": "Recent refusals"
+  },
+  "refusalsEmpty": {
+    "message": "No refusals."
+  },
+  "refusalLine": {
+    "message": "$AGENT$: $WHAT$, $WHEN$",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "what": {
+        "content": "$2"
+      },
+      "when": {
+        "content": "$3"
+      }
+    }
+  },
+  "refusal_not_paired": {
+    "message": "the agent has no access"
+  },
+  "refusal_invalid_scope": {
+    "message": "the task was described wrongly"
+  },
+  "refusal_no_such_task": {
+    "message": "no such task"
+  },
+  "refusal_origin_not_in_task": {
+    "message": "a site outside the task"
+  },
+  "refusal_verb_not_in_task": {
+    "message": "an action outside the task"
+  },
+  "refusal_budget_exhausted": {
+    "message": "the task ran out of steps"
+  },
+  "refusal_task_expired": {
+    "message": "the task's time ran out"
+  },
+  "refusal_tab_gone": {
+    "message": "the task's tab was closed"
+  },
+  "refusal_busy": {
+    "message": "the browser is busy with another task"
+  },
+  "refusal_in_use_by_person": {
+    "message": "a person is using this window"
+  },
+  "refusal_browser_offline": {
+    "message": "Chrome is not running or cannot be reached"
+  },
+  "refusal_blocked_by_shield": {
+    "message": "stopped by Okolos protection"
+  },
+  "refusal_internal": {
+    "message": "an Okolos Agent failure; nothing was sent"
+  },
+  "journalLink": {
+    "message": "Export the agents' journal"
+  }
+}

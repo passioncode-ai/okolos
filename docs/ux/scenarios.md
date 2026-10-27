@@ -975,7 +975,7 @@ every rule below; where they differ, the scenario says so.
   3. The person later revokes the agent -> its next call is refused and any task it holds stops
 - **Expected result:** only agents the person confirmed can reach the browser, and each one can be taken back on its own
 - **Alt paths:** the codes differ, or the person refuses or does not answer -> no key, and the attempt is recorded
-- **UI elements:** none yet — the pairing panel is designed in Б1
+- **UI elements:** SCR-23: `[data-role=pairing-requests]` with the code, `[data-role=pairing-confirm]`, `[data-role=pairing-refuse]`, `[data-role=agent-revoke]`
 - **States covered:** success, error, empty
 - **Errors & recovery:** a call carrying no key, a wrong key, or an `Origin` that is not the bridge -> refused and recorded, never treated as "local, so the person". Loopback is not a person: the research behind this feature found that every 2025–2026 bridge breach came through a door that believed it was
 - **Status:** draft
@@ -994,7 +994,7 @@ every rule below; where they differ, the scenario says so.
   4. The page is very large -> the snapshot arrives in parts the agent pages through, never as one answer
 - **Expected result:** the agent reads what the job needs, cannot be steered by text the page hid from people, and never sees a secret
 - **Alt paths:** the agent asks for a site outside the task -> refused with `origin_not_in_task`; the page has a finding -> the finding travels with the snapshot and the task's writes go to the person (SCN-046)
-- **UI elements:** none yet — the activity indicator is designed in Б1
+- **UI elements:** SCR-24: `[data-role=agent-tasks]`, `[data-role=agent-refusals]`
 - **States covered:** success, error, partial
 - **Errors & recovery:** the browser is closed -> the request waits in the agent's queue and the agent is told `browser_offline`, not that the page is empty; the snapshot could not be cleaned -> the agent receives nothing rather than an uncleaned tree
 - **Why a window and not a tab.** Measured 2026-10-06: input to a background tab never reaches the page, while a separate background window's tab is visible and receives trusted input, and an open agent window took the person's focus in none of the readings (`docs/superpowers/evidence/2026-10-06-b0-agent-window.md`)

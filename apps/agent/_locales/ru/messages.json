@@ -1,0 +1,235 @@
+{
+  "agentPageTitle": {
+    "message": "Агенты в браузере"
+  },
+  "agentPageLoading": {
+    "message": "Читается список агентов и задач."
+  },
+  "pairingHeading": {
+    "message": "Просят доступ"
+  },
+  "pairingAgentName": {
+    "message": "$NAME$ (так агент назвал себя сам)",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingCode": {
+    "message": "Код $CODE$",
+    "placeholders": {
+      "code": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingCompare": {
+    "message": "Подтвердите, только если агент показывает тот же код. Код другой: отклоните."
+  },
+  "pairingOpenUntil": {
+    "message": "Запрос открыт до $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingExpired": {
+    "message": "Запрос истёк. Агенту нужно попросить доступ снова."
+  },
+  "pairingConfirm": {
+    "message": "Подтвердить"
+  },
+  "pairingDecline": {
+    "message": "Отклонить"
+  },
+  "pairingConfirmed": {
+    "message": "Доступ выдан агенту $NAME$.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingDeclined": {
+    "message": "Запрос агента $NAME$ отклонён.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairedHeading": {
+    "message": "Агенты с доступом"
+  },
+  "pairedSince": {
+    "message": "Доступ с $DATE$, последний вызов $LAST$",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      },
+      "last": {
+        "content": "$2"
+      }
+    }
+  },
+  "pairedNever": {
+    "message": "вызовов ещё не было"
+  },
+  "pairedTasks": {
+    "message": "Открытых задач: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "agentRevoke": {
+    "message": "Отозвать доступ"
+  },
+  "agentRevoked": {
+    "message": "Доступ агента $NAME$ отозван, его задачи закрыты.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingEmpty": {
+    "message": "Ни один агент не подключён."
+  },
+  "pairingHow": {
+    "message": "Агент подключается по адресу $URL$. Первый вызов покажет здесь код.",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingStoreError": {
+    "message": "Список доступов не читается: $WHAT$. Пока его не починить, дверь отказывает всем агентам.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
+  },
+  "tasksHeading": {
+    "message": "Задачи агентов сейчас"
+  },
+  "tasksEmpty": {
+    "message": "Сейчас ни один агент не работает в браузере."
+  },
+  "taskGoal": {
+    "message": "Цель словами агента: $GOAL$",
+    "placeholders": {
+      "goal": {
+        "content": "$1"
+      }
+    }
+  },
+  "taskSites": {
+    "message": "Сайты: $SITES$",
+    "placeholders": {
+      "sites": {
+        "content": "$1"
+      }
+    }
+  },
+  "taskSteps": {
+    "message": "Шагов $USED$ из $BUDGET$",
+    "placeholders": {
+      "used": {
+        "content": "$1"
+      },
+      "budget": {
+        "content": "$2"
+      }
+    }
+  },
+  "taskTimeLeft": {
+    "message": "Осталось $MINUTES$ мин",
+    "placeholders": {
+      "minutes": {
+        "content": "$1"
+      }
+    }
+  },
+  "taskWindowOpen": {
+    "message": "Окно агента открыто"
+  },
+  "taskWindowClosed": {
+    "message": "Окно агента закрыто"
+  },
+  "tasksError": {
+    "message": "Список задач не читается: $WHAT$. Пока его не починить, новые задачи не открываются.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
+  },
+  "refusalsHeading": {
+    "message": "Последние отказы"
+  },
+  "refusalsEmpty": {
+    "message": "Отказов не было."
+  },
+  "refusalLine": {
+    "message": "$AGENT$: $WHAT$, $WHEN$",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "what": {
+        "content": "$2"
+      },
+      "when": {
+        "content": "$3"
+      }
+    }
+  },
+  "refusal_not_paired": {
+    "message": "у агента нет доступа"
+  },
+  "refusal_invalid_scope": {
+    "message": "задача описана с ошибкой"
+  },
+  "refusal_no_such_task": {
+    "message": "такой задачи нет"
+  },
+  "refusal_origin_not_in_task": {
+    "message": "сайт вне задачи"
+  },
+  "refusal_verb_not_in_task": {
+    "message": "действие вне задачи"
+  },
+  "refusal_budget_exhausted": {
+    "message": "шаги задачи кончились"
+  },
+  "refusal_task_expired": {
+    "message": "время задачи вышло"
+  },
+  "refusal_tab_gone": {
+    "message": "вкладку задачи закрыли"
+  },
+  "refusal_busy": {
+    "message": "браузер занят другой задачей"
+  },
+  "refusal_in_use_by_person": {
+    "message": "этим окном пользуется человек"
+  },
+  "refusal_browser_offline": {
+    "message": "Chrome не запущен или недоступен"
+  },
+  "refusal_blocked_by_shield": {
+    "message": "защита Okolos остановила действие"
+  },
+  "refusal_internal": {
+    "message": "сбой Okolos Agent, ответ не выдан"
+  },
+  "journalLink": {
+    "message": "Выгрузить журнал агентов"
+  }
+}

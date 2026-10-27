@@ -715,7 +715,7 @@ flowchart TD
   K -->|wrong origin, no key| N
 ```
 
-- **Screens traversed:** none designed yet. The pairing panel is designed in Б1 and gets its SCR id there; until then this flow traces to no screen, on purpose.
+- **Screens traversed:** SCR-23 (Agent pairing), SCR-24 (Agent activity). Both are a page of Okolos Agent opened in Fabric Dashboards, because in Б1 there is no Okolos Bridge extension yet and the Okolos extension has no channel to the daemon (ADR-0018).
 - **Local clients are not trusted for being local.** Every bridge breach of 2025–2026 that the research found came through a door that believed loopback meant "the person": ClawJacked approved pairing automatically for local clients, and CVE-2025-49596, CVE-2025-52882 and CVE-2025-66414 let a web page reach a localhost server. The pairing is a person's act, every time.
 
 ### FLW-22: An agent does a task in the browser
@@ -746,7 +746,7 @@ flowchart TD
   STOP[Stop control] -.-> E
 ```
 
-- **Screens traversed:** none designed yet — the approval panel, the activity indicator and the hand-off notice are designed in Б1/Б2.
+- **Screens traversed:** SCR-24 (Agent activity) in Б1. The approval panel and the hand-off notice are designed in Б2, with the actions they gate.
 - **The task gets its own window, not a background tab.** Measured 2026-10-06 (`docs/superpowers/evidence/2026-10-06-b0-agent-window.md`): input sent to a background tab never reaches the page, even with focus emulation, while a tab in a separate background window is visible and receives trusted input — and the window does not take the person's focus once it is open.
 - **"Refused" is a policy answer, not an error.** An agent that reads a refusal as a failure retries it; the codes say which kind of no it was, and a retry after a refusal counts against the task's budget.
 

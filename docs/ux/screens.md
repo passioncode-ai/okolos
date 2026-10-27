@@ -11,7 +11,7 @@ its wireframe is regenerated. That inverts the usual order: here the record of
 intent is this file, and the wireframe is derived evidence rather than a mockup
 drawn ahead of the code.
 
-**All eighteen screens are `built`.** SCR-15, the dashboard overview, was
+**Twenty screens are `built` and four are `designed`** (SCR-21 and SCR-22 for the mail check, SCR-23 and SCR-24 for the agents' bridge; counted 2026-10-27 from the index below). SCR-15, the dashboard overview, was
 specified in [plans/2026-08-12-options-dashboard.md](plans/2026-08-12-options-dashboard.md)
 and shipped in the same pass. (The paragraph here previously said most screens were
 `designed` and exactly two were `built`; it was written before the build and
@@ -43,6 +43,8 @@ never updated, which is the same drift this file exists to catch.)
 | SCR-20 | Local store unavailable | FLW-14 | - | built | packages/ui/src/storage/storage-problem.ts:renderStorageProblem |
 | SCR-21 | Message verdict | FLW-19, FLW-20 | - | designed | none — Ф0 |
 | SCR-22 | Message alert | FLW-20 | - | designed | none — Ф1 |
+| SCR-23 | Agent pairing | FLW-21 | - | designed | none yet: Б1 of the bridge, B-142 |
+| SCR-24 | Agent activity | FLW-21, FLW-22 | - | designed | none yet: Б1 of the bridge, B-142 |
 
 ## Design system
 
@@ -594,3 +596,39 @@ generator, and the sheet declares no colour of its own.
 - **Resources:** the watcher, the notification channel
 - **Status:** designed
 
+### SCR-23: Agent pairing
+- **Used by:** FLW-21 (the person's half of it)
+- **Purpose:** let the person decide, one agent at a time, whether it may reach the browser, after comparing a code the agent shows with the code this page shows
+- **Surface:** a page of Okolos Agent, the local daemon, opened in Fabric Dashboards (`/dashboard`, first section). Not in the Okolos extension: it has no channel to the daemon and must not get one (ADR-0018)
+- **Elements:** `[data-role=pairing-requests]`, one row per agent asking, each with the name **the agent gave itself**, labelled as such because nothing verifies it; the six-digit code, large, grouped three and three; when it asked and how long the request stays open; `[data-role=pairing-confirm]` and `[data-role=pairing-refuse]`. `[data-role=paired-agents]`, one row per paired agent: name, when it was paired, its last call, how many tasks it holds, `[data-role=agent-revoke]`. `[data-role=pairing-how]`: one sentence on how an agent connects, with the door's address
+- **States:**
+  | State | Trigger | Figma frame | Behavior |
+  |-------|---------|-------------|----------|
+  | loading | page opened | - | names what it is reading: the list of agents |
+  | empty | no request and no paired agent | - | says no agent is connected and shows how one connects; never an empty box |
+  | error | the daemon's store cannot be read | - | says which store and that no agent can be paired or checked until it is fixed; the door refuses every call meanwhile |
+  | success | a request, a paired agent, or both | - | requests first, then paired agents |
+  | expired | a request outlived its five minutes | - | the row says it expired and offers nothing to press; the agent has to ask again |
+- **The code is the whole decision.** A request whose code differs from the one the agent shows is refused, not confirmed "to see what happens". The page says so next to the buttons, because the research behind this feature found every 2025–2026 bridge breach came through a door that trusted a local caller.
+- **Confirm is a person's act on this page only.** The same action exists as a tool for parity (`fabric-actions/0.1`), and the tool answers that a person must confirm on this page. A local process cannot pair itself.
+- **Revoking is immediate.** The agent's next call is refused with `not_paired`, and every task it holds is closed with its window.
+- **Scenarios:** SCN-044
+- **Resources:** the pairing store, the keychain item per agent, the journal
+- **Status:** designed
+
+### SCR-24: Agent activity
+- **Used by:** FLW-21 (after pairing), FLW-22 (watching a task)
+- **Purpose:** show what each agent is doing in the browser right now, and what it was refused, so the person never has to guess why a window opened
+- **Surface:** the same page as SCR-23, second section
+- **Elements:** `[data-role=agent-tasks]`, one row per open task: agent, the goal in the agent's words (labelled as the agent's), sites it may read, time left, steps used of its budget, whether its window is open; `[data-role=agent-refusals]`, the last refusals with their code in words (`origin_not_in_task` as "a site outside the task"); `[data-role=agent-journal-link]` to the journal export
+- **States:**
+  | State | Trigger | Figma frame | Behavior |
+  |-------|---------|-------------|----------|
+  | loading | page opened | - | names what it is reading: open tasks |
+  | empty | no open task | - | says no agent is working in the browser now |
+  | error | the task list or journal cannot be read | - | says which, and that the door refuses new tasks until it can record them |
+  | success | one or more tasks | - | tasks first, newest first; refusals below |
+- **A refusal is a policy answer, shown as one.** It is listed with what was asked and why it was refused, never as a failure of the product.
+- **Scenarios:** SCN-045
+- **Resources:** the task table, the journal
+- **Status:** designed
