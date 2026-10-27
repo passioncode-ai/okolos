@@ -21,7 +21,7 @@
 
 | Что | Обещано | Чем подтверждено |
 |---|---|---|
-| Расширение | Chrome 137+, Edge 137+ и Firefox 129+ на Windows, macOS и Linux | пороги версий из манифестов и [ADR-0011](../adr/0011-the-signature-primitive-decides-the-supported-range.md); кода, зависящего от ОС, в сборке нет (`tools/docs.test.ts`); Edge получает сборку Chrome; браузерный прогон есть только на Linux, в CI; в Edge, на Windows и на macOS расширение не запускал ни один тест |
+| Расширение | Chrome 137+, Edge 137+ и Firefox 129+ на Windows, macOS и Linux | пороги версий из манифестов и [ADR-0011](../adr/0011-the-signature-primitive-decides-the-supported-range.md); кода, зависящего от ОС, в сборке нет (`tools/docs.test.ts`); Edge получает сборку Chrome; браузерный прогон есть в CI только на Linux, в Chromium и Firefox из Playwright; прогона в Edge, на Windows или на macOS с записанным коммитом нет |
 | `okolos-mail scan` | Windows, macOS и Linux, когда закрыт B-161 | исправления запуска в этом дереве; тест, который запускает саму команду, проходит в CI на Linux и Windows; строка B-161 открыта ([facts.md](../brand/facts.md#где-работает)) |
 | Наблюдение за почтой (SCN-042) | только Apple Mail на macOS | не построено, `docs/ux/scenarios.md` |
 | `pnpm gates` и хук pre-push | macOS, Linux и Windows | Linux и Windows: задачи `gates` и `gates (windows)` в `.github/workflows/ci.yml`, прогон 40572549603 на `3276f2c` зелёный; что гоняет задача Windows и чего она не проверяет (полный прогон хука в том числе), в разделе [«Windows»](#windows). macOS: `pnpm build` и `pnpm gates` 2026-10-27 на ветке `sw/sw-08`, код 0 |
