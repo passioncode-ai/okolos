@@ -221,7 +221,27 @@
         "packages/platform/**",
         "docs/ux/**",
         "packages/i18n/**"
-      ]
+      ],
+      "certification": {
+        "round": 1,
+        "tiers": {
+          "unit": "fail",
+          "seam": "fail",
+          "product": "fail"
+        },
+        "at": "20537817ea2077d0d76d5ed3110d759192bf690e",
+        "history": [
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
+          }
+        ],
+        "kinds": [
+          "blind"
+        ],
+        "tree": "8938cb75394f392aa9a39eb17d63cf73a337e817"
+      }
     },
     {
       "id": "N-108",
@@ -239,7 +259,27 @@
         "docs/brand/**",
         "docs/runbooks/**",
         "docs/store/**"
-      ]
+      ],
+      "certification": {
+        "round": 1,
+        "tiers": {
+          "unit": "pass",
+          "seam": "fail",
+          "product": "fail"
+        },
+        "at": "6998f97e1b4859a3384664cca8a6e77adb19c5a0",
+        "history": [
+          {
+            "unit": "pass",
+            "seam": "fail",
+            "product": "fail"
+          }
+        ],
+        "kinds": [
+          "blind"
+        ],
+        "tree": "dceac32fcb5fdda4f59add122027de5a0f700886"
+      }
     },
     {
       "id": "N-109",
