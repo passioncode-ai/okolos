@@ -188,6 +188,39 @@ describe('how long a request lives and how many there may be (spec §11 F5)', ()
     expect(pairing.list(T0 + REQUEST_LIFETIME_MS + EXPIRED_SHOWN_MS).requests).toEqual([])
   })
 
+  it('tells a request never confirmed from a confirmed one whose key nobody collected (SCR-23, fix round 1)', () => {
+    const notices: PairingNotice[] = []
+    const pairing = open(storeFile(), notices)
+    asked(pairing.request('Never confirmed', T0))
+    const late = asked(pairing.request('Confirmed late', T0 + 1))
+    const confirmedAt = T0 + 2 * MINUTE
+    expect(pairing.confirm(late.requestId, confirmedAt)).toBe(true)
+    expect(pairing.list(confirmedAt + 1).requests[1]).toMatchObject({ state: 'confirmed', confirmedAt, expiresAt: confirmedAt + CLAIM_WINDOW_MS })
+
+    // At T0 + 5 min the unconfirmed one ends as 'expired'; the confirmed one still waits.
+    const atFive = pairing.list(T0 + REQUEST_LIFETIME_MS).requests
+    expect(atFive.map((row) => [row.name, row.state, row.confirmedAt])).toEqual([
+      ['Confirmed late', 'confirmed', confirmedAt],
+      ['Never confirmed', 'expired', null],
+    ])
+
+    // Five minutes after its confirm the key was not collected: 'claim_expired', still saying when.
+    const end = confirmedAt + CLAIM_WINDOW_MS
+    expect(pairing.list(end - 1).requests.find((row) => row.name === 'Confirmed late')?.state).toBe('confirmed')
+    expect(pairing.list(end).requests.find((row) => row.name === 'Confirmed late')).toMatchObject({
+      state: 'claim_expired',
+      confirmedAt,
+      expiresAt: end,
+      duplicateName: false,
+    })
+    expect(pairing.claim(late.requestId, end)).toBeNull()
+    expect(pairing.list(end + EXPIRED_SHOWN_MS).requests).toEqual([])
+    expect(notices.filter((n) => n.kind === 'expired' || n.kind === 'claim_expired').map((n) => [n.kind, n.name])).toEqual([
+      ['expired', 'Never confirmed'],
+      ['claim_expired', 'Confirmed late'],
+    ])
+  })
+
   it('refuses a fourth waiting request; a confirmed one still waits for its claim', () => {
     expect(MAX_PENDING).toBe(3)
     const pairing = open()

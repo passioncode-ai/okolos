@@ -91,10 +91,16 @@ export interface PublicRequest {
   readonly name: string
   readonly code: string
   readonly createdAt: number
-  /** Until the confirm, the request's end; after it, the end of the claim window; once expired, when it ended. */
+  /** Until the confirm, the request's end; after it, the end of the claim window; once ended, when it ended. */
   readonly expiresAt: number
-  /** An expired row is shown for EXPIRED_SHOWN_MS with nothing to press; its handle does nothing. */
-  readonly state: 'pending' | 'confirmed' | 'expired'
+  /**
+   * `expired`: nobody confirmed it within five minutes of its creation. `claim_expired`: the person
+   * confirmed it, but the agent did not collect its key within five minutes of the confirm. Both
+   * ended rows are shown for EXPIRED_SHOWN_MS with nothing to press; their handles do nothing.
+   */
+  readonly state: 'pending' | 'confirmed' | 'expired' | 'claim_expired'
+  /** When the person confirmed it, kept on a `claim_expired` row; null when never confirmed. */
+  readonly confirmedAt: number | null
   /**
    * Another waiting request (pending or confirmed) or an agent with access carries a name that
    * looks the same (see `nameSkeleton`); every such request is marked. Never set on an expired row.
@@ -109,7 +115,7 @@ export interface PublicRequest {
  * request id, the code or a key.
  */
 export type PairingNotice =
-  | { readonly kind: 'requested' | 'confirmed' | 'declined' | 'expired'; readonly handle: string; readonly name: string }
+  | { readonly kind: 'requested' | 'confirmed' | 'declined' | 'expired' | 'claim_expired'; readonly handle: string; readonly name: string }
   | { readonly kind: 'paired'; readonly handle: string; readonly agentId: string; readonly name: string }
   | { readonly kind: 'revoked'; readonly agentId: string; readonly name: string }
 
@@ -143,6 +149,7 @@ interface Ended {
   readonly name: string
   readonly code: string
   readonly createdAt: number
+  readonly confirmedAt: number | null
   readonly endedAt: number
 }
 
@@ -310,18 +317,20 @@ export class Pairing {
         createdAt: entry.createdAt,
         expiresAt: deadline(entry),
         state: entry.confirmedAt === null ? 'pending' : 'confirmed',
+        confirmedAt: entry.confirmedAt,
         duplicateName: (perName.get(looks) ?? 0) > 1 || sameNameAgents.length > 0,
         sameNameAgents,
       }
     })
     const gone = [...this.ended.values()].map(
-      ({ handle, name, code, createdAt, endedAt }): PublicRequest => ({
+      ({ handle, name, code, createdAt, confirmedAt, endedAt }): PublicRequest => ({
         handle,
         name,
         code,
         createdAt,
         expiresAt: endedAt,
-        state: 'expired',
+        state: confirmedAt === null ? 'expired' : 'claim_expired',
+        confirmedAt,
         duplicateName: false,
         sameNameAgents: [],
       }),
@@ -355,9 +364,9 @@ export class Pairing {
       const endedAt = deadline(entry)
       if (now < endedAt) continue
       this.forget(entry)
-      const { handle, name, code, createdAt } = entry
-      this.ended.set(handle, { handle, name, code, createdAt, endedAt })
-      this.notify({ kind: 'expired', handle, name })
+      const { handle, name, code, createdAt, confirmedAt } = entry
+      this.ended.set(handle, { handle, name, code, createdAt, confirmedAt, endedAt })
+      this.notify({ kind: confirmedAt === null ? 'expired' : 'claim_expired', handle, name })
     }
     for (const row of [...this.ended.values()]) {
       if (now - row.endedAt >= EXPIRED_SHOWN_MS) this.ended.delete(row.handle)
