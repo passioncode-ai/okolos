@@ -29,8 +29,8 @@ export interface EntryHost {
  * folded on Windows, whose file system ignores it. A path without its
  * extension is accepted because node resolves one for a main file.
  *
- * The command itself does not depend on this: `bin.ts` calls `main`
- * unconditionally. This keeps a direct `node index.js` working and keeps an
+ * The command itself does not depend on this: `bin/okolos-mail.mjs` calls
+ * `run` unconditionally. This keeps a direct `node index.js` working and keeps an
  * import of the module from running anything.
  */
 export function isEntry(moduleUrl: string, argv1: string | undefined, host: EntryHost): boolean {
@@ -39,7 +39,12 @@ export function isEntry(moduleUrl: string, argv1: string | undefined, host: Entr
   const paths = windows ? path.win32 : path.posix
 
   const module = paths.normalize(fileURLToPath(moduleUrl, { windows }))
-  const invoked = paths.normalize(paths.resolve(host.cwd?.() ?? '', real(argv1, host)))
+  // The working directory only for a relative path: `cwd()` throws when the
+  // directory was deleted under the process, and an absolute path needs none.
+  const given = real(argv1, host)
+  const invoked = paths.normalize(
+    paths.isAbsolute(given) ? given : paths.resolve(host.cwd?.() ?? '', given),
+  )
 
   const fold = (file: string): string => (windows ? file.toLowerCase() : file)
   const withoutExtension = module.slice(0, module.length - paths.extname(module).length)

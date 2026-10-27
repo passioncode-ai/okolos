@@ -92,6 +92,28 @@ describe('which file the process was started with', () => {
     ).toBe(true)
   })
 
+  /**
+   * A working directory that was deleted under the process makes `cwd()` throw.
+   * An absolute `argv[1]` needs no working directory, so it must not ask.
+   */
+  it('does not ask for the working directory when argv is absolute', () => {
+    const gone: EntryHost = {
+      ...posix,
+      cwd: () => {
+        throw new Error('ENOENT: uv_cwd')
+      },
+    }
+    expect(
+      isEntry('file:///home/x/okolos/apps/mail-cli/dist/index.js', '/home/x/okolos/apps/mail-cli/dist/index.js', gone),
+    ).toBe(true)
+    expect(
+      isEntry('file:///C:/Users/x/okolos/apps/mail-cli/dist/index.js', 'C:\\Users\\x\\okolos\\apps\\mail-cli\\dist\\index.js', {
+        ...gone,
+        platform: 'win32',
+      }),
+    ).toBe(true)
+  })
+
   it('is not the entry when there is no argv path, as under a REPL or an import', () => {
     expect(isEntry('file:///home/x/okolos/apps/mail-cli/dist/index.js', undefined, posix)).toBe(false)
     expect(isEntry('file:///home/x/okolos/apps/mail-cli/dist/index.js', '', posix)).toBe(false)
