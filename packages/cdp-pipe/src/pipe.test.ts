@@ -1,8 +1,11 @@
+import type { ChildProcess } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { CdpError } from './errors.js'
 import { CdpPipe, type LaunchOptions } from './pipe.js'
 
 /**
@@ -41,6 +44,25 @@ async function eventually(predicate: () => boolean, ms = 3000): Promise<boolean>
     await new Promise((resolve) => setTimeout(resolve, 25))
   }
   return predicate()
+}
+
+/**
+ * One of the browser's streams as the pipe holds it. The stream is private; a
+ * test reaches it only to inject the fault an OS read error raises (Node
+ * destroys the stream with the error), which no fake browser can cause on demand.
+ */
+function streamOf(pipe: CdpPipe, fd: 2 | 4): Readable {
+  return (pipe as unknown as { child: ChildProcess }).child.stdio[fd] as Readable
+}
+
+/** The settled rejection of a promise, for assertions on its fields. */
+async function rejectionOf(promise: Promise<unknown>): Promise<CdpError> {
+  try {
+    await promise
+  } catch (error) {
+    return error as CdpError
+  }
+  throw new Error('expected the promise to reject, and it resolved')
 }
 
 // Whatever a test did, no fake browser outlives it: the group is killed here
@@ -167,6 +189,35 @@ describe('a listener that throws', () => {
     expect(lines).toHaveLength(1)
     expect(lines[0]).toContain('Network.requestWillBeSent')
     expect(lines[0]).not.toContain('p4ssw0rd-in-params')
+  })
+})
+
+describe('a stream of the browser that breaks', () => {
+  it('a read error on fd 4 does not end the owner: requests waiting are rejected as closed', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    const waiting = rejectionOf(pipe.send('Fake.silence'))
+
+    streamOf(pipe, 4).destroy(Object.assign(new Error('read EIO'), { code: 'EIO' }))
+
+    const error = await waiting
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('closed')
+    expect(error.method).toBe('Fake.silence')
+    expect(error.message).toContain('EIO')
+    // Nothing can answer any more, so a new request is refused at once, not timed out.
+    expect((await rejectionOf(pipe.send('Fake.echo'))).kind).toBe('closed')
+  })
+
+  it('a read error on stderr does not end the owner: requests waiting are rejected as closed', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    const waiting = rejectionOf(pipe.send('Fake.silence'))
+
+    streamOf(pipe, 2).destroy(Object.assign(new Error('read EIO'), { code: 'EIO' }))
+
+    const error = await waiting
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('closed')
+    expect(error.method).toBe('Fake.silence')
   })
 })
 

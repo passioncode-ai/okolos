@@ -13,6 +13,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { Readable, Writable } from 'node:stream'
 
+import { CdpError, type CdpErrorKind } from './errors.js'
 import { splitFrames } from './frames.js'
 
 export interface LaunchOptions {
@@ -86,7 +87,7 @@ export class CdpPipe {
   private readonly waiting = new Map<number, Waiting>()
   private readonly listeners = new Map<string, Set<EventListener>>()
   /** Why no further answer can arrive; set once the pipe or the process is gone. */
-  private closedBecause: string | undefined
+  private closedBecause: { readonly kind: CdpErrorKind; readonly reason: string } | undefined
   private exited = false
   private closing: Promise<void> | undefined
 
@@ -101,15 +102,19 @@ export class CdpPipe {
     const fromBrowser = child.stdio[4] as Readable
     fromBrowser.setEncoding('utf8')
     fromBrowser.on('data', (chunk: string) => this.read(chunk))
-    fromBrowser.on('end', () => this.fail('the pipe from the browser closed'))
-    // A write after the browser is gone fails with EPIPE; unhandled, it would
-    // take the owner's process down with it.
-    this.toBrowser.on('error', (cause) => this.fail(`the pipe to the browser broke (${cause.message})`))
+    fromBrowser.on('end', () => this.fail('closed', 'the pipe from the browser closed'))
+    // An unhandled 'error' on any of the browser's streams would take the
+    // owner's process down with it, and every session on the pipe. A write after
+    // the browser is gone fails with EPIPE; a read can fail too (EIO).
+    fromBrowser.on('error', (cause) => this.fail('closed', `the pipe from the browser broke (${cause.message})`))
+    this.toBrowser.on('error', (cause) => this.fail('closed', `the pipe to the browser broke (${cause.message})`))
+    const stderr = child.stdio[2] as Readable
+    stderr.on('error', (cause) => this.fail('closed', `the browser's stderr broke (${cause.message})`))
     // Unread stderr would fill the pipe and stall the browser.
-    ;(child.stdio[2] as Readable).resume()
+    stderr.resume()
     child.once('exit', () => {
       this.exited = true
-      this.fail('the browser exited')
+      this.fail('exited', 'the browser exited')
     })
   }
 
@@ -132,7 +137,7 @@ export class CdpPipe {
     const message = { id, method, params: params ?? {}, ...(sessionId === undefined ? {} : { sessionId }) }
     return new Promise<T>((resolve, reject) => {
       if (this.closedBecause !== undefined) {
-        reject(new Error(`${method}: ${this.closedBecause}`))
+        reject(new CdpError(this.closedBecause.kind, method, this.closedBecause.reason))
         return
       }
       const timer = setTimeout(() => {
@@ -221,11 +226,11 @@ export class CdpPipe {
     }
   }
 
-  private fail(reason: string): void {
-    this.closedBecause ??= reason
+  private fail(kind: CdpErrorKind, reason: string): void {
+    this.closedBecause ??= { kind, reason }
     for (const [id, waiting] of this.waiting) {
       this.waiting.delete(id)
-      waiting.reject(new Error(`${waiting.method}: ${reason}`))
+      waiting.reject(new CdpError(kind, waiting.method, reason))
     }
   }
 
