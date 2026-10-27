@@ -26,7 +26,15 @@ export interface LaunchOptions {
   readonly requestTimeoutMs?: number
 }
 
+/** One message from the browser: an answer (id) or an event (method). */
+interface Incoming {
+  readonly id?: number
+  readonly result?: unknown
+  readonly error?: { readonly code: number; readonly message: string }
+}
+
 interface Waiting {
+  readonly method: string
   readonly resolve: (result: unknown) => void
   readonly reject: (error: Error) => void
 }
@@ -74,6 +82,7 @@ export class CdpPipe {
         reject(new Error(`${method}: no answer within ${this.requestTimeoutMs} ms`))
       }, this.requestTimeoutMs)
       this.waiting.set(id, {
+        method,
         resolve: (result) => {
           clearTimeout(timer)
           resolve(result as T)
@@ -91,12 +100,13 @@ export class CdpPipe {
     const { messages, pending } = splitFrames(this.pending, chunk)
     this.pending = pending
     for (const text of messages) {
-      const message = JSON.parse(text) as { id?: number; result?: unknown }
+      const message = JSON.parse(text) as Incoming
       if (typeof message.id === 'number') {
         const waiting = this.waiting.get(message.id)
         if (waiting === undefined) continue
         this.waiting.delete(message.id)
-        waiting.resolve(message.result)
+        if (message.error === undefined) waiting.resolve(message.result)
+        else waiting.reject(new Error(`${waiting.method}: ${message.error.message} (CDP ${message.error.code})`))
       }
     }
   }

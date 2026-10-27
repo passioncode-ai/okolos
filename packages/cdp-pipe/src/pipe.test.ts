@@ -87,6 +87,14 @@ describe('launching a browser on a pipe', () => {
     expect(await pipe.send('Fake.echo', { after: 'timeout' })).toEqual({ after: 'timeout' })
   })
 
+  it('turns an answer carrying an error into a rejection with the CDP text and the method', async () => {
+    const pipe = await fake()
+    const failed = pipe.send('Fake.fail', { message: 'No target with given id found' })
+    await expect(failed).rejects.toThrow(/Fake\.fail/)
+    await expect(failed).rejects.toThrow(/No target with given id found/)
+    await expect(pipe.send('Page.noSuchThing')).rejects.toThrow(/'Page\.noSuchThing' wasn't found/)
+  })
+
   it('refuses a binary that does not exist', async () => {
     await expect(
       CdpPipe.launch({ binary: path.join(tmpdir(), 'okolos-no-such-browser'), args: [], userDataDir: PROFILE }),
