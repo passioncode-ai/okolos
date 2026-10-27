@@ -1453,6 +1453,9 @@
   "logTrapGeneric": {
     "message": "A page trap was detected."
   },
+  "logTrapOutsideLink": {
+    "message": "A link on a page tried to open a program or a shared folder outside the browser; the click was stopped."
+  },
   "logTrapTechsupport": {
     "message": "A page claimed your computer was locked and gave a number to call."
   },
@@ -2129,6 +2132,37 @@
   },
   "warnLookalikeSource": {
     "message": "comparing the address on this device"
+  },
+  "warnOutsideLinkHeadline": {
+    "message": "This link opens a program on your computer, not a page"
+  },
+  "warnOutsideLinkProgram": {
+    "message": "The address starts with $SCHEME$:, and the browser hands an address like this to a program on your computer.",
+    "placeholders": {
+      "scheme": {
+        "content": "$1"
+      }
+    }
+  },
+  "warnOutsideLinkShare": {
+    "message": "Opening a shared folder can run a file from it and send your Windows sign-in details to that computer."
+  },
+  "warnOutsideLinkShareHeadline": {
+    "message": "This link opens a folder on another computer"
+  },
+  "warnOutsideLinkSource": {
+    "message": "reading the link's address on this device"
+  },
+  "warnOutsideLinkStopped": {
+    "message": "The click was stopped, and nothing was opened."
+  },
+  "warnOutsideLinkWhere": {
+    "message": "The link leads to $HOST$.",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
   },
   "warnPasswordHeadline": {
     "message": "This password has appeared in a breach"

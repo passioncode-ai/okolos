@@ -956,6 +956,7 @@ const STORAGE_KEY: Record<string, string> = {
 const TRAP_KEY: Record<string, string> = {
   clickfix: 'logTrapClickfix',
   techsupport: 'logTrapTechsupport',
+  'outside-link': 'logTrapOutsideLink',
   generic: 'logTrapGeneric',
 }
 
@@ -986,7 +987,7 @@ async function journalTrap(payload: { kind: string; signals: string }): Promise<
   // Table, not a ternary, because `tools/locales.test.ts` finds the keys a
   // build asks for by reading `t('…')`, `*_KEY` tables and `…Key:` fields — and
   // deliberately nothing looser, since a looser reader keeps dead messages
-  // alive. Written any other way these five keys read as translated-and-unused.
+  // alive. Written any other way these keys read as translated-and-unused.
   try {
     const db = await openDb()
     const now = new Date().toISOString()

@@ -1453,6 +1453,9 @@
   "logTrapGeneric": {
     "message": "На странице обнаружена ловушка."
   },
+  "logTrapOutsideLink": {
+    "message": "Ссылка на странице пыталась открыть программу или общую папку вне браузера; нажатие остановлено."
+  },
   "logTrapTechsupport": {
     "message": "Страница заявила, что компьютер заблокирован, и дала номер для звонка."
   },
@@ -2129,6 +2132,37 @@
   },
   "warnLookalikeSource": {
     "message": "сравнение адреса на этом устройстве"
+  },
+  "warnOutsideLinkHeadline": {
+    "message": "Эта ссылка открывает программу на компьютере, а не страницу"
+  },
+  "warnOutsideLinkProgram": {
+    "message": "Адрес начинается с $SCHEME$:, и такой адрес браузер передаёт программе на компьютере.",
+    "placeholders": {
+      "scheme": {
+        "content": "$1"
+      }
+    }
+  },
+  "warnOutsideLinkShare": {
+    "message": "Открытие общей папки может запустить файл из неё и отправить тому компьютеру данные вашего входа в Windows."
+  },
+  "warnOutsideLinkShareHeadline": {
+    "message": "Эта ссылка открывает папку на другом компьютере"
+  },
+  "warnOutsideLinkSource": {
+    "message": "чтение адреса ссылки на этом устройстве"
+  },
+  "warnOutsideLinkStopped": {
+    "message": "Нажатие остановлено, ничего не открыто."
+  },
+  "warnOutsideLinkWhere": {
+    "message": "Ссылка ведёт на $HOST$.",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
   },
   "warnPasswordHeadline": {
     "message": "Этот пароль встречался в утечке"
