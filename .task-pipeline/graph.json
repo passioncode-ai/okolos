@@ -465,24 +465,30 @@
    ],
    "risk": "R2",
    "certification": {
-    "round": 1,
+    "round": 2,
     "tiers": {
      "unit": "pass",
-     "seam": "pass",
+     "seam": "fail",
      "product": "fail"
     },
-    "at": "a6f1501c24fecdeb802bca4b79956753a8c6d9d4",
+    "at": "bc713cda9a3ba91e23585e32319987e606cb12b7",
     "history": [
      {
       "unit": "pass",
       "seam": "pass",
       "product": "fail"
+     },
+     {
+      "unit": "pass",
+      "seam": "fail",
+      "product": "fail"
      }
     ],
     "kinds": [
+     "blind",
      "blind"
     ],
-    "tree": "4525a33e355974d266109386a861bd16eb570d6a"
+    "tree": "d3d8c587164dad88a3e115501b6623c79a4e009d"
    }
   },
   {

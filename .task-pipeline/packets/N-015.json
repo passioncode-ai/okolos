@@ -67,12 +67,12 @@
   "пока виден agent-journal-skipped, список отказов не показывает refusalsEmpty (проверки N-013 круг 10)",
   "PairingStoreError с причиной unreadable, not_json, not_a_store или bad_record (при list или revoke) показывает состояние error SCR-23 (pairingStoreError), а unwritable или too_large показывает store-unwritable; тест на каждый вид (проверки N-013 круг 10)",
   "перерыв журнала показывается строкой refusalsGap, и refusalsEmpty не показывается, пока перерыв в пределах срока хранения; нечитаемый список доступов показывается строкой refusalDoorFailureLine, а не refusalDoorLine (проверки N-013 круг 11)",
-  "строки pairingConfirmed, pairingDeclined, agentRevoked и pairingCompare проверены по data-role; код показывается тремя и тремя цифрами одинаково на странице и в CLI (N-008); дата в формате бренда, «Осталось 0 мин» не показывается после срока (строка уходит со списка) (проверки N-013 круг 12)",
+  "строки pairingConfirmed, pairingDeclined, agentRevoked и pairingCompare проверены по data-role; код показывается тремя и тремя цифрами одинаково на странице и в CLI (N-008); дата в формате бренда, «Осталось 0 мин» не показывается после срока: строка задачи с истёкшим сроком показывает taskTimeOver, пока таймер не закрыл её окно, и уходит со списка вместе с окном (проверки N-013 круг 12)",
   "при переводе SCN-045 в implemented из alt path убрано «записи задачи идут к человеку» (в Б1 записей нет) или помечено как Б2 (проверки N-013 круг 12)",
   "refusalsEmpty показывается только когда журнал прочитан целиком за срок хранения и в нём нет отказов и сбоев; дата агента в agentLabel до минуты; цель задачи выводится текстом с подписью «словами агента»; Confirm в состоянии store-unwritable показывает pairingStoreUnwritable, а не pairingConfirmed (проверки N-013 круг 13)",
   "элементы pairing-grants (строка pairingGrants рядом с кнопками) и строка окна задачи (taskWindowOpen или taskWindowClosed) проверены по data-role; журнальные коды bad_call и local_answer показываются строками refusal_bad_call и refusal_local_answer, глагол unknown строкой verb_unknown; сборка строки отказа без двух двоеточий подряд для каждого кода (проверки N-013 круг 16)",
-  "цель показана через goalShown из apps/agent/src/tasks/tasks.ts, своей копии правила 200 символов на странице нет (риск N-009 r1 seam #5)",
-  "задача, чей срок вышел, остаётся в списке SCR-24 с пометкой, пока её окно не закрыто таймером (риск N-009 r1 product #3)",
+  "цель показана через goalShown из apps/agent/src/tasks/tasks.ts, своей копии правила 200 символов на странице нет (риск N-009 r1 seam #5); цель сокращается в демоне (goalShown при сборке /api/state), а не в браузере: модуль задач тянет node:crypto и в страницу не попадает (риск N-009 r2 seam #2)",
+  "задача, чей срок вышел, остаётся в списке SCR-24 со строкой taskTimeOver вместо оставшегося времени, пока её окно не закрыто таймером (Tasks.list отдаёт её с пометкой expired; N-009 круг 2)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/dashboard && pnpm -s run typecheck"
  ],
  "guards": [
