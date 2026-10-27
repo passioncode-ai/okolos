@@ -2,7 +2,20 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
+
+import type { Confidence, Evidence, VerdictCategory } from './verdict.js'
+import type {
+  BridgeSessionVerb,
+  CensusEntry,
+  OpenResult,
+  ReadResult,
+  SessionOpenResult,
+  SnapshotFinding,
+  SnapshotResult,
+  SnapshotVerdict,
+} from './index.js'
+import * as contracts from './index.js'
 
 import {
   BRIDGE_REFUSALS,
@@ -200,6 +213,54 @@ describe('the verbs', () => {
     expect(verbAllowed(scope, 'snapshot')).toBe(true)
     expect(verbAllowed(scope, 'read')).toBe(false)
     expect(verbAllowed(scope, 'close')).toBe(true)
+  })
+})
+
+describe('the answers', () => {
+  // The daemon and its tests build these; the package entry is the one door
+  // both import through, so the shapes are checked as the entry exports them.
+  it('are exported from the package entry with the bridge helpers', () => {
+    expect(contracts.BRIDGE_SESSION_VERBS).toBe(BRIDGE_SESSION_VERBS)
+    expect(contracts.refusalKey).toBe(refusalKey)
+    expect(contracts.verbAllowed).toBe(verbAllowed)
+    expectTypeOf<BridgeSessionVerb>().toEqualTypeOf<'session.open' | 'hygiene.census'>()
+  })
+
+  it('carry the shapes of spec §2.2, and no fragment-bearing or argv field', () => {
+    expectTypeOf<SessionOpenResult>().toEqualTypeOf<{ readonly sessionId: string; readonly windowId: number }>()
+    expectTypeOf<OpenResult>().toEqualTypeOf<{ readonly url: string }>()
+    expectTypeOf<SnapshotFinding>().toEqualTypeOf<{
+      readonly kind: VerdictCategory
+      readonly confidence: Confidence
+      readonly evidence: readonly Evidence[]
+    }>()
+    expectTypeOf<SnapshotVerdict>().toEqualTypeOf<{
+      readonly level: 'clean' | 'finding'
+      readonly findings: readonly SnapshotFinding[]
+    }>()
+    expectTypeOf<SnapshotResult>().toEqualTypeOf<{
+      readonly text: string
+      readonly refs: readonly string[]
+      readonly verdict: SnapshotVerdict
+      readonly cursor?: string
+      readonly partial: boolean
+    }>()
+    expectTypeOf<ReadResult>().toEqualTypeOf<{
+      readonly text: string
+      readonly boundary: { readonly nonce: string; readonly origin: string }
+    }>()
+    // The census names a process by its executable and the flags the classifier
+    // needs, never by its command line, which carries other programs' tokens (F11).
+    expectTypeOf<CensusEntry>().toEqualTypeOf<{
+      readonly pid: number
+      readonly ppid: number
+      readonly executable: string
+      readonly owner: string | null
+      readonly ageSeconds: number
+      readonly flags: readonly string[]
+      readonly keep: boolean
+      readonly reason: string
+    }>()
   })
 })
 

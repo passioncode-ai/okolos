@@ -9,6 +9,8 @@
  * which kind of "no" it is and whether trying again could change it.
  */
 
+import type { Confidence, Evidence, VerdictCategory } from './verdict.js'
+
 /**
  * Verbs of the read-only bridge (Б1), the ones a task names. Actions arrive in
  * Б2 with their taxonomy, and so does `screenshot`: pixels bypass the cleaner and
@@ -138,6 +140,78 @@ export type BridgeResult<T> =
 
 export function refuse(code: BridgeRefusal, message: string): { success: false; error: BridgeError } {
   return { success: false, error: { code, message, retryable: REFUSAL_RETRYABLE[code] } }
+}
+
+/**
+ * What the verbs answer (spec §2.2). Every text in them comes from the cleaned
+ * snapshot, and every URL has lost its fragment, before it reaches these types.
+ */
+
+/** `sessionId` is 128 random bits; the task belongs to the agent that opened it. */
+export interface SessionOpenResult {
+  readonly sessionId: string
+  readonly windowId: number
+}
+
+/** The URL the tab actually landed on after navigation, without its fragment. */
+export interface OpenResult {
+  readonly url: string
+}
+
+/** One thing the engine cut from the snapshot, and why it believed so. */
+export interface SnapshotFinding {
+  readonly kind: VerdictCategory
+  readonly confidence: Confidence
+  readonly evidence: readonly Evidence[]
+}
+
+/**
+ * The verdict on a whole snapshot, sent with every page of it. There is no
+ * third level for "partly cleaned": a page the cleaner could not finish is a
+ * `cleaning_incomplete` refusal with no text at all.
+ */
+export interface SnapshotVerdict {
+  readonly level: 'clean' | 'finding'
+  readonly findings: readonly SnapshotFinding[]
+}
+
+/**
+ * One page of a snapshot. `refs` are opaque, keyed to the task; `cursor` names
+ * the next page of this stored snapshot and is absent on the last one.
+ */
+export interface SnapshotResult {
+  readonly text: string
+  readonly refs: readonly string[]
+  readonly verdict: SnapshotVerdict
+  readonly cursor?: string
+  readonly partial: boolean
+}
+
+/**
+ * Page text with the boundary that marks it as quoted page content: the nonce
+ * is the daemon's, not the page's, so text on the page cannot forge the end of
+ * the quote, and `origin` says whose page it is.
+ */
+export interface ReadResult {
+  readonly text: string
+  readonly boundary: { readonly nonce: string; readonly origin: string }
+}
+
+/**
+ * One process in the hygiene census (K5). It names the executable and only the
+ * flags the classifier reads, never the command line: argv of other programs
+ * carries their tokens (ревью F11). `keep` marks what must not be touched, an OS
+ * service, a live session or the person's browser, and `reason` says why.
+ */
+export interface CensusEntry {
+  readonly pid: number
+  readonly ppid: number
+  readonly executable: string
+  readonly owner: string | null
+  readonly ageSeconds: number
+  readonly flags: readonly string[]
+  readonly keep: boolean
+  readonly reason: string
 }
 
 /** `agent` carries the person's logins; `disposable` is a fresh profile with none. */
