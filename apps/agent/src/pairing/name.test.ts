@@ -1,139 +1,161 @@
 import { describe, expect, it } from 'vitest'
 
-import { MAX_NAME_LENGTH, checkAgentName, nameSkeleton } from './name.js'
+import { MAX_NAME_LENGTH, checkAgentName, checkFreeText, nameKeys, namesLookAlike } from './name.js'
 
 // Spec §11 F12: the name an agent gives itself is shown on the consent page next to a six-digit
 // code, so it may not be long enough to crowd the page, carry numerals that could pass for the
 // code, carry characters that move or hide text, or pass itself off as Okolos. A refusal is a
 // machine code; the page maps it through the catalogue.
+//
+// Fix round 4: two adversarial rounds got past a hand-made fold table with letters it did not list
+// (Greek, small capitals, Lisu, letters with a stroke or a hook). The name now passes an allowlist:
+// ASCII letters or the basic Cyrillic alphabet (never both), ASCII digits, the space and - _ . ( ) ' / +.
 describe('the name an agent gives itself', () => {
-  it('accepts an ordinary name, in any script, up to 40 characters', () => {
+  it('accepts an ordinary Latin or Cyrillic name up to 40 characters', () => {
     expect(MAX_NAME_LENGTH).toBe(40)
-    expect(checkAgentName('Claude Code')).toBeNull()
-    expect(checkAgentName('Агент Сергея')).toBeNull()
+    for (const name of ['Claude Code', 'Codex CLI', 'Cursor', 'gpt-4o', 'Агент Иван', 'Kolos', 'Агент Сергея', 'Ёжик', "O'Brien (bot)", 'a/b+c_d.e']) {
+      expect(checkAgentName(name), name).toBeNull()
+    }
     expect(checkAgentName('a'.repeat(40))).toBeNull()
-    // Characters, not UTF-16 units: a letter and thirty-nine emoji are forty characters.
-    expect(checkAgentName(`a${'🦊'.repeat(39)}`)).toBeNull()
-    // At most two numeric characters in total, of any script and wherever they stand: a third,
-    // even apart from the others, could pass for part of the code.
     expect(checkAgentName('gpt 45 helper')).toBeNull()
   })
 
-  it('refuses more than 40 characters', () => {
+  it('refuses more than 40 characters, counted in code points', () => {
     expect(checkAgentName('a'.repeat(41))).toBe('name_too_long')
-    expect(checkAgentName(`a${'🦊'.repeat(40)}`)).toBe('name_too_long')
+    // Too long is said before the script: 41 emoji are too long first.
+    expect(checkAgentName('🦊'.repeat(41))).toBe('name_too_long')
   })
 
-  it('refuses a run of three or more digits, in any script', () => {
-    expect(checkAgentName('agent 123')).toBe('name_digits')
-    expect(checkAgentName('123 456')).toBe('name_digits')
-    // Fullwidth and Arabic-Indic digits read as digits on the page too.
-    expect(checkAgentName('agent １２３')).toBe('name_digits')
-    expect(checkAgentName('agent ١٢٣')).toBe('name_digits')
-  })
-
-  // Fix round 1: a name reads as a code when it carries three numeric characters in total, of any
-  // kind (superscript, circled, fullwidth), whatever separates them.
-  it('refuses three or more numeric characters in total, whatever separates them', () => {
-    expect(checkAgentName('1 2 3 4 5 6')).toBe('name_digits')
-    expect(checkAgentName('12-34-56')).toBe('name_digits')
-    expect(checkAgentName('①②③④⑤⑥')).toBe('name_digits')
-    expect(checkAgentName('¹²³ ⁴⁵⁶')).toBe('name_digits')
-    expect(checkAgentName('agent ①②③')).toBe('name_digits')
-    expect(checkAgentName('a1 b2 c3')).toBe('name_digits')
+  it('refuses more than two ASCII digits in total, whatever separates them', () => {
+    for (const name of ['agent 123', '123 456', '1 2 3 4 5 6', '12-34-56', 'a1 b2 c3']) {
+      expect(checkAgentName(name), name).toBe('name_digits')
+    }
     expect(checkAgentName('agent 42')).toBeNull()
+    expect(checkAgentName('42')).toBeNull()
+    // Letters that look like numerals are not counted: the page shows the code in an element of its own (SCR-23).
+    expect(checkAgentName('Зоя')).toBeNull()
+    expect(checkAgentName('ЗОб')).toBeNull()
   })
 
-  // Fix round 3: numerals are counted after NFKC, so one character that reads as two numerals
-  // counts as two. Letters that look like numerals (З, О, б) are not counted: the page shows the
-  // code in an element of its own (SCR-23).
-  it('counts numerals after NFKC: a circled 21 is two (fix round 3)', () => {
-    expect(checkAgentName('1㉑')).toBe('name_digits')
-    expect(checkAgentName('agent ⑩0')).toBe('name_digits')
-    expect(checkAgentName('agent ㉑')).toBeNull()
-    // NFKC turns Roman numerals into letters; they still count as numerals as written.
-    expect(checkAgentName('agent ⅠⅡⅢ')).toBe('name_digits')
-    expect(checkAgentName('Зоя')).toBeNull()
-    expect(checkAgentName('ЗОб agent')).toBeNull()
+  it('refuses every numeral that is not an ASCII digit as outside the allowlist', () => {
+    for (const name of ['agent １２３', 'agent ١٢٣', '①②③', '¹²', 'agent ⅠⅡⅢ', 'agent ㉑']) {
+      expect(checkAgentName(name), name).toBe('name_script')
+    }
   })
 
   it('refuses control and other invisible characters', () => {
     expect(checkAgentName('agent\u0000x')).toBe('name_control')
     expect(checkAgentName('agent\nnext line')).toBe('name_control')
+    expect(checkAgentName('agent\tx')).toBe('name_control')
     expect(checkAgentName('agent\u007f')).toBe('name_control')
-    expect(checkAgentName('agent x')).toBe('name_control')
-    expect(checkAgentName('a​gent')).toBe('name_control')
+    expect(checkAgentName('agent\u0085x')).toBe('name_control')
+    expect(checkAgentName('a\u200bgent')).toBe('name_control')
     expect(checkAgentName('agent\ud800')).toBe('name_control')
   })
 
-  // Fix round 3: every character Unicode calls default-ignorable draws nothing, whatever its
-  // category: the combining grapheme joiner, variation selectors, the Hangul fillers.
-  it('refuses a default-ignorable character of any category (fix round 3)', () => {
-    for (const mark of ['͏', '︀', '️', '\u{e0100}', 'ㅤ', 'ᅟ', 'ᅠ', 'ﾠ', '​', '⁠', '᠎']) {
+  it('refuses a default-ignorable character of any category', () => {
+    for (const mark of ['\u034f', '\ufe00', '\ufe0f', '\u{e0100}', '\u3164', '\u115f', '\u1160', '\uffa0', '\u200b', '\u2060', '\u180e']) {
       expect(checkAgentName(`agent${mark}x`), mark.codePointAt(0)!.toString(16)).toBe('name_control')
     }
-    expect(checkAgentName('Okol͏os')).toBe('name_control')
-    // A Hangul filler alone draws nothing either.
-    expect(checkAgentName('ㅤㅤ')).toBe('name_control')
-  })
-
-  it('refuses a stack of more than two combining marks on one character (fix round 3)', () => {
-    expect(checkAgentName('é̂̃gent')).toBe('name_control')
-    expect(checkAgentName('Zalgò́̂̃̄')).toBe('name_control')
-    // Two marks in a row is ordinary writing (Vietnamese ệ written apart: e, dot below, circumflex).
-    expect(checkAgentName('Agent Việt')).toBeNull()
-    expect(checkAgentName('Café')).toBeNull()
-  })
-
-  it('refuses a name with no letter and no numeral: blanks, symbols and spaces only (fix round 3)', () => {
-    expect(checkAgentName('⠀')).toBe('name_empty') // braille blank
-    expect(checkAgentName('⠀ ⠀')).toBe('name_empty')
-    expect(checkAgentName('🦊🦊')).toBe('name_empty')
-    expect(checkAgentName('-- ** --')).toBe('name_empty')
-    expect(checkAgentName('🦊 Fox')).toBeNull()
-    expect(checkAgentName('42')).toBeNull()
+    expect(checkAgentName('Okol\u034fos')).toBe('name_control')
+    expect(checkAgentName('\u3164\u3164')).toBe('name_control')
   })
 
   it('refuses bidirectional controls', () => {
-    for (const mark of ['‮', '‪', '⁦', '⁩', '‏', '‎', '؜']) {
+    for (const mark of ['\u202e', '\u202a', '\u2066', '\u2069', '\u200f', '\u200e', '\u061c']) {
       expect(checkAgentName(`agent${mark}x`)).toBe('name_bidi')
     }
   })
 
-  // Fix round 2: an agent may not pass itself off as Okolos on the consent page. A name is refused
-  // when what it looks like (the folding the duplicate check uses) contains what "okolos" looks like.
-  it('refuses a name that looks like it contains "okolos"', () => {
-    expect(checkAgentName('Okolos Agent')).toBe('name_reserved')
-    expect(checkAgentName('OKOLOS')).toBe('name_reserved')
-    expect(checkAgentName('Оkolos')).toBe('name_reserved') // Cyrillic capital O
-    expect(checkAgentName('my okolos helper')).toBe('name_reserved')
-    expect(checkAgentName('0kolos')).toBe('name_reserved') // digit zero for the o
-    expect(checkAgentName('ｏkolos')).toBe('name_reserved') // fullwidth o, folded by NFKC
-    expect(checkAgentName('okolos-agent')).toBe('name_reserved')
+  it('refuses an empty name: nothing but spaces and the allowed punctuation', () => {
+    for (const name of ['', '   ', '-- . --', '()', "'/+_"]) {
+      expect(checkAgentName(name), JSON.stringify(name)).toBe('name_empty')
+    }
+    expect(checkAgentName(42 as unknown as string)).toBe('name_not_text')
   })
 
-  // Fix round 3: the reserved name is compared on a stricter key: the folded name with every
-  // character that is not a letter removed and Cyrillic written in Latin letters, so spacing,
-  // punctuation, a capital I and the Russian spelling do not get around it.
-  it('refuses "okolos" spelled apart, in Cyrillic, or with a capital I for the l (fix round 3)', () => {
+  // Fix round 4: the letters that broke the fold table, and anything else outside the allowlist.
+  it('refuses every character outside the allowlist as name_script', () => {
     for (const name of [
-      'OkoIos', // capital i for the l
-      'Околос', // Cyrillic
-      'ОКОЛОС',
-      'O k o l o s',
+      'Oko\u0399os', // Greek capital iota
+      'Oko\u0456os', // Cyrillic і, outside the basic alphabet
+      'Oko\u0142os',
+      'Oko\u00f8os',
+      'Oko\u0275os',
+      '\u1d0f\u1d0b\u1d0f\u029f\u1d0f\ua731', // small capitals
+      'Oko\ua4f2os', // Lisu
+      '\u0199olos',
+      'Claude C\u00f5de', // precomposed
+      'Claude Co\u0303de', // a combining tilde
+      'Oko\u1e0dos',
+      '\u03f9laude', // Greek capital lunate sigma
+      '\u0257oc',
+      'C\u0399aude', // Greek capital iota
+      '\u4e03\u4e09\u4e5d',
+      '\u2764',
+      '🦊 Fox',
+      '🦊🦊',
+      '⠀', // braille blank
+      '-- ** --',
+      'Caf\u00e9',
+      'Agent Vi\u1ec7t',
+      '\uff4fkolos', // fullwidth
+      'agent\u00a0x', // no-break space
+      'a@b',
+      'a,b',
+    ]) {
+      expect(checkAgentName(name), name).toBe('name_script')
+    }
+  })
+
+  it('refuses Latin and Cyrillic letters in one name', () => {
+    for (const name of ['\u041ekolos', '\u0421odex', 'claude c\u043ede', 'Агент Ivan', 'Oko\u043bos']) {
+      expect(checkAgentName(name), name).toBe('name_script')
+    }
+  })
+
+  // A heart with the emoji presentation selector (U+FE0F) carries an invisible character, and the
+  // control check comes before the script check (decision of round 4: existing reasons keep their
+  // order), so it is refused as control. The bare heart is refused as script.
+  it('refuses the emoji heart as control, for its invisible selector, and the bare heart as script', () => {
+    expect(checkAgentName('\u2764\ufe0f')).toBe('name_control')
+    expect(checkAgentName('\u2764')).toBe('name_script')
+  })
+
+  it('keeps a stack of combining marks a control refusal, said before the script', () => {
+    expect(checkAgentName('e\u0301\u0302\u0303gent')).toBe('name_control')
+  })
+
+  // The reserved name is compared on the comparison key: lower case, i and 1 as l, 0 as o, Cyrillic
+  // in Latin letters, every character that is not a letter or a digit dropped.
+  it('refuses a name whose key contains "okolos"', () => {
+    for (const name of [
+      'Okolos',
+      'OKOLOS',
+      'Okolos Agent',
+      'my okolos helper',
+      'okolos-agent',
+      'OkoIos',
+      '0kolos',
       'Oko-los',
+      'O k o l o s',
       'O.k.o.l.o.s',
       'oko_los',
-      'oko los',
-      '0kolos',
-      'ｏkolos',
-      'Okoлos', // one Cyrillic letter
-      'my Ok0l0s agent',
-      'Ökolos', // a diacritic is not a letter of its own
+      'Ok0l0s',
+      'Okoios',
+      'Околос',
+      'ОКОЛОС',
+      'мой околос',
     ]) {
       expect(checkAgentName(name), name).toBe('name_reserved')
     }
-    expect(checkAgentName('Okol\u034fos')).toBe('name_control') // refused already, as invisible
+  })
+
+  // Known false positives of the rule, recorded on purpose: spaces are dropped from the key, so a
+  // name that runs "okolos" across two words is refused too.
+  it('refuses "Joko Lost" and "Echo Kolos" as reserved: the rule knows it errs here', () => {
+    expect(checkAgentName('Joko Lost')).toBe('name_reserved')
+    expect(checkAgentName('Echo Kolos')).toBe('name_reserved')
   })
 
   it('accepts a name that only shares letters with "okolos"', () => {
@@ -141,34 +163,54 @@ describe('the name an agent gives itself', () => {
       expect(checkAgentName(name), name).toBeNull()
     }
   })
+})
 
-  it('folds a name the way the duplicate check does: NFKC, lower case, look-alikes, spaces', () => {
-    expect(nameSkeleton('  Claude   Cоde ')).toBe('claude code')
-    expect(nameSkeleton('Café')).toBe(nameSkeleton('Café'))
-    expect(nameSkeleton('ＯＫＯＬＯＳ')).toBe('okolos')
+describe('the comparison key of a name', () => {
+  it('folds case, punctuation, spaces, the l and o look-alikes', () => {
+    expect(nameKeys('Claude Code')).toEqual(['claudecode'])
+    for (const name of ['Claude-Code', 'Claude_Code', 'Claude Code.', 'claude code', 'CIaude Code', '  Claude   Code ', 'C1aude C0de']) {
+      expect(namesLookAlike(name, 'Claude Code'), name).toBe(true)
+    }
+    expect(namesLookAlike('Codex', 'Claude Code')).toBe(false)
+    expect(nameKeys('gpt-4o')).toEqual(['gpt4o'])
+    expect(namesLookAlike('Agent 2', 'Agent 3')).toBe(false)
   })
 
-  // Fix round 3: a capital I, a pipe or a digit one read as a small l; a zero and the round letters
-  // of other scripts read as o. The look-alikes are folded before the case is, so `CIaude` (capital
-  // i) is `Claude`.
-  it('folds the letters that read as l and as o, before the case is folded (fix round 3)', () => {
-    expect(nameSkeleton('CIaude Code')).toBe(nameSkeleton('Claude Code'))
-    expect(nameSkeleton('CIaude Code')).toBe('claude code')
-    for (const l of ['I', 'l', '1', '|', '\u01c0', '\u04cf', '\u04c0', '\u0131', '\u2113']) {
-      expect(nameSkeleton(`C${l}aude`), l.codePointAt(0)!.toString(16)).toBe('claude')
-    }
-    for (const o of ['0', 'O', '\u0585', '\u1d0f', '\u03bf', '\u039f', '\u043e', '\u041e']) {
-      expect(nameSkeleton(`C${o}dex`), o.codePointAt(0)!.toString(16)).toBe('codex')
-    }
-    // The small i stays an i: only the capital reads as l.
-    expect(nameSkeleton('Iris')).toBe('lris')
-    expect(nameSkeleton('iris')).toBe('iris')
-    expect(nameSkeleton(' Claude \t  Code ')).toBe('claude code')
+  it('gives a Cyrillic name two keys: its transliteration and its look in Latin letters', () => {
+    expect(nameKeys('Околос')).toEqual(['okolos', 'okoloc'])
+    expect(nameKeys('Агент Иван')).toEqual(['agentlvan', 'agehtlbah'])
+    expect(nameKeys('Щука')).toEqual(['schuka', 'schyka'])
+    // An all-Cyrillic name that reads as a Latin one looks alike by its look.
+    expect(namesLookAlike('\u0421\u043e\u0441\u043e\u0430', 'Cocoa')).toBe(true)
+    expect(namesLookAlike('\u041c\u043e\u0445\u0430', 'Moxa')).toBe(true)
+    // ... and a transliteration is a look-alike too.
+    expect(namesLookAlike('Кодекс', 'Kodeks')).toBe(true)
+    expect(namesLookAlike('Колос', 'Codex')).toBe(false)
+  })
+})
+
+// For N-009: free text the page shows (a task goal) gets the same bidi and control checks, without
+// the allowlist and the digit rule.
+describe('free text the page shows', () => {
+  it('accepts any script, symbols and digits up to the given length', () => {
+    expect(checkFreeText('Найти билеты в Kraków на 12.11, 2 взрослых 🧳', 200)).toBeNull()
+    expect(checkFreeText('Café 七三九 ①②③', 20)).toBeNull()
+    expect(checkFreeText('a'.repeat(20), 20)).toBeNull()
   })
 
-  it('refuses an empty or blank name, and a value that is not text', () => {
-    expect(checkAgentName('')).toBe('name_empty')
-    expect(checkAgentName('   ')).toBe('name_empty')
-    expect(checkAgentName(42 as unknown as string)).toBe('name_not_text')
+  it('refuses what is not text, empty, or too long', () => {
+    expect(checkFreeText(42 as unknown as string, 20)).toBe('text_not_text')
+    expect(checkFreeText('', 20)).toBe('text_empty')
+    expect(checkFreeText('  🦊 -- ', 20)).toBe('text_empty')
+    expect(checkFreeText('a'.repeat(21), 20)).toBe('text_too_long')
+    expect(checkFreeText('🦊'.repeat(20) + 'a', 20)).toBe('text_too_long')
+  })
+
+  it('refuses bidirectional controls, control and invisible characters, and stacked marks', () => {
+    expect(checkFreeText('goal\u202ex', 20)).toBe('text_bidi')
+    expect(checkFreeText('goal\nx', 20)).toBe('text_control')
+    expect(checkFreeText('goal\u200bx', 20)).toBe('text_control')
+    expect(checkFreeText('goal\ufe0fx', 20)).toBe('text_control')
+    expect(checkFreeText('e\u0301\u0302\u0303goal', 20)).toBe('text_control')
   })
 })

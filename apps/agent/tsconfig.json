@@ -13,7 +13,6 @@
   "references": [
     { "path": "../../packages/contracts" },
     { "path": "../../packages/cdp-pipe" },
-    { "path": "../../packages/core-lookalike" },
     { "path": "../../packages/core-snapshot" },
     { "path": "../../packages/i18n" },
     { "path": "../../packages/storage" }

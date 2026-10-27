@@ -68,9 +68,6 @@ importers:
       '@okolos/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@okolos/core-lookalike':
-        specifier: workspace:*
-        version: link:../../packages/core-lookalike
       '@okolos/core-snapshot':
         specifier: workspace:*
         version: link:../../packages/core-snapshot

@@ -334,6 +334,8 @@ describe('how long a request lives and how many there may be (spec §11 F5)', ()
     expect(pairing.request('agent 123', T0)).toEqual({ refused: 'name_digits' })
     expect(pairing.request('a'.repeat(41), T0)).toEqual({ refused: 'name_too_long' })
     expect(pairing.request('Okolos Agent', T0)).toEqual({ refused: 'name_reserved' })
+    expect(pairing.request('Oko\u0399os', T0)).toEqual({ refused: 'name_script' }) // Greek capital iota
+    expect(pairing.request('\u041ekolos', T0)).toEqual({ refused: 'name_script' }) // Cyrillic O among Latin letters
     expect(pairing.list(T0).requests).toEqual([])
   })
 })
@@ -849,16 +851,11 @@ describe('two waiting requests under one name (spec §11 F5)', () => {
     expect(rows.find((row) => row.name === 'Codex')?.duplicateName).toBe(false)
   })
 
-  it('are marked when the names differ only in case or in Unicode form', () => {
+  it('are marked when the names differ only in case or punctuation', () => {
     const pairing = open()
     asked(pairing.request('Claude Code', T0))
-    asked(pairing.request('claude code', T0 + 1))
+    asked(pairing.request('claude-code.', T0 + 1))
     expect(Object.values(flags(pairing, T0 + 2))).toEqual([true, true])
-
-    const other = open()
-    asked(other.request('Café', T0))
-    asked(other.request('Café', T0 + 1))
-    expect(Object.values(flags(other, T0 + 2))).toEqual([true, true])
   })
 
   it('stay marked when one is already confirmed, and the mark goes when the other leaves', () => {
@@ -871,16 +868,19 @@ describe('two waiting requests under one name (spec §11 F5)', () => {
     expect(Object.values(flags(pairing, T0 + 4))).toEqual([false])
   })
 
-  // Fix round 1: names are compared by what they look like, not by their code points.
-  it('are marked when a Cyrillic letter stands in for a Latin one', () => {
+  // Fix round 1: names are compared by what they look like, not by their code points. Fix round 4:
+  // one Cyrillic letter among Latin ones is refused outright; a name all in Cyrillic letters that
+  // reads as a Latin one is marked.
+  it('are marked when an all-Cyrillic name reads as a Latin one', () => {
     const pairing = open()
-    asked(pairing.request('Codex', T0))
-    asked(pairing.request('Сodex', T0 + 1)) // Cyrillic capital Es
+    expect(pairing.request('\u0421odex', T0)).toEqual({ refused: 'name_script' }) // Cyrillic capital Es
+    asked(pairing.request('Cocoa', T0))
+    asked(pairing.request('\u0421\u043e\u0441\u043e\u0430', T0 + 1)) // all Cyrillic
     asked(pairing.request('Claude', T0 + 2))
     const rows = pairing.list(T0 + 3).requests
     expect(rows.map((row) => [row.name, row.duplicateName])).toEqual([
-      ['Codex', true],
-      ['Сodex', true],
+      ['Cocoa', true],
+      ['\u0421\u043e\u0441\u043e\u0430', true],
       ['Claude', false],
     ])
   })
@@ -898,7 +898,7 @@ describe('two waiting requests under one name (spec §11 F5)', () => {
     const pairing = open()
     const key = pair(pairing, 'Claude Code', T0)
     const agent = pairing.verify(key)!
-    asked(pairing.request('claude cоde ', T0 + 10)) // Cyrillic o, trailing space
+    asked(pairing.request('claude_code ', T0 + 10)) // underscore, trailing space
     asked(pairing.request('Codex', T0 + 11))
     const rows = pairing.list(T0 + 12).requests
     expect(rows[0]).toMatchObject({ duplicateName: false, sameNameAgents: [{ agentId: agent.agentId, name: 'Claude Code' }] })
@@ -913,11 +913,25 @@ describe('two waiting requests under one name (spec §11 F5)', () => {
     expect(pairing.list(T0 + 11).requests[0]).toMatchObject({ name: 'CIaude Code', sameNameAgents: [{ agentId: agent.agentId, name: 'Claude Code' }] })
   })
 
+  // Fix round 4: the look-alikes the comparison key must catch, and one it must not.
+  it('names the agent with access for every spelling of its name, and not for another name (fix round 4)', () => {
+    for (const name of ['Claude-Code', 'Claude_Code', 'Claude Code.', 'claude code', 'CIaude Code']) {
+      const pairing = open()
+      const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
+      asked(pairing.request(name, T0 + 10))
+      expect(pairing.list(T0 + 11).requests[0], name).toMatchObject({ name, sameNameAgents: [{ agentId: agent.agentId, name: 'Claude Code' }] })
+    }
+    const pairing = open()
+    pair(pairing, 'Claude Code', T0)
+    asked(pairing.request('Codex', T0 + 10))
+    expect(pairing.list(T0 + 11).requests[0]).toMatchObject({ name: 'Codex', sameNameAgents: [] })
+  })
+
   it('marks two waiting look-alikes of an agent with access as duplicates, and names the agent on both', () => {
     const pairing = open()
     const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
     asked(pairing.request('Claude Code', T0 + 10))
-    asked(pairing.request('claude cоde', T0 + 11)) // Cyrillic o
+    asked(pairing.request('CIaude Code', T0 + 11)) // capital i for the l
     const rows = pairing.list(T0 + 12).requests
     expect(rows.map((row) => [row.duplicateName, row.sameNameAgents])).toEqual([
       [true, [{ agentId: agent.agentId, name: 'Claude Code' }]],

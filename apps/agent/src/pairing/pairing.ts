@@ -28,7 +28,7 @@ import path from 'node:path'
 
 import { atomicWrite } from '../fabric/fabric-service.mjs'
 import type { ServiceDirs } from '../service/dirs.js'
-import { checkAgentName, nameSkeleton, type NameRefusal } from './name.js'
+import { checkAgentName, namesLookAlike, type NameRefusal } from './name.js'
 
 /** The pairing store: the one place a key's SHA-256 lives, in the service data folder. */
 export function pairingStoreFile(dirs: ServiceDirs): string {
@@ -115,7 +115,7 @@ export interface PublicRequest {
   readonly confirmedAt: number | null
   /**
    * Another waiting request (pending or confirmed) carries a name that looks the same (see
-   * `nameSkeleton`); every such request is marked. Only waiting requests count: a request that
+   * `namesLookAlike`); every such request is marked. Only waiting requests count: a request that
    * looks like an agent with access is told by `sameNameAgents` alone. Never set on an expired row.
    */
   readonly duplicateName: boolean
@@ -343,12 +343,9 @@ export class Pairing {
   list(now: number): { requests: PublicRequest[]; agents: AgentRecord[] } {
     this.sweep(now)
     const waiting = [...this.byHandle.values()]
-    const perName = new Map<string, number>()
-    for (const entry of waiting) perName.set(nameSkeleton(entry.name), (perName.get(nameSkeleton(entry.name)) ?? 0) + 1)
     const live = waiting.map((entry): PublicRequest => {
-      const looks = nameSkeleton(entry.name)
       const sameNameAgents = this.agents
-        .filter((agent) => nameSkeleton(agent.name) === looks)
+        .filter((agent) => namesLookAlike(agent.name, entry.name))
         .map(({ agentId, name }) => ({ agentId, name }))
       return {
         handle: entry.handle,
@@ -358,7 +355,7 @@ export class Pairing {
         expiresAt: deadline(entry),
         state: entry.confirmedAt === null ? 'pending' : 'confirmed',
         confirmedAt: entry.confirmedAt,
-        duplicateName: (perName.get(looks) ?? 0) > 1,
+        duplicateName: waiting.some((other) => other !== entry && namesLookAlike(other.name, entry.name)),
         sameNameAgents,
       }
     })
