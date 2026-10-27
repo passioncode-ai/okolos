@@ -1445,3 +1445,54 @@ describe('what a store may hold (fix round 4)', () => {
     expect(refusal(`${atLimit} `)).toBe('not_a_store')
   })
 })
+
+// Fix round 6: a time the store would refuse at open (not a whole non-negative ms) is never taken,
+// so it can never be written. Every method that takes `now` throws a TypeError before it acts.
+describe('the clock a caller passes (fix round 6)', () => {
+  const BAD = [1.5, -1, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 53, '1' as unknown as number]
+
+  it('refuses a claim and a last call at a time the store would refuse, and writes nothing', () => {
+    const file = storeFile()
+    const pairing = open(file)
+    const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    const request = asked(pairing.request('Codex', T0 + 10))
+    expect(confirmAt(pairing, request, T0 + 11)).toBe(true)
+    const before = readFileSync(file, 'utf8')
+    for (const now of BAD) {
+      expect(() => pairing.claim(request.requestId, now), String(now)).toThrow(TypeError)
+      expect(() => pairing.touch(agent.agentId, now), String(now)).toThrow(TypeError)
+    }
+    expect(readFileSync(file, 'utf8')).toBe(before)
+    expect(pairing.list(T0 + 12).agents).toEqual([agent])
+    expect(pairing.claim(request.requestId, T0 + 12)).toHaveProperty('key')
+    expect(open(file).list(T0 + 13).agents.map((a) => a.name)).toEqual(['Claude Code', 'Codex'])
+  })
+
+  it('refuses it in every other method that takes a time, before anything happens', () => {
+    const file = storeFile()
+    const notices: PairingNotice[] = []
+    const pairing = open(file, notices)
+    const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    const request = asked(pairing.request('Codex', T0 + 10))
+    const handle = handleOf(pairing, request, T0 + 10)
+    const seen = notices.length
+    for (const now of BAD) {
+      const label = String(now)
+      expect(() => pairing.request('Cursor', now), label).toThrow(TypeError)
+      expect(() => pairing.confirmByHandle(handle, now), label).toThrow(TypeError)
+      expect(() => pairing.declineByHandle(handle, now), label).toThrow(TypeError)
+      expect(() => pairing.revoke(agent.agentId, now), label).toThrow(TypeError)
+      expect(() => pairing.list(now), label).toThrow(TypeError)
+      expect(() => pairing.close(now), label).toThrow(TypeError)
+    }
+    expect(notices).toHaveLength(seen)
+    expect(pairing.list(T0 + 20)).toMatchObject({ agents: [agent], requests: [{ handle, state: 'pending' }] })
+    expect(pairing.request('Cursor', T0 + 20)).toHaveProperty('requestId')
+  })
+
+  it('takes 0 and the largest safe integer', () => {
+    const pairing = open()
+    expect(pairing.list(0).requests).toEqual([])
+    expect(pairing.list(Number.MAX_SAFE_INTEGER).requests).toEqual([])
+  })
+})

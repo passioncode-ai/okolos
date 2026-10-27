@@ -22,6 +22,9 @@
  * journal says how each ended) and flushes. Agents with access live in the store and survive the
  * restart, each with its last call as it was last written: at most a minute older than its newest
  * call (see `touch`), or exactly that call when the daemon ran `close` or `flush` before it stopped.
+ *
+ * Every method that takes `now` (ms since the epoch) throws a TypeError before it acts unless `now` is
+ * a safe integer >= 0 (fix round 6): the store refuses any other time at open, so it is never written.
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { readFileSync, statSync } from 'node:fs'
@@ -308,6 +311,7 @@ export class Pairing {
    * false and nothing is written.
    */
   touch(agentId: string, now: number): boolean {
+    checkClock(now, 'touch')
     if (!this.agents.some((a) => a.agentId === agentId)) return false
     this.agents = this.agents.map((a) => (a.agentId === agentId ? { ...a, lastCallAt: now } : a))
     this.callsUnsaved = true
@@ -342,6 +346,7 @@ export class Pairing {
    * revoke and flush still work. A second close only flushes.
    */
   close(now: number): void {
+    checkClock(now, 'close')
     if (!this.closed) {
       this.sweep(now)
       this.closed = true
@@ -351,6 +356,7 @@ export class Pairing {
   }
 
   request(agentName: string, now: number): { requestId: string; code: string; expiresAt: number } | { refused: RequestRefusal } {
+    checkClock(now, 'request')
     if (this.closed) return { refused: 'closed' }
     const refused = checkAgentName(agentName)
     if (refused !== null) return { refused }
@@ -381,12 +387,14 @@ export class Pairing {
    * pair itself. Confirming a confirmed request again is true and keeps the first confirm time.
    */
   confirmByHandle(handle: string, now: number): boolean {
+    checkClock(now, 'confirmByHandle')
     this.sweep(now)
     return this.confirmEntry(this.byHandle.get(handle), now)
   }
 
   /** The person's decline, by handle only, like the confirm. An ended request stays an expired row. */
   declineByHandle(handle: string, now: number): boolean {
+    checkClock(now, 'declineByHandle')
     this.sweep(now)
     return this.declineEntry(this.byHandle.get(handle), now)
   }
@@ -396,6 +404,7 @@ export class Pairing {
    * and otherwise the reason it gets none (`ClaimRefusal`). A claim never makes a new request.
    */
   claim(requestId: string, now: number): { key: string } | { pending: true } | { refused: ClaimRefusal } {
+    checkClock(now, 'claim')
     // After a close no request waits, so every id ends in the refusals below (or is unknown).
     this.sweep(now)
     const entry = this.byRequestId.get(requestId)
@@ -424,6 +433,7 @@ export class Pairing {
    * and `now` as its time.
    */
   revoke(agentId: string, now: number): AgentRecord | null {
+    checkClock(now, 'revoke')
     this.sync(true)
     const agent = this.agents.find((a) => a.agentId === agentId)
     if (agent === undefined) return null
@@ -439,6 +449,7 @@ export class Pairing {
    * that no longer opens throws PairingStoreError, and the page shows its error state.
    */
   list(now: number): { requests: PublicRequest[]; agents: AgentRecord[] } {
+    checkClock(now, 'list')
     this.sync(false)
     this.sweep(now)
     const waiting = [...this.byHandle.values()]
@@ -749,6 +760,14 @@ function sameKeys(value: Record<string, unknown>, fields: readonly string[]): bo
 /** A time the store keeps: whole ms since the epoch, not negative. */
 function isTime(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+}
+
+/**
+ * Refuses a clock the store would refuse at open (fix round 6): every method that takes `now` runs
+ * this first, before it acts, so no time but a whole non-negative ms is ever kept or written.
+ */
+function checkClock(now: number, method: string): void {
+  if (!isTime(now)) throw new TypeError(`Pairing.${method}: now must be a safe integer >= 0, got ${String(now)}`) // i18n-exempt: a programming error in the daemon, thrown to its caller, never shown to a person
 }
 
 function isStoredAgent(value: unknown): value is StoredAgent {
