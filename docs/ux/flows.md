@@ -696,7 +696,7 @@ flowchart TD
 ### FLW-21: Connect an agent to the browser
 - **Traces:** ST-027 (JTBD-10, JRN-05/#1)
 - **Goal:** an agent the person chose can use the browser, and nothing else on the machine can
-- **Entry points:** an agent's first call to the local door of Okolos Agent; the bridge's panel
+- **Entry points:** an agent's first call to the local door of Okolos Agent (through `okolos-agent pair` or the stdio shim); the Okolos Agent page in Fabric Dashboards
 - **Success exit:** the agent is paired, listed with what it may reach, and revocable in one place
 - **Task analysis:**
   1. See which agent is asking
@@ -708,8 +708,8 @@ flowchart TD
 flowchart TD
   A[Agent calls the local door] --> K{Paired key?}
   K -->|yes| OK[Request handled under the agent's scope]
-  K -->|no| P[Panel: agent X asks to connect, code 1234]
-  P -->|person confirms, codes match| R[Key issued to the agent, stored in the keychain]
+  K -->|no| P[Page: agent X asks for access, code 123 456]
+  P -->|person confirms, codes match| R[Key issued to the agent once; the daemon keeps only its SHA-256]
   P -->|person refuses or no answer| N[Refused and recorded]
   R --> OK
   K -->|wrong origin, no key| N

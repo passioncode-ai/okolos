@@ -971,13 +971,13 @@ every rule below; where they differ, the scenario says so.
 - **Preconditions:** Okolos Agent is running; the agent has never connected
 - **Steps:**
   1. The agent calls the door without a key -> the door answers with a pairing request and shows a code; nothing else is reachable
-  2. The person sees the agent's name and the same code in the bridge's panel and confirms -> a key is issued to that agent and stored in the keychain
+  2. The person sees the agent's name and the same six-digit code on the Okolos Agent page and confirms -> a key is issued to that agent once; the daemon keeps only its SHA-256
   3. The person later revokes the agent -> its next call is refused and any task it holds stops
 - **Expected result:** only agents the person confirmed can reach the browser, and each one can be taken back on its own
 - **Alt paths:** the codes differ, or the person refuses or does not answer -> no key, and the attempt is recorded
 - **UI elements:** SCR-23: `[data-role=pairing-requests]` with the code, `[data-role=pairing-confirm]`, `[data-role=pairing-refuse]`, `[data-role=agent-revoke]`
 - **States covered:** success, error, empty
-- **Errors & recovery:** a call carrying no key, a wrong key, or an `Origin` that is not the bridge -> refused and recorded, never treated as "local, so the person". Loopback is not a person: the research behind this feature found that every 2025–2026 bridge breach came through a door that believed it was
+- **Errors & recovery:** a call carrying no key or a wrong key -> refused and recorded; a call carrying any `Origin` or `Sec-Fetch-*` header (a web page) -> refused before any pairing request is made, and recorded, never treated as "local, so the person". Loopback is not a person: the research behind this feature found that every 2025–2026 bridge breach came through a door that believed it was
 - **Status:** draft
 - **Coverage:** none — designed 2026-10-06, not built
 
@@ -996,7 +996,7 @@ every rule below; where they differ, the scenario says so.
 - **Alt paths:** the agent asks for a site outside the task -> refused with `origin_not_in_task`; the page has a finding -> the finding travels with the snapshot and the task's writes go to the person (SCN-046)
 - **UI elements:** SCR-24: `[data-role=agent-tasks]`, `[data-role=agent-refusals]`
 - **States covered:** success, error, partial
-- **Errors & recovery:** the browser is closed -> the request waits in the agent's queue and the agent is told `browser_offline`, not that the page is empty; the snapshot could not be cleaned -> the agent receives nothing rather than an uncleaned tree
+- **Errors & recovery:** the browser is closed -> the agent is told `browser_offline`, marked retryable, not that the page is empty; nothing is queued; the snapshot could not be cleaned -> the agent receives nothing rather than an uncleaned tree
 - **Why a window and not a tab.** Measured 2026-10-06: input to a background tab never reaches the page, while a separate background window's tab is visible and receives trusted input, and an open agent window took the person's focus in none of the readings (`docs/superpowers/evidence/2026-10-06-b0-agent-window.md`)
 - **Why the snapshot comes in parts.** Measured the same day: Wikipedia's raw tree is about 10.5 MB, and even compacted it is about 66 thousand tokens
 - **Status:** draft

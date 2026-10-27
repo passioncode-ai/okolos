@@ -16,22 +16,31 @@
  "source_scope": {
   "edit_targets": [
    "apps/agent/src/door/door.ts",
-   "src/door/stdio-shim.ts",
+   "apps/agent/src/door/guard.ts",
+   "apps/agent/src/door/stdio-shim.ts",
+   "apps/agent/src/cli/pair.ts",
    "apps/agent/src/door/door.test.ts",
-   "src/door/stdio-shim.test.ts",
+   "apps/agent/src/door/guard.test.ts",
+   "apps/agent/src/door/stdio-shim.test.ts",
+   "apps/agent/src/cli/pair.test.ts",
    "apps/agent/package.json",
    "@modelcontextprotocol/node"
   ]
  },
  "outputs": [
-  "`doorRoute({pairing, journal, tools}): Route` — POST /mcp: ключ в `X-Okolos-Agent-Key`; токен хоста отвергается; без ключа → результат not_paired с {requestId, code}; `claim` через заголовок `X-Okolos-Pairing-Request`; `type ToolSet = (agent: AgentRecord) => McpServer`; `okolos-agent mcp-stdio` проксирует stdio ↔ /mcp с ключом из файла 0600"
+  "`doorGuard(req): {status, code} | null` (Host, Origin, Sec-Fetch-*, Content-Type); `doorRoute({pairing, journal, tools}): Route` для POST /mcp, POST /pair, POST /pair/claim; обёртка journaled(res) пишет запись до тела; `type ToolSet = (agent: AgentRecord) => McpServer`; `okolos-agent pair --name <имя>`; `okolos-agent mcp-stdio --as <имя>`"
  ],
  "acceptance": [
-  "без ключа: not_paired с кодом, запрос виден в pairing.list()",
-  "токен хоста в Authorization: not_paired, не 200",
-  "Host rebinding (Host: attacker.example:47871) → 403 до разбора",
-  "Origin http://evil.example → 403; без Origin, но без ключа → not_paired",
-  "ключ отозван → not_paired, задачи агента закрыты",
+  "без ключа: 403, тело {error: not_paired}, нет WWW-Authenticate, запроса привязки не создаётся",
+  "POST /pair {name} создаёт запрос и возвращает {requestId, code}; POST /pair/claim с X-Okolos-Pairing-Request до подтверждения → pending",
+  "токен хоста в Authorization: 403 not_paired, не 200",
+  "Host rebinding (attacker.example:47871) → 403 до разбора, запись в журнале, запроса привязки нет",
+  "любой Origin (в том числе http://localhost:3000) или Sec-Fetch-Site → 403, запроса привязки нет (ревью F7)",
+  "Content-Type не application/json → 415",
+  "журнал недоступен: каждый маршрут и вид ответа (отказ двери, ошибка разбора, ошибка протокола, ответ инструмента) уходит без тела (ревью F14)",
+  "ключ отозван → 403 not_paired, задачи агента закрыты",
+  "stdio-шим: читает ключ из файла 0600 клиента, проксирует stdin/stdout ↔ /mcp; без файла ключа печатает в stderr, как пройти привязку, и выходит 2",
+  "CLI pair: печатает код, ждёт подтверждения, пишет ключ в clients/<имя>.key 0600; отказ человека → выход 1 без файла",
   "тестовый MCP-клиент (@modelcontextprotocol/client) получает tools/list после привязки",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/door"
  ],
@@ -43,5 +52,5 @@
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "без длинного тире в текстах для людей"
  ],
- "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/door/door.ts src/door/stdio-shim.ts apps/agent/src/door/door.test.ts; затем первый непройденный тест в списке acceptance"
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/door/door.ts apps/agent/src/door/guard.ts apps/agent/src/door/stdio-shim.ts; затем первый непройденный тест в списке acceptance"
 }

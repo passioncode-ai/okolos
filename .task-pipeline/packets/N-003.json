@@ -23,7 +23,9 @@
   "`snapshotVerdict(probe: {verdicts: readonly Verdict[], truncated: boolean, unresolved: number}): SnapshotVerdict` — `{level: 'clean'|'finding'|'incomplete', findings: {kind, confidence, evidence}[]}`; `incomplete`, когда пробник упёрся в бюджет или не нашёл элемент: агенту говорится, что очистка неполная"
  ],
  "acceptance": [
-  "корпус corpora/injections/positives.json: каждый позитив, помещённый в AX-дерево скрытым узлом, отсутствует в renderLine-выдаче",
+  "buildSnapshot с rootRef под скрытым предком возвращает пусто; с rootRef под полем ввода текст поля не выдаётся (ревью F2)",
+  "refs непрозрачны: refOf(backendId, taskKey) — HMAC; ref другой задачи не находит узла",
+  "корпус corpora/injections/positives.json: каждый позитив, помещённый в AX-дерево скрытым узлом, отсутствует в renderLine-выдаче (уровень функции; настоящая проверка REQ-55 в Chrome — N-011)",
   "negatives.json: ни один негатив не вырезан",
   "fuzz: 200 случайных значений, введённых в textbox/searchbox/combobox и потомки, не встречаются в выдаче (фиксированное зерно)",
   "truncated или unresolved > 0 дают level 'incomplete', а не 'clean' (правило retro №3)",

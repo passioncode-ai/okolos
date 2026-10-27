@@ -23,6 +23,9 @@
   "refusalKey даёт ключ для каждого из BRIDGE_REFUSALS, и каждый ключ есть в apps/agent/_locales/{ru,en}/messages.json",
   "добавление кода в BRIDGE_REFUSALS без ветки в refusalKey — ошибка компиляции (посадка наблюдается: tsc TS2322/TS2366)",
   "validateScope отвергает write ⊄ read, ttlSeconds > 3600, stepBudget > 500 (уже есть, сохраняется)",
+  "validateScope отвергает localhost, 127.0.0.0/8, ::1, 10/8, 172.16/12, 192.168/16, 169.254/16, fe80::/10 и *.local (ревью F9)",
+  "validateScope без поля profile отвергает задачу (ревью F26)",
+  "BRIDGE_VERBS не содержит screenshot; close разрешён, даже если не назван в verbs (ревью F3, F16)",
   "проверка узла: pnpm -s exec vitest run packages/contracts && pnpm -s typecheck"
  ],
  "guards": [

@@ -15,3 +15,6 @@ loop: not armed — no pipeline.json; the run walks the graph without check-ins 
 stage: 3 spec — gate auto — verdict pending-review — 2026-10-27T07:10:00+01:00
 stage: 4 plan — gate auto — verdict pass — 2026-10-27T07:30:00+01:00
 gate:  4 — command "plan_audit.py --graph .task-pipeline/graph.json --packets .task-pipeline/packets" — exit 0 — 2026-10-27T07:30:00+01:00
+review: 3 — surface spec — rounds 1 — returned — 2026-10-27T08:05:00+01:00
+finding: F1..F4 — blocking:B4 — round 1 — base-repro n/a
+finding: F5..F17,F19..F22,F24 — blocking:B0 should-fix 15 — round 1 — base-repro n/a

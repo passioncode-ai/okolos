@@ -26,7 +26,9 @@
   "GET /dashboard (сессия-кука от кода входа), GET /api/state, POST /api/pairing/:id/confirm|decline, POST /api/agents/:id/revoke — запись требует куку и заголовок X-Okolos-Request: 1; CSP без inline-скрипта; действия fabric-actions: pairing.confirm (human, consent), pairing.decline (human, consent), agent.revoke (relayed)"
  ],
  "acceptance": [
-  "без куки → 401; запись без X-Okolos-Request → 403",
+  "без куки → 401; запись без X-Okolos-Request → 403; запись без Origin или с чужим Origin → 403; чужой Host на любом маршруте → 403 (ревью F4)",
+  "requestId не попадает в HTML и /api/state; подтверждение идёт по handle, который страница получила в своей сессии",
+  "имя агента выводится текстом (textContent), код в отдельном элементе [data-role=pairing-code]",
   "состояния SCR-23: loading, empty, error, success, expired; SCR-24: loading, empty, error, success — каждое по data-role",
   "инструмент pairing.confirm через MCP отвечает human-step-required со ссылкой /dashboard",
   "строки берутся из каталога; ключ без строки виден как [key]",

@@ -22,7 +22,9 @@
  ],
  "acceptance": [
   "каждый отказ BRIDGE_REFUSALS, который выдают задачи (invalid_scope, no_such_task, origin_not_in_task, verb_not_in_task, budget_exhausted, task_expired), — свой тест",
-  "чужая задача (другой agentId) → no_such_task",
+  "чужая задача (другой agentId) → no_such_task (ревью F8)",
+  "sessionId — 128 случайных бит (32 hex), два открытия дают разные id",
+  "checkLanded(task, actualUrl): фактический origin вне origins.read → origin_not_in_task (ревью F9)",
   "отказ тоже списывает шаг (спека §2.3)",
   "фрагмент URL не влияет на проверку origin",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/tasks"

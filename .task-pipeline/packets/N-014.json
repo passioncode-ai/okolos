@@ -1,7 +1,7 @@
 {
  "schema_version": "task-pipeline/execution-packet/1",
  "node": "N-014",
- "intent": "Термины и строки",
+ "intent": "Термины и строки (каталог apps/agent/_locales, ревью F22)",
  "inputs": [
   "—",
   "N-013: список строк экранов"

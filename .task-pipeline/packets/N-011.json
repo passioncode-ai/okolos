@@ -29,10 +29,14 @@
  ],
  "acceptance": [
   "skeleton на Chrome: session.open → open локальной фикстуры со скрытой инструкцией из корпуса → snapshot не содержит текста инструкции, verdict.level = finding → close: окна нет",
+  "корпус в Chrome: HTML-фикстура из каждого позитива positives.json (по носителю и сокрытию), ответы snapshot, read, get text, waitFor {text} не содержат текста позитива (ревью F1, F3)",
+  "read, get text|title, waitFor {text} строятся только из очищенных строк снимка",
+  "open {ref} на ссылку вне origins.read → origin_not_in_task до перехода; редирект за область → snapshot и read отвечают origin_not_in_task",
+  "каждый глагол, возвращающий URL, срезает фрагмент",
   "open вне origins.read → origin_not_in_task, запись в журнале есть",
   "snapshot большой фикстуры приходит частями ≤ 32 КБ с курсором",
   "read возвращает boundary с nonce и origin; get title/url без фрагмента",
-  "поле password с введённым значением: значения нет ни в snapshot, ни в read, ни в get text",
+  "поля password, cc-number, one-time-code с введёнными значениями (fuzz, фиксированное зерно): значений нет ни в одном ответе ни одного глагола",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/verbs"
  ],
  "guards": [

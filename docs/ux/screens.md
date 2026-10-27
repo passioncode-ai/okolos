@@ -599,7 +599,7 @@ generator, and the sheet declares no colour of its own.
 ### SCR-23: Agent pairing
 - **Used by:** FLW-21 (the person's half of it)
 - **Purpose:** let the person decide, one agent at a time, whether it may reach the browser, after comparing a code the agent shows with the code this page shows
-- **Surface:** a page of Okolos Agent, the local daemon, opened in Fabric Dashboards (`/dashboard`, first section). Not in the Okolos extension: it has no channel to the daemon and must not get one (ADR-0018)
+- **Surface:** a page of Okolos Agent, the local daemon, opened in Fabric Dashboards (`/dashboard`, first section). Not in the Okolos extension: in Б1 the extension has no channel to the daemon; how the two meet is decided with Б2 and recorded in the bridge's ADR
 - **Elements:** `[data-role=pairing-requests]`, one row per agent asking, each with the name **the agent gave itself**, labelled as such because nothing verifies it; the six-digit code, large, grouped three and three; when it asked and how long the request stays open; `[data-role=pairing-confirm]` and `[data-role=pairing-refuse]`. `[data-role=paired-agents]`, one row per paired agent: name, when it was paired, its last call, how many tasks it holds, `[data-role=agent-revoke]`. `[data-role=pairing-how]`: one sentence on how an agent connects, with the door's address
 - **States:**
   | State | Trigger | Figma frame | Behavior |
@@ -610,7 +610,8 @@ generator, and the sheet declares no colour of its own.
   | success | a request, a paired agent, or both | - | requests first, then paired agents |
   | expired | a request outlived its five minutes | - | the row says it expired and offers nothing to press; the agent has to ask again |
 - **The code is the whole decision.** A request whose code differs from the one the agent shows is refused, not confirmed "to see what happens". The page says so next to the buttons, because the research behind this feature found every 2025–2026 bridge breach came through a door that trusted a local caller.
-- **Confirm is a person's act on this page only.** The same action exists as a tool for parity (`fabric-actions/0.1`), and the tool answers that a person must confirm on this page. A local process cannot pair itself.
+- **Confirm is a person's act on this page only, and that has a boundary.** The same action exists as a tool for parity (`fabric-actions/0.1`, gate `human`, step `consent`), and the tool answers that a person must confirm on this page; an agent coming through the door cannot pair itself. Code already running as the person is outside what Б1 defends against: it can read the host token and open this page, as it can read the Chrome profile. Confirmation by Touch ID is planned with Б2. Every route of this page checks `Host`, and every write requires its own `Origin`, the session cookie and the `X-Okolos-Request` header.
+- **The agent's name is shown as text and fenced.** At most 40 characters, no run of three or more digits, no control or bidirectional characters; the code sits in its own element, so a name cannot imitate it.
 - **Revoking is immediate.** The agent's next call is refused with `not_paired`, and every task it holds is closed with its window.
 - **Scenarios:** SCN-044
 - **Resources:** the pairing store, the keychain item per agent, the journal
