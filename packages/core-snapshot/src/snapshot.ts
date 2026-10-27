@@ -17,12 +17,18 @@
  *      field contributes a name or a text; the field itself is shown by its
  *      role, with its name only where that name is a label and not its content.
  *      The options of an ordinary select keep their names so the agent can
- *      choose one; a secret field gives no option at all, since masking the
- *      chosen one among the others would name it. And because a page can echo a
- *      value into another node's name (a `<label>` around the field, a button
- *      labelled by the code field, a card number split across spans), every
- *      field's value is also cleaned out of all the text of the page, read as
- *      one run (review R4, S4).
+ *      choose one, and no select's value masks an option, so the chosen one is
+ *      not marked among the others (decided 2026-10-27: the agent sees the
+ *      options, not the choice); a secret field gives no option at all. And
+ *      because a page can echo a value into another node's name (a `<label>`
+ *      around the field, a button labelled by the code field, a card number
+ *      split across spans), every field's value is also cleaned out of all the
+ *      text of the page, read as one run in reading order: every name shown
+ *      and every text node, a piece too short to be shown included, so leaving
+ *      one character out of view does not break the match (review R4, S4,
+ *      certification round 2). A field hidden from people (in `hidden` or
+ *      under it, an `<input type=hidden>` included through `hiddenInputIds`)
+ *      masks nothing: its value is not what the person sees or typed.
  *   3. **References are opaque.** A ref is an HMAC of the DOM node number under
  *      the task's key (`refOf`), and a node is found only by a ref the same task
  *      was given (`resolveRef`, which `rootRef` uses too). Its ancestors are
@@ -32,9 +38,10 @@
  *      is about 66 thousand tokens. One answer that size is not a snapshot an
  *      agent can use, so the caller pages through it with a byte ceiling.
  *
- * The cleaner's work is set by the page (values times text), so it has a budget;
- * past it the snapshot is `incomplete` and the verdict is a refusal, never a page
- * cleaned halfway.
+ * The cleaner's work is set by the page (values times text, a field's name times
+ * its content), so it has one budget every such step draws on; past it the
+ * snapshot is `incomplete` and the verdict is a refusal, never a page cleaned
+ * halfway.
  */
 
 /** The parts of a CDP `Accessibility.AXNode` this module reads. */
@@ -87,7 +94,11 @@ export interface Snapshot {
 }
 
 export interface SnapshotOptions {
-  /** Backend DOM node ids the injection detector judged hidden from people. */
+  /**
+   * Backend DOM node ids the injection detector judged hidden from people, with
+   * `hiddenInputIds` added: cut with everything under them, and a field among
+   * them masks nothing elsewhere.
+   */
   readonly hidden: ReadonlySet<number>
   /** Take only the subtree under this ref. */
   readonly rootRef?: string
@@ -124,7 +135,11 @@ const FIELD_ROLES: ReadonlySet<string> = new Set(['textbox', 'searchbox', 'combo
 
 const NAME_LIMIT = 160
 
-/** A field value shorter than this, once bare, is left in names: "ab" would cut half the page (S4). */
+/**
+ * A field value shorter than this is left in names: "ab" would cut half the page
+ * (S4). Counted without spaces but with punctuation and symbols (certification
+ * round 2), so "pa$$" and "!@#$%^&*" are looked for; see `fieldValues`.
+ */
 const MIN_CLEANED_VALUE = 4
 
 /**
@@ -146,7 +161,8 @@ const VALUE_PIECE = 256
 
 /**
  * The most cleaning work one snapshot may do: characters of page text times
- * the values looked for in them. Measured 2026-10-27 on a 30 000-line page
+ * the values looked for in them, and characters of a field's name times the
+ * pieces of its content (`fromContent`), drawn from one budget. Measured 2026-10-27 on a 30 000-line page
  * (about 1.1 million characters): 100 field values (about 110 million) built in
  * 229 ms against 189 ms with none; 5 000 field values are about 18 times past
  * the budget and were refused in 54 ms instead of a stall.
@@ -159,8 +175,24 @@ const CLEANING_BUDGET = 300_000_000
  */
 const MATCH_BUDGET = 1_000_000
 
-/** `autocomplete` tokens of fields whose values are secrets: card number, expiry, security code, one-time code. */
-const SECRET_AUTOCOMPLETE: ReadonlySet<string> = new Set(['cc-number', 'cc-csc', 'cc-exp', 'cc-exp-month', 'cc-exp-year', 'one-time-code'])
+/**
+ * What one unit of `fromContent`'s work (a character of a field's name, for one
+ * piece of its content) costs against `CLEANING_BUDGET`. Measured 2026-10-27
+ * (Node 26): a short piece looked for in a name whose every character starts it
+ * costs about 7 ns a character, so 300 million units unweighted took 2.2 s,
+ * against about 0.3 ns a unit for the run search; weighted, a page just under
+ * the budget is cleaned in a fraction of a second.
+ */
+const NAME_SEARCH_COST = 8
+
+/**
+ * `autocomplete` tokens of fields whose values are secrets: password (a password
+ * a show-password control switched to `type=text` keeps it), card number,
+ * expiry, security code, one-time code.
+ */
+const SECRET_AUTOCOMPLETE: ReadonlySet<string> = new Set([
+  'current-password', 'new-password', 'cc-number', 'cc-csc', 'cc-exp', 'cc-exp-month', 'cc-exp-year', 'one-time-code',
+])
 
 /**
  * Whether an input holds a password, a card number, expiry or security code, or
@@ -196,24 +228,50 @@ const FORM_FIELDS: ReadonlySet<string> = new Set(['INPUT', 'SELECT', 'TEXTAREA']
  */
 export function secretFieldIds(roots: readonly CdpDomNode[]): Set<number> {
   const out = new Set<number>()
+  eachDomNode(roots, (node) => {
+    if (!FORM_FIELDS.has(str(node.nodeName).toUpperCase())) return
+    const attributes = attributesOf(node, ['type', 'autocomplete'])
+    if (isSecretInput({ type: attributes.get('type') ?? '', autocomplete: attributes.get('autocomplete') ?? '' })) out.add(node.backendNodeId)
+  })
+  return out
+}
+
+/**
+ * Backend node ids of every `<input type=hidden>`, in shadow roots and frames
+ * too. The caller adds them to `hidden`: such a field is never seen by the
+ * person, so its value masks nothing on the page (decided 2026-10-27), and it
+ * is not shown if Chrome gives it a node.
+ */
+export function hiddenInputIds(roots: readonly CdpDomNode[]): Set<number> {
+  const out = new Set<number>()
+  eachDomNode(roots, (node) => {
+    if (str(node.nodeName).toUpperCase() !== 'INPUT') return
+    if ((attributesOf(node, ['type']).get('type') ?? '').trim().toLowerCase() === 'hidden') out.add(node.backendNodeId)
+  })
+  return out
+}
+
+/** Every node of CDP DOM trees with a usable backend id, shadow roots and frame documents included, each once. */
+function eachDomNode(roots: readonly CdpDomNode[], visit: (node: CdpDomNode) => void): void {
   const stack: CdpDomNode[] = [...roots]
   const seen = new Set<CdpDomNode>()
   while (stack.length > 0) {
     const node = stack.pop()
     if (node === undefined || seen.has(node)) continue
     seen.add(node)
-    if (FORM_FIELDS.has(str(node.nodeName).toUpperCase()) && Number.isSafeInteger(node.backendNodeId)) {
-      const attributes: { type?: string; autocomplete?: string } = {}
-      const list = node.attributes ?? []
-      for (let i = 0; i + 1 < list.length; i += 2) {
-        const name = str(list[i]).toLowerCase()
-        if (name === 'type' && attributes.type === undefined) attributes.type = str(list[i + 1])
-        if (name === 'autocomplete' && attributes.autocomplete === undefined) attributes.autocomplete = str(list[i + 1])
-      }
-      if (isSecretInput(attributes)) out.add(node.backendNodeId)
-    }
+    if (Number.isSafeInteger(node.backendNodeId)) visit(node)
     stack.push(...(node.children ?? []), ...(node.shadowRoots ?? []))
     if (node.contentDocument !== undefined) stack.push(node.contentDocument)
+  }
+}
+
+/** The first value of each named attribute, names compared without case. */
+function attributesOf(node: CdpDomNode, names: readonly string[]): Map<string, string> {
+  const out = new Map<string, string>()
+  const list = node.attributes ?? []
+  for (let i = 0; i + 1 < list.length; i += 2) {
+    const name = str(list[i]).toLowerCase()
+    if (names.includes(name) && !out.has(name)) out.set(name, str(list[i + 1]))
   }
   return out
 }
@@ -223,6 +281,8 @@ const VALUE_MASK = '***'
 
 /** Spaces and separators, ignored when a value is looked for: a card typed with spaces is echoed with dashes. */
 const SEPARATOR = /^[\p{White_Space}\p{P}\p{S}\p{Cf}]$/u
+/** What is dropped when punctuation and symbols are kept: spaces and format characters only. */
+const SPACE = /^[\p{White_Space}\p{Cf}]$/u
 const MARK = /^\p{M}$/u
 const DIGIT = /^\p{Nd}$/u
 
@@ -271,6 +331,30 @@ interface Entry {
   readonly role: string
   name: string
   readonly depth: number
+  /** An option of an ordinary select: page text no select's value masks. */
+  readonly option: boolean
+}
+
+/**
+ * One piece of the page's text in reading order: a shown line's name (`entry`
+ * is its index) or a text node that is not shown (`entry` is -1), such as a
+ * single character, an ignored one or one with no DOM node. Values are looked
+ * for in all of them joined, so a piece left out of view cannot break a match.
+ */
+interface Piece {
+  readonly entry: number
+  readonly text: string
+}
+
+/** What is left of `CLEANING_BUDGET` for one snapshot. */
+interface Budget {
+  left: number
+}
+
+/** Takes `work` from the budget; false once it is spent. */
+function spend(budget: Budget, work: number): boolean {
+  budget.left -= work
+  return budget.left >= 0
 }
 
 /**
@@ -310,17 +394,28 @@ export function buildSnapshot(nodes: readonly AxNode[], options: SnapshotOptions
   // page around it in view: a value split across spans, one of which is the
   // subtree, is masked in the subtree too.
   const walk = walkTree(nodes, hidden, secretFields)
-  const { patterns, content } = fieldValues(nodes, walk.byId, secretFields)
+  const { patterns, content } = fieldValues(nodes, walk.byId, secretFields, walk.underCut)
+  const budget: Budget = { left: CLEANING_BUDGET }
   for (const entry of walk.entries) {
-    if (entry.name !== '' && content.has(entry.nodeId) && fromContent(entry.name, content.get(entry.nodeId) ?? [])) entry.name = ''
+    const pieces = content.get(entry.nodeId)
+    if (entry.name === '' || pieces === undefined) continue
+    const isContent = fromContent(entry.name, pieces, budget)
+    if (isContent === null) return empty(true)
+    if (isContent) entry.name = ''
   }
   const cleaned = withoutValues(
-    walk.entries.map((e) => e.name),
+    walk.run.map((p) => (p.entry >= 0 ? (walk.entries[p.entry]?.name ?? '') : p.text)),
+    walk.run.map((p) => p.entry >= 0 && walk.entries[p.entry]?.option === true),
     patterns,
+    budget,
   )
   if (cleaned === null) return empty(true)
+  const names: string[] = walk.entries.map(() => '')
+  walk.run.forEach((p, i) => {
+    if (p.entry >= 0) names[p.entry] = cleaned[i] ?? ''
+  })
 
-  let chosen = walk.entries.map((e, i) => ({ entry: e, name: cleaned[i] ?? '' }))
+  let chosen = walk.entries.map((e, i) => ({ entry: e, name: names[i] ?? '' }))
   let base = 0
   let hiddenRemoved = 0
   let fieldTextDropped = 0
@@ -363,16 +458,21 @@ function walkTree(
   secretFields: ReadonlySet<number>,
 ): {
   entries: Entry[]
+  run: Piece[]
   byId: ReadonlyMap<string, AxNode>
   frameDepth: ReadonlyMap<string, number>
   cut: Array<[string, number]>
+  /** Every node cut as hidden, and everything under it. */
+  underCut: ReadonlySet<string>
   dropped: string[]
 } {
   const byId = new Map(nodes.map((n) => [n.nodeId, n]))
   const roots = nodes.filter((n) => n.parentId === undefined || !byId.has(n.parentId))
   const entries: Entry[] = []
+  const run: Piece[] = []
   const frameDepth = new Map<string, number>()
   const cut: Array<[string, number]> = []
+  const underCut = new Set<string>()
   const dropped: string[] = []
 
   const stack: Array<{ node: AxNode; depth: number; inside: Inside }> = []
@@ -390,22 +490,28 @@ function walkTree(
     frameDepth.set(node.nodeId, depth)
 
     if (node.backendDOMNodeId !== undefined && hidden.has(node.backendDOMNodeId)) {
-      cut.push([node.nodeId, 1 + countDescendants(node, byId)])
+      underCut.add(node.nodeId)
+      cut.push([node.nodeId, 1 + countDescendants(node, byId, underCut)])
       continue
     }
 
     const role = str(node.role?.value)
     const own = kindOf(node, secretFields)
     let shownDepth = depth
-    if (!node.ignored) {
-      if (role === 'StaticText' && inside !== OUTSIDE) {
-        dropped.push(node.nodeId)
-      } else {
-        const shown = lineOf(node, role, inside, own)
-        if (shown !== null && node.backendDOMNodeId !== undefined) {
-          entries.push({ nodeId: node.nodeId, backend: node.backendDOMNodeId, role: shown.role, name: shown.name, depth })
-          shownDepth = depth + 1
-        }
+    if (role === 'StaticText' && inside !== OUTSIDE) {
+      if (!node.ignored) dropped.push(node.nodeId)
+    } else {
+      const shown = node.ignored ? null : lineOf(node, role, inside, own)
+      if (shown !== null && node.backendDOMNodeId !== undefined) {
+        entries.push({
+          nodeId: node.nodeId, backend: node.backendDOMNodeId, role: shown.role, name: shown.name, depth,
+          option: inside === CHOICE && shown.role === 'option',
+        })
+        run.push({ entry: entries.length - 1, text: '' })
+        shownDepth = depth + 1
+      } else if (role === 'StaticText') {
+        // Page text that is not shown (one character, ignored, no DOM node) still joins the run.
+        run.push({ entry: -1, text: nameOf(node) })
       }
     }
 
@@ -416,7 +522,7 @@ function walkTree(
       if (child !== undefined) stack.push({ node: child, depth: shownDepth, inside: childInside })
     }
   }
-  return { entries, byId, frameDepth, cut, dropped }
+  return { entries, run, byId, frameDepth, cut, underCut, dropped }
 }
 
 /** The line a node shows, by where it sits; `null` when it shows none. */
@@ -443,11 +549,16 @@ function nameOf(node: AxNode): string {
 /**
  * Whether a field's name is its content rather than a label: Chrome names a
  * `contenteditable` (and some roles) from what is inside it. Such a name is the
- * content, so it is not shown.
+ * content, so it is not shown. `null` when the work (the name's length times
+ * the pieces, and the pieces themselves) would pass the budget: a page sets
+ * both, and unbudgeted a 10 000-character name over 100 000 pieces took seconds.
  */
-function fromContent(name: string, pieces: readonly string[]): boolean {
+function fromContent(name: string, pieces: readonly string[], budget: Budget): boolean | null {
   const own = bare(name).text
   if (own === '' || pieces.length === 0) return false
+  let length = 0
+  for (const p of pieces) length += p.length
+  if (!spend(budget, own.length * (pieces.length + 1) * NAME_SEARCH_COST + length)) return null
   return pieces.join('').includes(own) || pieces.some((p) => p.length >= 2 && own.includes(p))
 }
 
@@ -517,12 +628,31 @@ export function resolveRef(
 }
 
 /**
- * Every value a person typed or chose, bare (see `bare`) and cut into the
- * patterns that are looked for: the AX `value` of each field, and the name and
- * value of everything inside it except a select's options (page text, not
- * typed). Read from the whole tree, not the subtree, since a field outside a
- * subtree can be echoed by a name inside it. Also each field's content, piece
- * by piece, to tell a name that is a label from one that is the content.
+ * A value as it is looked for in the page's text: `text` is folded (see `fold`);
+ * `kept` says it was folded with punctuation and symbols kept, because without
+ * them it is under the floor ("pa$$", "!@#$%^&*"); `fromSelect` says every field
+ * it came from is a select, whose value masks no option (decided 2026-10-27).
+ */
+interface Pattern {
+  readonly text: string
+  readonly kept: boolean
+  fromSelect: boolean
+}
+
+/**
+ * Every value a person typed or chose, cut into the patterns that are looked
+ * for: the AX `value` of each field, and the name and value of everything
+ * inside it except a select's options (page text, not typed). Read from the
+ * whole tree, not the subtree, since a field outside a subtree can be echoed by
+ * a name inside it; a field hidden from people (in `underCut`), or anything
+ * hidden inside a field, gives none. Also each field's content, piece by piece,
+ * to tell a name that is a label from one that is the content.
+ *
+ * The floor counts the characters of the value without spaces but with
+ * punctuation and symbols. A value at the floor without them is looked for
+ * with separators ignored (S4); one that reaches it only with them is looked
+ * for with them kept, so a symbol-only secret is still found and "pa$$" does
+ * not become a search for every "pa".
  *
  * Secret fields are walked first, so text inside a secret field is held to the
  * secret floor even when an ordinary field also contains it.
@@ -531,27 +661,41 @@ function fieldValues(
   nodes: readonly AxNode[],
   byId: ReadonlyMap<string, AxNode>,
   secretFields: ReadonlySet<number>,
-): { patterns: readonly string[]; content: ReadonlyMap<string, readonly string[]> } {
-  const found = new Set<string>()
+  underCut: ReadonlySet<string>,
+): { patterns: readonly Pattern[]; content: ReadonlyMap<string, readonly string[]> } {
+  const found = new Map<string, Pattern>()
   const content = new Map<string, string[]>()
   const inside = new Set<string>()
-  const fields = nodes.filter((n) => isField(n) || isSecret(n, secretFields))
+  const fields = nodes.filter((n) => !underCut.has(n.nodeId) && (isField(n) || isSecret(n, secretFields)))
   fields.sort((a, b) => Number(isSecret(b, secretFields)) - Number(isSecret(a, secretFields)))
   for (const field of fields) {
     const floor = isSecret(field, secretFields) ? MIN_CLEANED_SECRET : MIN_CLEANED_VALUE
+    const fromSelect = str(field.role?.value) === 'combobox'
     const pieces: string[] = []
     content.set(field.nodeId, pieces)
+    const look = (text: string, kept: boolean): void => {
+      const key = `${kept ? 'k' : 'b'}${text}`
+      const known = found.get(key)
+      if (known === undefined) found.set(key, { text, kept, fromSelect })
+      else known.fromSelect &&= fromSelect
+    }
     const add = (raw: unknown): void => {
-      const value = bare(str(raw)).text
-      if (value === '') return
-      pieces.push(value)
-      if ([...value].length < floor) return
-      if (value.length <= VALUE_PIECE) {
-        found.add(value)
+      const value = str(raw)
+      const plain = bare(value).text
+      if (plain !== '') pieces.push(plain)
+      let text = plain
+      let kept = false
+      if ([...plain].length < floor) {
+        text = bare(value, true).text
+        kept = true
+        if ([...text].length < floor) return
+      }
+      if (text.length <= VALUE_PIECE) {
+        look(text, kept)
         return
       }
-      for (let at = 0; at < value.length; at += VALUE_PIECE) found.add(value.slice(at, at + VALUE_PIECE))
-      found.add(value.slice(value.length - VALUE_PIECE))
+      for (let at = 0; at < text.length; at += VALUE_PIECE) look(text.slice(at, at + VALUE_PIECE), kept)
+      look(text.slice(text.length - VALUE_PIECE), kept)
     }
     add(field.value?.value)
     const stack = [...(field.childIds ?? [])]
@@ -560,23 +704,30 @@ function fieldValues(
       if (id === undefined || inside.has(id)) continue
       inside.add(id)
       const child = byId.get(id)
-      if (child === undefined || str(child.role?.value) === 'option') continue
+      if (child === undefined || underCut.has(id) || str(child.role?.value) === 'option') continue
       add(child.value?.value)
       add(child.name?.value)
       stack.push(...(child.childIds ?? []))
     }
   }
-  return { patterns: [...found], content }
+  return { patterns: [...found.values()], content }
 }
 
-/** Each printable ASCII character, folded: lower case, or nothing for a separator. */
+/** Each ASCII character, folded: lower case, or nothing for a separator. */
 const ASCII_FOLD: readonly string[] = Array.from({ length: 128 }, (_, cp) => {
   const ch = String.fromCharCode(cp)
   return SEPARATOR.test(ch) ? '' : ch.toLowerCase()
 })
 
+/** The same with punctuation and symbols kept: nothing only for a space. */
+const ASCII_KEPT: readonly string[] = Array.from({ length: 128 }, (_, cp) => {
+  const ch = String.fromCharCode(cp)
+  return SPACE.test(ch) ? '' : ch.toLowerCase()
+})
+
 /** Folded non-ASCII code points, kept so a page in one script folds each letter once. */
 const FOLDED = new Map<number, string>()
+const FOLDED_KEPT = new Map<number, string>()
 const FOLDED_LIMIT = 65_536
 
 /**
@@ -584,20 +735,23 @@ const FOLDED_LIMIT = 65_536
  * full-width digit is a digit and a ligature its letters), case-folded (upper
  * then lower, so ß matches SS and a dotted capital I matches i), without
  * combining marks, with every decimal digit of any script as its ASCII digit,
- * and nothing for a separator. Decomposing and dropping marks is NFKC with the
- * marks gone, done per code point so the index back into the name stays exact.
+ * and nothing for a separator (with `kept`, nothing only for a space or a
+ * format character). Decomposing and dropping marks is NFKC with the marks gone,
+ * done per code point so the index back into the name stays exact.
  */
-function fold(ch: string, cp: number): string {
-  if (cp < 0x80) return ASCII_FOLD[cp] ?? ''
-  const known = FOLDED.get(cp)
+function fold(ch: string, cp: number, kept: boolean): string {
+  if (cp < 0x80) return (kept ? ASCII_KEPT : ASCII_FOLD)[cp] ?? ''
+  const cache = kept ? FOLDED_KEPT : FOLDED
+  const known = cache.get(cp)
   if (known !== undefined) return known
+  const drop = kept ? SPACE : SEPARATOR
   let out = ''
   for (const c of ch.normalize('NFKD').toUpperCase().toLowerCase().normalize('NFKD')) {
-    if (MARK.test(c) || SEPARATOR.test(c)) continue
+    if (MARK.test(c) || drop.test(c)) continue
     out += DIGIT.test(c) ? String(digitValue(c)) : c
   }
-  if (FOLDED.size >= FOLDED_LIMIT) FOLDED.clear()
-  FOLDED.set(cp, out)
+  if (cache.size >= FOLDED_LIMIT) cache.clear()
+  cache.set(cp, out)
   return out
 }
 
@@ -617,12 +771,12 @@ function digitValue(c: string): number {
  * A text as values are compared (see `fold`), with the index in the original
  * of the code point each of its code units came from.
  */
-function bare(text: string): { text: string; from: number[] } {
+function bare(text: string, kept = false): { text: string; from: number[] } {
   let out = ''
   const from: number[] = []
   let index = 0
   for (const ch of text) {
-    const folded = fold(ch, ch.codePointAt(0) ?? 0)
+    const folded = fold(ch, ch.codePointAt(0) ?? 0, kept)
     for (let i = 0; i < folded.length; i++) from.push(index)
     out += folded
     index += ch.length
@@ -632,56 +786,69 @@ function bare(text: string): { text: string; from: number[] } {
 
 /**
  * `names` with every occurrence of a pattern replaced by a mask, separators
- * inside it included. The names are read as one run of text, in document order,
+ * inside it included. The names are read as one run of text, in reading order,
  * so a value split over several names (a card number in separate spans) is
- * masked in each of them. `null` when the work would pass the budget.
+ * masked in each of them. A pattern is looked for in the run folded the way it
+ * was (`Pattern.kept`). A pattern from a select's value leaves the names marked
+ * `option` alone. `null` when the work would pass the budget.
  */
-function withoutValues(names: readonly string[], patterns: readonly string[]): string[] | null {
+function withoutValues(
+  names: readonly string[],
+  option: readonly boolean[],
+  patterns: readonly Pattern[],
+  budget: Budget,
+): string[] | null {
   if (patterns.length === 0) return [...names]
-  const parts = names.map(bare)
-  const starts: number[] = [0]
-  for (const part of parts) starts.push((starts[starts.length - 1] ?? 0) + part.text.length)
-  const total = starts[starts.length - 1] ?? 0
-  if (total * patterns.length > CLEANING_BUDGET) return null
-  const text = parts.map((p) => p.text).join('')
-
   const cuts: Array<Uint8Array | undefined> = []
-  /** Index of the name holding the joined text's unit `at`. */
-  const nameAt = (at: number): number => {
-    let lo = 0
-    let hi = parts.length - 1
-    while (lo < hi) {
-      const mid = (lo + hi + 1) >> 1
-      if ((starts[mid] ?? 0) <= at) lo = mid
-      else hi = mid - 1
-    }
-    return lo
-  }
-  const mark = (from: number, end: number): void => {
-    for (let k = nameAt(from); k < parts.length && (starts[k] ?? 0) < end; k++) {
-      const start = starts[k] ?? 0
-      const s = Math.max(from, start) - start
-      const e = Math.min(end, starts[k + 1] ?? 0) - start
-      const part = parts[k]
-      const name = names[k] ?? ''
-      if (part === undefined || s >= e) continue
-      const first = part.from[s] ?? 0
-      const last = part.from[e - 1] ?? first
-      const stop = last + ((name.codePointAt(last) ?? 0) > 0xffff ? 2 : 1)
-      const cut = (cuts[k] ??= new Uint8Array(name.length))
-      cut.fill(1, first, stop)
-    }
-  }
-
   let matches = 0
-  for (const pattern of patterns) {
-    let covered = 0
-    for (let at = text.indexOf(pattern); at !== -1; at = text.indexOf(pattern, at + 1)) {
-      if (++matches > MATCH_BUDGET) return null
-      const end = at + pattern.length
-      const from = Math.max(at, covered)
-      if (from < end) mark(from, end)
-      covered = Math.max(covered, end)
+
+  for (const kept of [false, true]) {
+    const these = patterns.filter((p) => p.kept === kept)
+    if (these.length === 0) continue
+    const parts = names.map((name) => bare(name, kept))
+    const starts: number[] = [0]
+    for (const part of parts) starts.push((starts[starts.length - 1] ?? 0) + part.text.length)
+    const total = starts[starts.length - 1] ?? 0
+    if (!spend(budget, total * these.length)) return null
+    const text = parts.map((p) => p.text).join('')
+
+    /** Index of the name holding the joined text's unit `at`. */
+    const nameAt = (at: number): number => {
+      let lo = 0
+      let hi = parts.length - 1
+      while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1
+        if ((starts[mid] ?? 0) <= at) lo = mid
+        else hi = mid - 1
+      }
+      return lo
+    }
+    const mark = (from: number, end: number, spareOptions: boolean): void => {
+      for (let k = nameAt(from); k < parts.length && (starts[k] ?? 0) < end; k++) {
+        if (spareOptions && option[k] === true) continue
+        const start = starts[k] ?? 0
+        const s = Math.max(from, start) - start
+        const e = Math.min(end, starts[k + 1] ?? 0) - start
+        const part = parts[k]
+        const name = names[k] ?? ''
+        if (part === undefined || s >= e) continue
+        const first = part.from[s] ?? 0
+        const last = part.from[e - 1] ?? first
+        const stop = last + ((name.codePointAt(last) ?? 0) > 0xffff ? 2 : 1)
+        const cut = (cuts[k] ??= new Uint8Array(name.length))
+        cut.fill(1, first, stop)
+      }
+    }
+
+    for (const pattern of these) {
+      let covered = 0
+      for (let at = text.indexOf(pattern.text); at !== -1; at = text.indexOf(pattern.text, at + 1)) {
+        if (++matches > MATCH_BUDGET) return null
+        const end = at + pattern.text.length
+        const from = Math.max(at, covered)
+        if (from < end) mark(from, end, pattern.fromSelect)
+        covered = Math.max(covered, end)
+      }
     }
   }
 
@@ -811,7 +978,8 @@ function digest(data: Uint8Array): Uint8Array {
   return out
 }
 
-function countDescendants(node: AxNode, byId: ReadonlyMap<string, AxNode>): number {
+/** Nodes under `node`, each counted once; each is also added to `into`. */
+function countDescendants(node: AxNode, byId: ReadonlyMap<string, AxNode>, into: Set<string>): number {
   let count = 0
   const stack = [...(node.childIds ?? [])]
   const seen = new Set<string>()
@@ -822,6 +990,7 @@ function countDescendants(node: AxNode, byId: ReadonlyMap<string, AxNode>): numb
     const child = byId.get(id)
     if (child === undefined) continue
     count++
+    into.add(id)
     stack.push(...(child.childIds ?? []))
   }
   return count

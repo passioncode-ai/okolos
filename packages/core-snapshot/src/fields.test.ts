@@ -280,3 +280,208 @@ describe('the cost of cleaning (round 1, unit risk)', () => {
     expect(text(s)).not.toContain(long.slice(0, 8))
   })
 })
+
+/*
+ * N-003, certification round 2. A value is looked for in all the text of the
+ * page as it reads, pieces too short to be shown included; the work set by the
+ * page's names is counted too; a select's options are page text, not its value;
+ * a field hidden from people masks nothing.
+ */
+
+/** Whether a name keeps any 4-character run of `value`, once both are bare. */
+function keepsRunOf(name: string, value: string, run = 4): boolean {
+  const clean = (s: string): string => s.replace(/[\p{White_Space}\p{P}\p{S}\p{Cf}]/gu, '').toLowerCase()
+  const v = clean(value)
+  return name.split('***').some((part) => {
+    const p = clean(part)
+    for (let i = 0; i + run <= v.length; i++) if (p.includes(v.slice(i, i + run))) return true
+    return false
+  })
+}
+
+describe('a value echoed across pieces of text (round 2, unit break)', () => {
+  const SECRET = 'Tr0ub4dor&3x'
+  const split = tree({
+    id: '1', role: 'RootWebArea', children: [
+      { id: '2', role: 'textbox', name: 'Password', value: SECRET },
+      { id: '3', role: 'heading', name: `Saved: ${SECRET}`, children: [
+        { id: '4', role: 'StaticText', name: 'Saved: T' },
+        { id: '5', role: 'generic', ignored: true, children: [{ id: '6', role: 'StaticText', name: 'r' }] },
+        { id: '7', role: 'StaticText', name: '0ub4dor&3x' },
+      ] },
+    ],
+  })
+
+  it('masks every piece when one piece is a single character, plain or secret, in every answer', () => {
+    for (const secretFields of [NONE, new Set([2])]) {
+      for (const s of everyAnswer(split, { secretFields })) {
+        for (const line of s.lines) expect(keepsRunOf(line.name, SECRET), `${line.role} "${line.name}"`).toBe(false)
+      }
+    }
+    expect(text(snap(split))).toContain('Saved: ***')
+  })
+
+  it('masks a value written one character per node, shown and not shown in turn', () => {
+    const chars = [...SECRET]
+    const nodes = tree({
+      id: '1', role: 'RootWebArea', children: [
+        { id: '2', role: 'textbox', name: 'Password', value: SECRET },
+        { id: '3', role: 'paragraph', children: chars.map((c, i): Spec =>
+          i % 2 === 0 ? { id: String(10 + i), role: 'StaticText', name: c } : { id: String(10 + i), role: 'link', name: c }) },
+      ],
+    })
+    for (const secretFields of [NONE, new Set([2])]) {
+      const links = snap(nodes, { secretFields }).lines.filter((l) => l.role === 'link')
+      expect(links.length).toBe(6)
+      for (const l of links) expect(['***', '&']).toContain(l.name)
+    }
+  })
+
+  it('masks the ends of a value whose middle is written as single-character text nodes', () => {
+    const middle = [...SECRET].slice(1, -1)
+    const nodes = tree({
+      id: '1', role: 'RootWebArea', children: [
+        { id: '2', role: 'textbox', name: 'Password', value: SECRET },
+        { id: '3', role: 'paragraph', children: [
+          { id: '4', role: 'StaticText', name: `Your password is ${SECRET.slice(0, 1)}` },
+          ...middle.map((c, i): Spec => ({ id: String(10 + i), role: 'StaticText', name: c })),
+          { id: '30', role: 'StaticText', name: `${SECRET.slice(-1)}, keep it safe` },
+        ] },
+      ],
+    })
+    for (const secretFields of [NONE, new Set([2])]) {
+      const out = text(snap(nodes, { secretFields }))
+      expect(out).toContain('"Your password is ***"')
+      expect(out).toContain('"***, keep it safe"')
+    }
+  })
+
+  it('masks a 3-character secret split into "7" and "37"', () => {
+    const nodes = tree({
+      id: '1', role: 'RootWebArea', children: [
+        { id: '2', role: 'textbox', name: 'Security code', value: '737' },
+        { id: '3', role: 'paragraph', children: [
+          { id: '4', role: 'StaticText', name: 'Code:' },
+          { id: '5', role: 'StaticText', name: '7' },
+          { id: '6', role: 'StaticText', name: '37' },
+        ] },
+      ],
+    })
+    for (const s of everyAnswer(nodes, { secretFields: new Set([2]) })) {
+      expect(s.lines.some((l) => l.name.includes('37'))).toBe(false)
+    }
+  })
+})
+
+describe('the cost of a field name (round 2, unit break)', () => {
+  function named(name: string, pieces: number): AxNode[] {
+    // The probe's shape: every piece starts with the name's letter, so each search runs the whole name.
+    const children: Spec[] = Array.from({ length: pieces }, (_, i) => ({ id: String(1000 + i), role: 'StaticText', name: 'ab' }))
+    return tree({ id: '1', role: 'RootWebArea', children: [{ id: '2', role: 'textbox', name, children }, { id: '3', role: 'heading', name: 'After' }] })
+  }
+
+  it('refuses a 10 000-character name over 100 000 pieces of content quickly', () => {
+    const nodes = named('a'.repeat(10_000), 100_000)
+    const started = performance.now()
+    const s = snap(nodes)
+    expect(performance.now() - started).toBeLessThan(1500)
+    expect(s.incomplete).toBe(true)
+    expect(s.lines).toEqual([])
+  })
+
+  it('refuses a 1 000 000-character name over 1 000 pieces of content quickly', () => {
+    const nodes = named('a'.repeat(1_000_000), 1_000)
+    const started = performance.now()
+    const s = snap(nodes)
+    expect(performance.now() - started).toBeLessThan(1500)
+    expect(s.incomplete).toBe(true)
+    expect(s.lines).toEqual([])
+  })
+
+  it('still reads an ordinary field name next to its content', () => {
+    const s = snap(named('Message', 2_000))
+    expect(s.incomplete).toBe(false)
+    expect(s.lines.map((l) => `${l.role} ${l.name}`)).toEqual(['textbox Message', 'heading After'])
+  })
+})
+
+describe('an ordinary select (round 2, product decision 2026-10-27)', () => {
+  const country = tree({
+    id: '1', role: 'RootWebArea', children: [
+      { id: '2', role: 'combobox', name: 'Country', value: 'Germany', children: [
+        { id: '3', role: 'listbox', children: [
+          { id: '4', role: 'option', name: 'France' },
+          { id: '5', role: 'option', name: 'Germany' },
+          { id: '6', role: 'option', name: 'Italy' },
+        ] },
+      ] },
+      { id: '7', role: 'combobox', name: 'Billing country', value: 'France', children: [
+        { id: '8', role: 'listbox', children: [
+          { id: '9', role: 'option', name: 'France' },
+          { id: '10', role: 'option', name: 'Germany' },
+        ] },
+      ] },
+      { id: '11', role: 'heading', name: 'Shipping to Germany' },
+    ],
+  })
+
+  it('shows every option by its own name and marks none as the chosen one, in every answer', () => {
+    for (const s of everyAnswer(country)) {
+      for (const l of s.lines.filter((x) => x.role === 'option')) expect(l.name).not.toContain('***')
+    }
+    const options = snap(country).lines.filter((l) => l.role === 'option').map((l) => l.name)
+    expect(options).toEqual(['France', 'Germany', 'Italy', 'France', 'Germany'])
+  })
+
+  it('still masks the chosen value where the page repeats it outside the options', () => {
+    expect(text(snap(country))).toContain('Shipping to ***')
+  })
+
+  it('a secret select still shows no option, and its value masks no option of another select', () => {
+    const secret = new Set([2])
+    for (const s of everyAnswer(country, { secretFields: secret })) {
+      for (const id of [4, 5, 6]) expect(s.refMap.has(refOf(id, KEY))).toBe(false)
+      for (const l of s.lines.filter((x) => x.role === 'option')) expect(l.name).not.toContain('***')
+    }
+    expect(snap(country, { secretFields: secret }).lines.filter((l) => l.role === 'option').map((l) => l.name)).toEqual(['France', 'Germany'])
+  })
+})
+
+describe('a field hidden from people (round 2, product decision 2026-10-27)', () => {
+  it('masks nothing elsewhere when the field itself is hidden', () => {
+    const nodes = tree({
+      id: '1', role: 'RootWebArea', children: [
+        { id: '2', role: 'textbox', name: 'x', value: 'never' },
+        { id: '3', role: 'heading', name: 'Never wire money to this account' },
+        { id: '4', role: 'textbox', name: 'y', value: 'not' },
+        { id: '5', role: 'StaticText', name: 'Do not send your code to anyone' },
+      ],
+    })
+    const out = text(snap(nodes, { hidden: new Set([2, 4]), secretFields: new Set([4]) }))
+    expect(out).toContain('Never wire money to this account')
+    expect(out).toContain('Do not send your code to anyone')
+  })
+
+  it('masks nothing elsewhere when an ancestor is hidden, the field inside a visible field included', () => {
+    const nodes = tree({
+      id: '1', role: 'RootWebArea', children: [
+        { id: '2', role: 'group', children: [{ id: '3', role: 'textbox', name: 'x', value: 'never' }] },
+        { id: '4', role: 'generic', editable: true, children: [
+          { id: '5', role: 'generic', children: [{ id: '6', role: 'textbox', name: 'wire', value: 'wire' }] },
+        ] },
+        { id: '7', role: 'heading', name: 'Never wire money to this account' },
+      ],
+    })
+    expect(text(snap(nodes, { hidden: new Set([2, 5]) }))).toContain('Never wire money to this account')
+  })
+
+  it('still masks the value of a visible field', () => {
+    const nodes = tree({
+      id: '1', role: 'RootWebArea', children: [
+        { id: '2', role: 'textbox', name: 'x', value: 'never' },
+        { id: '3', role: 'heading', name: 'Never wire money to this account' },
+      ],
+    })
+    expect(text(snap(nodes))).toContain('*** wire money')
+  })
+})

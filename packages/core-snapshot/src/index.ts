@@ -1,6 +1,7 @@
 export {
   buildSnapshot,
   clampMaxBytes,
+  hiddenInputIds,
   isSecretInput,
   MAX_PAGE_BYTES,
   MIN_PAGE_BYTES,

@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildSnapshot,
   clampMaxBytes,
+  hiddenInputIds,
   MAX_PAGE_BYTES,
   MIN_PAGE_BYTES,
   refOf,
@@ -119,6 +120,48 @@ describe('secretFieldIds', () => {
     }
     expect([...secretFieldIds([dom])].sort((a, b) => a - b)).toEqual([2, 3, 4, 8, 11])
     expect(secretFieldIds([])).toEqual(new Set())
+  })
+})
+
+describe('secretFieldIds and hiddenInputIds (round 2)', () => {
+  it('names a text input whose autocomplete says it holds a password', () => {
+    const dom: CdpDomNode = {
+      backendNodeId: 1, nodeName: '#document', children: [
+        { backendNodeId: 2, nodeName: 'INPUT', attributes: ['type', 'text', 'autocomplete', 'current-password'] },
+        { backendNodeId: 3, nodeName: 'INPUT', attributes: ['type', 'text', 'autocomplete', 'new-password'] },
+        { backendNodeId: 4, nodeName: 'INPUT', attributes: ['type', 'text', 'autocomplete', 'username'] },
+      ],
+    }
+    expect([...secretFieldIds([dom])].sort((a, b) => a - b)).toEqual([2, 3])
+  })
+
+  it('names the inputs of type hidden, in shadow roots and frames too, for the caller to add to hidden', () => {
+    const dom: CdpDomNode = {
+      backendNodeId: 1, nodeName: '#document', children: [
+        { backendNodeId: 2, nodeName: 'INPUT', attributes: ['type', 'hidden', 'value', 'never'] },
+        { backendNodeId: 3, nodeName: 'input', attributes: ['TYPE', ' Hidden '] },
+        { backendNodeId: 4, nodeName: 'INPUT', attributes: ['type', 'text'] },
+        { backendNodeId: 5, nodeName: 'DIV', attributes: ['type', 'hidden'], shadowRoots: [
+          { backendNodeId: 6, nodeName: '#document-fragment', children: [{ backendNodeId: 7, nodeName: 'INPUT', attributes: ['type', 'hidden'] }] },
+        ] },
+        { backendNodeId: 8, nodeName: 'IFRAME', contentDocument: {
+          backendNodeId: 9, nodeName: '#document', children: [{ backendNodeId: 10, nodeName: 'INPUT', attributes: ['type', 'hidden'] }],
+        } },
+      ],
+    }
+    expect([...hiddenInputIds([dom])].sort((a, b) => a - b)).toEqual([2, 3, 7, 10])
+    expect(hiddenInputIds([])).toEqual(new Set())
+  })
+
+  it('a hidden input passed in hidden masks nothing and is not shown', () => {
+    const nodes: AxNode[] = [
+      { nodeId: 'r', role: { value: 'RootWebArea' }, backendDOMNodeId: 1, childIds: ['i', 'h'] },
+      { nodeId: 'i', parentId: 'r', role: { value: 'textbox' }, value: { value: 'never' }, backendDOMNodeId: 2 },
+      { nodeId: 'h', parentId: 'r', role: { value: 'heading' }, name: { value: 'Never wire money' }, backendDOMNodeId: 3 },
+    ]
+    const hidden = hiddenInputIds([{ backendNodeId: 1, nodeName: '#document', children: [{ backendNodeId: 2, nodeName: 'INPUT', attributes: ['type', 'hidden'] }] }])
+    const s = buildSnapshot(nodes, { hidden, taskKey: KEY, secretFields: NONE })
+    expect(s.lines.map((l) => `${l.role} ${l.name}`)).toEqual(['heading Never wire money'])
   })
 })
 

@@ -332,9 +332,11 @@ describe('fuzz: nothing typed into a field comes out', () => {
           buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set() }),
           buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_B, secretFields: new Set() }),
         ]) {
-          const out = text(s)
-          expect(out).not.toContain(value)
-          for (const line of s.lines) expect(carries(line.name, value)).toBe(false)
+          // A select's options are the page's list, not what was typed: its own
+          // option keeps its name (decided 2026-10-27); every other line is checked.
+          const checked = s.lines.filter((l) => !(role === 'combobox' && l.role === 'option'))
+          expect(checked.map((l) => l.name).join('\n')).not.toContain(value)
+          for (const line of checked) expect(carries(line.name, value)).toBe(false)
         }
       }),
       { seed: 20261027, numRuns: 200 },
@@ -369,5 +371,51 @@ describe('fuzz: nothing typed into a field comes out', () => {
       }),
       { seed: 20261027, numRuns: 200 },
     )
+  })
+})
+
+/*
+ * Certification round 2 (risks). The floor counts every character of the
+ * value but spaces, punctuation and symbols included, so a value made of them
+ * is still looked for; and a password shown as text is still a password.
+ */
+describe('the floor counts punctuation and symbols (round 2)', () => {
+  function echo(value: string, name: string, secret: boolean): string {
+    const nodes = tree({
+      id: '1', role: 'RootWebArea', children: [
+        { id: '2', role: 'textbox', name: 'Password', value },
+        { id: '3', role: 'heading', name },
+      ],
+    })
+    return text(buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A, secretFields: secret ? new Set([2]) : new Set() }))
+  }
+
+  it('looks for a secret made only of symbols', () => {
+    const out = echo('!@#$%^&*', 'You typed !@#$%^&* just now', true)
+    expect(out).not.toContain('!@#$%^&*')
+    expect(out).toContain('You typed *** just now')
+  })
+
+  it('looks for an ordinary value made only of symbols, spaces in the echo ignored', () => {
+    expect(echo('!@#$%^&*', 'You typed ! @ # $ % ^ & * now', false)).not.toContain('$ % ^')
+  })
+
+  it('looks for "pa$$" in a secret field, and leaves the bare "pa" elsewhere alone', () => {
+    const out = echo('pa$$', 'Saved pa$$ for the page', true)
+    expect(out).not.toContain('pa$$')
+    expect(out).toContain('Saved *** for the page')
+    expect(out).toContain('page')
+  })
+
+  it('still does not count spaces: "a b c" is under the ordinary floor', () => {
+    expect(echo('a b c', 'The abc club', false)).toContain('The abc club')
+  })
+})
+
+describe('a password shown as text (round 2)', () => {
+  it('is secret by its autocomplete: current-password and new-password', () => {
+    expect(isSecretInput({ type: 'text', autocomplete: 'current-password' })).toBe(true)
+    expect(isSecretInput({ type: 'text', autocomplete: 'new-password' })).toBe(true)
+    expect(isSecretInput({ type: 'text', autocomplete: 'username' })).toBe(false)
   })
 })
