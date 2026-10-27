@@ -11,6 +11,8 @@ import { BOOTSTRAP_FILES } from './feed/bootstrap.mjs'
 import {
   LABEL,
   agentStatus,
+  bootstrapDrift,
+  checkBranch,
   ensureCheckout,
   installAgent,
   installBootstrap,
@@ -496,6 +498,82 @@ describe('the node the plist falls back to', () => {
 
   it('is the running node itself when PATH has no way to it', () => {
     expect(stableNode({ execPath: '/opt/node/bin/node', pathEnv: '' })).toBe('/opt/node/bin/node')
+  })
+})
+
+describe('whether the installed bootstrap is the checkout’s', () => {
+  function installed() {
+    const h = home()
+    installBootstrap({ dir: h.paths.agentBin })
+    const from = path.join(h.paths.agentCheckout, 'tools/feed')
+    mkdirSync(from, { recursive: true })
+    for (const file of BOOTSTRAP_FILES) writeFileSync(path.join(from, file), readFileSync(path.join(repo, 'tools/feed', file)))
+    return { h, from }
+  }
+
+  it('matches when every module hashes the same', () => {
+    const { h, from } = installed()
+    expect(bootstrapDrift({ bin: h.paths.agentBin, from })).toEqual({ matches: true, differs: [] })
+  })
+
+  it('names the modules that changed on main since the install', () => {
+    const { h, from } = installed()
+    writeFileSync(path.join(from, 'status.mjs'), '// changed on main\n')
+    writeFileSync(path.join(from, 'newer.mjs'), '')
+    writeFileSync(path.join(h.paths.agentBin, 'newer.mjs'), 'older')
+    expect(bootstrapDrift({ bin: h.paths.agentBin, from })).toEqual({ matches: false, differs: ['newer.mjs', 'status.mjs'] })
+  })
+
+  it('cannot say when there is no checkout to compare with', () => {
+    const h = home()
+    installBootstrap({ dir: h.paths.agentBin })
+    expect(bootstrapDrift({ bin: h.paths.agentBin, from: path.join(h.paths.agentCheckout, 'tools/feed') })).toEqual({ matches: null, differs: [] })
+  })
+
+  it('reports drift, and whether the plist starts the bootstrap, in --status', async () => {
+    const { h, from } = installed()
+    writeFileSync(path.join(from, 'log.mjs'), '// changed\n')
+    writeFileSync(h.target, rendered({ template: template(), runner: null, checkout: h.paths.agentCheckout, logDir: h.paths.logs, bootstrap: h.paths.bootstrap }))
+    const status = await agentStatus({ ...base, target: h.target, launchctl: fakeLaunchd({ loaded: true }).launchctl, paths: h.paths })
+    expect(status).toMatchObject({ bootstrap: true, plistStartsBootstrap: true, bootstrapMatchesCheckout: false, bootstrapDiffers: ['log.mjs'] })
+    expect(status.note).toMatch(/differs .* pnpm feed:agent/)
+  })
+
+  it('says when the plist is the old one that cd’d into the checkout', async () => {
+    const h = home()
+    writeFileSync(h.target, '<plist><key>ProgramArguments</key><array><string>/bin/sh</string><string>-lc</string><string>cd x &amp;&amp; exec node tools/feed-job.mjs --agent</string></array></plist>')
+    const status = await agentStatus({ ...base, target: h.target, launchctl: fakeLaunchd({ loaded: true }).launchctl, paths: h.paths })
+    expect(status.plistStartsBootstrap).toBe(false)
+    expect(status.note).toMatch(/old plist/)
+  })
+})
+
+describe('the installer installs from main only (ADR-0017)', () => {
+  const git = (answers: Record<string, string>) => async (_command: string, args: string[]) => {
+    const key = args.slice(2).join(' ')
+    return key in answers ? ok(`${answers[key]}\n`) : { ...ok(), code: 128, stderr: `unexpected ${key}` }
+  }
+  const sha = (c: string) => c.repeat(40)
+
+  it('accepts the main branch', async () => {
+    expect(await checkBranch({ repo: '/r', tool: git({ 'rev-parse --abbrev-ref HEAD': 'main' }) })).toMatchObject({ ok: true, branch: 'main' })
+  })
+
+  it('accepts a detached HEAD at origin/main', async () => {
+    const tool = git({ 'rev-parse --abbrev-ref HEAD': 'HEAD', 'rev-parse HEAD': sha('a'), 'rev-parse origin/main': sha('a') })
+    expect(await checkBranch({ repo: '/r', tool })).toMatchObject({ ok: true })
+  })
+
+  it('refuses a feature branch, naming it and the override', async () => {
+    const result = await checkBranch({ repo: '/r', tool: git({ 'rev-parse --abbrev-ref HEAD': 'sw/sw-03' }) })
+    expect(result.ok).toBe(false)
+    expect(result.reason).toMatch(/sw\/sw-03.*origin\/main.*--allow-branch/)
+  })
+
+  it('refuses a detached HEAD elsewhere, and a clone git cannot read', async () => {
+    const tool = git({ 'rev-parse --abbrev-ref HEAD': 'HEAD', 'rev-parse HEAD': sha('b'), 'rev-parse origin/main': sha('a') })
+    expect((await checkBranch({ repo: '/r', tool })).ok).toBe(false)
+    expect((await checkBranch({ repo: '/r', tool: git({}) })).ok).toBe(false)
   })
 })
 
