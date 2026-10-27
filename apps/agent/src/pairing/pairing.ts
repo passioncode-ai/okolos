@@ -18,6 +18,8 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
+import { skeleton } from '@okolos/core-lookalike'
+
 import { atomicWrite } from '../fabric/fabric-service.mjs'
 import type { ServiceDirs } from '../service/dirs.js'
 import { checkAgentName, type NameRefusal } from './name.js'
@@ -84,10 +86,12 @@ export interface PublicRequest {
   /** An expired row is shown for EXPIRED_SHOWN_MS with nothing to press; its handle does nothing. */
   readonly state: 'pending' | 'confirmed' | 'expired'
   /**
-   * Another waiting request (pending or confirmed) carries the same name, compared without case
-   * and after Unicode normalisation; every such request is marked. Never set on an expired row.
+   * Another waiting request (pending or confirmed) or an agent with access carries a name that
+   * looks the same (see `nameSkeleton`); every such request is marked. Never set on an expired row.
    */
   readonly duplicateName: boolean
+  /** The agents with access whose name looks the same as this request's; empty when none. */
+  readonly sameNameAgents: readonly { readonly agentId: string; readonly name: string }[]
 }
 
 /**
@@ -236,16 +240,23 @@ export class Pairing {
     this.sweep(now)
     const waiting = [...this.byHandle.values()]
     const perName = new Map<string, number>()
-    for (const entry of waiting) perName.set(sameName(entry.name), (perName.get(sameName(entry.name)) ?? 0) + 1)
-    const live = waiting.map((entry): PublicRequest => ({
-      handle: entry.handle,
-      name: entry.name,
-      code: entry.code,
-      createdAt: entry.createdAt,
-      expiresAt: deadline(entry),
-      state: entry.confirmedAt === null ? 'pending' : 'confirmed',
-      duplicateName: (perName.get(sameName(entry.name)) ?? 0) > 1,
-    }))
+    for (const entry of waiting) perName.set(nameSkeleton(entry.name), (perName.get(nameSkeleton(entry.name)) ?? 0) + 1)
+    const live = waiting.map((entry): PublicRequest => {
+      const looks = nameSkeleton(entry.name)
+      const sameNameAgents = this.agents
+        .filter((agent) => nameSkeleton(agent.name) === looks)
+        .map(({ agentId, name }) => ({ agentId, name }))
+      return {
+        handle: entry.handle,
+        name: entry.name,
+        code: entry.code,
+        createdAt: entry.createdAt,
+        expiresAt: deadline(entry),
+        state: entry.confirmedAt === null ? 'pending' : 'confirmed',
+        duplicateName: (perName.get(looks) ?? 0) > 1 || sameNameAgents.length > 0,
+        sameNameAgents,
+      }
+    })
     const gone = [...this.ended.values()].map(
       ({ handle, name, code, createdAt, endedAt }): PublicRequest => ({
         handle,
@@ -255,6 +266,7 @@ export class Pairing {
         expiresAt: endedAt,
         state: 'expired',
         duplicateName: false,
+        sameNameAgents: [],
       }),
     )
     const requests = [...live, ...gone]
@@ -361,9 +373,13 @@ function isStoredAgent(value: unknown): value is StoredAgent {
   )
 }
 
-/** Two names a person would read as one: compatibility-normalised and case-folded. */
-function sameName(name: string): string {
-  return name.normalize('NFKC').toLowerCase()
+/**
+ * What a name looks like, so two names a person would read as one compare equal: NFKC, case folded,
+ * reduced by the Latin, Cyrillic and Greek look-alike table of @okolos/core-lookalike (`skeleton`,
+ * the same one the link check uses), with runs of white space collapsed and the ends trimmed.
+ */
+function nameSkeleton(name: string): string {
+  return skeleton(name.normalize('NFKC').toLowerCase()).replace(/\s+/gu, ' ').trim()
 }
 
 function sha256(key: string): string {
