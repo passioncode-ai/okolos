@@ -227,7 +227,6 @@ export class JournalError<C extends JournalFailure = JournalFailure> extends Err
     readonly operation: 'write' | 'read' | 'export',
     options?: { cause?: unknown },
   ) {
-    // i18n-exempt: read in the daemon's log by a developer; the page names `code` through its catalogue
     super(`journal ${operation} failed: ${code}`, options)
     this.name = 'JournalError'
   }
