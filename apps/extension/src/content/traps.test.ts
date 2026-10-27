@@ -161,7 +161,7 @@ describe('what the banner claims', () => {
   })
 })
 
-describe('a link that opens a program or a shared folder (B-165)', () => {
+describe('a link that opens a program outside the browser (B-165)', () => {
   /**
    * The address is read on the click and nowhere else: a page that merely carries a
    * `search-ms:` link has done nothing yet, and a warning on arrival would fire on
