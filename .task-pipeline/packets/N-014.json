@@ -17,6 +17,8 @@
    "docs/brand/terminology.md",
    "apps/agent/_locales/ru/messages.json",
    "apps/agent/_locales/en/messages.json",
+   "tools/locales.test.ts",
+   "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
    "tools/locales.test.ts"
   ]
  },
@@ -30,6 +32,7 @@
   "refusal_invalid_scope говорит «этого устройства»/«this device», как остальной продукт, и читается внутри строки refusalLine без двух двоеточий подряд; copylot_check на собранной строке (проверка product N-001 круг 2)",
   "ключи taskProfileAgent и taskProfileDisposable в обоих каталогах, copylot_check (аудит #20)",
   "тексты службы уже идут через каталог (N-024): служба не стартует без своих ключей; N-014 переносит в каталог английские тексты набора Fabric (403, занятый замок) или записывает, почему они остаются протокольными",
+  "eventsUnreadable не утверждает, что сохранены все остальные события: обрезка по сроку при том же старте может удалить старые (проверка product N-024 круг 2)",
   "проверка узла: python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts"
  ],
  "guards": [
