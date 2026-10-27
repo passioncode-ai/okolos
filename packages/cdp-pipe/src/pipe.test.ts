@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { CdpError } from './errors.js'
-import { CdpPipe, type LaunchOptions } from './pipe.js'
+import { CdpPipe, type CdpTransport, type LaunchOptions } from './pipe.js'
 
 /**
  * Every test here drives a real process: a node script that speaks CDP over
@@ -190,6 +190,31 @@ describe('a listener that throws', () => {
     expect(lines).toHaveLength(1)
     expect(lines[0]).toContain('Network.requestWillBeSent')
     expect(lines[0]).not.toContain('p4ssw0rd-in-params')
+  })
+})
+
+describe('the transport a consumer depends on', () => {
+  // The consumer (the daemon's agent windows, N-010) holds a CdpTransport, not
+  // a CdpPipe, so its tests hand it a plain object. CdpPipe has private members,
+  // and TypeScript compares classes with private members by name: a fake could
+  // never pass as one. `pnpm typecheck` checks this file.
+  it('is satisfied by a plain object with pid, send, on, onExit and close', async () => {
+    const sent: Array<{ method: string; timeoutMs: number | undefined }> = []
+    const transport: CdpTransport = {
+      pid: 4242,
+      send: async <T>(method: string, _params?: object, _sessionId?: string, opts?: { timeoutMs?: number }) => {
+        sent.push({ method, timeoutMs: opts?.timeoutMs })
+        return { targetId: 'T-1' } as T
+      },
+      on: () => () => undefined,
+      onExit: () => () => undefined,
+      close: async () => undefined,
+    }
+
+    const created = await transport.send<{ targetId: string }>('Target.createTarget', {}, undefined, { timeoutMs: 500 })
+
+    expect(created.targetId).toBe('T-1')
+    expect(sent).toEqual([{ method: 'Target.createTarget', timeoutMs: 500 }])
   })
 })
 

@@ -64,6 +64,34 @@ interface Incoming {
 /** Receives one CDP event; sessionId is set when the event came from an attached target. */
 export type EventListener<P = unknown> = (params: P, sessionId?: string) => void
 
+/** How the browser process ended: an exit code, or the signal that ended it. */
+export interface ExitInfo {
+  readonly code: number | null
+  readonly signal: NodeJS.Signals | null
+}
+
+/** Per-call settings of send(). */
+export interface SendOptions {
+  /** This request's deadline, instead of the pipe's requestTimeoutMs. */
+  readonly timeoutMs?: number
+}
+
+/**
+ * What a consumer of a CDP connection depends on. CdpPipe is the one over a
+ * real browser; a consumer's tests hand it a plain object instead, which a
+ * class with private members could never be.
+ *
+ * Every rejection of send() is a CdpError (./errors.ts).
+ */
+export interface CdpTransport {
+  readonly pid: number
+  send<T = unknown>(method: string, params?: object, sessionId?: string, opts?: SendOptions): Promise<T>
+  on<P = unknown>(event: string, listener: EventListener<P>): () => void
+  /** Hears the browser process end, whoever ended it; returns the function that unsubscribes. */
+  onExit(listener: (info: ExitInfo) => void): () => void
+  close(graceMs?: number): Promise<void>
+}
+
 interface Waiting {
   readonly method: string
   readonly resolve: (result: unknown) => void
