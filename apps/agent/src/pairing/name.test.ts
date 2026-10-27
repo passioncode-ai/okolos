@@ -123,7 +123,8 @@ describe('the name an agent gives itself', () => {
   })
 
   it('keeps a stack of combining marks a control refusal, said before the script', () => {
-    expect(checkAgentName('e\u0301\u0302\u0303gent')).toBe('name_control')
+    // x has no precomposed form with these marks, so NFC leaves all three stacked (fix round 5).
+    expect(checkAgentName('x\u0301\u0302\u0303gent')).toBe('name_control')
   })
 
   // The reserved name is compared on the comparison key: lower case, i and 1 as l, 0 as o, Cyrillic
@@ -162,6 +163,30 @@ describe('the name an agent gives itself', () => {
     for (const name of ['Kolos', 'Claude Code', 'oko', 'Cursor', 'Колос', 'Око', 'Okolo agent']) {
       expect(checkAgentName(name), name).toBeNull()
     }
+  })
+})
+
+// Fix round 5: a name is normalised to NFC before every check and key, so a letter written as a
+// base and a combining mark behaves like the same letter written precomposed.
+describe('a name in NFC (fix round 5)', () => {
+  const composed = 'Йван' // Йван, Й precomposed
+  const decomposed = 'Йван' // И and a combining breve
+
+  it('accepts a decomposed letter that NFC makes one the allowlist holds', () => {
+    expect(decomposed).not.toBe(composed)
+    expect(checkAgentName(composed)).toBeNull()
+    expect(checkAgentName(decomposed)).toBeNull()
+    expect(checkAgentName('Й'.repeat(40))).toBeNull() // 80 code points, 40 after NFC
+    expect(checkAgentName('Й'.repeat(41))).toBe('name_too_long')
+  })
+
+  it('gives the decomposed and the precomposed name the same keys', () => {
+    expect(nameKeys(decomposed)).toEqual(nameKeys(composed))
+    expect(namesLookAlike(decomposed, composed)).toBe(true)
+  })
+
+  it('still refuses what NFC turns into a letter outside the allowlist', () => {
+    expect(checkAgentName('Café')).toBe('name_script')
   })
 })
 

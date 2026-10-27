@@ -330,6 +330,19 @@ describe('how long a request lives and how many there may be (spec §11 F5)', ()
     expect(pairing.request('Agent eight', T0 + MINUTE + 1)).toEqual({ refused: 'too_many_requests' })
   })
 
+  it('keeps the name in NFC: on the page, in the notices and in the store (fix round 5)', () => {
+    const file = storeFile()
+    const notices: PairingNotice[] = []
+    const pairing = open(file, notices)
+    const decomposed = 'Йван'
+    const composed = 'Йван'
+    const key = pair(pairing, decomposed, T0)
+    expect(pairing.verify(key)).toMatchObject({ name: composed })
+    expect(notices.map((n) => n.name)).toEqual([composed, composed, composed])
+    expect(readFileSync(file, 'utf8')).toContain(`"name": "${composed}"`)
+    expect(open(file).verify(key)).toMatchObject({ name: composed })
+  })
+
   it('refuses a name the rules refuse, and that refusal counts toward nothing', () => {
     const pairing = open()
     expect(pairing.request('agent 123', T0)).toEqual({ refused: 'name_digits' })

@@ -308,6 +308,8 @@ export class Pairing {
     if (this.closed) return { refused: 'closed' }
     const refused = checkAgentName(agentName)
     if (refused !== null) return { refused }
+    // The name the page shows, the notices carry and the store keeps is the NFC form the rules checked.
+    const name = agentName.normalize('NFC')
     this.sweep(now)
     if (this.byHandle.size >= MAX_PENDING) return { refused: 'too_many_pending' }
     this.created = this.created.filter((at) => now - at < 60_000)
@@ -316,7 +318,7 @@ export class Pairing {
     const entry: Entry = {
       requestId: this.hex(16),
       handle: this.hex(8),
-      name: agentName,
+      name,
       code: this.code(),
       createdAt: now,
       confirmedAt: null,

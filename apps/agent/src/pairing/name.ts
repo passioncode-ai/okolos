@@ -92,12 +92,16 @@ const MAX_DIGITS = 2
 const RESERVED = 'okolos'
 
 /**
- * The reason the name is refused, or null when it may be shown. The checks run in this order, so
+ * The reason the name is refused, or null when it may be shown. Every check reads the name in NFC
+ * (fix round 5), so a letter written as a base and a combining mark (И and a breve) counts as the one
+ * letter it composes to (Й); the caller stores and shows that NFC form. The checks run in this order, so
  * each reason stays the precise one: not text; empty; longer than MAX_NAME_LENGTH; a bidirectional
  * control; a control or invisible character; a character outside the allowlist, or Latin and
  * Cyrillic letters in one name (`name_script`); more than two digits; reads as "okolos".
  */
-export function checkAgentName(name: string): NameRefusal | null {
+export function checkAgentName(raw: string): NameRefusal | null {
+  if (typeof raw !== 'string') return 'name_not_text'
+  const name = raw.normalize('NFC')
   const fault = textFault(name, MAX_NAME_LENGTH, (value) => BLANK.test(value))
   if (fault !== null) return `name_${fault}`
   if (!ALLOWED.test(name) || (LATIN.test(name) && CYRILLIC.test(name))) return 'name_script'
@@ -132,7 +136,7 @@ function key(lower: string, cyrillic: Readonly<Record<string, string>>): string 
 
 /**
  * The keys two names are compared on, so names a person would read as one compare equal (fix round
- * 4): lower case; Cyrillic written in Latin letters; every character that is not a letter or a digit
+ * 4): NFC (fix round 5); lower case; Cyrillic written in Latin letters; every character that is not a letter or a digit
  * dropped (spaces, - _ . ( ) ' / +); i and the digit 1 as l, the digit 0 as o (a capital I is a small
  * i by then, so `CIaude` is `claude`). A Latin name has one key. A Cyrillic name has two: by sound
  * (`Околос` is `okolos`) and by look (`Сосоа` is `cocoa`), the same when they agree. The duplicate
@@ -140,7 +144,7 @@ function key(lower: string, cyrillic: Readonly<Record<string, string>>): string 
  * allowlist; anything else is dropped from the key.
  */
 export function nameKeys(name: string): string[] {
-  const lower = name.toLowerCase()
+  const lower = name.normalize('NFC').toLowerCase()
   return [...new Set([key(lower, TRANSLITERATION), key(lower, LOOK)])]
 }
 
