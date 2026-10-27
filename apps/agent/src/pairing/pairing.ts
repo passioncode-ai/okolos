@@ -253,12 +253,16 @@ export class Pairing {
     return { key }
   }
 
-  revoke(agentId: string): boolean {
+  /**
+   * Removes the agent's access and gives back the record it removed, or null when there was none;
+   * the 'revoked' notice carries the same agent id, so the daemon can close its tasks and windows.
+   */
+  revoke(agentId: string): AgentRecord | null {
     const agent = this.agents.find((a) => a.agentId === agentId)
-    if (agent === undefined) return false
+    if (agent === undefined) return null
     this.save(this.agents.filter((a) => a !== agent))
     this.notify({ kind: 'revoked', agentId: agent.agentId, name: agent.name })
-    return true
+    return { agentId: agent.agentId, name: agent.name, pairedAt: agent.pairedAt }
   }
 
   list(now: number): { requests: PublicRequest[]; agents: AgentRecord[] } {

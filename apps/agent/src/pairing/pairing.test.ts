@@ -97,7 +97,7 @@ describe('the pairing request id (spec §11 F5)', () => {
     const claimed = pairing.claim(paired.requestId, T0 + 5)
     expect(claimed).toHaveProperty('key')
     const later = pairing.list(T0 + REQUEST_LIFETIME_MS + 10)
-    expect(pairing.revoke(later.agents[0]!.agentId)).toBe(true)
+    expect(pairing.revoke(later.agents[0]!.agentId)).toMatchObject({ name: 'Claude Code' })
 
     const everything = JSON.stringify({ page, later, notices, store: readFileSync(file, 'utf8') })
     for (const id of ids) expect(everything).not.toContain(id)
@@ -279,12 +279,22 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
     const key = pair(pairing, 'Claude Code', T0)
     const kept = pair(pairing, 'Codex', T0 + 10)
     const agent = pairing.verify(key)!
-    expect(pairing.revoke(agent.agentId)).toBe(true)
+    expect(pairing.revoke(agent.agentId)).toEqual(agent)
     expect(pairing.verify(key)).toBeNull()
-    expect(pairing.revoke(agent.agentId)).toBe(false)
+    expect(pairing.revoke(agent.agentId)).toBeNull()
     expect(pairing.list(T0 + 20).agents.map((a) => a.name)).toEqual(['Codex'])
     expect(open(file).verify(key)).toBeNull()
     expect(open(file).verify(kept)).toMatchObject({ name: 'Codex' })
+  })
+
+  it('says who was revoked: the record it removed, and a notice with the agent id (fix round 1)', () => {
+    const notices: PairingNotice[] = []
+    const pairing = open(storeFile(), notices)
+    const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    expect(pairing.revoke(agent.agentId)).toEqual(agent)
+    expect(notices.at(-1)).toEqual({ kind: 'revoked', agentId: agent.agentId, name: 'Claude Code' })
+    expect(pairing.revoke('no-such-agent')).toBeNull()
+    expect(notices.filter((n) => n.kind === 'revoked')).toHaveLength(1)
   })
 
   it('pairs the same name again after a revoke, with a new key', () => {
