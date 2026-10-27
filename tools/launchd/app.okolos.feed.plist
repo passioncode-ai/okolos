@@ -87,6 +87,11 @@ exit "$c"</string>
   </array>
 
   <!--
+    The first two are the folders the launch line above writes to, the same values:
+    the bootstrap and the job read them too, so an install made with OKOLOS_STATE_DIR
+    or OKOLOS_LOG_DIR set records each failure once, in one file, and never falls back
+    to the home folder launchd gives them.
+
     The secret runner is not on the command line: the job puts it in front of the
     publish step alone, so the Cloudflare token never reaches the ingest, git or
     pnpm. It is a JSON argv (paths only, no secret), empty when this machine has no
@@ -102,6 +107,10 @@ exit "$c"</string>
   -->
   <key>EnvironmentVariables</key>
   <dict>
+    <key>OKOLOS_STATE_DIR</key>
+    <string>{{STATE_DIR}}</string>
+    <key>OKOLOS_LOG_DIR</key>
+    <string>{{LOG_DIR}}</string>
     <key>OKOLOS_AGENT_CHECKOUT</key>
     <string>{{CHECKOUT}}</string>
     <key>OKOLOS_SOURCE_REPO</key>

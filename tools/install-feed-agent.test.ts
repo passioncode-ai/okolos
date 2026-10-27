@@ -254,6 +254,8 @@ describe('the plist launchd reads', () => {
     node: '/Users/example/.fnm/node-versions/v24/bin/node',
     sourceRepo: '/Users/example/DATA/okolos',
     origin: 'git@github.com:passioncode-ai/okolos.git',
+    // Given, never read from this runner's HOME or OKOLOS_STATE_DIR: the render is the same everywhere.
+    stateDir: '/Users/example/.okolos/state',
   }
   const plist = (runner: string[] | null = ['/opt/py/bin/python3', '/opt/obs/tools/use_secret.py', 'run', '--env', 'prod', 'okolos', 'CLOUDFLARE_API_TOKEN', '--']) =>
     rendered({ template: template(), runner, ...where })
@@ -278,6 +280,13 @@ describe('the plist launchd reads', () => {
     expect(variable(text, 'OKOLOS_AGENT_CHECKOUT')).toBe('/Users/example/.okolos/agent-checkout')
     expect(variable(text, 'OKOLOS_SOURCE_REPO')).toBe('/Users/example/DATA/okolos')
     expect(variable(text, 'OKOLOS_ORIGIN_URL')).toBe('git@github.com:passioncode-ai/okolos.git')
+  })
+
+  it('hands launchd the state and log folders the launch line writes, so all three writers agree', () => {
+    const text = plist()
+    expect(variable(text, 'OKOLOS_STATE_DIR')).toBe('/Users/example/.okolos/state')
+    expect(variable(text, 'OKOLOS_LOG_DIR')).toBe('/Users/example/Library/Logs/Okolos')
+    expect(program(text)).toContain("st='/Users/example/.okolos/state'; lg='/Users/example/Library/Logs/Okolos';")
   })
 
   it('renders an empty origin when the clone has none, which the bootstrap reads as none', () => {
@@ -401,6 +410,21 @@ describe('the bootstrap launchd starts lives outside the checkout (B-159)', () =
 describe.skipIf(process.platform === 'win32')('the launch line records what fails before the bootstrap', () => {
   const unxml = (text: string) =>
     text.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&amp;', '&')
+
+  /** The shell line launchd hands /bin/sh -lc. */
+  const launchLine = (text: string) =>
+    unxml(/<key>ProgramArguments<\/key>\s*<array>[\s\S]*?<string>[\s\S]*?<\/string>\s*<string>[\s\S]*?<\/string>\s*<string>([\s\S]*?)<\/string>/.exec(text)?.[1] ?? '')
+
+  /** What launchd gives the line: the plist's EnvironmentVariables, HOME and a PATH with node on it. */
+  function launchdEnv(text: string, homeDir: string) {
+    const dict = /<key>EnvironmentVariables<\/key>\s*<dict>([\s\S]*?)<\/dict>/.exec(text)?.[1] ?? ''
+    const env: Record<string, string> = {
+      HOME: homeDir,
+      PATH: [path.dirname(process.execPath), '/usr/bin', '/bin'].join(path.delimiter),
+    }
+    for (const [, key, value] of dict.matchAll(/<key>([^<]+)<\/key>\s*<string>([^<]*)<\/string>/g)) env[key as string] = unxml(value as string)
+    return env
+  }
 
   function launch(
     h: ReturnType<typeof home>,
@@ -560,6 +584,32 @@ process.exit(1)
     const note = 'sw/"x"\\y at bbbbbbb, origin/main aaaaaaa (--allow-branch, 2026-10-27T12:00:00Z)'
     launch(h, { bootstrap: 'process.exit(1)\n', extraEnv: { OKOLOS_INSTALLED_OFF_MAIN: note } })
     expect(readStatus(h.paths.status)).toMatchObject({ stage: 'launch', installedOffMain: note, consecutiveFailures: 2 })
+  })
+
+  it('writes one record in the folders it was installed with, through the real bootstrap, whatever HOME says', () => {
+    // An install made with OKOLOS_STATE_DIR and OKOLOS_LOG_DIR set: launchd starts the
+    // line with the plist's variables and HOME only, never the installer's shell.
+    const h = home()
+    const custom = { state: path.join(h.dir, 'custom-state'), logs: path.join(h.dir, 'custom-logs') }
+    installBootstrap({ dir: h.paths.agentBin })
+    const text = rendered({
+      template: template(),
+      runner: null,
+      checkout: h.paths.agentCheckout,
+      logDir: custom.logs,
+      stateDir: custom.state,
+      bootstrap: h.paths.bootstrap,
+      node: process.execPath,
+      sourceRepo: path.join(h.dir, 'no-such-clone'),
+      origin: '',
+    })
+    const result = spawnSync('/bin/sh', ['-c', launchLine(text)], { env: launchdEnv(text, h.dir), encoding: 'utf8', timeout: 20_000 })
+    expect(result.status, result.stderr).toBe(1)
+    const status = readStatus(path.join(custom.state, 'feed-status.json'))
+    expect(status).toMatchObject({ outcome: 'failed', stage: 'checkout', consecutiveFailures: 1 })
+    expect(readFileSync(path.join(custom.logs, 'feed.log'), 'utf8')).not.toMatch(/failed in launch/)
+    expect(existsSync(path.join(h.dir, '.okolos', 'state')), 'a second record under HOME').toBe(false)
+    expect(existsSync(path.join(h.dir, 'Library', 'Logs', 'Okolos')), 'a second log under HOME').toBe(false)
   })
 
   it('counts on from the previous record and keeps the last publish, as JSON the host can read', () => {

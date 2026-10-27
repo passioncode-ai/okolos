@@ -71,6 +71,7 @@ const PLACEHOLDERS = [
   '{{LOG_DIR}}',
   '{{LOGS}}',
   '{{STATE}}',
+  '{{STATE_DIR}}',
   '{{BOOTSTRAP}}',
   '{{NODE}}',
   '{{SOURCE_REPO}}',
@@ -139,6 +140,7 @@ export function rendered({
     .replaceAll('{{ORIGIN}}', xml(origin))
     .replaceAll('{{OFF_MAIN}}', xml(offMain))
     .replaceAll('{{RUNNER}}', runner ? xml(JSON.stringify(runner)).replaceAll('"', '&quot;') : '')
+    .replaceAll('{{STATE_DIR}}', xml(stateDir))
     .replaceAll('{{LOG_DIR}}', xml(logDir))
   if (out.includes('{{')) throw new Error('a placeholder survived rendering')
   return out
