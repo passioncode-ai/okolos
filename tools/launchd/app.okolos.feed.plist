@@ -41,8 +41,11 @@
     launch, exit, reason, time; consecutiveFailures counted on, lastPublished kept;
     a temp file, then mv), and one line to feed.log and to this file's log below.
     Not recorded anywhere: launchd not starting this at all, or /bin/sh failing;
-    the installer's status flag and `launchctl print` show those. No alarm reads the record yet
-    (B-135, blocked on OBS-32).
+    the installer's status flag and `launchctl print` show those. No alarm reads the
+    record yet: that is OBS-32 in project-observatory-dashboard, which does not read
+    this file yet. The line counts a record as this launch's only when it carries
+    its id; the bootstrap stamps the id into a record it adopts from a job that
+    writes none, so one failure is counted once.
 
     Production publishes still run only from origin/main: the job fast-forwards the
     checkout itself (tools/feed-job.mjs, F2). Through a login shell because `node`

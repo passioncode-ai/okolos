@@ -101,8 +101,8 @@ pnpm feed:snapshot                                         # перенести 
 ## Агент обновления
 
 ```bash
-pnpm feed:agent                                        # чекаут агента, загрузчик, plist, загрузка (только из main)
-node tools/install-feed-agent.mjs --allow-branch       # то же из другой ветки: обход ADR-0017, сознательно
+pnpm feed:agent                                        # чекаут агента, загрузчик, plist, загрузка (только HEAD = origin/main)
+node tools/install-feed-agent.mjs --allow-branch       # с другого HEAD: обход ADR-0017; пишется в feed.log и в installedOffMain
 node tools/install-feed-agent.mjs --status             # plist, загрузчик и его расхождение с чекаутом, launchd, последний прогон
 node tools/install-feed-agent.mjs --uninstall          # bootout, удалить plist и загрузчик, проверить launchctl print
 node tools/install-feed-agent.mjs --uninstall --purge  # и чекаут, состояние, логи
@@ -119,11 +119,13 @@ node tools/install-feed-agent.mjs --uninstall --purge  # и чекаут, сос
 - **Что и где записано при сбое.** Каждая строка ниже пишет `outcome: failed` в
   `~/.okolos/state/feed-status.json` и считается в `consecutiveFailures`:
   - `stage: launch`: `node` не найден, копии загрузчика нет, или `node` вышел с ненулевым кодом,
-    не записав статус этого запуска. Пишет сама строка `/bin/sh` из plist (через временный файл и
+    а статуса с `runId` этого запуска нет. Загрузчик вписывает этот `runId` и в статус, который
+    задача записала без него, так что один сбой считается один раз. Пишет сама строка `/bin/sh` из plist (через временный файл и
     `mv`, `lastPublished` сохраняется), плюс строка в `feed.log` и в `feed.launchd.log`;
   - `stage: checkout`: чекаут не удалось пересоздать или починка не уложилась в срок прогона;
   - `stage: job`: задача умерла, не записав статус; её stderr (ошибка и стек) уходит в `feed.log`
-    и `feed.launchd.log`, а `reason` берётся из первой строки с ошибкой;
+    и `feed.launchd.log`, а `reason` берётся из первой строки с ошибкой. Если задачу убил срок
+    прогона, код 124 и `reason` всегда одна фраза: «the run's deadline (2700 s) passed during the job; its process group was killed»;
   - стадии самой задачи (`config`, `pin`, `ingest`, `publish`, сторож, сигнал);
   - `stage: bootstrap`: упал сам загрузчик (стек в `feed.launchd.log`).
 
@@ -163,7 +165,9 @@ node tools/install-feed-agent.mjs --uninstall --purge  # и чекаут, сос
   `consecutiveFailures`, `lastPublished`, `recoveredCheckout` (`true`, если перед прогоном
   чекаут пришлось пересоздать; `recovery` говорит, что с ним было). Две неудачи подряд или
   `lastPublished` старше 26 часов — повод разбираться. **Внешней тревоги пока нет:**
-  `feed-status.json` никто не читает (B-135 ждёт OBS-32), так что смотрит человек, через
+  `feed-status.json` никто не читает. Тревога заведена как OBS-32 в
+  `passioncode-ai/project-observatory-dashboard` (B-135 закрыт: он её завёл), и этот файл она пока
+  не читает. Смотрит человек, через
   `--status`. `recoveredCheckout: true` значит, что чекаут кто-то удалил: ищите, кто (B-150).
 - **Токен** получает только стадия публикации: раннер секрета (`OKOLOS_SECRET_RUNNER` в plist,
   argv без значения) оборачивает её одну.

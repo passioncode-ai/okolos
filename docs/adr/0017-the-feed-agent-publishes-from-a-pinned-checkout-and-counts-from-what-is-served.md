@@ -40,8 +40,9 @@ That one line carried four defects the audit measured:
 3. **Production publishes run only from a clean checkout at origin/main.** The agent owns a
    detached worktree at `~/.okolos/agent-checkout` and fast-forwards it before each run; a manual
    run from a clone that is not at origin/main is refused unless `--unpinned` is given, which is
-   recorded. The installer itself refuses to install from a branch other than `main` (or a
-   detached HEAD at origin/main) without `--allow-branch`. wrangler is a pinned devDependency of `apps/proxy`, run through `pnpm exec` with the
+   recorded. The installer itself refuses to install unless the clone's HEAD equals a freshly
+   fetched origin/main (on `main` or detached); `--allow-branch` overrides, and is recorded in
+   `feed.log` and as `installedOffMain` in every run's record. wrangler is a pinned devDependency of `apps/proxy`, run through `pnpm exec` with the
    install-before-run check off and telemetry off.
 4. **Every run is bounded, exclusive and observable**: each stage a child in its own process
    group with a deadline, a thirty-minute watchdog over the run, a lock shared with every manual
@@ -67,8 +68,12 @@ That one line carried four defects the audit measured:
    a clone of its origin. The run's record carries `recoveredCheckout`. Every failure that reaches
    the bootstrap is recorded (`stage: checkout`, `stage: job`, the job's stages); one that fails
    before it (no `node`, the copy gone, `node` exiting without a record for this launch) is
-   recorded by the launch line itself with `/bin/sh` only (`stage: launch`). launchd not starting
-   the agent at all is recorded nowhere. No alarm reads the record yet (B-135, blocked on OBS-32).
+   recorded by the launch line itself with `/bin/sh` only (`stage: launch`). A record is a run's
+   when it carries that launch's `runId`; the bootstrap stamps it into a record adopted from a job
+   that writes none, so one failure is counted once. launchd not starting the agent at all is
+   recorded nowhere. No alarm reads the record yet: that alarm is OBS-32 in
+   `passioncode-ai/project-observatory-dashboard` (B-135, done, filed it), and it does not read
+   `feed-status.json` yet.
 
 ## Цена
 
@@ -99,6 +104,7 @@ That one line carried four defects the audit measured:
 | Bootstrap outside the checkout: recreate (worktree or clone), `.broken`, a record on every failure that reaches it, one run deadline, the job's stderr relayed (B-159) | `tools/feed/bootstrap.test.ts` |
 | The launch line records `stage: launch` with `/bin/sh` alone; bootstrap copy installed and removed; drift in `--status`; install from main only | `tools/install-feed-agent.test.ts` |
 | The run id and `recoveredCheckout` in the job's record; the watchdog handed down | `tools/feed-job.test.ts` |
-| A job started through a symlinked path still runs | `tools/feed/entry.test.ts` |
+| A tool or job started through a linked path still runs (one check, `tools/is-main.mjs`) | `tools/is-main.test.ts` |
+| One failed job run counts once: the launch line and the bootstrap agree on `runId` | `tools/install-feed-agent.test.ts`, `tools/feed/status.test.ts` |
 | State paths outside the working tree | `tools/feed/paths.test.ts` |
 | Release gate reads the newer of snapshot and state | `tools/feed-age.test.ts` |
