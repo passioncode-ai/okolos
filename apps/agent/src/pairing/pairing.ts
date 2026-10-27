@@ -367,9 +367,18 @@ export class Pairing {
     this.created = this.created.filter((at) => now - at < 60_000)
     if (this.created.length >= MAX_NEW_PER_MINUTE) return { refused: 'too_many_requests' }
     this.created.push(now)
+    // A request id or a handle already in use is drawn again (fix round 6), as claim does for agent
+    // ids: a handle of a waiting request or of an ended row still on the page, a request id waiting
+    // or still answered for. With real randomness this never repeats; with a seeded source it can.
+    let requestId: string
+    do requestId = this.hex(16)
+    while (this.byRequestId.has(requestId) || this.refusals.has(sha256(requestId)))
+    let handle: string
+    do handle = this.hex(8)
+    while (this.byHandle.has(handle) || this.ended.has(handle))
     const entry: Entry = {
-      requestId: this.hex(16),
-      handle: this.hex(8),
+      requestId,
+      handle,
       name,
       code: this.code(),
       createdAt: now,

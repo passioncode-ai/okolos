@@ -1496,3 +1496,56 @@ describe('the clock a caller passes (fix round 6)', () => {
     expect(pairing.list(Number.MAX_SAFE_INTEGER).requests).toEqual([])
   })
 })
+
+// Fix round 6: a handle already in use is drawn again, as claim does for agent ids. With real
+// randomness this never repeats; a seeded or broken source can repeat.
+describe('a handle drawn twice (fix round 6)', () => {
+  /** A source whose 8-byte draws (the handle) give the same bytes the first `times` times. */
+  function repeating(times: number): RandomSource {
+    const base = seeded()
+    const fixed = seeded('repeat')(8)
+    let eights = 0
+    return (size) => (size === 8 && eights++ < times ? Buffer.from(fixed) : base(size))
+  }
+
+  it('is drawn again for a waiting request, so each row keeps its own handle', () => {
+    const pairing = Pairing.open(storeFile(), { random: repeating(3) })
+    const first = asked(pairing.request('Claude Code', T0))
+    const second = asked(pairing.request('Codex', T0 + 10))
+    const rows = pairing.list(T0 + 20).requests
+    expect(rows).toHaveLength(2)
+    expect(new Set(rows.map((row) => row.handle)).size).toBe(2)
+    expect(confirmAt(pairing, second, T0 + 21)).toBe(true)
+    expect(pairing.claim(first.requestId, T0 + 22)).toEqual({ pending: true })
+    expect(pairing.claim(second.requestId, T0 + 22)).toHaveProperty('key')
+  })
+
+  it('is drawn again for an ended row still on the page', () => {
+    const pairing = Pairing.open(storeFile(), { random: repeating(2) })
+    asked(pairing.request('Claude Code', T0))
+    // The first request ends at this very time, before the second draws its handle.
+    const late = T0 + REQUEST_LIFETIME_MS
+    asked(pairing.request('Codex', late))
+    const rows = pairing.list(late).requests
+    expect(rows.map((row) => [row.name, row.state])).toEqual([
+      ['Codex', 'pending'],
+      ['Claude Code', 'expired'],
+    ])
+    expect(new Set(rows.map((row) => row.handle)).size).toBe(2)
+  })
+
+  it('draws a request id again too, while the first is waiting or still answered for', () => {
+    const base = seeded()
+    const fixed = seeded('repeat')(16)
+    let sixteens = 0
+    const pairing = Pairing.open(storeFile(), { random: (size) => (size === 16 && sixteens++ < 3 ? Buffer.from(fixed) : base(size)) })
+    const first = asked(pairing.request('Claude Code', T0))
+    const second = asked(pairing.request('Codex', T0 + 10))
+    expect(second.requestId).not.toBe(first.requestId)
+    expect(declineAt(pairing, first, T0 + 11)).toBe(true)
+    const third = asked(pairing.request('Cursor', T0 + 12))
+    expect(third.requestId).not.toBe(first.requestId)
+    expect(pairing.claim(first.requestId, T0 + 13)).toEqual({ refused: 'declined' })
+    expect(pairing.claim(second.requestId, T0 + 13)).toEqual({ pending: true })
+  })
+})
