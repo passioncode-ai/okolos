@@ -104,9 +104,14 @@ function officeDocument(scheme: string, address: string): string | null {
   const plain = decoded(address)
   const named = /\|u\|(.+)$/i.exec(plain)?.[1]?.trim()
   if (named !== undefined && named !== '') return named
-  if (scheme !== 'onenote') return null
   const rest = plain.slice(scheme.length + 1).trim()
-  return rest === '' ? null : rest
+  if (rest === '') return null
+  if (scheme === 'onenote') return rest
+  // The short form, `ms-word:http://…`: every Office handler opens a document written
+  // straight after the colon, the same as `ofe|u|`. Round 2 of the certification
+  // measured it passing silently. Read only when what follows is an address (a scheme)
+  // or a shared folder, so a launcher argument that is neither stays unnamed.
+  return /^(?:[a-z][a-z0-9+.-]*:|\\\\)/i.test(rest) ? rest : null
 }
 
 /** Percent-decoded where it can be; a malformed escape leaves the address as written. */

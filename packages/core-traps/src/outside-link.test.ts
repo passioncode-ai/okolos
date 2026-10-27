@@ -132,6 +132,54 @@ describe('the other Office handlers, round 1 of the certification', () => {
   })
 })
 
+describe('the short Office form, round 2 of the certification', () => {
+  /**
+   * The Office handlers also take the document straight after the colon
+   * (`ms-word:http://…`), the same open-for-edit as `ofe|u|`. Only the `|u|` form was
+   * read, so a page link that had Word fetch a document over plain http passed
+   * silently (measured: null).
+   */
+  it('names a document fetched over plain http, a shared folder or a file address', () => {
+    expect(classifyOutsideLink('ms-word:http://files.attacker.test/a.docx')).toMatchObject({
+      scheme: 'ms-word',
+      host: 'files.attacker.test',
+      signals: ['ms-word', 'document-not-over-https'],
+    })
+    expect(classifyOutsideLink('ms-excel:\\\\10.0.0.5\\s\\b.xlsx')).toMatchObject({
+      scheme: 'ms-excel',
+      host: '10.0.0.5',
+    })
+    expect(classifyOutsideLink('ms-powerpoint:file://evil.test/s/deck.pptx')).toMatchObject({
+      scheme: 'ms-powerpoint',
+      host: 'evil.test',
+    })
+  })
+
+  it('names it on every desktop Office handler, and percent-encoded too', () => {
+    for (const scheme of ['ms-word', 'ms-excel', 'ms-powerpoint', 'ms-visio', 'ms-access', 'ms-project', 'ms-publisher', 'ms-spd', 'ms-infopath']) {
+      expect(classifyOutsideLink(`${scheme}:http://files.attacker.test/a`), scheme).toMatchObject({
+        scheme,
+        host: 'files.attacker.test',
+      })
+      expect(classifyOutsideLink(`${scheme}:http%3A%2F%2Ffiles.attacker.test%2Fa`), `${scheme} encoded`).toMatchObject({
+        scheme,
+        host: 'files.attacker.test',
+      })
+      expect(classifyOutsideLink(`${scheme}:%5C%5C10.0.0.5%5Cs%5Ca`), `${scheme} encoded share`).toMatchObject({
+        host: '10.0.0.5',
+      })
+    }
+  })
+
+  it('leaves the https document alone, and a launcher with nothing after the colon', () => {
+    expect(classifyOutsideLink('ms-word:https://contoso.sharepoint.com/a.docx')).toBeNull()
+    expect(classifyOutsideLink('ms-excel:HTTPS://contoso.sharepoint.com/a.xlsx')).toBeNull()
+    expect(classifyOutsideLink('ms-word:https%3A%2F%2Fcontoso.sharepoint.com%2Fa.docx')).toBeNull()
+    expect(classifyOutsideLink('ms-excel:')).toBeNull()
+    expect(classifyOutsideLink('ms-word:  ')).toBeNull()
+  })
+})
+
 describe('what it does not look at', () => {
   it('ordinary addresses', () => {
     for (const href of [
