@@ -415,21 +415,63 @@ function normaliseOrigins(value: unknown): { ok: true; list: string[] } | { ok: 
  * The bridge drives the person's browser, which sits inside their network: a
  * task that may read `localhost` or `192.168.1.1` reaches the router, the dev
  * server and the cloud metadata endpoint, none of which a page on the web can
- * reach. The hostname comes from the URL parser, which already turned `127.1`,
- * `2130706433` and `0x7f000001` into `127.0.0.1` and wrote IPv6 in its one
- * compressed form, so each range has a single spelling to recognise.
+ * reach.
+ *
+ * One rule for both places the daemon asks: the hostname of an origin a task
+ * names, and the address a response actually came from (CDP `remoteIPAddress`,
+ * bare IPv6 without brackets). Two copies would drift, and the gap between them
+ * is a place a task reaches that the scope check refused. Every input goes
+ * through the URL parser first, which turns `127.1`, `2130706433`, `0x7f000001`
+ * and `::ffff:127.0.0.1` into one form each, so each range has a single spelling
+ * to recognise.
  *
  * Beyond the ranges the review named, `0.0.0.0/8` and `::` (both answer as this
  * machine on macOS and Linux), `*.localhost` (Chrome resolves it to loopback),
- * IPv4-mapped IPv6 of any refused address and `fc00::/7` (the IPv6 private range)
- * are refused too: each is a second spelling of a refused place.
+ * `100.64/10` (CGNAT, and the range Tailscale gives the person's own machines),
+ * `fc00::/7` (the IPv6 private range) and every IPv6 form that carries an IPv4
+ * address (mapped, compatible, SIIT, NAT64) are refused too: each is a second
+ * spelling of a refused place.
+ *
+ * A string that is not a host or an address at all counts as local: the caller
+ * is asking whether the agent may reach it, and an answer it cannot read is no.
+ *
+ * This judges the literal only. A public name that resolves to `127.0.0.1` passes
+ * here, which is why the daemon also asks it of the address the response came from.
  */
-function isLocalHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/\.$/, '')
-  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return true
-  if (host.startsWith('[') && host.endsWith(']')) return isLocalIPv6(host.slice(1, -1))
-  const v4 = ipv4Octets(host)
+export function isLocalHost(host: string): boolean {
+  const canonical = canonicalHost(host)
+  if (canonical === null) return true
+  if (canonical.startsWith('[')) return isLocalIPv6(ipv6Hextets(canonical.slice(1, -1)))
+  const name = canonical.replace(/\.+$/, '')
+  if (name === 'localhost' || name.endsWith('.localhost')) return true
+  // `local` itself is the mDNS domain, never a public name.
+  if (name === 'local' || name.endsWith('.local')) return true
+  const v4 = ipv4Octets(name)
   return v4 !== null && isLocalIPv4(v4)
+}
+
+/**
+ * The host as the URL parser writes it: lower case, IPv4 in dotted decimal,
+ * IPv6 bracketed and compressed. `null` when it is not a host on its own (a
+ * path, a port, user info, whitespace): those would make the parser read a
+ * different host than the caller meant.
+ */
+function canonicalHost(host: string): string | null {
+  const bracketed = host.startsWith('[') && host.endsWith(']')
+  const inner = bracketed ? host.slice(1, -1) : host
+  let literal: string
+  if (bracketed || inner.includes(':')) {
+    if (!/^[0-9a-f:.]+$/i.test(inner)) return null
+    literal = `[${inner}]`
+  } else {
+    if (!/^[a-z0-9._-]+$/i.test(inner)) return null
+    literal = inner
+  }
+  try {
+    return new URL(`http://${literal}/`).hostname
+  } catch {
+    return null
+  }
 }
 
 function ipv4Octets(host: string): readonly number[] | null {
@@ -447,23 +489,38 @@ function isLocalIPv4(octets: readonly number[]): boolean {
     a === 127 || // 127/8, loopback
     (a === 169 && b === 254) || // 169.254/16, link-local and the cloud metadata address
     (a === 172 && b >= 16 && b <= 31) || // 172.16/12
-    (a === 192 && b === 168) // 192.168/16
+    (a === 192 && b === 168) || // 192.168/16
+    (a === 100 && (b & 0xc0) === 0x40) // 100.64/10, CGNAT and Tailscale
   )
 }
 
-/** `address` is the parser's compressed, lower-case form, without brackets. */
-function isLocalIPv6(address: string): boolean {
-  if (address === '::' || address === '::1') return true
-  const mapped = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(address)
-  if (mapped) {
-    const hi = parseInt(mapped[1] ?? '', 16)
-    const lo = parseInt(mapped[2] ?? '', 16)
-    return isLocalIPv4([hi >> 8, hi & 0xff, lo >> 8, lo & 0xff])
-  }
-  const first = address.startsWith('::') ? 0 : parseInt(address.split(':')[0] ?? '', 16)
+/**
+ * The eight 16-bit groups of an address in the parser's compressed form (hex
+ * groups only, at most one `::`), so the checks below compare numbers rather
+ * than the several strings one prefix can be written as.
+ */
+function ipv6Hextets(address: string): readonly number[] {
+  const groups = (part: string): number[] => (part === '' ? [] : part.split(':').map((g) => parseInt(g, 16)))
+  const [head = '', tail] = address.split('::')
+  const left = groups(head)
+  if (tail === undefined) return left
+  const right = groups(tail)
+  return [...left, ...new Array<number>(8 - left.length - right.length).fill(0), ...right]
+}
+
+function isLocalIPv6(h: readonly number[]): boolean {
+  const [a = 0, b = 0, c = 0, d = 0, e = 0, f = 0, g = 0, l = 0] = h
+  const embedded = [g >> 8, g & 0xff, l >> 8, l & 0xff]
+  const zero = (n: number): boolean => h.slice(0, n).every((x) => x === 0)
+  // An IPv4 address carried inside IPv6 reaches that IPv4 address, so it is
+  // judged as one. `::` and `::1` fall here as 0.0.0.0 and 0.0.0.1, both in 0/8.
+  if (zero(6)) return isLocalIPv4(embedded) // ::a.b.c.d, IPv4-compatible
+  if (zero(5) && f === 0xffff) return isLocalIPv4(embedded) // ::ffff:a.b.c.d, mapped
+  if (zero(4) && e === 0xffff && f === 0) return isLocalIPv4(embedded) // ::ffff:0:a.b.c.d, SIIT
+  if (a === 0x64 && b === 0xff9b && c === 0 && d === 0 && e === 0 && f === 0) return isLocalIPv4(embedded) // 64:ff9b::/96, NAT64
   return (
-    (first & 0xffc0) === 0xfe80 || // fe80::/10, link-local
-    (first & 0xfe00) === 0xfc00 // fc00::/7, unique local
+    (a & 0xffc0) === 0xfe80 || // fe80::/10, link-local
+    (a & 0xfe00) === 0xfc00 // fc00::/7, unique local
   )
 }
 

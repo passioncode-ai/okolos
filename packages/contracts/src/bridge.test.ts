@@ -26,6 +26,7 @@ import {
   REFUSAL_RETRYABLE,
   SCOPE_LIMITS,
   inScope,
+  isLocalHost,
   originOf,
   refusalKey,
   refuse,
@@ -104,12 +105,23 @@ describe('a task scope', () => {
       'http://[fd00::1]/': 'http://[fd00::1]',
       'http://printer.local/': 'http://printer.local',
       'http://printer.local./': 'http://printer.local.',
+      // CGNAT, and the range Tailscale gives the person's own machines: the plan
+      // counts it as the local network, and so must the scope (seam N-001, r3).
+      'http://100.64.0.1/': 'http://100.64.0.1',
+      'http://100.127.255.254/': 'http://100.127.255.254',
+      'http://[::ffff:100.64.0.1]/': 'http://[::ffff:6440:1]',
+      // IPv4-compatible, SIIT and NAT64 spellings of loopback (unit N-001, r2).
+      'http://[::127.0.0.1]/': 'http://[::7f00:1]',
+      'http://[::ffff:0:127.0.0.1]/': 'http://[::ffff:0:7f00:1]',
+      'http://[64:ff9b::127.0.0.1]/': 'http://[64:ff9b::7f00:1]',
     }
     for (const [url, origin] of Object.entries(refused)) {
       expect(validateScope({ ...base, origins: { read: [url], write: [] } }), url).toEqual({
         ok: false,
         reason: `origins.read: not a public origin: ${origin}`,
       })
+      // One rule: the scope refuses exactly what the shared classifier calls local.
+      expect(isLocalHost(new URL(url).hostname), url).toBe(true)
     }
     const write = validateScope({
       ...base,
@@ -127,13 +139,18 @@ describe('a task scope', () => {
       'http://172.32.0.0/',
       'http://192.169.0.1/',
       'http://169.255.0.1/',
+      'http://100.63.255.255/',
+      'http://100.128.0.0/',
       'http://[fec0::1]/',
       'http://[2001:db8::1]/',
+      'http://[::ffff:8.8.8.8]/',
+      'http://[64:ff9b::8.8.8.8]/',
       'https://local.example/',
       'https://notlocal.example/',
       'https://localhost.example/',
     ]) {
       expect(validateScope({ ...base, origins: { read: [url], write: [] } }).ok, url).toBe(true)
+      expect(isLocalHost(new URL(url).hostname), url).toBe(false)
     }
   })
 
@@ -169,6 +186,105 @@ describe('a task scope', () => {
     expect(validateScope({ ...base, goal: '   ' }).ok).toBe(false)
     expect(validateScope({ ...base, origins: { read: [], write: [] } }).ok).toBe(false)
     expect(validateScope(null).ok).toBe(false)
+  })
+})
+
+describe('this machine or the local network', () => {
+  // The daemon asks the same question twice: of a hostname when a task names an
+  // origin, and of the address a response actually came from (N-011, CDP
+  // remoteIPAddress), which arrives bare and unbracketed. One function answers
+  // both, so the two answers cannot drift apart.
+  it('is every listed range, however the host or address is spelled', () => {
+    for (const host of [
+      'localhost',
+      'LOCALHOST',
+      'localhost.',
+      'app.localhost',
+      'local',
+      'printer.local',
+      'printer.local.',
+      '127.0.0.1',
+      '127.0.0.1.',
+      '127.255.255.254',
+      '0.0.0.0',
+      '0.255.255.255',
+      '10.0.0.1',
+      '10.255.255.255',
+      '172.16.0.1',
+      '172.31.255.255',
+      '192.168.0.1',
+      '192.168.255.255',
+      '169.254.169.254',
+      '100.64.0.1',
+      '100.127.255.254',
+      '::',
+      '[::]',
+      '::1',
+      '[::1]',
+      '0:0:0:0:0:0:0:1',
+      'fe80::1',
+      '[fe80::1]',
+      'fe80::1%en0',
+      'febf::1',
+      'fc00::1',
+      '[fd00::1]',
+      'FDFF::1',
+      '::ffff:127.0.0.1',
+      '[::ffff:7f00:1]',
+      '[::ffff:100.64.0.1]',
+      '::ffff:100.64.0.1',
+      '::ffff:c0a8:1',
+      '::127.0.0.1',
+      '[::7f00:1]',
+      '::ffff:0:127.0.0.1',
+      '64:ff9b::127.0.0.1',
+      '[64:ff9b::a00:1]',
+    ]) {
+      expect(isLocalHost(host), host).toBe(true)
+    }
+  })
+
+  it('is not a public address or name just outside a range', () => {
+    for (const host of [
+      'example.com',
+      'local.example',
+      'localhost.example',
+      'example.local.com',
+      'xn--pple-43d.com',
+      '8.8.8.8',
+      '126.255.255.255',
+      '128.0.0.1',
+      '11.0.0.1',
+      '172.15.255.255',
+      '172.32.0.0',
+      '192.169.0.1',
+      '169.255.0.1',
+      '100.63.255.255',
+      '100.128.0.0',
+      '1.0.0.0',
+      '2606:4700::1111',
+      '[2001:db8::1]',
+      'fe7f::1',
+      'fec0::1',
+      'fbff::1',
+      'fe00::1',
+      '::ffff:8.8.8.8',
+      '[::ffff:808:808]',
+      '64:ff9b::8.8.8.8',
+    ]) {
+      expect(isLocalHost(host), host).toBe(false)
+    }
+  })
+
+  it('is assumed for anything that is not a host at all, so a garbled answer never reads as public', () => {
+    for (const junk of ['', ' ', 'a b', '[::g]', '1::2::3', 'example.com/path', 'user@example.com', 'example.com:443']) {
+      expect(isLocalHost(junk), junk).toBe(true)
+    }
+  })
+
+  it('is exported from the package entry', () => {
+    expect(typeof isLocalHost).toBe('function')
+    expect(contracts.isLocalHost).toBe(isLocalHost)
   })
 })
 

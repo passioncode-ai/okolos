@@ -70,6 +70,7 @@ export {
   REFUSAL_RETRYABLE,
   SCOPE_LIMITS,
   inScope,
+  isLocalHost,
   originOf,
   refusalKey,
   refuse,
