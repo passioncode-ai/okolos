@@ -140,7 +140,7 @@ Contract: brand-contract v1
 | Забрать доступ | **Отозвать доступ** | Revoke access | `[data-role=agent-revoke]` |
 | Работа агента с областью, бюджетом и сроком | **задача** | task | `TaskScope` |
 | Шаг задачи, который считается в бюджет | **шаг** | step | `stepBudget` |
-| Ответ «нет» по правилам задачи или двери | **отказ** | refusal | `BridgeRefusal` и `DoorRejection`, кроме кодов сбоя ниже |
+| Ответ «нет» по правилам задачи или двери | **отказ** | refusal | `BridgeRefusal` и `DoorRejection`, кроме кодов сбоя ниже; журнальные коды `bad_call` (вызов составлен с ошибкой) и `local_answer` (сайт ответил с адреса этого устройства или локальной сети) |
 | Файл Okolos Agent, где хранятся агенты с доступом (только SHA-256 ключей) | **список доступов** | access list | `Pairing`, `pairings.json` |
 | Секрет, который агент получает один раз и предъявляет двери | **ключ доступа**, на странице Okolos Agent и в CLI допустимо короткое **ключ** | access key, short form key | `X-Okolos-Agent-Key` |
 | Постоянный профиль Chrome, где работают задачи агентов | **профиль агента** | agent profile | `profile: 'agent'` |
