@@ -709,12 +709,12 @@ flowchart TD
   A[Agent calls the local door] --> K{Paired key?}
   PR[okolos-agent pair: POST /pair] --> P
   K -->|yes| OK[Request handled under the agent's scope]
-  K -->|no key| N
+  K -->|no key| N[Refused and recorded in the agents' journal, SCR-24]
   P[Page: agent X asks for access, code 123 456]
   P -->|person confirms, codes match| C[Confirmed: the CLI collects the key within five minutes]
   C -->|collected| R[Key issued to the agent once; the daemon keeps only its SHA-256]
-  C -->|not collected in time| N
-  P -->|person refuses or no answer| N[Refused and recorded in the service's events]
+  C -->|not collected in time| NE
+  P -->|person refuses or no answer| NE[Refused and recorded in the service's events]
   R --> OK
   K -->|any Origin or Sec-Fetch header| N
 ```
@@ -750,7 +750,7 @@ flowchart TD
   STOP[Stop control] -.-> E
 ```
 
-- **Screens traversed:** SCR-24 (Agent activity) in Б1. The approval panel and the hand-off notice are designed in Б2, with the actions they gate.
+- **Screens traversed:** SCR-24 (Agent activity) in Б1. The approval panel, the hand-off notice and the stop control are designed in Б2, with the actions they gate; in Б1 a task ends by its time limit, its step budget, the agent's `close` or the person revoking the agent's access.
 - **The task gets its own window, not a background tab.** Measured 2026-10-06 (`docs/superpowers/evidence/2026-10-06-b0-agent-window.md`): input sent to a background tab never reaches the page, even with focus emulation, while a tab in a separate background window is visible and receives trusted input — and the window does not take the person's focus once it is open.
 - **"Refused" is a policy answer, not an error.** An agent that reads a refusal as a failure retries it; the codes say which kind of no it was, and a retry after a refusal counts against the task's budget.
 

@@ -35,6 +35,8 @@
   "слова для машинных причин привязки: name_not_text, name_empty, name_too_long, name_digits, name_bidi, name_control, too_many_pending, too_many_requests и причин хранилища unreadable, not_json, not_a_store, bad_record; copylot_check (проверка product N-007); также name_reserved (имя похоже на «Okolos») и unwritable (хранилище не записалось) (отчёт N-007 fix 2)",
   "ключи verb_<глагол> для каждого AnyBridgeVerb (точки как подчёркивания: verb_session_open), исчерпывающая функция verbKey как refusalKey; на странице не появляется идентификатор глагола (проверки N-013 круг 3, N-007 круг 2)",
   "слова для причин сбоя журнала (то, что подставляется в $WHAT$ строки journalError) и хранилища (pairingStoreError, agentRevokeFailed), copylot_check (проверки N-013 круг 3, N-007 круг 2)",
+  "ключи для семи событий привязки (requested, confirmed, declined, expired, claim_expired, paired, revoked) с именем после слова «агент»; N-011 добавляет их в проверку ключей при старте (проверки N-013 круг 4)",
+  "слова для кодов сбоя журнала no_space, no_permission, other (подставляются в $WHAT$ строк journalError и journalUnreadable) (проверки N-013 круг 4)",
   "проверка узла: python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts"
  ],
  "guards": [

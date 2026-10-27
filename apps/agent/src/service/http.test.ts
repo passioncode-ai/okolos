@@ -496,7 +496,7 @@ describe('what a person reads comes from the agent catalogue', () => {
     const { service } = await start({ dirs, routes: [slow, later], locale: 'en' })
 
     const warned = (await feed(service.port, dirs)).find((e) => e.kind === 'service.events_unreadable')
-    expect(warned?.text).toBe('The events file had unreadable lines: 1. They were removed at start; the other events are kept.')
+    expect(warned?.text).toBe('The events file had unreadable lines: 1. They were removed at start.')
 
     const inFlight = call(service.port, '/slow')
     await inside
@@ -946,7 +946,7 @@ describe('the host’s routes take the host token', () => {
     expect(warnings).toHaveLength(1)
     expect(warnings[0]?.level).toBe('warning')
     expect(warnings[0]?.text).toBe(
-      'В файле событий нашлись нечитаемые строки: 1. При запуске они удалены, остальные события сохранены.',
+      'В файле событий нашлись нечитаемые строки: 1. При запуске они удалены.',
     )
     expect(page.events.map((e) => e.id)).toEqual(['1', '2', '3'])
   })

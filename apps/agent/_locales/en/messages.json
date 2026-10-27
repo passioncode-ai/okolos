@@ -9,7 +9,7 @@
     "message": "Asking for access"
   },
   "pairingAgentName": {
-    "message": "$NAME$ (the name the agent gave itself)",
+    "message": "Agent $NAME$ (a name it gave itself)",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -45,7 +45,7 @@
     "message": "Decline"
   },
   "pairingConfirmed": {
-    "message": "Access for $NAME$ is confirmed. The agent has five minutes to collect its key.",
+    "message": "Access for agent $NAME$ is confirmed. The agent has five minutes to collect its key.",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -53,7 +53,7 @@
     }
   },
   "pairingDeclined": {
-    "message": "$NAME$'s request was declined.",
+    "message": "The request from agent $NAME$ was declined.",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -86,7 +86,7 @@
     "message": "Revoke access"
   },
   "agentRevoked": {
-    "message": "$NAME$'s access was revoked and its tasks closed.",
+    "message": "Access for agent $NAME$ was revoked and its tasks closed.",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -166,7 +166,7 @@
     "message": "No refusals."
   },
   "refusalLine": {
-    "message": "$WHEN$. Agent $AGENT$, call “$ASKED$”. Refused: $WHAT$",
+    "message": "$WHEN$. $AGENT$, call “$ASKED$”. Refused: $WHAT$",
     "placeholders": {
       "when": {
         "content": "$1"
@@ -204,31 +204,31 @@
     "message": "the task's time ran out"
   },
   "refusal_tab_gone": {
-    "message": "the task's tab was closed"
+    "message": "the task's tab is gone"
   },
   "refusal_busy": {
-    "message": "the browser is busy with another task"
+    "message": "Okolos Agent is busy with another task"
   },
   "refusal_in_use_by_person": {
-    "message": "a person is using this window"
+    "message": "a person is using this window now"
   },
   "refusal_browser_offline": {
-    "message": "Chrome is not running or cannot be reached"
+    "message": "Okolos Agent could not start or reach its Chrome"
   },
   "refusal_blocked_by_shield": {
     "message": "Okolos protection stopped the call"
   },
   "refusal_internal": {
-    "message": "an Okolos Agent failure; nothing was sent"
+    "message": "an Okolos Agent failure; no answer was given"
   },
   "journalLink": {
     "message": "Export the agents' journal"
   },
   "refusal_cleaning_incomplete": {
-    "message": "cleaning did not finish; no text was sent"
+    "message": "cleaning did not finish; no text was given"
   },
   "refusal_stale_cursor": {
-    "message": "this snapshot page is out of date; take a new snapshot"
+    "message": "the cursor is not from the latest snapshot"
   },
   "eventStarted": {
     "message": "Okolos Agent started."
@@ -248,7 +248,7 @@
     "message": "Okolos Agent is stopping and takes on no new work. Try again once it has started."
   },
   "eventsUnreadable": {
-    "message": "The events file had unreadable lines: $COUNT$. They were removed at start; the other events are kept.",
+    "message": "The events file had unreadable lines: $COUNT$. They were removed at start.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -297,13 +297,13 @@
     }
   },
   "rejection_bad_host": {
-    "message": "the call came to a foreign address for the service"
+    "message": "the call named an address other than Okolos Agent"
   },
   "rejection_bad_origin": {
-    "message": "the call came from a page in the browser"
+    "message": "the call carried an Origin header, as a web page does"
   },
   "rejection_cross_site": {
-    "message": "the call came from another site"
+    "message": "the call carried a Sec-Fetch-Site header, as a browser does"
   },
   "rejection_bad_content_type": {
     "message": "the call was in the wrong format"
@@ -312,13 +312,13 @@
     "message": "the call could not be read"
   },
   "rejection_stopping": {
-    "message": "the service was stopping"
+    "message": "Okolos Agent was stopping"
   },
   "rejection_not_paired": {
     "message": "the call had no valid access key"
   },
   "journalError": {
-    "message": "The agents' journal cannot be written: $WHAT$. Until it is fixed, agents get a refusal and no page content is sent. Run okolos-agent doctor to see what is wrong with the journal.",
+    "message": "The agents' journal cannot be written: $WHAT$. Until it is fixed, agents get a refusal and no page content is given to them. Run okolos-agent doctor to see what is wrong with the journal.",
     "placeholders": {
       "what": {
         "content": "$1"
@@ -326,15 +326,15 @@
     }
   },
   "pairingLooksLikeAgent": {
-    "message": "The name looks like that of an agent with access: $NAME$. Compare the code with special care.",
+    "message": "The name looks like that of an agent with access: $AGENTS$. Compare the code with special care.",
     "placeholders": {
-      "name": {
+      "agents": {
         "content": "$1"
       }
     }
   },
   "agentRevokeFailed": {
-    "message": "$NAME$'s access was not revoked: the access list could not be written. The agent can still work. Try again; if it fails, run okolos-agent doctor.",
+    "message": "Access for agent $NAME$ was not revoked: the access list could not be written. The agent can still work. Try again. If it fails, run okolos-agent doctor.",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -348,21 +348,66 @@
     "message": "take a page snapshot"
   },
   "verb_read": {
-    "message": "read a snapshot"
+    "message": "read the page text"
   },
   "verb_get": {
-    "message": "get part of a snapshot"
+    "message": "get a text, title or address"
   },
   "verb_waitFor": {
     "message": "wait on the page"
   },
   "verb_close": {
-    "message": "close the task"
+    "message": "close the task's window"
   },
   "verb_session_open": {
     "message": "open a task"
   },
   "verb_hygiene_census": {
     "message": "run the process census"
+  },
+  "agentLabel": {
+    "message": "Agent $NAME$ (access since $DATE$)",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "date": {
+        "content": "$2"
+      }
+    }
+  },
+  "agentLabelRevoked": {
+    "message": "Agent $NAME$ (access revoked)",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "rejection_store_unreadable": {
+    "message": "the access list could not be read; the key was not checked"
+  },
+  "journalUnreadable": {
+    "message": "The agents' journal cannot be read: $WHAT$. Refusals are not shown here. Run okolos-agent doctor to see what is wrong with the journal.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
+  },
+  "refusalsIncomplete": {
+    "message": "This list is incomplete: while the agents' journal cannot be written, refusals are not recorded."
+  },
+  "pageSessionExpired": {
+    "message": "The page session expired. Open Okolos Agent again in Fabric Dashboards."
+  },
+  "pageStopping": {
+    "message": "Okolos Agent is stopping. Open the page again once it has started."
+  },
+  "taskProfileAgent": {
+    "message": "Agent profile, which keeps sign-ins"
+  },
+  "taskProfileDisposable": {
+    "message": "Temporary profile, which keeps no sign-ins"
   }
 }

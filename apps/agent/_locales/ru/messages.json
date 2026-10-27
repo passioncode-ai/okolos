@@ -9,7 +9,7 @@
     "message": "Просят доступ"
   },
   "pairingAgentName": {
-    "message": "$NAME$ (так агент назвал себя сам)",
+    "message": "Агент $NAME$ (имя он дал себе сам)",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -105,7 +105,7 @@
     }
   },
   "pairingStoreError": {
-    "message": "Список доступов не читается: $WHAT$. Пока его не починят, дверь отказывает всем вызовам. Запустите okolos-agent doctor: он скажет, что с файлом.",
+    "message": "Список доступов не читается: $WHAT$. Пока его не починят, дверь отказывает всем вызовам. Запустите okolos-agent doctor: он покажет, что с файлом.",
     "placeholders": {
       "what": {
         "content": "$1"
@@ -166,7 +166,7 @@
     "message": "Отказов не было."
   },
   "refusalLine": {
-    "message": "$WHEN$. Агент $AGENT$, вызов «$ASKED$». Отказ: $WHAT$",
+    "message": "$WHEN$. $AGENT$, вызов «$ASKED$». Отказ: $WHAT$",
     "placeholders": {
       "when": {
         "content": "$1"
@@ -204,16 +204,16 @@
     "message": "время задачи вышло"
   },
   "refusal_tab_gone": {
-    "message": "вкладку задачи закрыли"
+    "message": "вкладки задачи больше нет"
   },
   "refusal_busy": {
-    "message": "браузер занят другой задачей"
+    "message": "Okolos Agent занят другой задачей"
   },
   "refusal_in_use_by_person": {
-    "message": "этим окном пользуется человек"
+    "message": "человек сейчас пользуется этим окном"
   },
   "refusal_browser_offline": {
-    "message": "Chrome не запущен или недоступен"
+    "message": "Okolos Agent не смог запустить свой Chrome или связаться с ним"
   },
   "refusal_blocked_by_shield": {
     "message": "защита Okolos не пропустила вызов"
@@ -228,7 +228,7 @@
     "message": "очистка не завершилась, текст не выдан"
   },
   "refusal_stale_cursor": {
-    "message": "эта страница снимка устарела, нужен новый снимок"
+    "message": "курсор не от последнего снимка"
   },
   "eventStarted": {
     "message": "Okolos Agent запущен."
@@ -248,7 +248,7 @@
     "message": "Okolos Agent останавливается и новую работу не берёт. Повторите, когда он снова запустится."
   },
   "eventsUnreadable": {
-    "message": "В файле событий нашлись нечитаемые строки: $COUNT$. При запуске они удалены, остальные события сохранены.",
+    "message": "В файле событий нашлись нечитаемые строки: $COUNT$. При запуске они удалены.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -297,13 +297,13 @@
     }
   },
   "rejection_bad_host": {
-    "message": "вызов пришёл на чужой адрес службы"
+    "message": "вызов назвал не адрес Okolos Agent"
   },
   "rejection_bad_origin": {
-    "message": "вызов пришёл со страницы в браузере"
+    "message": "вызов нёс заголовок Origin, как у веб-страницы"
   },
   "rejection_cross_site": {
-    "message": "вызов пришёл с чужого сайта"
+    "message": "вызов нёс заголовок Sec-Fetch-Site, как у браузера"
   },
   "rejection_bad_content_type": {
     "message": "вызов в неверном формате"
@@ -312,13 +312,13 @@
     "message": "вызов не удалось разобрать"
   },
   "rejection_stopping": {
-    "message": "служба останавливалась"
+    "message": "Okolos Agent останавливался"
   },
   "rejection_not_paired": {
     "message": "у вызова нет действующего ключа доступа"
   },
   "journalError": {
-    "message": "Журнал агентов не пишется: $WHAT$. Пока его не починят, агенты получают отказ, а содержимое страниц не уходит. Запустите okolos-agent doctor: он скажет, что с журналом.",
+    "message": "Журнал агентов не пишется: $WHAT$. Пока его не починят, агенты получают отказ, а содержимое страниц им не выдаётся. Запустите okolos-agent doctor: он покажет, что с журналом.",
     "placeholders": {
       "what": {
         "content": "$1"
@@ -326,15 +326,15 @@
     }
   },
   "pairingLooksLikeAgent": {
-    "message": "Имя похоже на имя агента с доступом: $NAME$. Сверьте код особенно внимательно.",
+    "message": "Имя похоже на имя агента с доступом: $AGENTS$. Сверьте код особенно внимательно.",
     "placeholders": {
-      "name": {
+      "agents": {
         "content": "$1"
       }
     }
   },
   "agentRevokeFailed": {
-    "message": "Доступ агента $NAME$ не отозван: список доступов не записался. Агент по-прежнему может работать. Попробуйте ещё раз; не выйдет, запустите okolos-agent doctor.",
+    "message": "Доступ агента $NAME$ не отозван: список доступов не записался. Агент по-прежнему может работать. Попробуйте ещё раз. Если не выйдет, запустите okolos-agent doctor.",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -348,21 +348,66 @@
     "message": "сделать снимок страницы"
   },
   "verb_read": {
-    "message": "прочитать снимок"
+    "message": "прочитать текст страницы"
   },
   "verb_get": {
-    "message": "взять часть снимка"
+    "message": "узнать текст, заголовок или адрес"
   },
   "verb_waitFor": {
     "message": "подождать на странице"
   },
   "verb_close": {
-    "message": "закрыть задачу"
+    "message": "закрыть окно задачи"
   },
   "verb_session_open": {
     "message": "открыть задачу"
   },
   "verb_hygiene_census": {
     "message": "провести перепись процессов"
+  },
+  "agentLabel": {
+    "message": "Агент $NAME$ (доступ с $DATE$)",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "date": {
+        "content": "$2"
+      }
+    }
+  },
+  "agentLabelRevoked": {
+    "message": "Агент $NAME$ (доступ отозван)",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "rejection_store_unreadable": {
+    "message": "список доступов не читался, ключ не проверен"
+  },
+  "journalUnreadable": {
+    "message": "Журнал агентов не читается: $WHAT$. Отказы здесь не показаны. Запустите okolos-agent doctor: он покажет, что с журналом.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
+  },
+  "refusalsIncomplete": {
+    "message": "Список неполный: пока журнал агентов не пишется, отказы в него не попадают."
+  },
+  "pageSessionExpired": {
+    "message": "Сеанс страницы истёк. Откройте Okolos Agent заново в Fabric Dashboards."
+  },
+  "pageStopping": {
+    "message": "Okolos Agent останавливается. Откройте страницу снова, когда он запустится."
+  },
+  "taskProfileAgent": {
+    "message": "Профиль агента, где сохраняются входы на сайты"
+  },
+  "taskProfileDisposable": {
+    "message": "Временный профиль, входы на сайты не сохраняются"
   }
 }
