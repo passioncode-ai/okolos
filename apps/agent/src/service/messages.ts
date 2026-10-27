@@ -17,11 +17,19 @@ import { fromCatalogue, type Catalogue } from '@okolos/i18n'
 export type Locale = 'ru' | 'en'
 
 /** Every catalogue key this shell resolves. */
-export const SERVICE_KEYS = ['eventStarted', 'eventStopping', 'serviceStopping', 'eventsUnreadable'] as const
+export const SERVICE_KEYS = [
+  'eventStarted',
+  'eventStopping',
+  'eventDrainCutOff',
+  'serviceStopping',
+  'eventsUnreadable',
+] as const
 
 export interface ServiceMessages {
   started(): string
   stopping(): string
+  /** The drain's deadline passed with `count` requests still open; they were cut off. */
+  drainCutOff(count: number): string
   refusingWhileStopping(): string
   unreadableEvents(count: number): string
 }
@@ -32,11 +40,19 @@ export function defaultLocalesDir(): string {
 }
 
 export function serviceMessages(locale: Locale, localesDir: string = defaultLocalesDir()): ServiceMessages {
-  const catalogue = JSON.parse(readFileSync(path.join(localesDir, locale, 'messages.json'), 'utf8')) as Catalogue
+  const file = path.join(localesDir, locale, 'messages.json')
+  const catalogue = JSON.parse(readFileSync(file, 'utf8')) as Catalogue
+  // A stale catalogue would put "[key]" into the feed a person reads: refuse to start instead.
+  const missing = SERVICE_KEYS.filter((key) => typeof catalogue[key]?.message !== 'string')
+  if (missing.length > 0) {
+    // i18n-exempt: a start failure for whoever installs the daemon, naming the catalogue file and its missing keys
+    throw new Error(`The agent catalogue ${file} lacks ${missing.join(', ')}.`)
+  }
   const say = fromCatalogue(catalogue)
   return {
     started: () => say('eventStarted'),
     stopping: () => say('eventStopping'),
+    drainCutOff: (count) => say('eventDrainCutOff', [String(count)]),
     refusingWhileStopping: () => say('serviceStopping'),
     unreadableEvents: (count) => say('eventsUnreadable', [String(count)]),
   }

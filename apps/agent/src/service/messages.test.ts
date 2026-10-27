@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -27,6 +28,28 @@ describe('the sentences the service shell says to a person', () => {
         expect(message, `${locale} ${key}`).not.toMatch(/[!—]/)
         expect(message.trim().endsWith('.'), `${locale} ${key}`).toBe(true)
       }
+    }
+  })
+
+  it('says only what the drain can keep: stopping takes no new work, and a cut-off is told with its count', () => {
+    expect(catalogue('ru').eventStopping?.message).toBe('Okolos Agent останавливается и новую работу не берёт.')
+    expect(catalogue('en').eventStopping?.message).toBe('Okolos Agent is stopping and takes on no new work.')
+    const ru = serviceMessages('ru', LOCALES)
+    const en = serviceMessages('en', LOCALES)
+    expect(ru.drainCutOff(2)).toBe('Okolos Agent остановился, не дождавшись конца запросов (2): они оборваны.')
+    expect(en.drainCutOff(2)).toBe('Okolos Agent stopped before 2 requests finished: they were cut off.')
+  })
+
+  it('refuses a catalogue that lacks a key the service says, naming the key', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-agent-locales-'))
+    try {
+      const partial = { ...catalogue('en') }
+      delete partial.eventStarted
+      mkdirSync(path.join(dir, 'en'))
+      writeFileSync(path.join(dir, 'en', 'messages.json'), JSON.stringify(partial))
+      expect(() => serviceMessages('en', dir)).toThrow(/eventStarted/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
     }
   })
 

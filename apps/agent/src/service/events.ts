@@ -40,7 +40,8 @@ export class EventLog {
   readonly file: string
   /**
    * Lines found at start that are not events (cut short by a full disk or a power loss, or
-   * edited by hand). They are skipped, never fatal; the service reports the count as degraded.
+   * edited by hand). They are skipped, never fatal, and removed from the file at that start; the
+   * service reports the count as degraded for this run only.
    */
   readonly unreadable: number
   private last: number
@@ -50,6 +51,9 @@ export class EventLog {
     this.endLastLine()
     const { events, unreadable } = this.scan()
     this.unreadable = unreadable
+    // Counted once, for the start that found them; then the file is rewritten without them (ids
+    // kept), so the next start is clean and a degraded status does not outlive what caused it.
+    if (unreadable > 0) atomicWrite(this.file, events.map((event) => `${JSON.stringify(event)}\n`).join(''), 0o600)
     this.last = Number(events.at(-1)?.id ?? 0)
     this.trim(now())
   }

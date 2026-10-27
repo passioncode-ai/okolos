@@ -148,10 +148,16 @@ export async function startService(options: StartOptions): Promise<RunningServic
   const { dirs } = options
   const exit = options.exit ?? ((code: number) => process.exit(code))
 
-  // 1. The lock, before any side effect.
-  const lock = await holdSingleInstance(dirs.data, { exit })
+  // 1. The lock, before any side effect. Once exit was asked for, this copy stops, whatever exit returned.
+  let exited = false
+  const lock = await holdSingleInstance(dirs.data, {
+    exit: (code) => {
+      exited = true
+      exit(code)
+    },
+  })
   // i18n-exempt: reached only when a test's exit returns; the daemon has already exited 75 with the kit's sentence
-  if (!lock) throw new ServiceError('Another copy of Okolos Agent holds the lock; this one did not start.')
+  if (exited || lock === undefined) throw new ServiceError('Another copy of Okolos Agent holds the lock; this one did not start.')
 
   // 2. State, only after the lock. Whatever fails from here to the bind lets the lock go.
   const paths = servicePaths(dirs)
@@ -162,7 +168,9 @@ export async function startService(options: StartOptions): Promise<RunningServic
   let events: EventLog
   let say: ServiceMessages
   let added: readonly Route[]
+  let build: ReturnType<typeof buildIdentity>
   try {
+    build = buildIdentity(options.buildRoot)
     say = serviceMessages(locale, options.localesDir)
     token = ensureToken(paths.hostToken)
     log = new RotatingLog(paths.serviceLog)
@@ -173,7 +181,6 @@ export async function startService(options: StartOptions): Promise<RunningServic
     lock.release()
     throw error
   }
-  const build = buildIdentity(options.buildRoot)
   const startedAt = nowIso()
   const drain = new Drain()
   let status: ServiceStatus = 'starting'
@@ -244,6 +251,15 @@ export async function startService(options: StartOptions): Promise<RunningServic
     })
   }
 
+  // The document once before the bind: an action table or extension the kit refuses fails the start
+  // with the kit's reason, rather than every well-known request answering 500 while the service runs.
+  try {
+    document()
+  } catch (error) {
+    lock.release()
+    throw error
+  }
+
   /** Tells the caller's hook first; a hook that throws turns the answer into a 500 with no body. */
   const refuse = async (
     req: IncomingMessage,
@@ -253,7 +269,8 @@ export async function startService(options: StartOptions): Promise<RunningServic
     answer: () => void,
   ): Promise<void> => {
     try {
-      await options.onRefused?.(req, url, reason)
+      // Without its query: a refused /fabric/v1/login?code= still holds a live code, and the hook journals.
+      await options.onRefused?.(req, url === null ? null : withoutQuery(url), reason)
     } catch (error) {
       log.write('error', 'onRefused failed', { reason, error: errorName(error) })
       res.writeHead(500)
@@ -344,22 +361,14 @@ export async function startService(options: StartOptions): Promise<RunningServic
     throw error
   }
   port = (server.address() as AddressInfo).port
-  status = 'ready'
-  events.append('service.started', 'info', say.started())
-  log.write('info', 'started', { port, pid: process.pid })
-
-  const markStopping = () => {
-    status = 'stopping'
-    events.append('service.stopping', 'info', say.stopping())
-    log.write('info', 'stopping')
-  }
 
   let finished: Promise<void> | null = null
+  /** Stops listening, cuts what is left, releases the lock; a log write that fails stops none of it. */
   const finish = (drained: boolean): Promise<void> => {
     finished ??= new Promise<void>((resolve) => {
       server.close(() => {
         lock.release()
-        log.write('info', 'stopped', { drained })
+        quietly(() => log.write('info', 'stopped', { drained }))
         resolve()
       })
       server.closeAllConnections()
@@ -367,9 +376,35 @@ export async function startService(options: StartOptions): Promise<RunningServic
     return finished
   }
 
+  // A write that fails after the bind (a full disk) closes the server and lets the lock go before the
+  // start rejects: the caller gets no handle, so nothing may be left listening or locked.
+  try {
+    status = 'ready'
+    events.append('service.started', 'info', say.started())
+    log.write('info', 'started', { port, pid: process.pid })
+  } catch (error) {
+    await finish(false)
+    throw error
+  }
+
+  const markStopping = () => {
+    status = 'stopping'
+    quietly(() => events.append('service.stopping', 'info', say.stopping()))
+    quietly(() => log.write('info', 'stopping'))
+  }
+
+  /** The drain's deadline passed with requests open: say so before they are cut. */
+  const markCutOff = (drained: boolean) => {
+    if (drained) return
+    const open = drain.inflight
+    quietly(() => events.append('service.drain_cut_off', 'warning', say.drainCutOff(open)))
+    quietly(() => log.write('warning', 'drain_cut_off', { open }))
+  }
+
   if (options.handleSignals) {
     drain.install(
       async (drained) => {
+        markCutOff(drained)
         await finish(drained)
         exit(0)
       },
@@ -385,7 +420,9 @@ export async function startService(options: StartOptions): Promise<RunningServic
     operatorSession: sessionOf,
     close: async () => {
       if (drain.requestStop()) markStopping()
-      await finish(await drain.wait(DRAIN_SECONDS))
+      const drained = await drain.wait(DRAIN_SECONDS)
+      markCutOff(drained)
+      await finish(drained)
     },
   }
 }
@@ -425,6 +462,22 @@ function parseTarget(target: string | undefined, port: number): URL | null {
   } catch {
     return null
   }
+}
+
+/** Runs a bookkeeping write whose failure must not stop a shutdown. */
+function quietly(write: () => unknown): void {
+  try {
+    write()
+  } catch {
+    // The events file or the log cannot be written (a full disk, a read-only file); stopping goes on.
+  }
+}
+
+function withoutQuery(url: URL): URL {
+  const bare = new URL(url.href)
+  bare.search = ''
+  bare.hash = ''
+  return bare
 }
 
 function errorName(error: unknown): string {

@@ -73,6 +73,17 @@ describe('a torn or unreadable line does not stop the service', () => {
     expect(log.read(null, 50).map((e) => e.id)).toEqual(['1', '2'])
   })
 
+  it('rewrites the file without the unreadable lines at start, so the next start finds it clean', () => {
+    const where = file()
+    writeFileSync(where, `${line(1)}\nnot json\n${line(2)}\n${line(3).slice(0, 25)}`, { mode: 0o600 })
+    expect(new EventLog(where).unreadable).toBe(2)
+    expect(readFileSync(where, 'utf8')).toBe(`${line(1)}\n${line(2)}\n`)
+    expect(statSync(where).mode & 0o777).toBe(0o600)
+    const again = new EventLog(where)
+    expect(again.unreadable).toBe(0)
+    expect(again.read(null, 50).map((e) => e.id)).toEqual(['1', '2'])
+  })
+
   it('counts nothing on a clean file', () => {
     const where = file()
     writeFileSync(where, `${line(1)}\n`, { mode: 0o600 })

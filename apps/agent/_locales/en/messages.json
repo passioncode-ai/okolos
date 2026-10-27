@@ -242,7 +242,15 @@
     "message": "Okolos Agent started."
   },
   "eventStopping": {
-    "message": "Okolos Agent is stopping. It finishes the work in progress and takes on nothing new."
+    "message": "Okolos Agent is stopping and takes on no new work."
+  },
+  "eventDrainCutOff": {
+    "message": "Okolos Agent stopped before $COUNT$ requests finished: they were cut off.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "serviceStopping": {
     "message": "Okolos Agent is stopping and takes on no new work. Try again once it has started."

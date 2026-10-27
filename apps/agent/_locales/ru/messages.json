@@ -242,7 +242,15 @@
     "message": "Okolos Agent запущен."
   },
   "eventStopping": {
-    "message": "Okolos Agent останавливается. Начатую работу он завершает, новую не берёт."
+    "message": "Okolos Agent останавливается и новую работу не берёт."
+  },
+  "eventDrainCutOff": {
+    "message": "Okolos Agent остановился, не дождавшись конца запросов ($COUNT$): они оборваны.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   },
   "serviceStopping": {
     "message": "Okolos Agent останавливается и новую работу не берёт. Повторите, когда он снова запустится."

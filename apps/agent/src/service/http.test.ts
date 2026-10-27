@@ -510,6 +510,160 @@ describe('what a person reads comes from the agent catalogue', () => {
   })
 })
 
+describe('fix round 2: a start that fails lets everything go, and stopping tells the truth', () => {
+  /** A port that was free a moment ago. */
+  async function freePort(): Promise<number> {
+    const probe = net.createServer()
+    await new Promise<void>((resolve) => probe.listen(0, '127.0.0.1', resolve))
+    const { port } = probe.address() as net.AddressInfo
+    await new Promise<void>((resolve) => probe.close(() => resolve()))
+    return port
+  }
+
+  /** True when nothing accepts a connection on the port. */
+  function refused(port: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const socket = net.connect(port, '127.0.0.1')
+      socket.on('connect', () => {
+        socket.destroy()
+        resolve(false)
+      })
+      socket.on('error', () => resolve(true))
+    })
+  }
+
+  it('a build root that cannot be read fails the start and lets the lock go', async () => {
+    const dirs = serviceDirs(tempHome())
+    await expect(start({ dirs, buildRoot: path.join(tempHome(), 'no-such-release') })).rejects.toThrow()
+    const next = await start({ dirs })
+    expect((await call(next.service.port, '/.well-known/fabric-service')).status).toBe(200)
+  })
+
+  it('an injected exit that returns a value still stops a second copy', async () => {
+    const dirs = serviceDirs(tempHome())
+    await start({ dirs })
+    const codes: number[] = []
+    await expect(start({ dirs, exit: (code) => codes.push(code) })).rejects.toThrow(/another copy/i)
+    expect(codes).toEqual([75])
+  })
+
+  it('a write that fails after the bind closes the server and lets the lock go before the start rejects', async () => {
+    const dirs = serviceDirs(tempHome())
+    const port = await freePort()
+    await expect(
+      start({
+        dirs,
+        port,
+        setup: async (ctx) => {
+          // The events file exists and is read-only: the "started" event after the bind fails.
+          ctx.events.append('setup.ready', 'info', 'Ready.')
+          chmodSync(ctx.paths.events, 0o400)
+          return []
+        },
+      }),
+    ).rejects.toThrow(/EACCES/)
+    expect(await refused(port)).toBe(true)
+    chmodSync(servicePaths(dirs).events, 0o600)
+    const next = await start({ dirs })
+    expect((await call(next.service.port, '/.well-known/fabric-service')).status).toBe(200)
+  })
+
+  it('close() finishes shutting down even when its stopping event cannot be written', async () => {
+    const dirs = serviceDirs(tempHome())
+    const { service } = await start({ dirs })
+    chmodSync(servicePaths(dirs).events, 0o400)
+    await service.close()
+    expect(await refused(service.port)).toBe(true)
+    chmodSync(servicePaths(dirs).events, 0o600)
+    const next = await start({ dirs })
+    expect((await call(next.service.port, '/.well-known/fabric-service')).status).toBe(200)
+  })
+
+  it('onRefused gets the URL without its query, so a live login code never reaches a journal', async () => {
+    const seen: Array<string | undefined> = []
+    const { service, dirs } = await start({
+      onRefused: async (_req, url) => {
+        seen.push(url?.href)
+      },
+    })
+    const issued = await call(service.port, '/fabric/v1/login-code', { method: 'POST', headers: bearer(dirs) })
+    const { url } = JSON.parse(issued.body) as { url: string }
+    const code = url.split('code=')[1] ?? ''
+    expect((await call(service.port, url, { headers: { 'Sec-Fetch-Site': 'cross-site' } })).status).toBe(403)
+    expect(seen).toEqual([`http://127.0.0.1:${service.port}/fabric/v1/login`])
+    expect(seen.join('')).not.toContain(code)
+  })
+
+  it('an action table the kit refuses fails the start with the reason, and lets the lock go', async () => {
+    const dirs = serviceDirs(tempHome())
+    const door: Route = Object.assign(async () => false, { paths: ['/mcp', '/dashboard'] })
+    await expect(
+      start({
+        dirs,
+        routes: [door],
+        // A human gate without its humanStep: the kit refuses the declaration (DEC-0121 AP-4).
+        wellKnownExtras: () => ({ actions: [{ id: 'pairing.confirm', title: 'Confirm', tool: 'pairing.confirm', gate: 'human' }] }),
+      }),
+    ).rejects.toThrow(/Actions declaration/)
+    const next = await start({ dirs })
+    expect((await call(next.service.port, '/.well-known/fabric-service')).status).toBe(200)
+  })
+
+  it('a catalogue without a key the service says fails the start, naming the key, and lets the lock go', async () => {
+    const dirs = serviceDirs(tempHome())
+    const locales = tempHome()
+    const en = JSON.parse(
+      readFileSync(path.resolve(here, '..', '..', '_locales', 'en', 'messages.json'), 'utf8'),
+    ) as Record<string, unknown>
+    delete en.eventStopping
+    mkdirSync(path.join(locales, 'en'))
+    writeFileSync(path.join(locales, 'en', 'messages.json'), JSON.stringify(en))
+    await expect(start({ dirs, locale: 'en', localesDir: locales })).rejects.toThrow(/eventStopping/)
+    const next = await start({ dirs })
+    expect((await call(next.service.port, '/.well-known/fabric-service')).status).toBe(200)
+  })
+
+  it('when the drain deadline passes with requests open, it says so in the events log (warning) and stops', async () => {
+    let release: () => void = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    let entered: () => void = () => {}
+    const inside = new Promise<void>((resolve) => (entered = resolve))
+    const stuck: Route = async (_req, res, ctx) => {
+      if (ctx.url.pathname !== '/stuck') return false
+      entered()
+      await held
+      res.end('late')
+      return true
+    }
+    const dirs = serviceDirs(tempHome())
+    const { service } = await start({ dirs, routes: [stuck] })
+    const open = call(service.port, '/stuck').catch(() => 'cut')
+    await inside
+
+    const started = Date.now()
+    await service.close()
+    expect(Date.now() - started).toBeGreaterThanOrEqual(7_500)
+    expect(await open).toBe('cut')
+    release()
+
+    const lines = readFileSync(servicePaths(dirs).events, 'utf8')
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l) as { kind: string; level: string; text: string })
+    const cut = lines.find((e) => e.kind === 'service.drain_cut_off')
+    expect(cut?.level).toBe('warning')
+    expect(cut?.text).toBe('Okolos Agent остановился, не дождавшись конца запросов (1): они оборваны.')
+    expect(await refused(service.port)).toBe(true)
+  })
+
+  it('a drain that finishes in time writes no cut-off', async () => {
+    const dirs = serviceDirs(tempHome())
+    const { service } = await start({ dirs })
+    await service.close()
+    expect(readFileSync(servicePaths(dirs).events, 'utf8')).not.toContain('service.drain_cut_off')
+  })
+})
+
 describe('routes built after the lock (setup)', () => {
   it('runs after the lock and the token exist, and its routes are served beside the plain ones', async () => {
     const seen: Array<{ lockPid: string; token: boolean; locale: string }> = []
