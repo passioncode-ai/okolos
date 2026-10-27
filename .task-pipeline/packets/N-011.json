@@ -33,7 +33,7 @@
   "read, get text|title, waitFor {text} строятся только из очищенных строк снимка",
   "open {ref} на ссылку вне origins.read → origin_not_in_task до перехода; редирект за область → snapshot и read отвечают origin_not_in_task",
   "каждый глагол, возвращающий URL, срезает фрагмент",
-  "ответ главного фрейма пришёл с адреса loopback или частной сети (Network.responseReceived remoteIPAddress), например по имени 127.0.0.1.nip.io: snapshot и read отвечают origin_not_in_task (проверка unit N-001, риск 2)",
+  "ответ главного фрейма пришёл с адреса loopback, частной сети или 100.64.0.0/10 (Tailscale, CGNAT; решение: это локальная сеть) (Network.responseReceived remoteIPAddress), например по имени 127.0.0.1.nip.io: snapshot и read отвечают origin_not_in_task (проверка unit N-001, риск 2)",
   "ни один ответ агенту и ни одна запись журнала не содержат текста вырезанной инструкции: находки идут через toSnapshotFinding (проверка seam N-001, break 1)",
   "фикстуры тестов открываются по имени fixture.test через --host-resolver-rules; разрешение на loopback даёт только параметр конструктора allowLoopbackForTests, который main.ts не передаёт, и тест читает main.ts на его отсутствие (проверка product N-001, риск 2)",
   "tools/list не содержит screenshot (ревью R2)",
