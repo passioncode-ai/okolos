@@ -38,7 +38,7 @@
   "POST /pair {name} создаёт запрос и возвращает {requestId, code}; POST /pair/claim с X-Okolos-Pairing-Request до подтверждения → pending",
   "токен хоста в Authorization: 403 not_paired, не 200",
   "Host rebinding (attacker.example:47871) → 403 до разбора, запись в журнале, запроса привязки нет",
-  "любой Origin (в том числе http://localhost:3000) или Sec-Fetch-Site → 403, запроса привязки нет (ревью F7)",
+  "любой Origin (в том числе http://localhost:3000) или Sec-Fetch-Site → 403, запроса привязки нет (ревью F7); любой заголовок Sec-Fetch-* (Site, Mode, Dest, User), а не только Sec-Fetch-Site: cross-site, отвергается как cross_site; оболочка N-024 правится в N-008 (проверки N-013 круг 9)",
   "Content-Type не application/json → 415",
   "журнал недоступен (ответ — конверт internal из answerAfterRecord, без содержимого; аудит #18): каждый маршрут и вид ответа (отказ двери, ошибка разбора, ошибка протокола, ответ инструмента) уходит без тела (ревью F14)",
   "ключ отозван → 403 not_paired (verify отозванного ключа отдаёт null, как неизвестного); onRevoke зовёт тот, кто вызвал Pairing.revoke (страница N-015, действие agent.revoke) с AgentRecord, один тип onRevoke(record: AgentRecord) в N-008 и N-011 (проверки N-013 круг 3, N-007 круг 2)",

@@ -42,7 +42,8 @@
   "строки «запроса уже нет» и «у агента уже нет доступа» для действий страницы над ушедшей строкой; строка CLI pair после кода: где подтвердить (Okolos Agent в Fabric Dashboards) (проверки N-013 круг 7)",
   "слова для name_script, closed (Okolos Agent останавливается) и changed_on_disk (список доступов изменили на диске, запись остановлена, нужен перезапуск) (отчёт N-007 fix 4)",
   "проверку одинаковых ключей ru и en каталога демона уже держит tools/agent-locales.test.ts (N-013): N-014 её не дублирует в tools/locales.test.ts и запускает этот файл в своей проверке узла (проверки N-013 круг 8)",
-  "проверка узла: python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts"
+  "слово для причины unwritable в $WHAT$ не повторяет «не записывается» (например «нет места на диске», «нет прав на файл»), по errno (проверки N-013 круг 9)",
+  "проверка узла: python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts tools/agent-locales.test.ts"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",

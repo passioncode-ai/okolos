@@ -213,7 +213,7 @@
     "message": "you were using this window"
   },
   "refusal_browser_offline": {
-    "message": "the agents' Chrome did not start or does not answer"
+    "message": "the agents' Chrome did not start or did not answer"
   },
   "refusal_blocked_by_shield": {
     "message": "Okolos protection stopped the call"
@@ -386,7 +386,7 @@
     "message": "the access list could not be read; the key was not checked"
   },
   "journalUnreadable": {
-    "message": "The agents' journal cannot be read: $WHAT$. Refusals are not shown here. Run okolos-agent doctor to see what is wrong with the journal.",
+    "message": "The agents' journal cannot be read: $WHAT$. Refusals and failures are not shown here. Run okolos-agent doctor to see what is wrong with the journal.",
     "placeholders": {
       "what": {
         "content": "$1"
@@ -454,5 +454,13 @@
   },
   "agentGone": {
     "message": "This agent no longer has access."
+  },
+  "journalLinesSkipped": {
+    "message": "The agents' journal has unreadable lines: $COUNT$. They are skipped here.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

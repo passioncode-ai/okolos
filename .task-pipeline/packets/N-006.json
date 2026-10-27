@@ -33,6 +33,8 @@
   "recent отдаёт отказы отдельно от ответов (фильтр по outcome), так что поток ответов не вытесняет отказы со страницы; нечитаемые строки журнала считаются и отдаются странице, а не пропускаются молча (проверки N-013 круг 5)",
   "у журнала есть выгрузка (export) для GET /api/journal: отдаёт JSONL без содержимого страниц и при сбое бросает ошибку с кодом причины (no_space, no_permission, other), из которой N-015 берёт $WHAT$ строк journalExportFailed и journalUnreadable (проверки N-013 круг 7)",
   "запись журнала несёт рядом с agentId дату выдачи доступа (pairedAt), чтобы SCR-24 показал отозванного агента строкой agentLabelRevoked с датой (проверки N-013 круг 8)",
+  "recent при сбое чтения бросает ошибку с кодом причины (no_space не бывает, no_permission, unreadable, other): из неё N-015 берёт $WHAT$ строки journalUnreadable (проверки N-013 круг 9)",
+  "ответы протокола MCP привязанному агенту (initialize, tools/list, ошибка разбора) пишутся записью с outcome answered и глаголом протокола (mcp.initialize, mcp.tools_list, mcp.parse_error) или явно не пишутся с причиной в спеке §3; решение одно для N-006 и N-008 (проверки N-013 круг 9)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/journal && pnpm -s run typecheck"
  ],
  "guards": [

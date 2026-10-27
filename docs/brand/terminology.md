@@ -141,6 +141,11 @@ Contract: brand-contract v1
 | Работа агента с областью, бюджетом и сроком | **задача** | task | `TaskScope` |
 | Шаг задачи, который считается в бюджет | **шаг** | step | `stepBudget` |
 | Ответ «нет» по правилам задачи или двери | **отказ** | refusal | `BridgeRefusal`, кроме трёх кодов сбоя; `DoorRejection` |
+| Файл Okolos Agent, где хранятся агенты с доступом (только SHA-256 ключей) | **список доступов** | access list | `Pairing`, `pairings.json` |
+| Секрет, который агент получает один раз и предъявляет двери | **ключ доступа** (на странице просто «ключ») | access key | `X-Okolos-Agent-Key` |
+| Постоянный профиль Chrome, где работают задачи агентов | **профиль агента** | agent profile | `profile: 'agent'` |
+| Профиль Chrome на одну задачу, удаляется после неё | **временный профиль** | temporary profile | `profile: 'disposable'` |
+| Chrome, который Okolos Agent запускает для окон агентов | **Chrome для агентов** | the agents' Chrome | `AgentWindows`, `browser_offline` |
 | Okolos Agent не смог выполнить разрешённый вызов: `internal`, `browser_offline`, `cleaning_incomplete` | **сбой Okolos Agent** | Okolos Agent failure | `refusalFailureLine` |
 | Локальный адрес Okolos Agent, через который агенты обращаются к службе | **дверь** | door | `doorRoute`, `/mcp`, `/pair`, `/pair/claim` |
 | Любое обращение к службе: агента к двери, страницы или Fabric к службе | **вызов** | call | журнал агентов, `pairedSince`, `eventDrainCutOff` |

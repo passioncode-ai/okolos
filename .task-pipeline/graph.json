@@ -479,7 +479,7 @@
     "N-024"
    ],
    "serves": "REQ-66",
-   "check": "python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts",
+   "check": "python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts tools/agent-locales.test.ts",
    "touches": [
     "docs/brand/terminology.md",
     "apps/agent/_locales/ru/messages.json",
