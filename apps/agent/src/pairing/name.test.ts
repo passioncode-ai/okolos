@@ -152,6 +152,18 @@ describe('the name an agent gives itself', () => {
     }
   })
 
+  // Fix round 5: every digit reads as the letter it resembles before the reserved test (0 o, 1 l,
+  // 2 z, 3 e, 4 a, 5 s, 6 g, 7 t, 8 b, 9 g), so a 5 for the final s does not get past it.
+  it('reads every digit as the letter it resembles before the reserved test (fix round 5)', () => {
+    for (const name of ['OKOLO5', 'Okolo5', 'OK0LO5', '0KOLO5', '\u041e\u041a\u041e\u041b\u041e5', 'okoIo5', 'Oko1o5']) {
+      expect(checkAgentName(name), name).toBe('name_reserved')
+    }
+    // Ordinary names with digits stay accepted.
+    for (const name of ['gpt-4o', 'Claude 2', 'agent 42', 'Kolos 5', 'Oko 5']) {
+      expect(checkAgentName(name), name).toBeNull()
+    }
+  })
+
   // Known false positives of the rule, recorded on purpose: spaces are dropped from the key, so a
   // name that runs "okolos" across two words is refused too.
   it('refuses "Joko Lost" and "Echo Kolos" as reserved: the rule knows it errs here', () => {
@@ -192,13 +204,33 @@ describe('a name in NFC (fix round 5)', () => {
 
 describe('the comparison key of a name', () => {
   it('folds case, punctuation, spaces, the l and o look-alikes', () => {
-    expect(nameKeys('Claude Code')).toEqual(['claudecode'])
     for (const name of ['Claude-Code', 'Claude_Code', 'Claude Code.', 'claude code', 'CIaude Code', '  Claude   Code ', 'C1aude C0de']) {
       expect(namesLookAlike(name, 'Claude Code'), name).toBe(true)
     }
     expect(namesLookAlike('Codex', 'Claude Code')).toBe(false)
-    expect(nameKeys('gpt-4o')).toEqual(['gpt4o'])
-    expect(namesLookAlike('Agent 2', 'Agent 3')).toBe(false)
+  })
+
+  // Fix round 5: look-alikes compare letters only. A digit is dropped, so a number added to a name
+  // does not make it a new one; this reverses what round 4 asserted on purpose ("Agent 2" and
+  // "Agent 3" apart). A second key reads each digit as the letter it resembles, so "C1aude" still
+  // matches "Claude". Then the shapes two letters make are folded: rn as m, vv as w, cl as d.
+  it('drops digits, so a number added to a name looks like the name (fix round 5)', () => {
+    expect(namesLookAlike('Claude 2', 'Claude')).toBe(true)
+    expect(namesLookAlike('Agent 2', 'Agent 3')).toBe(true)
+    expect(namesLookAlike('gpt-4', 'gpt-5')).toBe(true)
+    expect(namesLookAlike('gpt-4o', 'gpt-5')).toBe(false)
+    expect(nameKeys('gpt-4o')).toEqual(['gpto', 'gptao'])
+    expect(namesLookAlike('C1aude C0de', 'Claude Code')).toBe(true)
+  })
+
+  it('folds rn to m, vv to w and cl to d, in both names (fix round 5)', () => {
+    expect(namesLookAlike('Gernini', 'Gemini')).toBe(true)
+    expect(namesLookAlike('VVindsurf', 'Windsurf')).toBe(true)
+    expect(namesLookAlike('Windsurf', 'VVindsurf')).toBe(true)
+    expect(namesLookAlike('Dlaude', 'Claude')).toBe(false)
+    expect(namesLookAlike('Daude', 'Claude')).toBe(true)
+    expect(nameKeys('Claude Code')).toEqual(['daudecode'])
+    expect(namesLookAlike('Cursor', 'Gemini')).toBe(false)
   })
 
   it('gives a Cyrillic name two keys: its transliteration and its look in Latin letters', () => {

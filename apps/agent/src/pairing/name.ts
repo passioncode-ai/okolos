@@ -88,7 +88,7 @@ const BLANK = /^[\p{White_Space}\-_.()'/+]*$/u
  */
 const MAX_DIGITS = 2
 
-/** The product's own name: a name any of whose keys contains it is refused (`name_reserved`). */
+/** The product's own name: a name any of whose reserved keys contains it is refused (`name_reserved`). */
 const RESERVED = 'okolos'
 
 /**
@@ -106,7 +106,7 @@ export function checkAgentName(raw: string): NameRefusal | null {
   if (fault !== null) return `name_${fault}`
   if (!ALLOWED.test(name) || (LATIN.test(name) && CYRILLIC.test(name))) return 'name_script'
   if ((name.match(/[0-9]/g)?.length ?? 0) > MAX_DIGITS) return 'name_digits'
-  if (nameKeys(name).some((key) => key.includes(RESERVED))) return 'name_reserved'
+  if (reservedKeys(name).some((key) => key.includes(RESERVED))) return 'name_reserved'
   return null
 }
 
@@ -123,29 +123,68 @@ const LOOK: Readonly<Record<string, string>> = {
   а: 'a', в: 'b', е: 'e', к: 'k', м: 'm', н: 'h', о: 'o', р: 'p', с: 'c', т: 't', у: 'y', х: 'x',
 }
 
-/** What reads as an l (i, the digit one) or as an o (the digit zero), after lower case. */
-const READS_AS: Readonly<Record<string, string>> = { i: 'l', '1': 'l', '0': 'o' }
+/** The letter each digit reads as (fix round 5): 0 o, 1 l, 2 z, 3 e, 4 a, 5 s, 6 g, 7 t, 8 b, 9 g. */
+const DIGIT_AS_LETTER: Readonly<Record<string, string>> = {
+  '0': 'o', '1': 'l', '2': 'z', '3': 'e', '4': 'a', '5': 's', '6': 'g', '7': 't', '8': 'b', '9': 'g',
+}
 
-function key(lower: string, cyrillic: Readonly<Record<string, string>>): string {
+/** Shapes two letters make that read as one (fix round 5), folded after the single letters. */
+const TWO_LETTER_SHAPES: readonly (readonly [RegExp, string])[] = [
+  [/rn/g, 'm'],
+  [/vv/g, 'w'],
+  [/cl/g, 'd'],
+]
+
+/** How a key treats digits: `drop` them, or read each `asLetter`. */
+type Digits = 'drop' | 'asLetter'
+
+/**
+ * One key of a name already in NFC and lower case: Cyrillic by the given table; everything but a-z
+ * and 0-9 dropped; digits dropped or read as letters; i as l (a capital I is a small i by then).
+ */
+function letters(lower: string, cyrillic: Readonly<Record<string, string>>, digits: Digits): string {
   return [...lower]
     .map((char) => cyrillic[char] ?? char)
     .join('')
     .replace(/[^a-z0-9]/g, '')
-    .replace(/[i10]/g, (char) => READS_AS[char]!)
+    .replace(/[0-9]/g, (digit) => (digits === 'drop' ? '' : DIGIT_AS_LETTER[digit]!))
+    .replace(/i/g, 'l')
+}
+
+function lowerNfc(name: string): string {
+  return name.normalize('NFC').toLowerCase()
 }
 
 /**
- * The keys two names are compared on, so names a person would read as one compare equal (fix round
- * 4): NFC (fix round 5); lower case; Cyrillic written in Latin letters; every character that is not a letter or a digit
- * dropped (spaces, - _ . ( ) ' / +); i and the digit 1 as l, the digit 0 as o (a capital I is a small
- * i by then, so `CIaude` is `claude`). A Latin name has one key. A Cyrillic name has two: by sound
- * (`Околос` is `okolos`) and by look (`Сосоа` is `cocoa`), the same when they agree. The duplicate
- * check (`namesLookAlike`) and the reserved name both use them. Meant for names that pass the
- * allowlist; anything else is dropped from the key.
+ * The keys the reserved name is tested on (fix round 5): by sound and by look for Cyrillic, every
+ * digit read as the letter it resembles, i as l; no two-letter shapes ("okolos" holds none).
+ */
+function reservedKeys(name: string): string[] {
+  const lower = lowerNfc(name)
+  return [letters(lower, TRANSLITERATION, 'asLetter'), letters(lower, LOOK, 'asLetter')]
+}
+
+/**
+ * The keys two names are compared on, so names a person would read as one compare equal (fix rounds
+ * 4 and 5): NFC; lower case; Cyrillic written in Latin letters; every character that is not a letter
+ * or a digit dropped (spaces, - _ . ( ) ' / +); i as l (a capital I is a small i by then, so `CIaude`
+ * is `claude`); then rn as m, vv as w, cl as d. Digits: one key drops them, so a number added to a
+ * name does not make it another (`Claude 2` is `Claude`); one reads each as the letter it resembles,
+ * so `C1aude` is `Claude`. A Cyrillic name has both of those by sound (`Околос` is `okolos`) and by
+ * look (`Сосоа` is `cocoa`). Duplicates are dropped, in this order: sound with digits dropped, sound
+ * with digits as letters, look with digits dropped, look with digits as letters. Used by the
+ * duplicate check (`namesLookAlike`); the reserved name has keys of its own. Meant for names that
+ * pass the allowlist; anything else is dropped from the key.
  */
 export function nameKeys(name: string): string[] {
-  const lower = name.normalize('NFC').toLowerCase()
-  return [...new Set([key(lower, TRANSLITERATION), key(lower, LOOK)])]
+  const lower = lowerNfc(name)
+  const keys: string[] = []
+  for (const table of [TRANSLITERATION, LOOK]) {
+    for (const digits of ['drop', 'asLetter'] as const) {
+      keys.push(TWO_LETTER_SHAPES.reduce((key, [shape, letter]) => key.replace(shape, letter), letters(lower, table, digits)))
+    }
+  }
+  return [...new Set(keys)]
 }
 
 /** Two names look alike when they share a key. */
