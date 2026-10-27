@@ -47,7 +47,8 @@ const CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{Default_Ignorable_Code_Point}
  * in a name: ZWNJ U+200C (Persian), ZWJ U+200D (Indic scripts, emoji sequences) and the variation
  * selectors U+FE0E and U+FE0F (text or emoji presentation).
  */
-const TEXT_JOINERS = /[\u200c\u200d\ufe0e\ufe0f]/gu
+// An alternation, not a class: a class of joiners and selectors reads as one joined character.
+const TEXT_JOINERS = /\u200c|\u200d|\ufe0e|\ufe0f/gu
 
 /** More than two combining marks in a row stack above or below one letter and crowd the page. */
 const STACKED_MARKS = /\p{M}{3,}/u
