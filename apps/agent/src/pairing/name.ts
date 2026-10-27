@@ -35,9 +35,17 @@ const BIDI = /[؜‎‏‪-‮⁦-⁩]/u
 
 /**
  * Control and invisible characters: C0 and C1 controls, the other format characters (zero-width
- * space, joiners, byte order mark), line and paragraph separators, and lone surrogates.
+ * space, joiners, byte order mark), line and paragraph separators, lone surrogates, and every
+ * character Unicode calls default-ignorable whatever its category (fix round 3: the combining
+ * grapheme joiner U+034F, variation selectors, the Hangul fillers U+115F, U+1160, U+3164, U+FFA0).
  */
-const CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}]/u
+const CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{Default_Ignorable_Code_Point}]/u
+
+/** More than two combining marks in a row stack above or below one letter and crowd the page. */
+const STACKED_MARKS = /\p{M}{3,}/u
+
+/** A name shows something: at least one letter or numeral, not only blanks, symbols and spaces. */
+const VISIBLE = /[\p{L}\p{N}]/u
 
 /**
  * What a name looks like, so two names a person would read as one compare equal: NFKC, case folded,
@@ -59,7 +67,8 @@ export function checkAgentName(name: string): NameRefusal | null {
   if ([...name].length > MAX_NAME_LENGTH) return 'name_too_long'
   // Bidirectional marks are format characters too; they are named first, for a precise reason.
   if (BIDI.test(name)) return 'name_bidi'
-  if (CONTROL.test(name)) return 'name_control'
+  if (CONTROL.test(name) || STACKED_MARKS.test(name)) return 'name_control'
+  if (!VISIBLE.test(name)) return 'name_empty'
   if ((name.match(NUMERIC)?.length ?? 0) > MAX_NUMERIC) return 'name_digits'
   if (nameSkeleton(name).includes(RESERVED)) return 'name_reserved'
   return null

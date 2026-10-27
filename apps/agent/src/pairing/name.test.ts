@@ -12,8 +12,8 @@ describe('the name an agent gives itself', () => {
     expect(checkAgentName('Claude Code')).toBeNull()
     expect(checkAgentName('Агент Сергея')).toBeNull()
     expect(checkAgentName('a'.repeat(40))).toBeNull()
-    // Characters, not UTF-16 units: forty emoji are forty characters.
-    expect(checkAgentName('🦊'.repeat(40))).toBeNull()
+    // Characters, not UTF-16 units: a letter and thirty-nine emoji are forty characters.
+    expect(checkAgentName(`a${'🦊'.repeat(39)}`)).toBeNull()
     // At most two numeric characters in total, of any script and wherever they stand: a third,
     // even apart from the others, could pass for part of the code.
     expect(checkAgentName('gpt 45 helper')).toBeNull()
@@ -21,7 +21,7 @@ describe('the name an agent gives itself', () => {
 
   it('refuses more than 40 characters', () => {
     expect(checkAgentName('a'.repeat(41))).toBe('name_too_long')
-    expect(checkAgentName('🦊'.repeat(41))).toBe('name_too_long')
+    expect(checkAgentName(`a${'🦊'.repeat(40)}`)).toBe('name_too_long')
   })
 
   it('refuses a run of three or more digits, in any script', () => {
@@ -51,6 +51,34 @@ describe('the name an agent gives itself', () => {
     expect(checkAgentName('agent x')).toBe('name_control')
     expect(checkAgentName('a​gent')).toBe('name_control')
     expect(checkAgentName('agent\ud800')).toBe('name_control')
+  })
+
+  // Fix round 3: every character Unicode calls default-ignorable draws nothing, whatever its
+  // category: the combining grapheme joiner, variation selectors, the Hangul fillers.
+  it('refuses a default-ignorable character of any category (fix round 3)', () => {
+    for (const mark of ['͏', '︀', '️', '\u{e0100}', 'ㅤ', 'ᅟ', 'ᅠ', 'ﾠ', '​', '⁠', '᠎']) {
+      expect(checkAgentName(`agent${mark}x`), mark.codePointAt(0)!.toString(16)).toBe('name_control')
+    }
+    expect(checkAgentName('Okol͏os')).toBe('name_control')
+    // A Hangul filler alone draws nothing either.
+    expect(checkAgentName('ㅤㅤ')).toBe('name_control')
+  })
+
+  it('refuses a stack of more than two combining marks on one character (fix round 3)', () => {
+    expect(checkAgentName('é̂̃gent')).toBe('name_control')
+    expect(checkAgentName('Zalgò́̂̃̄')).toBe('name_control')
+    // Two marks in a row is ordinary writing (Vietnamese ệ written apart: e, dot below, circumflex).
+    expect(checkAgentName('Agent Việt')).toBeNull()
+    expect(checkAgentName('Café')).toBeNull()
+  })
+
+  it('refuses a name with no letter and no numeral: blanks, symbols and spaces only (fix round 3)', () => {
+    expect(checkAgentName('⠀')).toBe('name_empty') // braille blank
+    expect(checkAgentName('⠀ ⠀')).toBe('name_empty')
+    expect(checkAgentName('🦊🦊')).toBe('name_empty')
+    expect(checkAgentName('-- ** --')).toBe('name_empty')
+    expect(checkAgentName('🦊 Fox')).toBeNull()
+    expect(checkAgentName('42')).toBeNull()
   })
 
   it('refuses bidirectional controls', () => {
