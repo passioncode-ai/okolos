@@ -4,13 +4,23 @@
  * Nothing verifies the name: the consent page shows it as the agent's own claim, next to the
  * six-digit code the person compares. So the name may not crowd the page, may not carry
  * numerals that could pass for the code, and may not carry a character that moves, hides or breaks
- * text. A refusal is a machine code; the page and the CLI map it through the catalogue.
+ * text. Nor may it pass the agent off as Okolos itself: the page is Okolos speaking, so a name that
+ * looks like it contains "okolos" is reserved. A refusal is a machine code; the page and the CLI map
+ * it through the catalogue.
  */
+import { skeleton } from '@okolos/core-lookalike'
 
 /** At most this many characters (code points, not UTF-16 units). */
 export const MAX_NAME_LENGTH = 40
 
-export type NameRefusal = 'name_not_text' | 'name_empty' | 'name_too_long' | 'name_digits' | 'name_bidi' | 'name_control'
+export type NameRefusal =
+  | 'name_not_text'
+  | 'name_empty'
+  | 'name_too_long'
+  | 'name_digits'
+  | 'name_bidi'
+  | 'name_control'
+  | 'name_reserved'
 
 /**
  * A name reads as a code when it carries this many numeric characters in total, whatever separates
@@ -29,6 +39,19 @@ const BIDI = /[؜‎‏‪-‮⁦-⁩]/u
  */
 const CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}]/u
 
+/**
+ * What a name looks like, so two names a person would read as one compare equal: NFKC, case folded,
+ * reduced by the Latin, Cyrillic and Greek look-alike table of @okolos/core-lookalike (`skeleton`,
+ * the same one the link check uses), with runs of white space collapsed and the ends trimmed. The
+ * pairing's duplicate check and the reserved name below both use it.
+ */
+export function nameSkeleton(name: string): string {
+  return skeleton(name.normalize('NFKC').toLowerCase()).replace(/\s+/gu, ' ').trim()
+}
+
+/** The product's own name, as it looks: a name that contains it is refused (`name_reserved`). */
+const RESERVED = nameSkeleton('okolos')
+
 /** The reason the name is refused, or null when it may be shown. */
 export function checkAgentName(name: string): NameRefusal | null {
   if (typeof name !== 'string') return 'name_not_text'
@@ -38,5 +61,6 @@ export function checkAgentName(name: string): NameRefusal | null {
   if (BIDI.test(name)) return 'name_bidi'
   if (CONTROL.test(name)) return 'name_control'
   if ((name.match(NUMERIC)?.length ?? 0) > MAX_NUMERIC) return 'name_digits'
+  if (nameSkeleton(name).includes(RESERVED)) return 'name_reserved'
   return null
 }

@@ -24,11 +24,9 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { skeleton } from '@okolos/core-lookalike'
-
 import { atomicWrite } from '../fabric/fabric-service.mjs'
 import type { ServiceDirs } from '../service/dirs.js'
-import { checkAgentName, type NameRefusal } from './name.js'
+import { checkAgentName, nameSkeleton, type NameRefusal } from './name.js'
 
 /** The pairing store: the one place a key's SHA-256 lives, in the service data folder. */
 export function pairingStoreFile(dirs: ServiceDirs): string {
@@ -470,15 +468,6 @@ function isStoredAgent(value: unknown): value is StoredAgent {
     typeof value['keyHash'] === 'string' &&
     /^[0-9a-f]{64}$/.test(value['keyHash'])
   )
-}
-
-/**
- * What a name looks like, so two names a person would read as one compare equal: NFKC, case folded,
- * reduced by the Latin, Cyrillic and Greek look-alike table of @okolos/core-lookalike (`skeleton`,
- * the same one the link check uses), with runs of white space collapsed and the ends trimmed.
- */
-function nameSkeleton(name: string): string {
-  return skeleton(name.normalize('NFKC').toLowerCase()).replace(/\s+/gu, ' ').trim()
 }
 
 function sha256(key: string): string {

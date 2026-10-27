@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { MAX_NAME_LENGTH, checkAgentName } from './name.js'
+import { MAX_NAME_LENGTH, checkAgentName, nameSkeleton } from './name.js'
 
 // Spec §11 F12: the name an agent gives itself is shown on the consent page next to a six-digit
 // code, so it may not be long enough to crowd the page, carry a run of digits that could pass for
@@ -56,6 +56,30 @@ describe('the name an agent gives itself', () => {
     for (const mark of ['‮', '‪', '⁦', '⁩', '‏', '‎', '؜']) {
       expect(checkAgentName(`agent${mark}x`)).toBe('name_bidi')
     }
+  })
+
+  // Fix round 2: an agent may not pass itself off as Okolos on the consent page. A name is refused
+  // when what it looks like (the folding the duplicate check uses) contains what "okolos" looks like.
+  it('refuses a name that looks like it contains "okolos"', () => {
+    expect(checkAgentName('Okolos Agent')).toBe('name_reserved')
+    expect(checkAgentName('OKOLOS')).toBe('name_reserved')
+    expect(checkAgentName('Оkolos')).toBe('name_reserved') // Cyrillic capital O
+    expect(checkAgentName('my okolos helper')).toBe('name_reserved')
+    expect(checkAgentName('0kolos')).toBe('name_reserved') // digit zero for the o
+    expect(checkAgentName('ｏkolos')).toBe('name_reserved') // fullwidth o, folded by NFKC
+    expect(checkAgentName('okolos-agent')).toBe('name_reserved')
+  })
+
+  it('accepts a name that only shares letters with "okolos"', () => {
+    expect(checkAgentName('Kolos')).toBeNull()
+    expect(checkAgentName('Claude Code')).toBeNull()
+    expect(checkAgentName('oko los')).toBeNull()
+  })
+
+  it('folds a name the way the duplicate check does: NFKC, lower case, look-alikes, spaces', () => {
+    expect(nameSkeleton('  Claude   Cоde ')).toBe('claude code')
+    expect(nameSkeleton('Café')).toBe(nameSkeleton('Café'))
+    expect(nameSkeleton('ＯＫＯＬＯＳ')).toBe('okolos')
   })
 
   it('refuses an empty or blank name, and a value that is not text', () => {
