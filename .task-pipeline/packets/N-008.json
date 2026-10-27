@@ -61,6 +61,7 @@
   "CLI pair называет настоящую причину отказа claim: declined, expired, claim_expired, claimed, unknown (перезапуск демона или чужой id), каждая своей строкой каталога (проверка seam N-007 круг 3)",
   "вызов с отозванным ключом: шим печатает в stderr, что доступ отозван или ключ неверен, и как попросить снова: okolos-agent pair --name \"<имя>\" --replace (проверка seam N-013 круг 5)",
   "один тип onRevoke(record: AgentRecord) в выходах и в проверках N-008 и N-011 (проверка seam N-007 круг 3)",
+  "CLI pair после кода печатает, где человек подтверждает запрос: страница Okolos Agent в Fabric Dashboards (строка каталога из N-014) (проверки N-013 круг 7)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/door apps/agent/src/cli && pnpm -s run typecheck && pnpm -s run i18n:sweep"
  ],
  "guards": [

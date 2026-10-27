@@ -31,6 +31,7 @@
   "answerAfterRecord отдаёт вызывающему причину сбоя записи закрытым набором кодов (no_space, no_permission, other, по errno), а не только false: из неё N-011 берёт $WHAT$ строки journalError (проверки N-013 круг 4)",
   "DoorRejection дополнен store_unreadable (список доступов не читался, ключ не проверен); у каждого кода rejected есть строка rejection_<код> в каталоге демона (проверки N-013 круг 4)",
   "recent отдаёт отказы отдельно от ответов (фильтр по outcome), так что поток ответов не вытесняет отказы со страницы; нечитаемые строки журнала считаются и отдаются странице, а не пропускаются молча (проверки N-013 круг 5)",
+  "у журнала есть выгрузка (export) для GET /api/journal: отдаёт JSONL без содержимого страниц и при сбое бросает ошибку с кодом причины (no_space, no_permission, other), из которой N-015 берёт $WHAT$ строк journalExportFailed и journalUnreadable (проверки N-013 круг 7)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/journal && pnpm -s run typecheck"
  ],
  "guards": [

@@ -213,13 +213,13 @@
     "message": "этим окном пользовались вы"
   },
   "refusal_browser_offline": {
-    "message": "Okolos Agent не смог запустить свой Chrome или связаться с ним"
+    "message": "не удалось запустить свой Chrome или связаться с ним"
   },
   "refusal_blocked_by_shield": {
     "message": "защита Okolos не пропустила вызов"
   },
   "refusal_internal": {
-    "message": "сбой Okolos Agent, ответ не выдан"
+    "message": "ответ не выдан"
   },
   "journalLink": {
     "message": "Выгрузить журнал агентов"
@@ -418,6 +418,23 @@
     "placeholders": {
       "what": {
         "content": "$1"
+      }
+    }
+  },
+  "refusalFailureLine": {
+    "message": "$WHEN$. $AGENT$, вызов «$ASKED$». Сбой Okolos Agent: $WHAT$",
+    "placeholders": {
+      "when": {
+        "content": "$1"
+      },
+      "agent": {
+        "content": "$2"
+      },
+      "asked": {
+        "content": "$3"
+      },
+      "what": {
+        "content": "$4"
       }
     }
   }

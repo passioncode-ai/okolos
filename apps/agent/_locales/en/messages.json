@@ -213,13 +213,13 @@
     "message": "you were using this window"
   },
   "refusal_browser_offline": {
-    "message": "Okolos Agent could not start or reach its Chrome"
+    "message": "could not start or reach its Chrome"
   },
   "refusal_blocked_by_shield": {
     "message": "Okolos protection stopped the call"
   },
   "refusal_internal": {
-    "message": "an Okolos Agent failure; no answer was given"
+    "message": "no answer was given"
   },
   "journalLink": {
     "message": "Export the agents' journal"
@@ -418,6 +418,23 @@
     "placeholders": {
       "what": {
         "content": "$1"
+      }
+    }
+  },
+  "refusalFailureLine": {
+    "message": "$WHEN$. $AGENT$, call “$ASKED$”. Okolos Agent failure: $WHAT$",
+    "placeholders": {
+      "when": {
+        "content": "$1"
+      },
+      "agent": {
+        "content": "$2"
+      },
+      "asked": {
+        "content": "$3"
+      },
+      "what": {
+        "content": "$4"
       }
     }
   }

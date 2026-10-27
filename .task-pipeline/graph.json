@@ -619,7 +619,8 @@
     "docs/superpowers/backlog.md",
     "SECURITY.md",
     "AGENTS.md",
-    "README.md"
+    "README.md",
+    "docs/brand/facts.md"
    ],
    "risk": "R1"
   },

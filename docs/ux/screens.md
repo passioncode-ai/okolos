@@ -642,7 +642,7 @@ generator, and the sheet declares no colour of its own.
 - **A task's time runs out, its window closes.** Okolos Agent's timer closes a task whose time limit has passed, with its window, within a minute; the task leaves this list. A task out of steps stays, with its steps shown as used up, until its time runs out, the agent closes it or the person revokes the agent's access.
 - **The journal export can fail.** In the journal-unreadable state the export link is not shown; when an export fails, the page says so with the reason and names `okolos-agent doctor`.
 - **`browser_offline` shows no reason here.** The agent gets the reason in its refusal (Chrome not installed, a policy forbids the flags it needs), and `okolos-agent doctor` names it; the page says only that Okolos Agent could not start or reach its Chrome.
-- **A refusal says which kind it is.** A policy answer (outside the task, out of steps, time over, no access) is listed with what was asked and why, never as a failure of the product. A failure of Okolos Agent (`internal`, `browser_offline`, `cleaning_incomplete`) is listed in the same place and says it is Okolos Agent's failure, so the person does not blame the task or the agent.
+- **A refusal says which kind it is.** A policy answer (outside the task, out of steps, time over, no access) is listed with what was asked and why, never as a failure of the product. A failure of Okolos Agent (`internal`, `browser_offline`, `cleaning_incomplete`) is listed in the same place with its own line, «Сбой Okolos Agent: …» / "Okolos Agent failure: …" (`refusalFailureLine`), never under «Отказ», so the person does not blame the task or the agent.
 - **Scenarios:** SCN-045
 - **Resources:** the task table, the journal
 - **Status:** designed
