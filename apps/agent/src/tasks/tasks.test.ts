@@ -1,7 +1,9 @@
+import { readFileSync } from 'node:fs'
+
 import { REFUSAL_RETRYABLE, SCOPE_LIMITS, type BridgeResult, type TaskScope } from '@okolos/contracts'
 import { describe, expect, it } from 'vitest'
 
-import { Tasks, checkLanded, type Task } from './tasks.js'
+import { GOAL_SHOWN_MAX, Tasks, checkLanded, goalShown, type Task } from './tasks.js'
 
 const T0 = 1_800_000_000_000
 
@@ -298,5 +300,111 @@ describe('checkLanded: where the navigation actually ended (ревью F9, ау�
     const task = opened(tasks)
     checkLanded(task, 'https://evil.example.net/')
     expect(task.stepsUsed).toBe(0)
+  })
+})
+
+describe('Tasks.close and closeAllOf', () => {
+  it('close removes the task and returns it, so the caller closes its window', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks)
+    const other = opened(tasks)
+    expect(ok(tasks.close('agent-a', task.id))).toBe(task)
+    expect(refusal(tasks.get('agent-a', task.id, T0)).code).toBe('no_such_task')
+    expect(tasks.list(T0)).toEqual([other])
+  })
+
+  it('close works on a task that used all its steps, and on one whose time ran out', () => {
+    const tasks = new Tasks()
+    const spent = opened(tasks, 'agent-a', { stepBudget: 1 })
+    ok(tasks.charge(spent, 'snapshot'))
+    expect(refusal(tasks.charge(spent, 'snapshot')).code).toBe('budget_exhausted')
+    expect(ok(tasks.close('agent-a', spent.id)).stepsUsed).toBe(1)
+    const late = opened(tasks, 'agent-a', { ttlSeconds: 1 })
+    expect(refusal(tasks.get('agent-a', late.id, T0 + 5_000)).code).toBe('task_expired')
+    expect(ok(tasks.close('agent-a', late.id)).id).toBe(late.id)
+  })
+
+  it("close of another agent's task is no_such_task and leaves it open", () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a')
+    expect(refusal(tasks.close('agent-b', task.id)).code).toBe('no_such_task')
+    expect(ok(tasks.get('agent-a', task.id, T0)).id).toBe(task.id)
+  })
+
+  it('closeAllOf closes every task of one agent, and only of that agent, and returns them', () => {
+    const tasks = new Tasks()
+    const a1 = opened(tasks, 'agent-a')
+    const b1 = opened(tasks, 'agent-b')
+    const a2 = opened(tasks, 'agent-a')
+    expect(tasks.closeAllOf('agent-a')).toEqual([a1, a2])
+    expect(tasks.list(T0)).toEqual([b1])
+    expect(refusal(tasks.get('agent-a', a1.id, T0)).code).toBe('no_such_task')
+    expect(tasks.closeAllOf('agent-a')).toEqual([])
+  })
+})
+
+describe('Tasks.list and sweep', () => {
+  it('list gives the live tasks of every agent, oldest first, with what the page row needs', () => {
+    const tasks = new Tasks()
+    const a = opened(tasks, 'agent-a', {}, T0)
+    const b = opened(tasks, 'agent-b', { ttlSeconds: 30 }, T0 + 1_000)
+    expect(tasks.list(T0 + 2_000)).toEqual([a, b])
+    expect(tasks.list(T0 + 31_000)).toEqual([a])
+  })
+
+  it('sweep removes the tasks whose time ran out and returns them, so their windows are closed', () => {
+    const tasks = new Tasks()
+    const short = opened(tasks, 'agent-a', { ttlSeconds: 10 })
+    const long = opened(tasks, 'agent-b', { ttlSeconds: 600 })
+    expect(tasks.sweep(T0 + 9_999)).toEqual([])
+    expect(tasks.sweep(T0 + 10_000)).toEqual([short])
+    expect(refusal(tasks.get('agent-a', short.id, T0 + 10_000)).code).toBe('no_such_task')
+    expect(tasks.list(T0 + 10_000)).toEqual([long])
+  })
+
+  it('the window fields are the caller to set: N-011 records the window and whether it is open', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks)
+    task.windowId = 'TARGET-1'
+    task.windowOpen = true
+    expect(tasks.list(T0)[0]).toMatchObject({ windowId: 'TARGET-1', windowOpen: true })
+  })
+})
+
+describe('the goal as the page shows it', () => {
+  it(`keeps a goal of up to ${GOAL_SHOWN_MAX} visible characters as it is`, () => {
+    expect(GOAL_SHOWN_MAX).toBe(200)
+    expect(goalShown('Pay the bill')).toBe('Pay the bill')
+    expect(goalShown('a'.repeat(200))).toBe('a'.repeat(200))
+  })
+
+  it('cuts a longer goal to 200 visible characters, the ellipsis included', () => {
+    const shown = goalShown('a'.repeat(201))
+    expect(shown).toBe(`${'a'.repeat(199)}…`)
+    expect([...shown].length).toBe(200)
+  })
+
+  it('counts what a person sees: an emoji family or a letter with its marks is one character, never split', () => {
+    const family = '👩‍👩‍👧'
+    expect(goalShown(family.repeat(200))).toBe(family.repeat(200))
+    const cut = goalShown(family.repeat(201))
+    expect(cut).toBe(`${family.repeat(199)}…`)
+    const accented = 'é'
+    expect(goalShown(accented.repeat(201))).toBe(`${accented.repeat(199)}…`)
+  })
+
+  it('the page labels the goal as the agent\'s words in both locales (taskGoal)', () => {
+    for (const [locale, words] of [['ru', 'словами агента'], ['en', "in the agent's words"]] as const) {
+      const catalogue = JSON.parse(readFileSync(new URL(`../../_locales/${locale}/messages.json`, import.meta.url), 'utf8')) as Record<string, { message: string }>
+      expect(catalogue.taskGoal?.message).toContain(words)
+      expect(catalogue.taskGoal?.message).toContain('$GOAL$')
+    }
+  })
+})
+
+describe('the clock is the caller\'s', () => {
+  it('tasks.ts never reads the time itself', () => {
+    const source = readFileSync(new URL('./tasks.ts', import.meta.url), 'utf8')
+    expect(source).not.toMatch(/Date\.now|new Date\b|performance\.now|process\.hrtime/)
   })
 })

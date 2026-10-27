@@ -147,6 +147,18 @@ export class Tasks {
     return DONE
   }
 
+  /**
+   * Closes the task `taskId` of `agentId` and returns it, so the caller closes its window. Works on a
+   * task that used all its steps and on one whose time ran out: closing only gives back what the
+   * task holds. Another agent's task is `no_such_task` and stays open.
+   */
+  close(agentId: string, taskId: string): BridgeResult<Task> {
+    const task = this.table.get(taskId)
+    if (task === undefined || task.agentId !== agentId) return noSuchTask()
+    this.table.delete(taskId)
+    return { success: true, data: task }
+  }
+
   /** Closes every task of `agentId` (the agent's access was revoked) and returns them, so the caller closes their windows. */
   closeAllOf(agentId: string): Task[] {
     const closed = [...this.table.values()].filter((task) => task.agentId === agentId)
@@ -159,12 +171,36 @@ export class Tasks {
     return [...this.table.values()].filter((task) => !expired(task, now))
   }
 
+  /** Removes the tasks whose time ran out by `now` and returns them, so the caller closes their windows. */
+  sweep(now: number): Task[] {
+    const over = [...this.table.values()].filter((task) => expired(task, now))
+    for (const task of over) this.table.delete(task.id)
+    return over
+  }
+
   private newId(): string {
     for (;;) {
       const id = Buffer.from(this.random(ID_BYTES)).toString('hex')
       if (!this.table.has(id)) return id
     }
   }
+}
+
+/** The page shows at most this many visible characters of a goal (SCR-24, `taskGoal`), the ellipsis included. */
+export const GOAL_SHOWN_MAX = 200
+
+const ELLIPSIS = '\u2026'
+
+/**
+ * The goal as the page shows it: up to `GOAL_SHOWN_MAX` visible characters (grapheme clusters, so
+ * an emoji sequence or a letter with its marks is one and is never split), a longer goal cut to one
+ * less and ended with an ellipsis. The page puts it in as text, never as markup, after the label
+ * that says these are the agent's words (`taskGoal`).
+ */
+export function goalShown(goal: string): string {
+  const graphemes = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(goal)].map((part) => part.segment)
+  if (graphemes.length <= GOAL_SHOWN_MAX) return goal
+  return `${graphemes.slice(0, GOAL_SHOWN_MAX - 1).join('')}${ELLIPSIS}`
 }
 
 /** A task is over once `ttlSeconds` have passed since it opened: at `openedAt + ttl` it is already expired. */
@@ -189,5 +225,5 @@ function noSuchTask(): BridgeResult<never> {
 
 /** The origin is not named: the message does not repeat the URL, which may carry what the page put in it. */
 function notInTask(): BridgeResult<never> {
-  return refuse('origin_not_in_task', 'the URL is outside the origins the task may read') // i18n-exempt: a refusal read by the agent over MCP, not by the person
+  return refuse('origin_not_in_task', 'the URL is outside the origins the task may read')
 }
