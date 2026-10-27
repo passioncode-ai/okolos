@@ -420,7 +420,7 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 - **Acceptance criteria:**
   - Given a task with its sites named, when the agent asks for a site outside them, then it is refused with a reason it can act on.
   - Given a page with hidden instructions from the corpus, when the agent takes a snapshot, then none of them is in what it receives and the finding is attached.
-  - Given a page with a password, card or one-time-code field, when the agent reads it, then it sees the field and never its value; the value is also removed from other elements' names from 3 characters on (spec §11 S4), so a 1- or 2-character value can still show in a label that repeats it.
+  - Given a page with a password, card or one-time-code field, when the agent reads it, then it sees the field and never its value; the value of any input field is also removed from other elements' names, from 4 characters and from 3 in password, card and one-time-code fields (spec §3 R4, §11 S4), so a 1- or 2-character value can still show in a label that repeats it.
   - Given the person working in another app, when the agent opens, navigates and reads, then the person's app stays in front.
   - Given a very large page, when the agent asks for a snapshot, then it receives it in parts it can page through, never a single answer too large to use.
 - **Priority:** must
