@@ -108,6 +108,10 @@ export class CdpPipe {
     // the browser is gone fails with EPIPE; a read can fail too (EIO).
     fromBrowser.on('error', (cause) => this.fail('closed', `the pipe from the browser broke (${cause.message})`))
     this.toBrowser.on('error', (cause) => this.fail('closed', `the pipe to the browser broke (${cause.message})`))
+    // A browser that stops reading fd 3 ends our side of it too, and a write to
+    // a stream already closed fails in its callback only, with no 'error': without
+    // this, the request would wait out its whole deadline.
+    this.toBrowser.on('close', () => this.fail('closed', 'the pipe to the browser closed'))
     const stderr = child.stdio[2] as Readable
     stderr.on('error', (cause) => this.fail('closed', `the browser's stderr broke (${cause.message})`))
     // Unread stderr would fill the pipe and stall the browser.

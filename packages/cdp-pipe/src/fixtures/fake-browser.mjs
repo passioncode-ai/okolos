@@ -15,6 +15,8 @@
  *   Fake.spawnGrandchild -> starts a process in this process's group (as Chrome's
  *                           helpers are) and answers { pid }, so a test can see
  *                           whether close() ends the whole group
+ *   Fake.closeInput      -> closes its fd 3 and stays, then answers {}: the owner's
+ *                           next write meets a pipe with no reader (EPIPE)
  *   Browser.close        -> answers {} and exits, like Chrome; with --ignore-close it
  *                           never answers and stays
  *   anything else        -> the error Chrome gives for an unknown method
@@ -76,6 +78,13 @@ function handle(message) {
       })
       return write({ id, result: { pid: grandchild.pid } })
     }
+    case 'Fake.closeInput':
+      // Destroyed, not ended: no 'end' event. A ref'd timer holds the process
+      // (an idle fd 4 does not), up to its lifetime or its owner's kill, and the
+      // answer leaves only once fd 3 is shut.
+      setTimeout(() => {}, LIFETIME_MS)
+      fromOwner.once('close', () => write({ id, result: {} }))
+      return fromOwner.destroy()
     case 'Browser.close':
       if (ignoreClose) return undefined
       return toOwner.write(`${JSON.stringify({ id, result: {} })}\0`, () => process.exit(0))

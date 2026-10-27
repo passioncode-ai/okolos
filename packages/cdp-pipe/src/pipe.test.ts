@@ -1,7 +1,7 @@
 import type { ChildProcess } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import type { Readable } from 'node:stream'
+import type { Readable, Writable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -48,11 +48,12 @@ async function eventually(predicate: () => boolean, ms = 3000): Promise<boolean>
 
 /**
  * One of the browser's streams as the pipe holds it. The stream is private; a
- * test reaches it only to inject the fault an OS read error raises (Node
- * destroys the stream with the error), which no fake browser can cause on demand.
+ * test reaches it only to inject the fault an OS read or write error raises
+ * (Node destroys the stream with the error), which no fake browser can cause on
+ * demand.
  */
-function streamOf(pipe: CdpPipe, fd: 2 | 4): Readable {
-  return (pipe as unknown as { child: ChildProcess }).child.stdio[fd] as Readable
+function streamOf(pipe: CdpPipe, fd: 2 | 3 | 4): Readable | Writable {
+  return (pipe as unknown as { child: ChildProcess }).child.stdio[fd] as Readable | Writable
 }
 
 /** The settled rejection of a promise, for assertions on its fields. */
@@ -219,6 +220,33 @@ describe('a stream of the browser that breaks', () => {
     expect(error.kind).toBe('closed')
     expect(error.method).toBe('Fake.silence')
   })
+
+  it('a write that fails with EPIPE does not end the owner: requests waiting are rejected as closed', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    const waiting = rejectionOf(pipe.send('Fake.silence'))
+
+    streamOf(pipe, 3).destroy(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }))
+
+    const error = await waiting
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('closed')
+    expect(error.method).toBe('Fake.silence')
+    expect(error.message).toContain('the pipe to the browser broke')
+    expect(error.message).toContain('EPIPE')
+  })
+
+  it('a browser that stops reading its fd 3 is noticed: the next request is refused as closed, not timed out', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    // Its own answer may come before or after the pipe notices fd 3 closed;
+    // either is right, so only the request after it is asserted.
+    await pipe.send('Fake.closeInput').catch(() => undefined)
+
+    const error = await rejectionOf(pipe.send('Fake.echo', { n: 1 }))
+
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('closed')
+    expect(error.method).toBe('Fake.echo')
+  })
 })
 
 describe('closing ends the whole process group', () => {
@@ -285,6 +313,28 @@ describe('closing ends the whole process group', () => {
     expect(refused).toContainEqual([-pipe.pid, 'SIGKILL'])
     // The browser really is still there: close said so rather than pretending.
     expect(alive(pipe.pid)).toBe(true)
+  })
+
+  it('reports a group it could not end, by default, as one stderr line naming the pid', async () => {
+    const pipe = await fake(['--ignore-close'], {
+      kill: (() => {
+        throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' })
+      }) as typeof process.kill,
+    })
+    const lines: string[] = []
+    const write = process.stderr.write.bind(process.stderr)
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      lines.push(String(chunk))
+      return true
+    }) as typeof process.stderr.write
+    try {
+      await pipe.close(100)
+    } finally {
+      process.stderr.write = write
+    }
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain(`browser ${pipe.pid} `)
+    expect(lines[0]).toContain('close() gave up')
   })
 
   it('is idempotent', async () => {
