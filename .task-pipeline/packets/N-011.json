@@ -3,11 +3,15 @@
  "node": "N-011",
  "intent": "K3: глаголы и walking skeleton",
  "inputs": [
-  "Tasks, AgentWindows, Journal, buildSnapshot, snapshotVerdict, paginate, runProbe (бандл apps/extension/src/agent-probe.ts)",
+  "Tasks и checkLanded (N-009), AgentWindows (N-010), Journal и answerAfterRecord (N-006), doorRoute, pair, mcp-stdio (N-008), buildSnapshot, snapshotVerdict, paginate (N-003, N-004), census и readCensus (N-012), VerbIO, toolName, canonicalVerb, isLocalAddress, toSnapshotFinding (N-023), service из N-024 (capStdoutLog, buildIdentity с корнем релиза), runProbe (бандл apps/extension/src/agent-probe.ts)",
   "N-004: pageOf с курсором",
+  "N-006: Journal, answerAfterRecord",
   "N-008: регистрация инструментов на запрос",
   "N-009: Task.charge и проверки области",
-  "N-010: AgentWindow.open/close"
+  "N-010: AgentWindow.open/close",
+  "N-012: census, readCensus, CensusEntry[]",
+  "N-022: CdpError.kind и cdpCode для перевода в отказы контракта",
+  "N-007: Pairing: open, close, flush, list, onNotice, onReload"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -16,16 +20,22 @@
  ],
  "source_scope": {
   "edit_targets": [
+   "apps/agent/src/agent.ts",
+   "apps/agent/src/main.ts",
    "apps/agent/src/verbs/verbs.ts",
-   "src/verbs/probe.ts",
-   "src/main.ts",
+   "apps/agent/src/verbs/probe.ts",
    "tools/build-agent.mjs",
+   "apps/agent/package.json",
+   "tools/imports.mjs",
+   "apps/agent/src/agent.test.ts",
    "apps/agent/src/verbs/verbs.test.ts",
-   "src/verbs/skeleton.chrome.test.ts"
+   "apps/agent/src/verbs/skeleton.chrome.test.ts",
+   "apps/agent/src/service/http.ts",
+   "apps/agent/src/service/events.ts"
   ]
  },
  "outputs": [
-  "инструменты MCP под именами toolName(verb) из N-001 (точка заменяется на _): session_open, open, snapshot, read, get, waitFor, close, hygiene_census (без screenshot); находки в ответе строятся только через toSnapshotFinding из N-001, без текста страницы; каждый ответ проходит journal.record до отправки; `main.ts` собирает службу"
+  "`createAgent({home?, port, allowLoopbackForTests?, extraChromeArgs?}): Promise<Agent>` (каталоги из serviceDirs(home); тесты передают временный home; журнал, привязки и окна строятся в setup N-005 после замка, проверка seam N-005) в src/agent.ts: служба, дверь, задачи, окна, журнал, перепись; onRevoke(agentId) закрывает задачи агента и их окна (аудит #13); таймер Journal.sweep раз в сутки (аудит #30); main.ts: serve → createAgent, pair, mcp-stdio; bin okolos-agent указывает на собранный бандл (исходники импортируют ./x.js, обычный node их не запустит; проверка seam N-005 круг 2); инструменты MCP под toolName: session_open, open, snapshot, read, get, waitFor, close, hygiene_census; схемы zod типа z.ZodType<VerbIO[V]['input']> (аудит #26); журнал хранит canonicalVerb (аудит #19); SessionOpenResult.sessionId = Task.id, cdpSessionId не уходит агенту (аудит #28); находки только через toSnapshotFinding"
  ],
  "acceptance": [
   "skeleton на Chrome: session.open → open локальной фикстуры со скрытой инструкцией из корпуса → snapshot не содержит текста инструкции, verdict.level = finding → close: окна нет",
@@ -43,15 +53,43 @@
   "snapshot большой фикстуры приходит частями ≤ 32 КБ с курсором",
   "read возвращает boundary с nonce и origin; get title/url без фрагмента",
   "поля password, cc-number, one-time-code, <label> вокруг поля, aria-labelledby на поле кода, contenteditable без роли, с введёнными значениями (fuzz, фиксированное зерно): значений нет ни в одном ответе ни одного глагола (ревью R4)",
-  "проверка узла: pnpm -s exec vitest run apps/agent/src/verbs"
+  "remoteIPAddress пуст или отсутствует: snapshot и read отказывают cleaning_incomplete (аудит #27)",
+  "отзыв доступа закрывает задачи агента и их окна: окна с targetId задачи больше нет (аудит #13)",
+  "журнал несёт глагол в каноническом виде (session.open), инструмент зовётся session_open (аудит #19)",
+  "бандл несёт apps/agent/src/fabric (.mjs набор не копирует tsc)",
+  "тот же таймер раз в сутки обрезает events.jsonl по правилу N-005 (7 дней или 1000 событий), а не только при старте (отчёт N-005, fix 0)",
+  "вторая копия демона на том же home выходит с 75, не открыв журнал, хранилище привязок и Chrome (setup после замка, проверка seam N-005)",
+  "отказы двери до разбора пишутся в журнал через onRefused оболочки N-005 с DoorRejection (проверка seam N-005)",
+  "CdpError превращается в отказ контракта: kind exited/closed → browser_offline, ошибка CDP о пропавшей цели (cdpCode) → tab_gone, timeout → internal; тест на каждый (проверка seam N-022)",
+  "createAgent передаёт оболочке N-005 version, buildRoot и localesDir; при неизвестном каталоге строк служба не стартует молча с ключами вместо фраз (отчёт N-005, fix 1)",
+  "в журнал агентов попадают только отказы маршрутов двери (/mcp, /pair, /pair/claim); опросы Fabric и загрузки страницы во время остановки туда не пишутся (проверки N-024)",
+  "сбой accept (ошибка сервера после bind) не завершает демон; close() дожидается начатых onRefused; предупреждение о вычищенных строках доходит до событий и после неудачного старта (проверка unit N-024)",
+  "onRevoke получает AgentRecord из Pairing.revoke и закрывает задачи и окна именно этого агента; хранилище привязок не читается при старте: служба стартует, страница показывает состояние error SCR-23, дверь отказывает всем с кодом store_unreadable, агент получает internal с retryable (проверки N-007; N-013 круг 4)",
+  "Pairing onNotice связан с событиями службы: requested, confirmed, declined, expired, claim_expired, paired, revoked пишутся в events.jsonl фиксированными фразами без requestId; отклонённый и истёкший запрос оставляют запись (SCN-044 alt path); onNoticeError идёт в лог службы (проверки N-013 круг 3, N-007 круг 2)",
+  "последний сбой записи журнала (время и код причины) хранится и отдаётся странице: SCR-24 error и строка journalError берут его, причина в словах из каталога (проверки N-013 круг 3, N-007 круг 2)",
+  "остановка демона зовёт Pairing.flush(): время последнего вызова каждого агента переживает перезапуск (проверки N-013 круг 3, N-007 круг 2)",
+  "Task.windowOpen падает в false, когда окно задачи закрыто не через close, и SCR-24 показывает taskWindowClosed (проверки N-013 круг 3, N-007 круг 2)",
+  "пока есть открытые запросы привязки, таймер раз в минуту зовёт Pairing.list(now): истёкший запрос попадает в события не позже чем через минуту после срока, событие несёт время срока, а не время обнаружения (проверки N-013 круг 4)",
+  "тот же минутный таймер закрывает задачи, чьё время вышло, вместе с окнами (часы через createAgent): задача уходит из списка SCR-24 не позже чем через минуту после срока; задача без шагов остаётся до срока (проверки N-013 круг 5)",
+  "у оболочки службы есть точка остановки для владельца: при слиянии и выходе демон зовёт Pairing.flush() и ловит PairingStoreError в лог службы (проверка seam N-007 круг 3)",
+  "хранилище привязок, нечитаемое при старте, открывается заново при следующем вызове двери или загрузке страницы, когда его починили: перезапуск не нужен (проверка seam N-007 круг 3)",
+  "createAgent принимает часы (now: () => number) для e2e N-017 и тестов таймеров (проверка seam N-007 круг 3)",
+  "сохранённый «последний сбой записи журнала» снимается после следующей успешной записи: состояние error SCR-24 не залипает до перезапуска (проверки N-013 круг 7)",
+  "последний сбой записи списка доступов (claim или revoke) хранится и отдаётся странице, снимается после следующей успешной записи (проверки N-013 круг 9)",
+  "минутный таймер ловит PairingStoreError от list и пишет его в лог службы, таймер не останавливается (проверки N-013 круг 10)",
+  "последний перерыв записи журнала (начало и конец) хранится и отдаётся странице, пока он в пределах срока хранения журнала; при остановке демон зовёт Pairing.close(now), а не только flush; событие истечения берёт слова по cause (timeout или stopped) (проверки N-013 круг 11, N-007 круг 6)",
+  "onReload с removed закрывает задачи и окна пропавших агентов так же, как отзыв (отчёт N-007 fix 6)",
+  "перерыв записи журнала сохраняется на диск и переживает перезапуск демона: refusalsGap показывается и после рестарта (проверки N-013 круг 12)",
+  "сбой записи списка доступов при заборе ключа дверью (N-008) попадает в «последний сбой записи» и показывает store-unwritable на SCR-23 (проверки N-013 круг 12)",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/agent.test.ts apps/agent/src/verbs && pnpm -s run typecheck"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
-  "никакого секрета в argv, логах, журнале и URL",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
   "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
   "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "без длинного тире в текстах для людей"
  ],
- "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/verbs/verbs.ts src/verbs/probe.ts src/main.ts; затем первый непройденный тест в списке acceptance"
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/agent.ts apps/agent/src/main.ts apps/agent/src/verbs/verbs.ts; затем первый непройденный тест в списке acceptance"
 }

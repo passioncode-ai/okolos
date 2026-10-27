@@ -1,0 +1,38 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-025",
+ "intent": "Исправление: git в тестах и в buildIdentity не наследует GIT_DIR хука",
+ "inputs": [
+  "buildIdentity и тест «dotfiles» из N-024",
+  "N-024: buildIdentity и тест dotfiles"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "apps/agent/src/service/wellknown.ts",
+   "apps/agent/src/service/wellknown.test.ts",
+   "tools/git-env.test.ts"
+  ]
+ },
+ "outputs": [
+  "gitEnv() без GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE и соседей; buildIdentity и тестовые вызовы git -C идут с ним; гейт tools/git-env.test.ts"
+ ],
+ "acceptance": [
+  "тест на жертвенном репозитории под унаследованным GIT_DIR: в его логе только «the only commit» (наблюдался красным: «dotfiles» утекал)",
+  "гейт: тестовый файл с git -C без gitEnv() назван; подсаженный дефект гейт ловит",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/service/wellknown.test.ts tools/git-env.test.ts && pnpm -s run gates"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/service/wellknown.ts apps/agent/src/service/wellknown.test.ts tools/git-env.test.ts; затем первый непройденный тест в списке acceptance"
+}

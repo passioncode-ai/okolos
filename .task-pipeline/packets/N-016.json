@@ -6,7 +6,8 @@
   "бандл из tools/build-agent.mjs; набор Fabric: writeDescriptor, launchdPlist, launchdInstall, launchdUninstall, pruneReleases",
   "N-011: точка входа main",
   "N-012: инструмент переписи",
-  "N-015: статика страницы"
+  "N-015: статика страницы",
+  "N-007: путь и формат списка доступов для doctor"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -17,7 +18,7 @@
   "edit_targets": [
    "tools/install-agent.mjs",
    "tools/install-agent.test.ts",
-   "tools/launchd/app.okolos.agent.plist",
+   "apps/agent/src/main.ts",
    "package.json",
    "docs/runbooks/development.md",
    "docs/runbooks/agent.md"
@@ -30,15 +31,28 @@
   "dry-run печатает plist: RunAtLoad, KeepAlive, ThrottleInterval 10, ProcessType Standard, FABRIC_SERVICE_SUPERVISOR=launchd, абсолютный node, путь в релизе, ни одного секрета",
   "tools/runbook.test.ts видит новые скрипты в раннбуке",
   "фальшивый launchctl первым в PATH: install зовёт bootout, ждёт, bootstrap",
+  "релиз содержит бандл, apps/agent/src/fabric и apps/agent/static (аудит #37)",
+  "install пишет plist через launchdPlist набора и зовёт capStdoutLog при старте",
+  "дескриптор берёт auth.tokenFile из servicePaths(dirs) N-005, а не из своей копии пути (проверка seam N-005)",
+  "релиз содержит apps/agent/_locales; buildIdentity от корня релиза даёт digest, не коммит чужого git (отчёт N-005, fix 1)",
+  "serviceDirs из dirs.ts и serviceDirs набора Fabric дают одни и те же каталоги (их использует uninstall --purge); тест держит их вместе (проверка seam N-005 круг 2)",
+  "okolos-agent doctor --json на нечитаемом хранилище привязок и на журнале, который не пишется или не читается, называет каждую проблему с путём и причиной: строки pairingStoreError, journalError, journalUnreadable и agentRevokeFailed обещают именно это (проверки N-013 круг 4)",
+  "установка кладёт okolos-agent в ~/.local/bin (ссылка на текущий релиз), --uninstall её убирает; если ~/.local/bin нет в PATH, установщик говорит, какую строку добавить в профиль оболочки; после установки `okolos-agent doctor` и `okolos-agent pair --name x --help` запускаются из новой оболочки (проверки N-013 круг 5)",
+  "okolos-agent doctor без --json печатает человеку то же, что --json, словами; называет отсутствующий Chrome и политику, запрещающую нужные флаги (причина browser_offline) (проверки N-013 круг 5)",
+  "--uninstall --purge удаляет и данные Okolos Agent: список доступов, журнал агентов, события, логи; без --purge они остаются, и установщик это говорит (SCN-023, SCN-024: стирание и выгрузка расширения их не касаются) (проверка product N-013 круг 6)",
+  "--uninstall --purge удаляет и профиль Chrome агента (проверки N-013 круг 7)",
+  "okolos-agent doctor на списке доступов, который не записывается (нет прав на файл или каталог, нет места), называет проблему с путём и причиной: это обещают pairingStoreUnwritable и agentRevokeFailed (проверки N-013 круг 10)",
+  "okolos-agent doctor называет и сбой выгрузки журнала (права на каталог журнала, место на диске), который обещает journalExportFailed (проверки N-013 круг 11)",
+  "--uninstall --purge удаляет и папку clients/ с ключами агентов; без --purge она остаётся (SCN-023, SCN-024) (проверки N-013 круг 12)",
   "проверка узла: pnpm -s exec vitest run tools/install-agent.test.ts tools/runbook.test.ts"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
-  "никакого секрета в argv, логах, журнале и URL",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
   "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
   "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "без длинного тире в текстах для людей"
  ],
- "resume": "git log --oneline origin/main..bridge/b1-run2 -- tools/install-agent.mjs tools/install-agent.test.ts tools/launchd/app.okolos.agent.plist; затем первый непройденный тест в списке acceptance"
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- tools/install-agent.mjs tools/install-agent.test.ts apps/agent/src/main.ts; затем первый непройденный тест в списке acceptance"
 }

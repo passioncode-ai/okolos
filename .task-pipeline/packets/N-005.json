@@ -3,8 +3,9 @@
  "node": "N-005",
  "intent": "K3: оболочка службы fabric-service/0.1",
  "inputs": [
-  "набор Fabric: holdSingleInstance, ensureToken, checkRequest, buildWellKnown, LoginCodes, JsonlEventLog, Drain, RotatingLog",
-  "N-002: resource: корневой tsconfig.json, ссылки на проекты; N-005 дописывает после N-002"
+  "Node-набор Fabric: holdSingleInstance, ensureToken, checkRequest, buildWellKnown, LoginCodes, makeEvent, eventsPage, Drain, RotatingLog; JsonlEventLog в Node-наборе нет, файл событий пишет service/events.ts (аудит #5)",
+  "N-002: resource: корневой tsconfig.json, ссылки на проекты; N-005 дописывает после N-002",
+  "N-022: resource: packages/cdp-pipe/src/pipe.ts; N-022 вливается первым, при слиянии N-005 файл берётся из N-022 (его пометки i18n-exempt покрывают весь файл)"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -14,12 +15,18 @@
  "source_scope": {
   "edit_targets": [
    "apps/agent/package.json",
+   "pnpm-lock.yaml",
    "apps/agent/tsconfig.json",
-   "apps/agent/src/fabric/",
+   "apps/agent/src/fabric/**",
    "apps/agent/src/service/dirs.ts",
    "apps/agent/src/service/http.ts",
    "apps/agent/src/service/wellknown.ts",
+   "apps/agent/src/service/events.ts",
    "tsconfig.json",
+   "eslint.config.js",
+   "tools/i18n-sweep.mjs",
+   "tools/reachable.test.ts",
+   "packages/cdp-pipe/src/pipe.ts",
    "apps/agent/src/service/*.test.ts"
   ]
  },
@@ -32,15 +39,18 @@
   "Origin https://evil.example → 403; Sec-Fetch-Site: cross-site → 403",
   "well-known: id okolos-agent, instance default, build.commit, process.pid, degraded присутствует, surfaces.mcp.auth = own",
   "события без токена → 401; код входа одноразовый",
-  "проверка узла: pnpm -s exec vitest run apps/agent/src/service"
+  "@okolos/contracts, cdp-pipe, core-snapshot, storage разрешаются из apps/agent (аудит #2, #3)",
+  "Set-Cookie от /fabric/v1/login: HttpOnly; SameSite=Strict; Path=/; функция проверки сессии экспортирована для N-015 (аудит #12)",
+  "pnpm lint, typecheck, i18n:sweep проходят с вендоренным набором и apps/agent/src в обходе (аудит #6, #33)",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/service && pnpm -s run typecheck && pnpm -s run lint"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
-  "никакого секрета в argv, логах, журнале и URL",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
   "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
   "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "без длинного тире в текстах для людей"
  ],
- "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/package.json apps/agent/tsconfig.json apps/agent/src/fabric/; затем первый непройденный тест в списке acceptance"
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/package.json pnpm-lock.yaml apps/agent/tsconfig.json; затем первый непройденный тест в списке acceptance"
 }

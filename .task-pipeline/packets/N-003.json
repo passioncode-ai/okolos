@@ -4,7 +4,8 @@
  "intent": "K2: вердикт к снимку, корпус, fuzz секретов",
  "inputs": [
   "`buildSnapshot`, `AxNode` (packages/core-snapshot/src/snapshot.ts); `Verdict` (@okolos/contracts)",
-  "N-023: TaskScope и BridgeRefusal"
+  "N-023: toSnapshotFinding, SnapshotFinding, TaskScope",
+  "N-024: resource: pnpm-lock.yaml; N-003 правит lockfile после N-005"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -14,15 +15,18 @@
  "source_scope": {
   "edit_targets": [
    "packages/core-snapshot/src/verdict.ts",
+   "packages/core-snapshot/src/snapshot.ts",
+   "packages/core-snapshot/src/index.ts",
    "packages/core-snapshot/package.json",
    "packages/core-snapshot/tsconfig.json",
+   "pnpm-lock.yaml",
    "packages/core-snapshot/src/verdict.test.ts",
-   "src/corpus.test.ts",
-   "src/secrets.test.ts"
+   "packages/core-snapshot/src/corpus.test.ts",
+   "packages/core-snapshot/src/secrets.test.ts"
   ]
  },
  "outputs": [
-  "`snapshotVerdict(probe: {verdicts: readonly Verdict[], truncated: boolean, unresolved: number}): SnapshotVerdict | {refused: 'cleaning_incomplete'}` — `{level: 'clean'|'finding', findings: SnapshotFinding[]}`, каждая находка строится только через `toSnapshotFinding` из N-001 (без текста, локатора и detail страницы); неполная очистка означает отказ без текста; `refOf(backendId, taskKey)` HMAC; `buildSnapshot` вычищает значения полей из имён"
+  "`snapshotVerdict(probe: {verdicts: readonly Verdict[], truncated: boolean, unresolved: number}): SnapshotVerdict | {refused: 'cleaning_incomplete'}` — `{level: 'clean'|'finding', findings: SnapshotFinding[]}`, каждая находка строится только через `toSnapshotFinding` из N-023 (без текста, локатора и detail страницы); неполная очистка означает отказ без текста; `refOf(backendId, taskKey)` HMAC; `buildSnapshot` вычищает значения полей из имён"
  ],
  "acceptance": [
   "buildSnapshot с rootRef под скрытым предком возвращает пусто; с rootRef под полем ввода текст поля не выдаётся (ревью F2)",
@@ -34,15 +38,18 @@
   "значение поля (AX value) вычищается из имени любого узла: <label> вокруг поля, aria-labelledby на поле кода; contenteditable без роли считается полем (ревью R4)",
   "значение ищется после удаления пробелов и разделителей и только если оно не короче 4 знаков: «4111 1111 1111 1111» в имени как «4111-1111-1111-1111» вычищается; значение «ab» имён не трогает (ревью S4)",
   "toSnapshotFinding на настоящем выводе detectHidden (stage1) и stage3 по позитивам корпуса: concealment и carrier заполнены; тест падает, если детектор сменит формат detail (проверка seam N-001 круг 2)",
-  "проверка узла: pnpm -s exec vitest run packages/core-snapshot"
+  "снимок хранит refMap: ref (HMAC) → backendDOMNodeId; buildSnapshot принимает rootRef как ref и разрешает его через refMap снимка той же задачи (аудит #29)",
+  "новые символы импортируются из '@okolos/core-snapshot' (аудит #4)",
+  "pnpm install --frozen-lockfile → 0 (аудит #22)",
+  "проверка узла: pnpm -s exec vitest run packages/core-snapshot && pnpm -s run typecheck"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
-  "никакого секрета в argv, логах, журнале и URL",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
   "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
   "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "без длинного тире в текстах для людей"
  ],
- "resume": "git log --oneline origin/main..bridge/b1-run2 -- packages/core-snapshot/src/verdict.ts packages/core-snapshot/package.json packages/core-snapshot/tsconfig.json; затем первый непройденный тест в списке acceptance"
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- packages/core-snapshot/src/verdict.ts packages/core-snapshot/src/snapshot.ts packages/core-snapshot/src/index.ts; затем первый непройденный тест в списке acceptance"
 }

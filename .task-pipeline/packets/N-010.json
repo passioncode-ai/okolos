@@ -5,7 +5,8 @@
  "inputs": [
   "CdpTransport, CdpPipe.launch (N-022); launch сам добавляет --remote-debugging-pipe и --user-data-dir, AgentWindows их не передаёт (проверка seam N-002)",
   "N-022: CdpTransport, onExit, CdpError, timeoutMs на вызов",
-  "N-005: apps/agent: package.json с зависимостью @okolos/contracts, tsconfig, каталоги службы"
+  "N-024: apps/agent: package.json, tsconfig",
+  "N-014: ключ события onCloseIncomplete"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -15,13 +16,13 @@
  "source_scope": {
   "edit_targets": [
    "apps/agent/src/window/chrome.ts",
-   "src/window/window.ts",
+   "apps/agent/src/window/window.ts",
    "apps/agent/src/window/window.test.ts",
-   "src/window/window.chrome.test.ts"
+   "apps/agent/src/window/window.chrome.test.ts"
   ]
  },
  "outputs": [
-  "`findChrome(): string | null`; `class AgentWindows { constructor({binary, profileDir, launch: (o) => Promise<CdpTransport> = CdpPipe.launch}); openWindow(): Promise<{targetId, sessionId}> /* targetId и есть windowId в SessionOpenResult */; closeWindow(targetId); shutdown() }` — свои аргументы `--no-startup-window --no-first-run --no-default-browser-check` и никогда `--enable-automation`"
+  "`findChrome(): string | null`; `class AgentWindows { constructor({binary, profileDir, launch: (o) => Promise<CdpTransport> = CdpPipe.launch, extraArgs?: readonly string[] /* для тестов: --host-resolver-rules; --enable-automation и --remote-debugging-port отвергаются (аудит #21) */}); openWindow(): Promise<{targetId, cdpSessionId}> /* targetId и есть windowId в SessionOpenResult; cdpSessionId агенту не уходит (аудит #28) */; closeWindow(targetId); shutdown() }` — свои аргументы `--no-startup-window --no-first-run --no-default-browser-check` и никогда `--enable-automation`"
  ],
  "acceptance": [
   "аргументы запуска: нет --enable-automation, есть --no-startup-window (фальшивый launch)",
@@ -29,15 +30,22 @@
   "shutdown закрывает группу (фальшивый браузер)",
   "Chrome: окно открывается, document.visibilityState = visible, фронтальное приложение не меняется (osascript), outerHeight − innerHeight < 120",
   "Chrome: kill -9 демона-обёртки → процессов с профилем не остаётся после перезапуска (зачистка сирот своего профиля по SingletonLock)",
-  "проверка узла: pnpm -s exec vitest run apps/agent/src/window"
+  "extraArgs с --enable-automation или --remote-debugging-port → ошибка конструктора; --host-resolver-rules проходит (аудит #21)",
+  "onExit: самостоятельный выход браузера отличается от выхода по close() (поле requested), окна задач помечаются закрытыми; send, отклонённый как closed, ведёт к close() группы (проверка seam N-022)",
+  "на настоящем Chrome: kill -9 браузера даёт CdpError kind exited у ожидающего запроса в пределах окна EXIT_AFTER_PIPE_MS (проверка seam N-022, риск 4)",
+  "onCloseIncomplete при close() окна агента: демон пишет событие с pid, отмечает degraded источник window и не считает окно закрытым; спека §3 получает это исключение (проверка seam N-022)",
+  "AgentWindows зовёт close() только с константой graceMs (close(NaN) в cdp-pipe может зависнуть: риск вердикта N-022); хелперы Chrome (crashpad) после kill -9 не остаются сиротами",
+  "тексты, которые читает человек, идут ключами каталога, которые заранее добавил N-014; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
+  "временный профиль (profile disposable) создаётся в своём временном каталоге на задачу и удаляется при её закрытии; это обещает строка taskProfileDisposable (проверки N-013 круг 12)",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/window && pnpm -s run typecheck && pnpm -s run i18n:sweep"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
-  "никакого секрета в argv, логах, журнале и URL",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
   "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
   "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "без длинного тире в текстах для людей"
  ],
- "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/window/chrome.ts src/window/window.ts apps/agent/src/window/window.test.ts; затем первый непройденный тест в списке acceptance"
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/window/chrome.ts apps/agent/src/window/window.ts apps/agent/src/window/window.test.ts; затем первый непройденный тест в списке acceptance"
 }

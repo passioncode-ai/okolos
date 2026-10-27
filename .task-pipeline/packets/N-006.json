@@ -4,7 +4,8 @@
  "intent": "K3: журнал до ответа",
  "inputs": [
   "serviceDirs().data",
-  "N-005: каталоги данных службы"
+  "N-024: каталоги данных службы, servicePaths, setup после замка",
+  "N-023: BridgeRefusal, AnyBridgeVerb, canonicalVerb для типа JournalEntry"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -14,26 +15,36 @@
  "source_scope": {
   "edit_targets": [
    "apps/agent/src/journal/journal.ts",
-   "apps/agent/src/journal/journal.test.ts"
+   "apps/agent/src/journal/journal.test.ts",
+   "tools/reachable.test.ts"
   ]
  },
  "outputs": [
-  "`class Journal { static open(dir, {retentionDays}): Journal; record(e: JournalEntry): Promise<void> /* append + fsync, бросает при сбое */; recent(limit): JournalEntry[]; sweep(now) }`; `JournalEntry {at, agent, task?, verb, origin?, outcome: 'answered'|'refused'|'rejected', code?: BridgeRefusal | DoorRejection, bytes?, verdict?}`; `DoorRejection = 'bad_host'|'bad_origin'|'bad_content_type'|'bad_request'` для отказов двери до разбора (проверка seam N-001 круг 2) — без текста страницы и значений полей"
+  "`class Journal { static open(dir, {retentionDays}): Journal; record(e: JournalEntry): Promise<void> /* append + fsync, бросает при сбое */; recent(limit): JournalEntry[]; sweep(now) }`; `JournalEntry {at, agent, task?, verb, origin?, outcome: 'answered'|'refused'|'rejected', code?: BridgeRefusal | DoorRejection, bytes?, verdict?}`; `DoorRejection = 'bad_host'|'bad_origin'|'cross_site'|'stopping'|'bad_content_type'|'bad_request'` (значения onRefused оболочки N-024); JournalEntry — объединение по outcome: у 'rejected' нет agent и verb (аудит #38); verb: AnyBridgeVerb, канонический (аудит #19); `answerAfterRecord(journal, entry, send)` — единственная обёртка «запись до ответа», при сбое записи отправляет конверт отказа internal без содержимого страницы (аудит #18); RETENTION_DAYS_JOURNAL = 90, тест сверяет с RETENTION_DAYS.journal из @okolos/storage (аудит #30) (проверка seam N-001 круг 2) — без текста страницы и значений полей"
  ],
  "acceptance": [
   "record дописывает строку и делает fsync до возврата (шпион на fd.sync)",
   "каталог только для чтения → record бросает, и обёртка answerAfterRecord отдаёт internal, а не ответ",
   "запись с полем text или value отвергается типом и рантайм-проверкой",
   "sweep удаляет записи старше срока; срок берётся из RETENTION_DAYS журнала расширения",
-  "проверка узла: pnpm -s exec vitest run apps/agent/src/journal"
+  "запись журнала несёт agentId рядом с именем агента: два агента с одинаковым именем различимы в журнале и на SCR-24 (проверки N-013 круг 3, N-007 круг 2)",
+  "answerAfterRecord отдаёт вызывающему причину сбоя записи закрытым набором кодов (no_space, no_permission, other, по errno), а не только false: из неё N-011 берёт $WHAT$ строки journalError (проверки N-013 круг 4)",
+  "DoorRejection дополнен store_unreadable (список доступов не читался, ключ не проверен); у каждого кода rejected есть строка rejection_<код> в каталоге демона (проверки N-013 круг 4)",
+  "recent отдаёт отказы отдельно от ответов (фильтр по outcome), так что поток ответов не вытесняет отказы со страницы; нечитаемые строки журнала считаются и отдаются странице, а не пропускаются молча (проверки N-013 круг 5)",
+  "у журнала есть выгрузка (export) для GET /api/journal: отдаёт JSONL без содержимого страниц и при сбое бросает ошибку с кодом причины (no_space, no_permission, other), из которой N-015 берёт $WHAT$ строк journalExportFailed и journalUnreadable (проверки N-013 круг 7)",
+  "запись журнала несёт рядом с agentId дату выдачи доступа (pairedAt), чтобы SCR-24 показал отозванного агента строкой agentLabelRevoked с датой (проверки N-013 круг 8)",
+  "recent при сбое чтения бросает ошибку с кодом причины (no_space не бывает, no_permission, unreadable, other): из неё N-015 берёт $WHAT$ строки journalUnreadable (проверки N-013 круг 9)",
+  "ответы протокола MCP привязанному агенту (initialize, tools/list, ошибка разбора) пишутся записью с outcome answered и глаголом протокола (mcp.initialize, mcp.tools_list, mcp.parse_error) или явно не пишутся с причиной в спеке §3; решение одно для N-006 и N-008 (проверки N-013 круг 9)",
+  "ответы агенту «неизвестный инструмент», «неверные аргументы» и ошибки протокола пишутся в журнал с outcome refused и кодом invalid_scope или internal и показываются на странице существующими строками (проверки N-013 круг 12)",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/journal && pnpm -s run typecheck"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
-  "никакого секрета в argv, логах, журнале и URL",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
   "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
   "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "без длинного тире в текстах для людей"
  ],
- "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/journal/journal.ts apps/agent/src/journal/journal.test.ts; затем первый непройденный тест в списке acceptance"
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/journal/journal.ts apps/agent/src/journal/journal.test.ts tools/reachable.test.ts; затем первый непройденный тест в списке acceptance"
 }

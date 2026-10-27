@@ -1,0 +1,201 @@
+{
+  "node": "N-024",
+  "done": [
+    "Test 1 of the brief: a service log made read-only after the start no longer ends the daemon: the request-log write in the 'finish' listener is wrapped in quietly (http.ts:285-289); two well-known calls answer 200 and close() completes (http.test.ts:571-583)",
+    "Test 2: two overlapping close() calls with a stuck request write service.drain_cut_off exactly once; the cutOffTold flag (http.ts:407-414) is shared by close() and the signal hand-over (http.ts:416-425), so a signal plus close() is also one event (http.test.ts:687-721 asserts length 1)",
+    "Test 3: eventDrainCutOff reads, verbatim from the brief, ru 'Okolos Agent остановился, не дождавшись конца вызовов. Оборвано: $COUNT$.' and en 'Okolos Agent stopped before all calls finished. Cut off: $COUNT$.' (both _locales files; messages.test.ts asserts both resolved)",
+    "Test 4: eventsUnreadable reads verbatim from the brief in ru and en; it is appended once at start as level warning before service.started (http.ts:388-391), the shell no longer adds an 'events' degraded source (http.ts:244), the well-known document says status ready and degraded [] (http.test.ts:930-952), and a second start on the cleaned file writes no second warning (http.test.ts:954-965)",
+    "Test 5: a request refused with Stopping now goes through refuse(..., 'stopping') and the hook is awaited before the 503 is written; the hook gets the URL without its query (http.ts:322-327, 269-270; http.test.ts:585-630 asserts no answer while the hook is gated, then 503 and [{path:'/mcp', reason:'stopping'}]); RefusalReason gains 'stopping' (http.ts:453)",
+    "Everything N-005 asked for is still held by tests that pass: second copy exits 75 and the first answers (http.test.ts:156), 403 for Host evil.example, foreign Origin and Sec-Fetch-Site cross-site on every route including well-known (202-275), well-known id okolos-agent, instance default, build.commit, process.pid, degraded present, surfaces.mcp.auth own (876-897), events 401 without the token (900), one-time login code (978), 0600 token (189), 127.0.0.1 only via address() (196), package.json licence AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+    "No em dash in either agent catalogue (grep count 0 in both files)",
+    "No test server left listening: the node LISTEN set from lsof was identical before and after the run, and no run-service.mjs child process remained",
+    "RefusalReason 'bad_host'|'bad_origin'|'cross_site'|'bad_request'|'stopping' is a subset of N-006's DoorRejection, so every value onRefused hands the door has a journal code",
+    "onRefused gets the URL without its query (http.ts:270, test 'onRefused gets the URL without its query'), so N-011 can filter journal entries by pathname (/mcp, /pair, /pair/claim) as its Test 25 requires, and a live login code never reaches the journal",
+    "the 'stopping' 503 now passes through onRefused before it is written (http.ts:322-327), which is what N-011 Test 22 and N-008 need to journal it",
+    "SetupContext (dirs, paths, events, codes, log, locale) is built after the lock and before the bind; a second copy never reaches setup (test 'is never called by a copy that finds the lock held'), which N-011's 'second copy exits 75 without opening journal, pairing store, Chrome' relies on",
+    "RouteContext.operatorSession and RunningService.operatorSession give N-015 the session check; cookie attributes HttpOnly, SameSite=Strict, Path=/, max 7 days are tested here (http.test.ts:999), as N-015 acceptance (audit #12) assigns to the shell",
+    "a route's own CSP header overrides the shell default (test 'the shell's CSP applies unless the route sets its own'), as N-015 needs for script-src 'self'",
+    "well-known declares surfaces.mcp (auth own) and surfaces.dashboard only when a route lists /mcp or /dashboard in paths, matching N-008 and N-015 acceptance",
+    "kit serviceDirs('okolos-agent','darwin') and dirs.ts serviceDirs agree on all three folders (fabric-paths.mjs:24-29 vs dirs.ts:53-58); N-016 owns the test that holds them together",
+    "servicePaths(dirs).hostToken is an absolute path, so it satisfies the kit descriptor rule LOCAL_PATH (fabric-base.mjs:28) N-016 will hit",
+    "buildIdentity returns a digest for any root containing a 'releases' segment, and N-016 installs to ~/.local/share/okolos-agent/releases/<v>-<sha12>/",
+    "kit DEFAULT_EXIT_TIMEOUT 15 s (fabric-supervisors.mjs:13) exceeds DRAIN_SECONDS 8 + DRAIN_GRACE_SECONDS 2, so the plist N-016 writes through launchdPlist will not SIGKILL a draining daemon",
+    "apps/agent/package.json declares @okolos/{cdp-pipe,contracts,core-snapshot,i18n,storage}; lockfile importer apps/agent matches and `pnpm install --frozen-lockfile` is up to date, so N-003 starts from a consistent lockfile and N-009/N-010/N-012 can import contracts and cdp-pipe (deps.test.ts)",
+    "vitest include 'apps/**/*.test.ts' and tsconfig.tests.json 'apps/*/src/**/*.test.ts' already cover N-006..N-015 test folders; apps/agent/tsconfig include 'src/**/*.ts' covers their modules",
+    "both agent catalogues hold the same 54 keys, matching the spec §9 record 'Всего строк 54'",
+    "every remaining gap in the shell has an owner node in the current plan: N-008 (AbortSignal in RouteContext, plan line 326), N-011 (server 'error' handler, lost unreadable warning, close() waits onRefused, events.ts comments, plan line 424), N-014 (term «вызов», catalogue parity), N-015 (stopping state, plan Test 14), N-020 (LC-15 cleanup, plan line 673)",
+    "the five service sentences in both catalogues match the brief word for word; both catalogues hold 54 keys, the number spec section 9 states",
+    "spec section 9 names a current Copylot report pair for every service sentence: eventStarted, eventStopping, serviceStopping (ru bb3a7be2, en 9f797e22); eventDrainCutOff and eventsUnreadable (ru 8748c348, en 4658bee7). The reports themselves were not opened",
+    "terminology holds: 'Okolos Agent' is never declined in the service sentences, and the word 'запрос' (reserved for an access request) is not used in them; eventDrainCutOff says 'вызовов'",
+    "no em dash and no spaced-hyphen substitute in either catalogue",
+    "the sentences say what the service does: 'started' is written once the bind succeeded; 'stopping and takes on no new work' is true (new work gets 503, only the well-known document still answers); the cut-off event is written once per stop with the number of open calls; unreadable lines are removed from the file at that start and reported once as a warning, and the well-known document carries no degraded source for them",
+    "spec section 8 identity holds: service okolos-agent, instance default, 127.0.0.1:47871 only; data in ~/Library/Application Support/okolos-agent, logs in ~/Library/Logs/okolos-agent; /dashboard and /mcp are declared in the well-known document only when a route serves them, mcp auth 'own'",
+    "spec section 11 F4 and R8, and the plan's secret rule: session cookie is HttpOnly; SameSite=Strict; the sign-in code lives 120 s and is burned on use; the request log and the refusal hook get the path without its query",
+    "the 503 while stopping now passes through onRefused with reason 'stopping' before it is written, so spec section 3 ('every answer to an agent is journaled before it goes out, door refusals included') is reachable once the door wires the hook",
+    "SCN-044, SCN-045 and SCN-048 are draft and no step is contradicted by the shell; SCR-23/24 stay 'designed', which is true",
+    "docs/README.md code map row for apps/agent ('Б1 моста, в работе') and the count '22 пакета, 4 приложения' are true of the tree",
+    "AGENTS.md Commands row 'MCP: none yet ... decided, not built' is still true: no /mcp route exists at this node"
+  ],
+  "not_done": [],
+  "not_verified": [
+    "unit: Whether Tests 1 to 5 were written first and observed red: 84d3e6c carries tests and code together, so TDD order is not visible from the history",
+    "unit: The vendored kit beyond fabric-logs.mjs (holdSingleInstance, ensureToken, checkRequest, LoginCodes, buildWellKnown, eventsPage, atomicWrite) was taken as used, not read; kit.test.ts integrity was not run",
+    "unit: The doors that consume onRefused('stopping') and the owner's journal lifetime after close(): seam tier",
+    "unit: pnpm gates (named in the N-024 definition of done) was not run; the node check is the four commands above",
+    "unit: REQ-63's check_service.py and restart after kill -9: no launchd install or descriptor is in this node's unit",
+    "unit: events.test.ts and wellknown.test.ts bodies were not read line by line, only run",
+    "unit: Behaviour when the tests run as root (chmod 0400 would not make the log unwritable)",
+    "seam: the vendored kit internals under apps/agent/src/fabric/*.mjs beyond the members the shell and its consumers call (excluded by the task)",
+    "seam: the Copylot report ids in spec §9; not fetched from Copylot",
+    "seam: full `pnpm gates` and `pnpm typecheck` (tsc -b writes build output); only the test typecheck and targeted suites were run",
+    "seam: REQ-63's kill -9 restart under launchd and check_service.py: N-016's installer does not exist yet",
+    "seam: the stale-lock path of holdSingleInstance after kill -9 (kit code, untested from this side)",
+    "product: the contents of the Copylot reports named in spec section 9 (cannot be opened from here); only that a current report is named for each service sentence",
+    "product: how the events and the 503 sentence render in Fabric Dashboards' event view and status (visual tier; no host or installed service here)",
+    "product: how the entry point picks ru or en: nothing selects 'en' yet and no document says how; that belongs to N-011/N-016 and the runbook",
+    "product: fabric-workspace knowledge pages (products.md MCP gaps, lifecycle.md) that may need the service named once it is installed",
+    "product: whether the kit accepting Host [::1]:47871 alongside 127.0.0.1 and localhost differs in any way a person could meet from spec section 11 F4 'Host ровно свой' (judged a seam or unit question)"
+  ],
+  "blockers": [
+    {
+      "what": "The one-time eventsUnreadable warning is lost when the start fails after the events file is opened. EventLog's constructor removes the unreadable lines from the file at once (events.ts:56), but the warning is appended only after the bind (http.ts:388-390). A start that fails in between (a busy port, a setup that throws) leaves a cleaned file and no warning, and the next successful start finds 0 unreadable lines, so the person is never told lines were removed. Reproduced: torn events file, start on a held port -> EADDRINUSE, file after it is \"\", next start's events are only ['service.started']. (apps/agent/src/service/events.ts:54-56 with apps/agent/src/service/http.ts:179-184, 354-365, 388-390, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "close() can resolve while a 'stopping' refusal's onRefused hook is still running. The refused request is outside drain.work, so the drain does not wait for it; when the last in-flight request ends, finish() closes all connections and releases the lock, close() resolves, the client gets ECONNRESET instead of the 503, and the hook (the door's journal write) completes after close() returned. Reproduced: hook gated, in-flight /slow released, close() resolved with the hook unfinished, the refused call ended 'error ECONNRESET', the hook finished afterwards. Same shape as the guard's refusals, but at stopping it is the expected timing, not a corner. (apps/agent/src/service/http.ts:316-327 (refusal outside drain.work), 368-380 (finish), 433-438 (close), found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Doc comments still describe the unreadable-lines count as a degraded state, which this node removed: EventLog.unreadable says 'the service reports the count as degraded for this run only' and the constructor comment says 'a degraded status does not outlive what caused it'; messages.ts calls the catalogue's sentences 'the degraded reason beside the service's status'. events.ts is one of this node's edit targets. (apps/agent/src/service/events.ts:41-46, 54-55; apps/agent/src/service/messages.ts:5-6, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "After the bind, the HTTP server has no 'error' listener: the one used for listen is removed (http.ts:358). A later server-level error (Node's net server emits 'error' on an accept failure such as EMFILE) would be an unhandled 'error' event and end the daemon. Inherited from N-005, read from code and Node's net semantics, not reproduced. (apps/agent/src/service/http.ts:354-361, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "RouteContext carries no stopping signal. A long /mcp stream learns of a stop only when the drain deadline (8 s) passes and finish() calls closeAllConnections(), with no journal entry for the cut call. N-008 Test 17 requires the door to close the stream itself before the deadline and journal it. (N-008 (plan line 326: Modify apps/agent/src/service/http.ts, RouteContext gains an AbortSignal); shell side apps/agent/src/service/http.ts:48-58, 398-402, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Three shell gaps the daemon will hit: (1) after the bind the server has no 'error' listener (http.ts:358 removes it), so an accept error such as EMFILE is an uncaught exception; (2) EventLog removes unreadable lines in its constructor (events.ts:56) before the warning is appended (http.ts:388-390), so a start that fails in setup or bind loses the warning for good; (3) close() waits only on drain.work, not on onRefused calls already started for guard or 'stopping' refusals, so the door's journal write can race the lock release. The events.ts doc comment (lines 44, 54-55) still says the count is reported as degraded. (N-011 (plan line 424, Test 26) which edits apps/agent/src/service/http.ts and events.ts, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "N-006 plans DoorRejection as a hand-copied literal union of the shell's onRefused values. Nothing ties it to the exported RefusalReason, so a reason the shell adds later reaches Journal.record as an untyped code with no compile error. (N-006 apps/agent/src/journal/journal.ts (plan line 279), found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "While stopping, the shell answers every route except well-known with its own JSON 503 (application/json, CSP default-src 'none'). N-015 Test 14 ('страница получает 503 во время слива и говорит об этом') holds only for /api calls from a page already loaded. A fresh GET /dashboard during the drain shows raw JSON, and N-015's edit targets do not include http.ts, so the page cannot change that answer. (N-015 apps/agent/src/dashboard/page.ts (plan line 565); shell answer at apps/agent/src/service/http.ts:322-327, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "N-014 is asked to move the kit's English 403 sentence and lock-held sentence into the catalogue, or to record why they stay protocol text. The 403 sentence is written by http.ts:294 and the lock sentence by the vendored kit straight to stderr (fabric-lock.mjs:224), and neither file is in N-014's edit targets, so only the 'record why' branch is open and no file is named for that record. Separately, spec §9 now states 'Всего строк 54' (design.md:200, 212), which N-014's page and CLI keys will make false, and the spec is not in N-014's edit targets either. tools/locales.test.ts covers only apps/extension/_locales, so agent catalogue parity and placeholders are gated only for the five service keys (messages.test.ts) until N-014 extends it. (N-014 (plan line 521, Test 6; edit targets docs/brand/terminology.md, apps/agent/_locales/*, tools/locales.test.ts), found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "`pnpm typecheck` now emits apps/agent/dist and apps/agent/tsconfig.tsbuildinfo (root tsconfig references apps/agent). The AGENTS.md LC-15 cleanup command and 500 MB cap list do not name them yet. (N-020 AGENTS.md Lifecycle, LC-15 (plan line 673), found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "the term 'вызов' that eventDrainCutOff (and the page's pairedSince) relies on is not in the brand pack: terminology.md section 'Мост для агентов' has no row for it, so the catalogue uses a word the brand pack does not yet own (docs/brand/terminology.md:125-146; apps/agent/_locales/ru/messages.json eventDrainCutOff, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "two sentences a person can read still come from the Fabric kit in English, outside the catalogue: the 403 body ('Host ... is not this service.', 'Origin ... is not this service.', 'Cross-site requests are refused.') and the held-lock sentence printed with exit 75 ('Another copy is already running (process N holds <path>).') (apps/agent/src/fabric/fabric-platform.mjs:158-164; apps/agent/src/fabric/fabric-lock.mjs:23; apps/agent/src/service/http.ts:291-295, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "AGENTS.md Lifecycle says 'There is no port, no native-messaging host, no login item and no per-session (MCP) server', and LC-15's cap and cleanup command list no apps/agent build output; this node's code binds 127.0.0.1:47871 and tsc -b writes apps/agent/dist. True today only because nothing installs or starts the service (AGENTS.md:76-77; AGENTS.md LC-15 paragraph (cleanup command), found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "docs/privacy.md lists the product's stores as nine, all in the extension; the service keeps four more on the person's machine (events.jsonl, 7 days or the newest 1000; host.token; auth/ sessions; the rotating service log) and the privacy page (SCR-18) is generated from this file (docs/privacy.md:71-87; apps/agent/src/service/dirs.ts servicePaths; apps/agent/src/service/events.ts KEEP_DAYS, KEEP_EVENTS, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "SCR-23 and SCR-24 have no state for 'the service is stopping' (the page's own /api calls get 503 with serviceStopping during the drain) nor for 'the session expired' (the shell's cookie ends after 12 h idle or 7 days); the page will meet both (docs/ux/screens.md:599-640 (states tables), found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "interaction: onRefused fires for every refused request on every path, not only the door's. Once the door journals the hook (N-006 DoorRejection includes 'stopping'), each stop's 8 s drain can put rows into the agents' journal and SCR-24 'Последние отказы' that no agent caused: Fabric's host polling /fabric/v1/events, the page's own /api requests. The refusal list then counts refusals that are not agents' and shows rows with no agent for the refusalLine '$AGENT$: ...' format (apps/agent/src/service/http.ts:126-131, 316-328; plan N-006 DoorRejection, N-015 test 7, N-014 test 3 (rejection_door), found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "an agent that calls during a stop receives a bare HTTP 503 whose body is a Russian sentence by default, not the contract envelope of spec section 2.3; the agent and its person would read 'Okolos Agent останавливается...' rather than a retryable refusal (apps/agent/src/service/http.ts:322-327; spec section 2.3, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "eventsUnreadable tells the person 'остальные события сохранены' / 'the other events are kept', but the same start then runs the retention trim, which drops events older than 7 days beyond the newest 1000. On a long-lived file the sentence and the file can disagree in the same minute (apps/agent/src/service/events.ts:49-58; apps/agent/_locales/ru/messages.json eventsUnreadable, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "developer comments still describe unreadable events lines as a degraded state, which the node removed: events.ts says the service 'reports the count as degraded for this run only' and that 'a degraded status does not outlive what caused it'; messages.ts lists 'the degraded reason beside the service's status' among the places these sentences appear. Not product text, but the next reader takes it as the behaviour (apps/agent/src/service/events.ts:44, 54-55; apps/agent/src/service/messages.ts:5-6, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    }
+  ],
+  "replan": {
+    "possible": true,
+    "add": [],
+    "park": [],
+    "why": "certified at all 3 tiers in round 2"
+  },
+  "evidence": [
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-024 -s exec vitest run apps/agent/src/service -> 6 files passed, 102 tests passed, exit 0 (http.test.ts 67, events.test.ts 13, wellknown.test.ts 8, deps.test.ts 5)",
+    "unit: pnpm --dir ... -s run typecheck -> exit 0",
+    "unit: pnpm --dir ... -s run lint -> exit 0",
+    "unit: pnpm --dir ... -s run i18n:sweep -> exit 0, '0 sentence(s) in 0 file(s) outside the catalogue', 46 exempt",
+    "unit: lsof -nP -iTCP -sTCP:LISTEN | grep node, before and after the run -> the same six listeners (pids 1319, 26602, 84646, 90974, 92044, 93018), none added; pgrep -fl run-service.mjs -> nothing",
+    "unit: node catalogue read of eventDrainCutOff and eventsUnreadable in ru/en -> byte-equal to the brief's Test 3 and Test 4 strings; em dash grep count 0 in both files",
+    "unit: scratch probe (scratchpad lost-warning.mjs, temp home): torn events file + start on a held port -> 'first start failed: EADDRINUSE', 'file after failed start: \"\"', 'kinds after second start: [ service.started ]'",
+    "unit: scratch probe (scratchpad hook-race.mjs, temp home): 'close() resolved; hook finished yet? false', '/slow -> 200', '/later (refused while stopping) -> error ECONNRESET', 'hook finished after close: true'",
+    "unit: read git diff 9f5d5c9..HEAD (http.ts, http.test.ts, messages.test.ts, both catalogues) and http.ts, events.ts, messages.ts, wellknown.ts, dirs.ts, fabric-logs.mjs in full",
+    "seam: git -C okolos-b1-n-024 log: HEAD ac469ae merges b76a8f7; apps/ and packages/ last changed at 84d3e6c",
+    "seam: grep -rln startService|serviceDirs|servicePaths|operatorSession|onRefused|RefusalReason|SERVICE_KEYS over apps packages tools e2e: only src/service/* and fixtures/run-service.mjs (plus dist/*.d.ts build output and an unrelated core-feeds symbol)",
+    "seam: pnpm -s exec vitest run apps/agent tools/coverage-shape.test.ts tools/reachable.test.ts tools/runbook.test.ts tools/docs.test.ts: 11 files, 232 passed",
+    "seam: node tools/i18n-sweep.mjs: exit 0",
+    "seam: pnpm -s exec tsc -p tsconfig.tests.json: exit 0",
+    "seam: pnpm -s exec eslint apps/agent tools/i18n-sweep.mjs tools/coverage-shape.test.ts tools/reachable.test.ts: exit 0",
+    "seam: pnpm install --frozen-lockfile --lockfile-only --offline: 'Already up to date', exit 0; git status clean afterwards",
+    "seam: node key count: ru 54, en 54, symmetric difference empty",
+    "seam: grep 'вызов' docs/brand/terminology.md: no match (term pending at N-014); 'запрос' bound to the access request at line 136",
+    "seam: graph.json edges from N-024: N-003, N-006, N-007, N-009, N-010, N-012, N-014; N-008/N-011/N-015/N-016 depend on N-024 transitively",
+    "seam: kit: DRAIN_SECONDS 8 (fabric-base.mjs:20), DRAIN_GRACE_SECONDS 2 (fabric-logs.mjs:8), DEFAULT_EXIT_TIMEOUT 15 (fabric-supervisors.mjs:13); checkRequest accepts 127.0.0.1, localhost, [::1] on the port (fabric-auth.mjs:158-164)",
+    "product: read apps/agent/_locales/ru/messages.json and en/messages.json: 54 keys each (python3 json len), five service keys match the brief verbatim",
+    "product: grep -c U+2014 on both catalogues → 0 and 0; grep ' - | -- ' → no hits",
+    "product: read spec section 9 lines 200-214: report ids for eventStarted, eventStopping, serviceStopping, eventDrainCutOff, eventsUnreadable; 'Всего строк 54'",
+    "product: read apps/agent/src/service/http.ts, events.ts, messages.ts, wellknown.ts, dirs.ts for when each sentence is written and what the service does then",
+    "product: read apps/agent/src/fabric/fabric-platform.mjs:158-164 (checkRequest sentences), fabric-lock.mjs:23 (lock sentence), fabric-auth.mjs:215 (cookie HttpOnly; SameSite=Strict), fabric-base.mjs:20 (DRAIN_SECONDS = 8)",
+    "product: grep terminology.md for agent terms: 'Okolos Agent', 'доступ', 'запрос', 'задача', 'шаг', 'отказ' present; 'вызов' absent",
+    "product: grep AGENTS.md:76 'There is no port'; docs/privacy.md:71 'их девять'; docs/README.md:128 apps/agent row",
+    "product: read docs/ux/screens.md:599-640 SCR-23/24 states (loading, empty, error, success, expired / loading, empty, error, success); no stopping or session-expired state",
+    "product: read plan N-008 test 17, N-014 tests 3 and 6 and 'вызов' row, N-015 tests 7, 11, 14, N-020 files list (AGENTS.md Lifecycle and LC-15, privacy stores)",
+    "product: pnpm -s exec vitest run apps/agent/src/service → 6 files, 102 tests passed",
+    "product: pnpm -s run i18n:sweep → exit 0; python3 docs/ux/lint.py → exit 0; python3 docs/brand/lint.py → 'brand pack is clean', exit 0",
+    "product: pnpm -s exec vitest run tools/docs.test.ts tools/runbook.test.ts tools/adr.test.ts → 3 files, 134 tests passed",
+    "product: git -C /Users/sshlg/DATA/_worktrees/okolos-b1-n-024 status --short → empty before and after the runs; apps/agent/dist and tsconfig.tsbuildinfo are git-ignored (.gitignore:2, :6)"
+  ],
+  "tested": {
+    "head": "87eea45fdddf5db508eef27599173e538c61512f",
+    "tree": "173d507eeb1ac4520728efa93fd125f4ba43cc69"
+  }
+}

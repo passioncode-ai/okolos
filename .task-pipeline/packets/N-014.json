@@ -4,7 +4,9 @@
  "intent": "Термины и строки (каталог apps/agent/_locales, ревью F22)",
  "inputs": [
   "—",
-  "N-013: список строк экранов"
+  "N-013: список строк экранов",
+  "N-024: resource: apps/agent/_locales/{ru,en}/messages.json; N-014 дописывает строки страницы после строк службы N-024",
+  "N-007: NameRefusal, StoreRefusal, ClaimRefusal, EndCause: коды, которым нужны слова"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -16,22 +18,40 @@
    "docs/brand/terminology.md",
    "apps/agent/_locales/ru/messages.json",
    "apps/agent/_locales/en/messages.json",
+   "tools/locales.test.ts",
+   "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
    "tools/locales.test.ts"
   ]
  },
  "outputs": [
-  "47 ключей строк; термины раздела «Мост для агентов»"
+  "строки страницы; число ключей меряется командой по каталогу ru (аудит #34); термины раздела «Мост для агентов»; ключи для текстов, которые читает человек, у N-008 (CLI привязки: код, ожидание, отказ; шим без ключа), N-010 (событие onCloseIncomplete с pid), N-012 (причины «не трогать» переписи), каждая через copylot_check; термин «вызов» в terminology.md: любое обращение к службе (агента к двери, страницы или Fabric к службе), его используют pairedSince и eventDrainCutOff (проверки N-024)"
  ],
  "acceptance": [
   "оба каталога с одинаковыми ключами; каждый $X$ объявлен в placeholders",
   "python3 docs/brand/lint.py → 0",
-  "ключ строки rejection_door в обоих каталогах для отказов двери до разбора; copylot_check (seam N-001 круг 3, break 3)",
-  "refusal_invalid_scope говорит «этого устройства»/«this device», как остальной продукт, и читается внутри строки refusalLine без двух двоеточий подряд; copylot_check на собранной строке (проверка product N-001 круг 2)",
-  "проверка узла: python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts"
+  "refusal_invalid_scope читается внутри строки refusalLine без двух двоеточий подряд; copylot_check на собранной строке (проверка product N-001 круг 2; «этого устройства» снято проверкой N-013 круг 5: отказ говорит о задаче, а не об устройстве)",
+  "ключи taskProfileAgent и taskProfileDisposable в обоих каталогах, copylot_check (аудит #20)",
+  "тексты службы уже идут через каталог (N-024): служба не стартует без своих ключей; N-014 переносит в каталог английские тексты набора Fabric (403, занятый замок) или записывает, почему они остаются протокольными",
+  "eventsUnreadable не утверждает, что сохранены все остальные события: обрезка по сроку при том же старте может удалить старые (проверка product N-024 круг 2)",
+  "слова для машинных причин привязки: name_not_text, name_empty, name_too_long, name_digits, name_bidi, name_control, too_many_pending, too_many_requests и причин хранилища unreadable, not_json, not_a_store, bad_record; copylot_check (проверка product N-007); также name_reserved (имя похоже на «Okolos») и unwritable (хранилище не записалось) (отчёт N-007 fix 2)",
+  "ключи verb_<глагол> для каждого AnyBridgeVerb (точки как подчёркивания: verb_session_open), исчерпывающая функция verbKey как refusalKey; на странице не появляется идентификатор глагола (проверки N-013 круг 3, N-007 круг 2)",
+  "слова для причин сбоя журнала (то, что подставляется в $WHAT$ строки journalError) и хранилища (pairingStoreError, agentRevokeFailed), copylot_check (проверки N-013 круг 3, N-007 круг 2)",
+  "ключи для семи событий привязки (requested, confirmed, declined, expired, claim_expired, paired, revoked) с именем после слова «агент»; N-011 добавляет их в проверку ключей при старте (проверки N-013 круг 4)",
+  "слова для кодов сбоя журнала no_space, no_permission, other (подставляются в $WHAT$ строк journalError и journalUnreadable) (проверки N-013 круг 4)",
+  "строки CLI для ClaimRefusal (declined, expired, claim_expired, claimed, unknown) и подсказка про --replace; copylot_check (проверки N-013 круг 5)",
+  "слова для name_script (имя пишется только латиницей A–Z или только кириллицей, цифры 0–9, пробел и знаки - _ . ( ) ' / +) и для name_reserved, которые описывают правило, а не утверждают «похоже на Okolos»: правило отказывает и честным именам вроде «Echo Kolos» (проверки N-007 круг 4)",
+  "строки «запроса уже нет» и «у агента уже нет доступа» для действий страницы над ушедшей строкой; строка CLI pair после кода: где подтвердить (Okolos Agent в Fabric Dashboards) (проверки N-013 круг 7)",
+  "слова для name_script, closed (Okolos Agent останавливается) и too_large (список доступов больше 1 МБ); changed_on_disk снят исправлением N-007 fix 5: изменённый файл перечитывается (отчёт N-007 fix 4)",
+  "проверку одинаковых ключей ru и en каталога демона уже держит tools/agent-locales.test.ts (N-013): N-014 её не дублирует в tools/locales.test.ts и запускает этот файл в своей проверке узла (проверки N-013 круг 8)",
+  "слово для причины unwritable в $WHAT$ не повторяет «не записывается» (например «нет места на диске», «нет прав на файл»), по errno (проверки N-013 круг 9)",
+  "слова событий истечения различают cause: timeout («запрос истёк») и stopped («Okolos Agent остановился»); CLI получает stopped своей строкой (отчёт N-007 fix 5)",
+  "слово для кода сбоя чтения unreadable в $WHAT$ не повторяет «не читается» (например «файл повреждён», «нет прав на чтение»); verbKey живёт в apps/agent/src/dashboard/verbs.ts, его создаёт N-014, N-015 импортирует (проверки N-013 круг 10)",
+  "гейт: каждый ключ, который страница и CLI зовут через t(), есть в обоих каталогах демона (поиск по apps/agent/src), иначе сборка падает; слова для $WHAT$ строки journalExportFailed (проверки N-013 круг 12)",
+  "проверка узла: python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts tools/agent-locales.test.ts"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
-  "никакого секрета в argv, логах, журнале и URL",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
   "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
   "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",

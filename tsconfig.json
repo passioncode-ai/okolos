@@ -42,6 +42,9 @@
     },
     {
       "path": "apps/mail-cli"
+    },
+    {
+      "path": "apps/agent"
     }
   ]
 }

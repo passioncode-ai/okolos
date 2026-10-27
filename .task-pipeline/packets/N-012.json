@@ -4,8 +4,9 @@
  "intent": "K5: перепись процессов",
  "inputs": [
   "CensusEntry (bridge.ts)",
-  "N-023: тип ответа hygiene.census",
-  "N-005: apps/agent: package.json с зависимостью @okolos/contracts, tsconfig, каталоги службы"
+  "N-023: CensusEntry",
+  "N-024: apps/agent: package.json, tsconfig",
+  "N-014: ключи причин переписи"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -19,7 +20,7 @@
   ]
  },
  "outputs": [
-  "`census(ps: string, launchctl: string, opts: {selfPid, home, now}): CensusEntry[]` — тип из N-001: `{pid, ppid, executable, owner: string|null, ageSeconds, flags: string[], keep: boolean, reason}`, без полной командной строки; `readCensus()` вызывает `ps -axo pid=,ppid=,lstart=,command=` и `launchctl list` с таймаутом"
+  "`census(ps: string, launchctl: string, opts: {selfPid, home, now}): CensusEntry[]` — тип из N-023: `{pid, ppid, executable, owner: string|null, ageSeconds, flags: string[], keep: boolean, reason}`, без полной командной строки; `readCensus()` вызывает `ps -axo pid=,ppid=,lstart=,command=` и `launchctl list` с таймаутом"
  ],
  "acceptance": [
   "процесс --remote-debugging-port с живым родителем-сессией: keep, owner = сессия",
@@ -27,11 +28,12 @@
   "Chrome человека без флагов автоматизации: keep, «браузер человека»",
   "chrome-headless-shell с мёртвым родителем на $TMPDIR-профиле: keep=false, причина «сирота», но ничего не завершается",
   "процесс с --token=SECRET в argv: в ответе нет SECRET, есть путь, pid, владелец, возраст, причина и флаги автоматизации (ревью F11)",
-  "проверка узла: pnpm -s exec vitest run apps/agent/src/hygiene"
+  "тексты, которые читает человек, идут ключами каталога, которые заранее добавил N-014; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/hygiene && pnpm -s run typecheck && pnpm -s run i18n:sweep"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
-  "никакого секрета в argv, логах, журнале и URL",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
   "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
   "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",

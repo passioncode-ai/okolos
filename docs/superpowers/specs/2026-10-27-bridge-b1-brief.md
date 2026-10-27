@@ -79,11 +79,11 @@
 | REQ-61 | Окно агента: без стартового окна, окно на задачу, фокус не уходит, инфобара нет, процессы закрываются | e2e на настоящем Chrome по методике Б0 | open |
 | REQ-62 | Перепись процессов автоматизации с владельцем и причиной «не трогать» | тест на фикстуре `ps` и `launchctl` | open |
 | REQ-63 | Установка: launchd, дескриптор `fabric-service/0.1`, `doctor`, раннбук | `check_service.py` → 0 FAIL; перезапуск после `kill -9` | open |
-| REQ-64 | Панель привязки: экран в `docs/ux/screens.md` с состояниями, FLW-21 ведёт к нему, SCN-044 со статусом `built` | `python3 docs/ux/lint.py`; e2e SCN-044 | open |
+| REQ-64 | Панель привязки: экран в `docs/ux/screens.md` с состояниями, FLW-21 ведёт к нему, SCN-044 со статусом `implemented` | `python3 docs/ux/lint.py`; e2e SCN-044 | open |
 | REQ-65 | Вид активности: открытые задачи агентов и последние отказы (отзыв доступа живёт в SCR-23) | e2e SCN-045 читает страницу | open |
 | REQ-66 | Термины моста (Okolos Bridge, Okolos Agent, окно агента, привязка, задача агента) в `docs/brand/terminology.md` до первых строк для людей (B-147) | `python3 docs/brand/lint.py`; `tools/docs.test.ts` | open |
 | REQ-67 | ADR «мост — часть Okolos Agent; две двери; задача — своё окно» (B-146) и ADR «снимок частями, не больше 32 КБ»; строки механизмов моста в ADR-0019 | `tools/adr.test.ts` (каждый названный файл существует) | open |
-| REQ-68 | Три исключения `tools/reachable.test.ts` для моста сняты | `tools/reachable.test.ts` без строк `Okolos Bridge Б1` | open |
+| REQ-68 | Все исключения `tools/reachable.test.ts` для моста сняты (строки, добавленные узлами Б1; их число растёт по ходу сборки) | `tools/reachable.test.ts` без строк `Okolos Bridge Б1` | open |
 | REQ-69 | Документы: строка демона в `AGENTS.md` → Lifecycle и строка MCP в Commands, раннбук, `docs/README.md` (статус и карта), строка в `org-index/repositories.json`, `knowledge/products.md` (MCP gaps) и RM-18 в roadmap | `tools/runbook.test.ts`, `tools/docs.test.ts`; `check_index.py` в org-index | open |
 | REQ-70 | Ничего работающего не сломано: защита людей в расширении и права его манифеста те же | `pnpm gates`, `pnpm test:e2e`, `tools/manifest.test.ts` «the line between Okolos and Okolos Bridge» | open |
 
@@ -124,7 +124,7 @@
 | Служба `fabric-service/0.1` | id `okolos-agent`, instance `default`; порт 47871 (свободен: ни один дескриптор в `~/Library/Application Support/ai.passioncode.fabric/services/` его не заявляет, `lsof` его не видит); `surfaces.mcp.auth: "own"` (DEC-0024): `/mcp` отвергает токен хоста, у агентов ключи привязки; четыре маршрута протокола; замок `service.lock` до любого побочного эффекта, выход 75; launchd `RunAtLoad`, `KeepAlive`, `ThrottleInterval` 10, `ProcessType Standard`, маркер `FABRIC_SERVICE_SUPERVISOR=launchd`; код из неизменяемого релиза `~/.local/share/okolos-agent/releases/<версия>-<sha12>/`; данные, логи и кэш в `~/Library/{Application Support,Logs,Caches}/okolos-agent/` | скил `fabric-agent-adapter:building-fabric-services` 0.52.0 (контракт `1197a90`): SKILL.md, `references/protocol.md`, `surfaces-and-auth.md`, `lifecycle.md` |
 | Кнопки и действия | у каждой кнопки страницы есть инструмент (`fabric-actions/0.1`, DEC-0121); подтверждение привязки идёт через шлюз `human` с шагом `consent`: инструмент отвечает `human-step-required` со ссылкой на страницу, так что локальный процесс не одобряет сам себя | `references/interop.md` → Actions |
 | Набор службы для Node | вендорится в `apps/agent` командой `fabric_kit.py install … --lang node --module fabric-service`; лицензия набора та же, что у Okolos | `scripts/kit.json`, `fabric-service.mjs` |
-| Связка ключей | `security -i` читает команды из stdin, поэтому даже отпечаток ключа не попадает в аргументы процесса; тесты работают на одноразовом имени службы и удаляют его | `man security` на этой машине, 2026-10-27 |
+| Связка ключей | Изучена (`security -i` читает команды из stdin) и **не используется в Б1**: решение 5 после ревью F13 хранит только SHA-256 ключа в хранилище привязок демона | `man security` на этой машине, 2026-10-27 |
 | CDP | `Target.createTarget {newWindow, background}`, `Accessibility.getFullAXTree`, `Input.dispatchMouseEvent`, `--remote-debugging-pipe`, `--no-startup-window` | измерено, а не прочитано: [замер Б0](../evidence/2026-10-06-b0-agent-window.md), Chrome 154 |
 
 ## Ответы стадиям 1–10
