@@ -72,7 +72,12 @@ export interface AgentRecord {
   readonly name: string
   /** When the key was claimed, ms since the epoch. */
   readonly pairedAt: number
+  /** The agent's last call through the door (`touch`), ms since the epoch; null before the first. */
+  readonly lastCallAt: number | null
 }
+
+/** A last call is written to the store at most this often; the newer value is kept in memory. */
+export const LAST_CALL_WRITE_MS = 60_000
 
 /** A request as the page sees it: a handle for its buttons, never the request id. */
 export interface PublicRequest {
@@ -158,6 +163,8 @@ export class Pairing {
   private readonly ended = new Map<string, Ended>()
   /** When each request of the last minute was created. */
   private created: number[] = []
+  /** When `touch` last wrote the store. */
+  private lastCallWrite = Number.NEGATIVE_INFINITY
 
   private constructor(file: string, agents: StoredAgent[], options: PairingOptions) {
     this.file = file
@@ -193,7 +200,23 @@ export class Pairing {
     for (const agent of this.agents) {
       if (timingSafeEqual(presented, Buffer.from(agent.keyHash, 'hex')) && found === null) found = agent
     }
-    return found === null ? null : { agentId: found.agentId, name: found.name, pairedAt: found.pairedAt }
+    return found === null ? null : record(found)
+  }
+
+  /**
+   * Records the agent's last call; false when no such agent has access. The value is kept in
+   * memory and written to the store (atomically, like every write) at most once a minute.
+   */
+  touch(agentId: string, now: number): boolean {
+    if (!this.agents.some((a) => a.agentId === agentId)) return false
+    const agents = this.agents.map((a) => (a.agentId === agentId ? { ...a, lastCallAt: now } : a))
+    if (now - this.lastCallWrite >= LAST_CALL_WRITE_MS) {
+      this.save(agents)
+      this.lastCallWrite = now
+    } else {
+      this.agents = agents
+    }
+    return true
   }
 
   request(agentName: string, now: number): { requestId: string; code: string; expiresAt: number } | { refused: RequestRefusal } {
@@ -245,7 +268,7 @@ export class Pairing {
     if (entry === undefined) return null
     if (entry.confirmedAt === null) return { pending: true }
     const key = this.hex(32)
-    const agent: StoredAgent = { agentId: this.hex(8), name: entry.name, pairedAt: now, keyHash: sha256(key) }
+    const agent: StoredAgent = { agentId: this.hex(8), name: entry.name, pairedAt: now, lastCallAt: null, keyHash: sha256(key) }
     // The key is given out only once the store holds its hash.
     this.save([...this.agents, agent])
     this.forget(entry)
@@ -262,7 +285,7 @@ export class Pairing {
     if (agent === undefined) return null
     this.save(this.agents.filter((a) => a !== agent))
     this.notify({ kind: 'revoked', agentId: agent.agentId, name: agent.name })
-    return { agentId: agent.agentId, name: agent.name, pairedAt: agent.pairedAt }
+    return record(agent)
   }
 
   list(now: number): { requests: PublicRequest[]; agents: AgentRecord[] } {
@@ -299,7 +322,7 @@ export class Pairing {
       }),
     )
     const requests = [...live, ...gone]
-    const agents = this.agents.map(({ agentId, name, pairedAt }) => ({ agentId, name, pairedAt }))
+    const agents = this.agents.map(record)
     return { requests, agents }
   }
 
@@ -387,6 +410,11 @@ function readStore(file: string): StoredAgent[] {
   return agents
 }
 
+/** The record the page and the door see; the key's hash stays in the store. */
+function record({ agentId, name, pairedAt, lastCallAt }: StoredAgent): AgentRecord {
+  return { agentId, name, pairedAt, lastCallAt }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -397,6 +425,7 @@ function isStoredAgent(value: unknown): value is StoredAgent {
     typeof value['agentId'] === 'string' &&
     typeof value['name'] === 'string' &&
     typeof value['pairedAt'] === 'number' &&
+    (value['lastCallAt'] === null || typeof value['lastCallAt'] === 'number') &&
     typeof value['keyHash'] === 'string' &&
     /^[0-9a-f]{64}$/.test(value['keyHash'])
   )

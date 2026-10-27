@@ -248,7 +248,7 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
     pair(pairing, 'Codex', T0 + 10)
     vi.mocked(timingSafeEqual).mockClear()
 
-    expect(pairing.verify(key)).toEqual({ agentId: expect.any(String), name: 'Claude Code', pairedAt: T0 + 2 })
+    expect(pairing.verify(key)).toEqual({ agentId: expect.any(String), name: 'Claude Code', pairedAt: T0 + 2, lastCallAt: null })
     const digest = createHash('sha256').update(key, 'utf8').digest()
     const calls = vi.mocked(timingSafeEqual).mock.calls
     expect(calls.length).toBeGreaterThan(0)
@@ -295,6 +295,42 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
     expect(notices.at(-1)).toEqual({ kind: 'revoked', agentId: agent.agentId, name: 'Claude Code' })
     expect(pairing.revoke('no-such-agent')).toBeNull()
     expect(notices.filter((n) => n.kind === 'revoked')).toHaveLength(1)
+  })
+
+  it('records an agent last call in memory and writes it at most once a minute (fix round 1)', () => {
+    const file = storeFile()
+    const pairing = open(file)
+    const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    expect(agent.lastCallAt).toBeNull()
+    expect(pairing.list(T0 + 3).agents[0]).toMatchObject({ lastCallAt: null })
+    const stored = (): unknown => (JSON.parse(readFileSync(file, 'utf8')) as { agents: Array<{ lastCallAt: unknown }> }).agents[0]!.lastCallAt
+
+    const t1 = T0 + 10_000
+    expect(pairing.touch(agent.agentId, t1)).toBe(true)
+    expect(pairing.list(t1).agents[0]).toMatchObject({ lastCallAt: t1 })
+    expect(stored()).toBe(t1)
+    const inode = statSync(file).ino
+
+    expect(pairing.touch(agent.agentId, t1 + 30_000)).toBe(true)
+    expect(pairing.list(t1 + 30_000).agents[0]).toMatchObject({ lastCallAt: t1 + 30_000 })
+    expect(stored()).toBe(t1)
+    expect(statSync(file).ino).toBe(inode)
+
+    expect(pairing.touch(agent.agentId, t1 + MINUTE)).toBe(true)
+    expect(stored()).toBe(t1 + MINUTE)
+    expect(statSync(file).ino).not.toBe(inode)
+    expect(statSync(file).mode & 0o777).toBe(0o600)
+    expect(readdirSync(path.dirname(file))).toEqual(['pairings.json'])
+
+    expect(open(file).list(t1 + MINUTE).agents[0]).toMatchObject({ name: 'Claude Code', lastCallAt: t1 + MINUTE })
+    expect(open(file).verify('f'.repeat(64))).toBeNull()
+  })
+
+  it('touches nothing for an agent it does not know', () => {
+    const file = storeFile()
+    const pairing = open(file)
+    expect(pairing.touch('no-such-agent', T0)).toBe(false)
+    expect(readdirSync(path.dirname(file))).toEqual([])
   })
 
   it('pairs the same name again after a revoke, with a new key', () => {
