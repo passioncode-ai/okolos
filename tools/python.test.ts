@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { findPython, noPythonMessage, pythonCandidates, PYTHON3_CHECK } from './python.mjs'
+import { findPython, noPythonMessage, pythonCandidates, pythonEnv, PYTHON3_CHECK } from './python.mjs'
 
 /**
  * The gates find Python instead of spelling `python3` (B-162).
@@ -55,6 +55,19 @@ describe('choosing one', () => {
 
   it('finds a real Python 3 on this machine, which the runbook requires', () => {
     expect(findPython()).not.toBeNull()
+  })
+})
+
+describe('the environment a linter gets', () => {
+  it('turns on UTF-8 mode on Windows, where a piped stdout is cp1252 and the findings are Russian', () => {
+    const env = pythonEnv({ PATH: 'p' }, 'win32')
+    expect(env).toEqual({ PATH: 'p', PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' })
+  })
+
+  it('passes the environment through unchanged on macOS and Linux', () => {
+    const given = { PATH: 'p' }
+    expect(pythonEnv(given, 'darwin')).toBe(given)
+    expect(pythonEnv(given, 'linux')).toBe(given)
   })
 })
 

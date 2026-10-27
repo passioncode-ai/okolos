@@ -59,6 +59,22 @@ export function findPython({ platform = process.platform, probe = answersAsPytho
   return null
 }
 
+/**
+ * The environment a linter runs in: on Windows, with Python's UTF-8 mode on.
+ *
+ * Python there reads files and writes a piped stdout in the ANSI code page (cp1252)
+ * unless told otherwise, and the linters read Russian documents and print Russian
+ * findings; the pre-push hook captures their output through a pipe, which is where
+ * a cp1252 stdout fails. macOS and Linux already run them in UTF-8, and their
+ * environment is passed through unchanged.
+ *
+ * @param {Record<string, string | undefined>} [env]
+ * @param {string} [platform]
+ */
+export function pythonEnv(env = process.env, platform = process.platform) {
+  return platform === 'win32' ? { ...env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' } : env
+}
+
 /** What to print when nothing answered: the names tried, and what to install. */
 export function noPythonMessage(platform = process.platform) {
   const tried = pythonCandidates(platform)
@@ -78,7 +94,11 @@ if (import.meta.filename === process.argv[1]) {
     console.error(`\n  ${noPythonMessage()}\n`)
     process.exit(1)
   }
-  const run = spawnSync(python.command, [...python.args, script, ...rest], { stdio: 'inherit', windowsHide: true })
+  const run = spawnSync(python.command, [...python.args, script, ...rest], {
+    stdio: 'inherit',
+    env: pythonEnv(),
+    windowsHide: true,
+  })
   if (run.error) {
     console.error(`\n  could not run ${python.command}: ${run.error.message}\n`)
     process.exit(1)

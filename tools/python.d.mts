@@ -12,5 +12,10 @@ export function findPython(options?: {
   platform?: string
   probe?: (command: string, args: string[]) => boolean
 }): { command: string; args: string[] } | null
+/** The environment a linter runs in: UTF-8 mode on win32, unchanged elsewhere. */
+export function pythonEnv(
+  env?: Record<string, string | undefined>,
+  platform?: string,
+): Record<string, string | undefined>
 /** The refusal printed when no candidate answered. */
 export function noPythonMessage(platform?: string): string

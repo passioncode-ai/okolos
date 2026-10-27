@@ -16,7 +16,7 @@
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 
-import { findPython, noPythonMessage } from './python.mjs'
+import { findPython, noPythonMessage, pythonEnv } from './python.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
 const pack = process.argv[2] ?? 'docs/brand'
@@ -30,6 +30,7 @@ if (python === null) {
 
 const run = spawnSync(python.command, [...python.args, path.join(root, 'docs/brand/lint.py'), path.join(root, pack)], {
   stdio: 'inherit',
+  env: pythonEnv(),
   windowsHide: true,
 })
 
