@@ -23,6 +23,11 @@ describe('apps/agent resolves its workspace dependencies', () => {
     expect(typeof snapshot.pageOf).toBe('function')
   })
 
+  it('imports @okolos/i18n', async () => {
+    const i18n = await import('@okolos/i18n')
+    expect(typeof i18n.fromCatalogue).toBe('function')
+  })
+
   it('imports @okolos/storage', async () => {
     const storage = await import('@okolos/storage')
     expect(storage.RETENTION_DAYS.journal).toBeGreaterThan(0)

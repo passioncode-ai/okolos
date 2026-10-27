@@ -446,6 +446,70 @@ describe('wrong methods, a taken port, a route that fails halfway, a route’s o
   })
 })
 
+describe('what a person reads comes from the agent catalogue', () => {
+  const LOCALES = path.resolve(here, '..', '..', '_locales')
+  const message = (locale: string, key: string) =>
+    (JSON.parse(readFileSync(path.join(LOCALES, locale, 'messages.json'), 'utf8')) as Record<string, { message: string }>)[key]
+      ?.message
+
+  const feed = async (port: number, dirs: ServiceDirs) =>
+    (JSON.parse((await call(port, '/fabric/v1/events', { headers: bearer(dirs) })).body) as {
+      events: Array<{ kind: string; text: string }>
+    }).events
+
+  it('in Russian by default: the start and the stop', async () => {
+    const dirs = serviceDirs(tempHome())
+    const { service } = await start({ dirs })
+    const started = (await feed(service.port, dirs)).find((e) => e.kind === 'service.started')
+    expect(started?.text).toBe(message('ru', 'eventStarted'))
+    await service.close()
+    const stopping = readFileSync(servicePaths(dirs).events, 'utf8')
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l) as { kind: string; text: string })
+      .find((e) => e.kind === 'service.stopping')
+    expect(stopping?.text).toBe(message('ru', 'eventStopping'))
+  })
+
+  it('in English when asked', async () => {
+    const dirs = serviceDirs(tempHome())
+    const { service } = await start({ dirs, locale: 'en' })
+    const started = (await feed(service.port, dirs)).find((e) => e.kind === 'service.started')
+    expect(started?.text).toBe(message('en', 'eventStarted'))
+  })
+
+  it('the refusal while stopping, and the degraded reason for unreadable events lines', async () => {
+    let release: () => void = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    let entered: () => void = () => {}
+    const inside = new Promise<void>((resolve) => (entered = resolve))
+    const slow: Route = async (_req, res, ctx) => {
+      if (ctx.url.pathname !== '/slow') return false
+      entered()
+      await held
+      res.end('done')
+      return true
+    }
+    const dirs = serviceDirs(tempHome())
+    mkdirSync(dirs.data, { recursive: true })
+    writeFileSync(servicePaths(dirs).events, 'torn', { mode: 0o600 })
+    const { service } = await start({ dirs, routes: [slow, later], locale: 'en' })
+
+    const doc = JSON.parse((await call(service.port, '/.well-known/fabric-service')).body)
+    expect(doc.degraded[0].reason).toBe(message('en', 'eventsUnreadable')?.replace('$COUNT$', '1'))
+
+    const inFlight = call(service.port, '/slow')
+    await inside
+    const closing = service.close()
+    const refused = await call(service.port, '/later')
+    expect(refused.status).toBe(503)
+    expect(JSON.parse(refused.body).message).toBe(message('en', 'serviceStopping'))
+    release()
+    await inFlight
+    await closing
+  })
+})
+
 describe('routes built after the lock (setup)', () => {
   it('runs after the lock and the token exist, and its routes are served beside the plain ones', async () => {
     const seen: Array<{ lockPid: string; token: boolean; locale: string }> = []
@@ -638,6 +702,36 @@ describe('the host’s routes take the host token', () => {
     const { service, dirs } = await start()
     const answer = await call(service.port, '/fabric/v1/events?limit=many', { headers: bearer(dirs) })
     expect(answer.status).toBe(400)
+  })
+
+  it('events: a cursor that is not an event id is a 400, not an empty page that echoes it', async () => {
+    const { service, dirs } = await start()
+    const answer = await call(service.port, '/fabric/v1/events?after=garbage', { headers: bearer(dirs) })
+    expect(answer.status).toBe(400)
+  })
+
+  it('a torn line in the events file: the service starts, says so in degraded, and serves the rest', async () => {
+    const dirs = serviceDirs(tempHome())
+    const paths = servicePaths(dirs)
+    mkdirSync(dirs.data, { recursive: true })
+    const one = JSON.stringify({ id: '1', at: '2026-10-27T05:00:00Z', kind: 'service.started', level: 'info', text: 'One.' })
+    writeFileSync(paths.events, `${one}\n{"id":"2","at":"2026-10-2`, { mode: 0o600 })
+
+    const { service } = await start({ dirs })
+    const doc = JSON.parse((await call(service.port, '/.well-known/fabric-service')).body)
+    expect(doc.status).toBe('degraded')
+    expect(doc.degraded).toHaveLength(1)
+    expect(doc.degraded[0].source).toBe('events')
+    expect(doc.degraded[0].reason).toContain('1')
+
+    const page = JSON.parse((await call(service.port, '/fabric/v1/events', { headers: bearer(dirs) })).body)
+    expect(page.events.map((e: { id: string }) => e.id)).toEqual(['1', '2'])
+  })
+
+  it('a clean events file adds no degraded source', async () => {
+    const { service } = await start()
+    const doc = JSON.parse((await call(service.port, '/.well-known/fabric-service')).body)
+    expect(doc.degraded).toEqual([])
   })
 
   it('login-code: 401 without the token', async () => {

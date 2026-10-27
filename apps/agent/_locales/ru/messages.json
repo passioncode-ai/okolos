@@ -237,5 +237,22 @@
   },
   "refusal_stale_cursor": {
     "message": "эта страница снимка устарела, нужен новый снимок"
+  },
+  "eventStarted": {
+    "message": "Okolos Agent запущен."
+  },
+  "eventStopping": {
+    "message": "Okolos Agent останавливается. Начатую работу он завершает, новую не берёт."
+  },
+  "serviceStopping": {
+    "message": "Okolos Agent останавливается и новую работу не берёт. Повторите, когда он снова запустится."
+  },
+  "eventsUnreadable": {
+    "message": "В файле событий не читаются строки ($COUNT$). При запуске они пропущены, остальные события сохранены.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

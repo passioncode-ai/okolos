@@ -12,6 +12,7 @@
     "@okolos/cdp-pipe": "workspace:*",
     "@okolos/contracts": "workspace:*",
     "@okolos/core-snapshot": "workspace:*",
+    "@okolos/i18n": "workspace:*",
     "@okolos/storage": "workspace:*"
   }
 }

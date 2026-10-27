@@ -20,15 +20,52 @@ export const KEEP_EVENTS = 1000
 /** Events younger than this are kept however many there are. */
 export const KEEP_DAYS = 7
 
+const LEVELS: ReadonlySet<string> = new Set(['info', 'notice', 'warning', 'error'])
+
+/** A line is an event when it parses and carries the members a host reads. */
+function asEvent(line: string): FabricEvent | null {
+  try {
+    const value = JSON.parse(line) as Partial<FabricEvent> | null
+    if (value === null || typeof value !== 'object') return null
+    if (typeof value.id !== 'string' || !/^\d+$/.test(value.id)) return null
+    if (typeof value.at !== 'string' || typeof value.kind !== 'string' || typeof value.text !== 'string') return null
+    if (typeof value.level !== 'string' || !LEVELS.has(value.level)) return null
+    return value as FabricEvent
+  } catch {
+    return null
+  }
+}
+
 export class EventLog {
   readonly file: string
+  /**
+   * Lines found at start that are not events (cut short by a full disk or a power loss, or
+   * edited by hand). They are skipped, never fatal; the service reports the count as degraded.
+   */
+  readonly unreadable: number
   private last: number
 
   constructor(file: string, { now = () => Date.now() }: { now?: () => number } = {}) {
     this.file = file
-    const events = this.all()
+    this.endLastLine()
+    const { events, unreadable } = this.scan()
+    this.unreadable = unreadable
     this.last = Number(events.at(-1)?.id ?? 0)
     this.trim(now())
+  }
+
+  /** A last line cut short gets its newline, so the next event lands on a line of its own. */
+  private endLastLine(): void {
+    if (!existsSync(this.file)) return
+    const text = readFileSync(this.file, 'utf8')
+    if (text === '' || text.endsWith('\n')) return
+    const fd = openSync(this.file, 'a', 0o600)
+    try {
+      writeSync(fd, '\n')
+      fsyncSync(fd)
+    } finally {
+      closeSync(fd)
+    }
   }
 
   /**
@@ -68,10 +105,19 @@ export class EventLog {
   }
 
   private all(): FabricEvent[] {
-    if (!existsSync(this.file)) return []
-    return readFileSync(this.file, 'utf8')
-      .split('\n')
-      .filter((line) => line.trim() !== '')
-      .map((line) => JSON.parse(line) as FabricEvent)
+    return this.scan().events
+  }
+
+  private scan(): { events: FabricEvent[]; unreadable: number } {
+    if (!existsSync(this.file)) return { events: [], unreadable: 0 }
+    const events: FabricEvent[] = []
+    let unreadable = 0
+    for (const line of readFileSync(this.file, 'utf8').split('\n')) {
+      if (line.trim() === '') continue
+      const event = asEvent(line)
+      if (event === null) unreadable += 1
+      else events.push(event)
+    }
+    return { events, unreadable }
   }
 }

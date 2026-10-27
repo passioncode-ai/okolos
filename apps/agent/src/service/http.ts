@@ -41,6 +41,7 @@ import {
 } from '../fabric/fabric-service.mjs'
 import { servicePaths, type ServiceDirs, type ServicePaths } from './dirs.js'
 import { EventLog } from './events.js'
+import { serviceMessages, type Locale, type ServiceMessages } from './messages.js'
 import { buildIdentity, wellKnown } from './wellknown.js'
 
 /** What a route is handed besides the request: the parsed URL and the service's own checks. */
@@ -65,8 +66,7 @@ export type Route = ((req: IncomingMessage, res: ServerResponse, ctx: RouteConte
   readonly paths?: readonly string[]
 }
 
-/** The language of the sentences a person reads: events in Fabric Dashboards, the refusal while stopping. */
-export type Locale = 'ru' | 'en'
+export type { Locale } from './messages.js'
 
 /** What `setup` is handed: the service's state, opened after the lock and before the bind. */
 export interface SetupContext {
@@ -109,6 +109,8 @@ export interface StartOptions {
   readonly setup?: (ctx: SetupContext) => Promise<readonly Route[]>
   /** Defaults to 'ru', the language Fabric's interface speaks to the operator. */
   readonly locale?: Locale
+  /** The agent catalogue's folder (`_locales`); apps/agent/_locales unless a release names its own. */
+  readonly localesDir?: string
   /** The owner's degraded sources, merged into the well-known document on every request. */
   readonly degraded?: () => readonly DegradedSource[]
   /** The owner's action table and extensions for the well-known document. */
@@ -158,8 +160,10 @@ export async function startService(options: StartOptions): Promise<RunningServic
   let log: RotatingLog
   let codes: LoginCodes
   let events: EventLog
+  let say: ServiceMessages
   let added: readonly Route[]
   try {
+    say = serviceMessages(locale, options.localesDir)
     token = ensureToken(paths.hostToken)
     log = new RotatingLog(paths.serviceLog)
     codes = new LoginCodes(paths.sessions, 120, { token })
@@ -191,7 +195,13 @@ export async function startService(options: StartOptions): Promise<RunningServic
         json(res, 400, { error: 'bad_request', message: 'limit must be an integer.' })
         return true
       }
-      json(res, 200, await eventsPage((after, n) => events.read(after, n), ctx.url.searchParams.get('after'), limit))
+      const after = ctx.url.searchParams.get('after')
+      if (after !== null && !/^\d+$/.test(after)) {
+        // i18n-exempt: a protocol answer to Fabric's host (fabric-service/0.1 events page), read by its code, not a person
+        json(res, 400, { error: 'bad_request', message: 'after must be an event id.' })
+        return true
+      }
+      json(res, 200, await eventsPage((from, n) => events.read(from, n), after, limit))
       return true
     }
     if (pathname === '/fabric/v1/login-code') {
@@ -215,6 +225,10 @@ export async function startService(options: StartOptions): Promise<RunningServic
   const routes: readonly Route[] = [builtIn, ...(options.routes ?? []), ...added]
   const served = routes.flatMap((route) => route.paths ?? [])
 
+  /** The shell's own degraded sources: unreadable lines found in the events file at start. */
+  const own: readonly DegradedSource[] =
+    events.unreadable > 0 ? [{ source: 'events', reason: say.unreadableEvents(events.unreadable) }] : []
+
   const document = () => {
     const extras = options.wellKnownExtras?.() ?? {}
     return wellKnown({
@@ -223,7 +237,7 @@ export async function startService(options: StartOptions): Promise<RunningServic
       startedAt,
       pid: process.pid,
       status,
-      degraded: [...(options.degraded?.() ?? [])],
+      degraded: [...own, ...(options.degraded?.() ?? [])],
       served,
       ...(extras.actions === undefined ? {} : { actions: extras.actions }),
       ...(extras.extensions === undefined ? {} : { extensions: extras.extensions }),
@@ -289,7 +303,7 @@ export async function startService(options: StartOptions): Promise<RunningServic
       })
     } catch (error) {
       if (error instanceof Stopping) {
-        json(res, 503, { error: 'stopping', message: 'Okolos Agent is stopping and takes no new work.' })
+        json(res, 503, { error: 'stopping', message: say.refusingWhileStopping() })
         return
       }
       log.write('error', 'route failed', { path: url.pathname, error: errorName(error) })
@@ -331,12 +345,12 @@ export async function startService(options: StartOptions): Promise<RunningServic
   }
   port = (server.address() as AddressInfo).port
   status = 'ready'
-  events.append('service.started', 'info', 'Okolos Agent started.')
+  events.append('service.started', 'info', say.started())
   log.write('info', 'started', { port, pid: process.pid })
 
   const markStopping = () => {
     status = 'stopping'
-    events.append('service.stopping', 'info', 'Okolos Agent is stopping.')
+    events.append('service.stopping', 'info', say.stopping())
     log.write('info', 'stopping')
   }
 

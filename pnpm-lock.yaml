@@ -71,6 +71,9 @@ importers:
       '@okolos/core-snapshot':
         specifier: workspace:*
         version: link:../../packages/core-snapshot
+      '@okolos/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@okolos/storage':
         specifier: workspace:*
         version: link:../../packages/storage

@@ -49,6 +49,37 @@ describe('the events feed', () => {
   })
 })
 
+describe('a torn or unreadable line does not stop the service', () => {
+  const line = (id: number) =>
+    JSON.stringify({ id: String(id), at: '2026-10-27T05:00:00Z', kind: 'service.started', level: 'info', text: `Start ${id}.` })
+
+  it('skips a truncated last line, counts it, and the next event lands on a line of its own', () => {
+    const where = file()
+    writeFileSync(where, `${line(1)}\n${line(2)}\n${line(3).slice(0, 25)}`, { mode: 0o600 })
+    const log = new EventLog(where)
+    expect(log.unreadable).toBe(1)
+    expect(log.read(null, 50).map((e) => e.id)).toEqual(['1', '2'])
+
+    const next = log.append('service.started', 'info', 'Okolos Agent started.')
+    expect(next.id).toBe('3')
+    expect(new EventLog(where).read(null, 50).map((e) => e.id)).toEqual(['1', '2', '3'])
+  })
+
+  it('skips a line that is not an event in the middle, and counts it', () => {
+    const where = file()
+    writeFileSync(where, `${line(1)}\nnot json\n{"id":"x"}\n${line(2)}\n`, { mode: 0o600 })
+    const log = new EventLog(where)
+    expect(log.unreadable).toBe(2)
+    expect(log.read(null, 50).map((e) => e.id)).toEqual(['1', '2'])
+  })
+
+  it('counts nothing on a clean file', () => {
+    const where = file()
+    writeFileSync(where, `${line(1)}\n`, { mode: 0o600 })
+    expect(new EventLog(where).unreadable).toBe(0)
+  })
+})
+
 describe('retention at start: at least 7 days or 1000 events (fabric-service/0.1)', () => {
   const DAY = 24 * 60 * 60 * 1000
   const NOW = Date.parse('2026-10-27T12:00:00Z')
