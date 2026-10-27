@@ -484,5 +484,8 @@
         "content": "$2"
       }
     }
+  },
+  "pairingGrants": {
+    "message": "Access lets the agent open its tasks' sites in the agent window and read this computer's process census, without command lines."
   }
 }
