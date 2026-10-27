@@ -257,13 +257,15 @@
       "owner": "implementer",
       "status": "pending",
       "blocked_by": [
-        "N-024"
+        "N-024",
+        "N-023"
       ],
       "serves": "REQ-60",
       "check": "pnpm -s exec vitest run apps/agent/src/journal && pnpm -s run typecheck",
       "touches": [
         "apps/agent/src/journal/journal.ts",
-        "apps/agent/src/journal/journal.test.ts"
+        "apps/agent/src/journal/journal.test.ts",
+        "tools/reachable.test.ts"
       ],
       "risk": "R3"
     },
@@ -271,7 +273,7 @@
       "id": "N-007",
       "title": "K3 привязка: коды, ключи, связка ключей, отзыв",
       "owner": "implementer",
-      "status": "pending",
+      "status": "done",
       "blocked_by": [
         "N-024"
       ],
@@ -281,9 +283,120 @@
         "apps/agent/src/pairing/pairing.ts",
         "apps/agent/src/pairing/name.ts",
         "apps/agent/src/pairing/pairing.test.ts",
-        "apps/agent/src/pairing/name.test.ts"
+        "apps/agent/src/pairing/name.test.ts",
+        "apps/agent/package.json",
+        "apps/agent/tsconfig.json",
+        "pnpm-lock.yaml",
+        "tools/reachable.test.ts"
       ],
-      "risk": "R3"
+      "risk": "R3",
+      "certification": {
+        "round": 10,
+        "tiers": {
+          "unit": "pass",
+          "seam": "pass",
+          "product": "pass"
+        },
+        "at": "5ff2e73808dbaf8c6b2f04b795ba499424e3e8b9",
+        "history": [
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "pass"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "pass"
+          }
+        ],
+        "kinds": [
+          "blind",
+          "blind",
+          "adversarial",
+          "adversarial",
+          "adversarial",
+          "adversarial",
+          "adversarial",
+          "blind",
+          "blind",
+          "blind"
+        ],
+        "tree": "4731e6cf302c4aaf5aec9b684dc10257c3a00d21"
+      },
+      "proof": {
+        "head": "5ff2e73808dbaf8c6b2f04b795ba499424e3e8b9",
+        "tree": "4731e6cf302c4aaf5aec9b684dc10257c3a00d21",
+        "graph_revision": "23"
+      },
+      "evidence": [
+        "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-007 -s exec vitest run apps/agent/src/pairing -> 2 files, 133 tests passed (name.test.ts 34, pairing.test.ts 99)",
+        "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-007 -s run typecheck -> exit 0 (tsc -b covers apps/agent via the root tsconfig reference, tsconfig.json:47)",
+        "unit: git diff bridge/b1-run2..HEAD --stat: 5 files, name.ts/pairing.ts and their tests new, tools/reachable.test.ts +2 EXEMPT rows; all inside the packet's edit_targets",
+        "unit: node probe of name.ts (scratchpad probe-name.mjs) over 26 names: reserved, script, digits, empty, too_long outcomes as listed in confirms; checkFreeText('a\\u200db',10) null, bidi refused, emoji-only text refused as text_empty",
+        "unit: read atomicWrite at apps/agent/src/fabric/fabric-paths.mjs:70-92: open wx with mode, fsync, chmod, rename, temp removed on failure",
+        "seam: certified at HEAD 5ff2e73808dbaf8c6b2f04b795ba499424e3e8b9, round 10, blind",
+        "seam: git diff --stat bridge/b1-run2..HEAD -> 5 files: pairing.ts, name.ts, their tests, tools/reachable.test.ts",
+        "seam: git merge-tree --write-tree HEAD b1/n-006 -> 70d93a076dc9455f636ca760f48023f8aedd9891, exit 0",
+        "seam: pnpm -s exec vitest run apps/agent/src/pairing tools/reachable.test.ts apps/agent/src/service -> 9 files, 240 passed",
+        "seam: pnpm -s exec vitest run tools/agent-locales.test.ts tools/docs.test.ts -> 2 files, 73 passed",
+        "seam: pnpm -s run typecheck -> exit 0",
+        "seam: pnpm -s run i18n:sweep -> exit 0, 0 sentences outside the catalogue",
+        "seam: pnpm -s exec eslint apps/agent/src/pairing tools/reachable.test.ts -> exit 0",
+        "seam: grep for pairing symbols outside apps/agent/src/pairing -> reachable.test.ts, docs and plan only",
+        "seam: node --experimental-strip-types probe: checkAgentName('Агент И\\u0306') -> null; raw !== NFC; sha256 prefixes a19907b7de8f vs 5b1ebdc20a03",
+        "seam: diff -rq of .task-pipeline/packets between okolos-b1-n-007 and okolos-bridge-b1 -> exit 0",
+        "seam: python3 over apps/agent/_locales -> ru 95 keys, en 95 keys, no name_*, claim, store-reason or notice keys yet",
+        "product: git -C okolos-b1-n-007 diff --stat bridge/b1-run2..HEAD: 5 files, pairing.ts, name.ts, their tests, tools/reachable.test.ts (+2 exemption rows); no package.json change",
+        "product: read apps/agent/src/pairing/pairing.ts: REQUEST_LIFETIME_MS and CLAIM_WINDOW_MS 5 min, MAX_PENDING 3, MAX_NEW_PER_MINUTE 6, hex(16) request id, hex(32) key, save() writes before taking agents into memory, close() ends with cause 'stopped'",
+        "product: read apps/agent/src/pairing/name.ts: ALLOWED allowlist, MAX_DIGITS 2, MAX_NAME_LENGTH 40 code points, reservedKeys and nameKeys tables",
+        "product: python3 read of apps/agent/_locales/{ru,en}/messages.json: 95 keys each; pairing, store and rejection strings listed and read against the code",
+        "product: grep -n -i 'agent|агент|pairing|привяз' docs/privacy.md docs/licences.md: no Okolos Agent mention; docs/brand/facts.md: no pairing claim",
+        "product: python3 read of .task-pipeline/plan_tasks.json: N-008 tests 20-33, N-011, N-014 lines on store reasons and claim refusals, N-015, N-016, N-017 SCN-044, N-020 (docs.test and runbook.test only)",
+        "product: python3 docs/ux/lint.py → exit 0; python3 docs/brand/lint.py → 'brand pack is clean'",
+        "product: grep for SCR-23 wireframe in docs/ux/wireframes: none (outside this node)",
+        "proven at 5ff2e73808dbaf8c6b2f04b795ba499424e3e8b9 (tree 4731e6cf302c4aaf5aec9b684dc10257c3a00d21)"
+      ]
     },
     {
       "id": "N-008",
@@ -321,7 +434,8 @@
       "status": "pending",
       "blocked_by": [
         "N-023",
-        "N-024"
+        "N-024",
+        "N-007"
       ],
       "serves": "REQ-59",
       "check": "pnpm -s exec vitest run apps/agent/src/tasks && pnpm -s run typecheck",
@@ -363,7 +477,8 @@
         "N-009",
         "N-010",
         "N-012",
-        "N-022"
+        "N-022",
+        "N-007"
       ],
       "serves": "REQ-55",
       "check": "pnpm -s exec vitest run apps/agent/src/agent.test.ts apps/agent/src/verbs && pnpm -s run typecheck",
@@ -405,17 +520,158 @@
       "id": "N-013",
       "title": "UX: FLW-21/22 к экранам, SCR привязки и активности, вайрфреймы, сценарии",
       "owner": "ux",
-      "status": "pending",
-      "blocked_by": [],
+      "status": "parked",
+      "blocked_by": [
+        "N-024"
+      ],
       "serves": "REQ-64",
       "check": "python3 docs/ux/lint.py",
       "touches": [
         "docs/ux/screens.md",
         "docs/ux/flows.md",
-        "docs/ux/scenarios.md"
+        "docs/ux/scenarios.md",
+        "docs/ux/foundation.md",
+        "docs/design/agent-dashboard/director-record.md",
+        "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+        "apps/agent/_locales/ru/messages.json",
+        "apps/agent/_locales/en/messages.json"
       ],
       "risk": "R2",
-      "surface_class": "product"
+      "certification": {
+        "round": 20,
+        "tiers": {
+          "unit": "pass",
+          "seam": "pass",
+          "product": "fail"
+        },
+        "at": "a719fe7ca1f5b7f1b9d519c0bd0bbac4e81f0c96",
+        "history": [
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          }
+        ],
+        "kinds": [
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind"
+        ],
+        "tree": "8eed553e256485eb293ac3178107958c1ca3246d"
+      },
+      "parked_reason": "certification ceiling: 20 failing round(s), ceiling 20; failing tier(s) product; stuck on product; first break apps/extension/_locales/ru/messages.json:1887 (storageResetNote, en twin), packages/ui/src/storage/storage-problem.ts:103, docs/ux/scenarios.md:747 SCN-032, docs/backlog.md B-156: A neighbouring extension string becomes false once Okolos Agent is installed, and nothing records it. The SCR-20 storage-problem screen says «Очистка удалит всё, что Okolos хранит на этом устройстве: находки, журнал, …» / 'Clearing removes everything Okolos kept on this device'. With Okolos Agent on the device, its access list, agents' journal, service events, logs, agent profile (with what sites keep from sign-ins) and clients/ keys all survive that clearing. N-013 handled the same collision for SCN-023 and SCN-024 (scope lines, B-156), and terminology.md cites SCR-20's «Очистить локальные данные», but SCN-032, storageResetNote, B-156 and every plan node leave this sentence out; check: grep -n 'storageResetNote\\|SCN-032' docs/backlog.md prints a row, and grep -n 'Okolos Agent' docs/ux/scenarios.md shows a hit inside SCN-032; then judgement: SCN-032 reads true for a device with Okolos Agent installed. Blocker row owed on the board"
     },
     {
       "id": "N-014",
@@ -424,10 +680,11 @@
       "status": "pending",
       "blocked_by": [
         "N-013",
-        "N-024"
+        "N-024",
+        "N-007"
       ],
       "serves": "REQ-66",
-      "check": "python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts",
+      "check": "python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts tools/agent-locales.test.ts",
       "touches": [
         "docs/brand/terminology.md",
         "apps/agent/_locales/ru/messages.json",
@@ -477,7 +734,8 @@
       "blocked_by": [
         "N-011",
         "N-012",
-        "N-015"
+        "N-015",
+        "N-007"
       ],
       "serves": "REQ-63",
       "check": "pnpm -s exec vitest run tools/install-agent.test.ts tools/runbook.test.ts",
@@ -566,7 +824,9 @@
         "docs/backlog.md",
         "docs/superpowers/backlog.md",
         "SECURITY.md",
-        "AGENTS.md"
+        "AGENTS.md",
+        "README.md",
+        "docs/brand/facts.md"
       ],
       "risk": "R1"
     },
@@ -678,7 +938,7 @@
       "id": "N-023",
       "title": "K0 контракты, замена запаркованного N-001: общее правило isLocalHost (с 100.64.0.0/10), типы входа и выхода каждого глагола, каноническое написание глагола в журнале",
       "owner": "implementer",
-      "status": "pending",
+      "status": "done",
       "blocked_by": [],
       "serves": "REQ-53",
       "check": "pnpm -s exec vitest run packages/contracts && pnpm -s run typecheck && pnpm -s run gates",
@@ -687,7 +947,88 @@
         "packages/contracts/src/index.ts",
         "packages/contracts/src/bridge.test.ts"
       ],
-      "risk": "R2"
+      "risk": "R2",
+      "certification": {
+        "round": 6,
+        "tiers": {
+          "unit": "pass",
+          "seam": "pass",
+          "product": "pass"
+        },
+        "at": "3623ca51150c87b485a2ab51f08c7b1ab3cef6f7",
+        "history": [
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "pass"
+          },
+          {
+            "unit": "pass",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "pass"
+          }
+        ],
+        "kinds": [
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind"
+        ],
+        "tree": "d5477d29e6e0ca2bee4e21cf10c099648c8b8d34"
+      },
+      "proof": {
+        "head": "3623ca51150c87b485a2ab51f08c7b1ab3cef6f7",
+        "tree": "d5477d29e6e0ca2bee4e21cf10c099648c8b8d34",
+        "graph_revision": "22"
+      },
+      "evidence": [
+        "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-023 -s exec vitest run packages/contracts -> 3 files passed, 57 tests passed (bridge.test.ts 41), exit 0",
+        "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-023 -s run typecheck -> exit 0, no output",
+        "unit: scratch copy of bridge.ts with 'session.list' added to BRIDGE_SESSION_VERBS, tsc --noEmit --strict -> error TS2536: Type 'V' cannot be used to index type 'VerbIOEntries' at bridge.ts(440,55); the unmodified copy has no bridge.ts error",
+        "unit: node --experimental-strip-types probe on a scratch copy: [::FFFF:127.0.0.1], [::ffff:a9fe:a9fe], [2002:a9fe:a9fe::], [64:ff9b::a9fe:a9fe], 100.100.100.200, 0, 0x0, 017700000001, 'localhost。', 127.0.0.1.. are local; validateScope refuses http://169.254.169.254., http://[::ffff:169.254.169.254], http://0, https://user:pw@10.0.0.1/, http://metadata.google.internal; accepts http://224.0.0.1 and http://255.255.255.255",
+        "unit: git diff bridge/b1-run2..HEAD -- packages/contracts | grep '^+' | grep -c U+2014 -> 0",
+        "seam: git diff --stat 392e48c 16ce36e -> only packages/contracts/src/{bridge.test.ts,bridge.ts,index.ts}",
+        "seam: grep of every exported bridge symbol over apps/ packages/ tools/ -> only apps/agent/src/service/deps.test.ts:12 outside contracts",
+        "seam: vitest run packages/contracts apps/agent/src/service/deps.test.ts tools/agent-locales.test.ts tools/gates/bundle-scan.test.ts -> 6 files, 87 passed",
+        "seam: scratch copy of 16ce36e: tsc -b -> exit 0; tsc -p tsconfig.tests.json -> exit 0",
+        "seam: git merge-tree --write-tree b1/n-023 b1/n-006 -> clean (7a613da); tsc -b apps/agent on it -> journal.ts(98,3) TS2353 'screenshot', exit 2",
+        "seam: git merge-tree --write-tree b1/n-023 b1/n-007 -> clean (9f909b1); tsc -b apps/agent -> exit 0",
+        "seam: probe under --exactOptionalPropertyTypes: {sessionId; ref?: string|undefined; ...} vs SnapshotInput -> TS2322",
+        "seam: grep -c on dist/{chrome,firefox}/content.js: \"open\" 0, home.arpa 0, session.open 0, refusal_ 0",
+        "seam: python read of apps/agent/_locales/{en,ru}: 15 refusal_* keys = BRIDGE_REFUSALS; 8 verb_* keys = toolName spelling of AnyBridgeVerb",
+        "seam: core-injection stage1.ts:132-133, stage3.ts:110-111 write concealment as join(',') and carrier as a string",
+        "product: read /Users/sshlg/DATA/_worktrees/okolos-b1-n-023/packages/contracts/src/bridge.ts in full (743 lines) at HEAD 16ce36e",
+        "product: node: Object.keys of apps/agent/_locales/{ru,en}/messages.json → 95 each; refusal_* x15, verb_* x8 printed with their text",
+        "product: python3 docs/ux/lint.py /Users/sshlg/DATA/_worktrees/okolos-b1-n-023 → exit 0 ('docs/ux is consistent'); python3 docs/brand/lint.py /Users/sshlg/DATA/_worktrees/okolos-b1-n-023/docs/brand → exit 0",
+        "product: vitest run --root /Users/sshlg/DATA/_worktrees/okolos-b1-n-023 tools/flows-diagrams.test.ts tools/agent-locales.test.ts packages/contracts → 5 files, 63 tests passed",
+        "product: grep -rl 'session\\.open|hygiene|home\\.arpa|not_paired|isLocalName' apps/extension/dist/{chrome,firefox} → no file (dist built 14:50, HEAD merge 14:55)",
+        "product: grep -n agent/bridge/MCP in docs/privacy.md → only an unrelated user-agent line; docs/privacy.md:69-73 'их девять'",
+        "product: plan_tasks.json rows N-009, N-011, N-015, N-016, N-018, N-020 read for the tests that keep later promises; grep CHANGELOG plan_tasks.json → no hit",
+        "product: git ls-files apps/agent → service shell and _locales only; tasks, verbs, pairing and census are not on this branch yet",
+        "proven at 3623ca51150c87b485a2ab51f08c7b1ab3cef6f7 (tree d5477d29e6e0ca2bee4e21cf10c099648c8b8d34)"
+      ]
     },
     {
       "id": "N-024",
@@ -841,6 +1182,16 @@
       "payload": "resource: packages/cdp-pipe/src/pipe.ts; N-022 вливается первым, при слиянии N-005 файл берётся из N-022 (его пометки i18n-exempt покрывают весь файл)"
     },
     {
+      "from": "N-024",
+      "to": "N-025",
+      "payload": "buildIdentity и тест dotfiles"
+    },
+    {
+      "from": "N-024",
+      "to": "N-007",
+      "payload": "каталоги данных и токен хоста"
+    },
+    {
       "from": "N-023",
       "to": "N-003",
       "payload": "toSnapshotFinding, SnapshotFinding, TaskScope"
@@ -857,18 +1208,13 @@
     },
     {
       "from": "N-024",
-      "to": "N-025",
-      "payload": "buildIdentity и тест dotfiles"
-    },
-    {
-      "from": "N-024",
       "to": "N-006",
       "payload": "каталоги данных службы, servicePaths, setup после замка"
     },
     {
-      "from": "N-024",
-      "to": "N-007",
-      "payload": "каталоги данных и токен хоста"
+      "from": "N-023",
+      "to": "N-006",
+      "payload": "BridgeRefusal, AnyBridgeVerb, canonicalVerb для типа JournalEntry"
     },
     {
       "from": "N-023",
@@ -904,6 +1250,11 @@
       "from": "N-024",
       "to": "N-009",
       "payload": "apps/agent: package.json, tsconfig"
+    },
+    {
+      "from": "N-007",
+      "to": "N-009",
+      "payload": "checkFreeText для цели задачи"
     },
     {
       "from": "N-022",
@@ -956,6 +1307,11 @@
       "payload": "CdpError.kind и cdpCode для перевода в отказы контракта"
     },
     {
+      "from": "N-007",
+      "to": "N-011",
+      "payload": "Pairing: open, close, flush, list, onNotice, onReload"
+    },
+    {
       "from": "N-023",
       "to": "N-012",
       "payload": "CensusEntry"
@@ -971,6 +1327,11 @@
       "payload": "ключи причин переписи"
     },
     {
+      "from": "N-024",
+      "to": "N-013",
+      "payload": "resource: каталоги строк агента; N-013 дописывает строки SCR-23 после строк службы"
+    },
+    {
       "from": "N-013",
       "to": "N-014",
       "payload": "список строк экранов"
@@ -979,6 +1340,11 @@
       "from": "N-024",
       "to": "N-014",
       "payload": "resource: apps/agent/_locales/{ru,en}/messages.json; N-014 дописывает строки страницы после строк службы N-024"
+    },
+    {
+      "from": "N-007",
+      "to": "N-014",
+      "payload": "NameRefusal, StoreRefusal, ClaimRefusal, EndCause: коды, которым нужны слова"
     },
     {
       "from": "N-006",
@@ -1024,6 +1390,11 @@
       "from": "N-015",
       "to": "N-016",
       "payload": "статика страницы"
+    },
+    {
+      "from": "N-007",
+      "to": "N-016",
+      "payload": "путь и формат списка доступов для doctor"
     },
     {
       "from": "N-015",
@@ -1150,6 +1521,53 @@
       "node": "N-025",
       "why": "certified at all 1 tiers in round 1",
       "precondition": "da814f658b78bac3874c960f6b9704da8e01d351"
+    },
+    {
+      "verb": "add",
+      "node": "N-006",
+      "why": "N-006 типизирует JournalEntry кодами отказов и глаголами контракта; ребро N-023→N-006 делает это явным. Сборка N-006 начата на старом контракте с именами из b1/n-023; узел закрывается после N-023"
+    },
+    {
+      "verb": "add",
+      "node": "N-013",
+      "why": "surface_class снят: N-013 меняет документы UX-цепочки и строки, не пиксели; визуальный трек отклонён записью режиссёра (docs/design/agent-dashboard/director-record.md); страницу рисует N-015, класс product остаётся на нём"
+    },
+    {
+      "verb": "park",
+      "node": "N-013",
+      "why": "loop guard: 12 failing certification rounds recorded in .task-pipeline/build/cert-N-013-r1..r12-*.json, against a cap of 3; from about round 7 most breaks were caused by the previous round's own fixes (self-inflicted >= new), so the axis is exhausted. Graph recorded only round 1 because rounds 2-12 were not passed to certify (process violation, run.md 2026-10-27). Last state: r10 unit and seam pass, r12 one shared break fixed at 0795850; r13 stopped unread. Resume only on the operator's explicit request; open findings in B-157"
+    },
+    {
+      "verb": "park",
+      "node": "N-007",
+      "why": "loop guard: 6 failing certification rounds (cert-N-007-r1..r6-*.json) against a cap of 3, not recorded in the graph (process violation, run.md 2026-10-27); round 7 ADVERSARIAL passed all three tiers at 2f1d71e (cert-N-007-r7-*.json, 0 breaks); R3 still owes one more passing round. Resume only on the operator's explicit request; open risks in B-157"
+    },
+    {
+      "verb": "resume",
+      "node": "N-007",
+      "why": "operator 2026-10-27 in chat: «проверим все долги … И давай все доделаем» (taken as the explicit request loop-guard.md requires for further rounds after the cap; B-157). Certification history rewritten from the tier reports in .task-pipeline/build/cert-N-007-r*-*.json so the graph holds every round, including those not passed to certify before (process violation recorded in run.md). Further rounds run with an explicit --ceiling raised for this request only."
+    },
+    {
+      "verb": "resume",
+      "node": "N-013",
+      "why": "operator 2026-10-27 in chat: «проверим все долги … И давай все доделаем» (taken as the explicit request loop-guard.md requires for further rounds after the cap; B-157). Certification history rewritten from the tier reports in .task-pipeline/build/cert-N-013-r*-*.json so the graph holds every round, including those not passed to certify before (process violation recorded in run.md). Further rounds run with an explicit --ceiling raised for this request only."
+    },
+    {
+      "verb": "close",
+      "node": "N-023",
+      "why": "certified at all 3 tiers in round 6",
+      "precondition": "3623ca51150c87b485a2ab51f08c7b1ab3cef6f7"
+    },
+    {
+      "verb": "close",
+      "node": "N-007",
+      "why": "certified at all 3 tiers in round 10",
+      "precondition": "5ff2e73808dbaf8c6b2f04b795ba499424e3e8b9"
+    },
+    {
+      "verb": "park",
+      "node": "N-013",
+      "why": "certification ceiling: 20 failing round(s), ceiling 20; failing tier(s) product; stuck on product; first break apps/extension/_locales/ru/messages.json:1887 (storageResetNote, en twin), packages/ui/src/storage/storage-problem.ts:103, docs/ux/scenarios.md:747 SCN-032, docs/backlog.md B-156: A neighbouring extension string becomes false once Okolos Agent is installed, and nothing records it. The SCR-20 storage-problem screen says «Очистка удалит всё, что Okolos хранит на этом устройстве: находки, журнал, …» / 'Clearing removes everything Okolos kept on this device'. With Okolos Agent on the device, its access list, agents' journal, service events, logs, agent profile (with what sites keep from sign-ins) and clients/ keys all survive that clearing. N-013 handled the same collision for SCN-023 and SCN-024 (scope lines, B-156), and terminology.md cites SCR-20's «Очистить локальные данные», but SCN-032, storageResetNote, B-156 and every plan node leave this sentence out; check: grep -n 'storageResetNote\\|SCN-032' docs/backlog.md prints a row, and grep -n 'Okolos Agent' docs/ux/scenarios.md shows a hit inside SCN-032; then judgement: SCN-032 reads true for a device with Okolos Agent installed. Blocker row owed on the board"
     }
   ]
 }

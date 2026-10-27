@@ -70,7 +70,7 @@
 |---|---|---|---|
 | REQ-53 | Контракты задачи, глаголов, конверта и отказов: один тип для демона и тестов | `pnpm typecheck`; исчерпывающий `switch` по `BridgeRefusal` | open (построено на ветке, проверяется заново) |
 | REQ-54 | CDP-клиент по pipe: кадры через NUL, таймауты, плоские сессии, завершение группы процессов | юнит-тесты разбора кадров в пакете; интеграционный тест на Chrome | open |
-| REQ-55 | Сжатый снимок с `ref`, очистка движком, находка приложена, секреты скрыты | корпус `corpora/injections` + fuzz секретов | open (частично на ветке) |
+| REQ-55 | Сжатый снимок с `ref`, очистка движком, находка приложена, значения полей с паролями, картами и одноразовыми кодами скрыты (открытый текст страницы не скрывается) | корпус `corpora/injections` + fuzz секретов | open (частично на ветке) |
 | REQ-56 | Выдача частями: `maxBytes` 32 КБ, курсор, поддерево по `ref` | тест на сохранённом дереве Википедии | open (частично на ветке) |
 | REQ-57 | Дверь MCP: Streamable HTTP на `127.0.0.1:47871`, ключ агента на каждый запрос, `Host` ровно свой, запрос с `Origin` или `Sec-Fetch-*` отвергается, stdio-шим и CLI привязки | тесты двери: без ключа, токен хоста, `Origin`, rebinding `Host`, страница на другом порту localhost; вызов из тестового MCP-клиента и из Claude Code через stdio-шим | open |
 | REQ-58 | Привязка агента человеком со сверкой кода по правилам спеки §11 F5; демон хранит SHA-256 ключа в своём хранилище привязок; отзыв закрывает задачи | юнит-тесты правил привязки; e2e SCN-044 | open |
@@ -79,7 +79,7 @@
 | REQ-61 | Окно агента: без стартового окна, окно на задачу, фокус не уходит, инфобара нет, процессы закрываются | e2e на настоящем Chrome по методике Б0 | open |
 | REQ-62 | Перепись процессов автоматизации с владельцем и причиной «не трогать» | тест на фикстуре `ps` и `launchctl` | open |
 | REQ-63 | Установка: launchd, дескриптор `fabric-service/0.1`, `doctor`, раннбук | `check_service.py` → 0 FAIL; перезапуск после `kill -9` | open |
-| REQ-64 | Панель привязки: экран в `docs/ux/screens.md` с состояниями, FLW-21 ведёт к нему, SCN-044 со статусом `built` | `python3 docs/ux/lint.py`; e2e SCN-044 | open |
+| REQ-64 | Панель привязки: экран в `docs/ux/screens.md` с состояниями, FLW-21 ведёт к нему, SCN-044 со статусом `implemented` | `python3 docs/ux/lint.py`; e2e SCN-044 | open |
 | REQ-65 | Вид активности: открытые задачи агентов и последние отказы (отзыв доступа живёт в SCR-23) | e2e SCN-045 читает страницу | open |
 | REQ-66 | Термины моста (Okolos Bridge, Okolos Agent, окно агента, привязка, задача агента) в `docs/brand/terminology.md` до первых строк для людей (B-147) | `python3 docs/brand/lint.py`; `tools/docs.test.ts` | open |
 | REQ-67 | ADR «мост — часть Okolos Agent; две двери; задача — своё окно» (B-146) и ADR «снимок частями, не больше 32 КБ»; строки механизмов моста в ADR-0019 | `tools/adr.test.ts` (каждый названный файл существует) | open |
@@ -124,7 +124,7 @@
 | Служба `fabric-service/0.1` | id `okolos-agent`, instance `default`; порт 47871 (свободен: ни один дескриптор в `~/Library/Application Support/ai.passioncode.fabric/services/` его не заявляет, `lsof` его не видит); `surfaces.mcp.auth: "own"` (DEC-0024): `/mcp` отвергает токен хоста, у агентов ключи привязки; четыре маршрута протокола; замок `service.lock` до любого побочного эффекта, выход 75; launchd `RunAtLoad`, `KeepAlive`, `ThrottleInterval` 10, `ProcessType Standard`, маркер `FABRIC_SERVICE_SUPERVISOR=launchd`; код из неизменяемого релиза `~/.local/share/okolos-agent/releases/<версия>-<sha12>/`; данные, логи и кэш в `~/Library/{Application Support,Logs,Caches}/okolos-agent/` | скил `fabric-agent-adapter:building-fabric-services` 0.52.0 (контракт `1197a90`): SKILL.md, `references/protocol.md`, `surfaces-and-auth.md`, `lifecycle.md` |
 | Кнопки и действия | у каждой кнопки страницы есть инструмент (`fabric-actions/0.1`, DEC-0121); подтверждение привязки идёт через шлюз `human` с шагом `consent`: инструмент отвечает `human-step-required` со ссылкой на страницу, так что локальный процесс не одобряет сам себя | `references/interop.md` → Actions |
 | Набор службы для Node | вендорится в `apps/agent` командой `fabric_kit.py install … --lang node --module fabric-service`; лицензия набора та же, что у Okolos | `scripts/kit.json`, `fabric-service.mjs` |
-| Связка ключей | `security -i` читает команды из stdin, поэтому даже отпечаток ключа не попадает в аргументы процесса; тесты работают на одноразовом имени службы и удаляют его | `man security` на этой машине, 2026-10-27 |
+| Связка ключей | Изучена (`security -i` читает команды из stdin) и **не используется в Б1**: решение 5 после ревью F13 хранит только SHA-256 ключа в хранилище привязок демона | `man security` на этой машине, 2026-10-27 |
 | CDP | `Target.createTarget {newWindow, background}`, `Accessibility.getFullAXTree`, `Input.dispatchMouseEvent`, `--remote-debugging-pipe`, `--no-startup-window` | измерено, а не прочитано: [замер Б0](../evidence/2026-10-06-b0-agent-window.md), Chrome 154 |
 
 ## Ответы стадиям 1–10

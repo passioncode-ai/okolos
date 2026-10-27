@@ -5,7 +5,8 @@
  "inputs": [
   "validateScope, inScope, refuse, verbAllowed (close разрешён всегда) (bridge.ts)",
   "N-023: validateScope, inScope, verbAllowed, refuse",
-  "N-024: apps/agent: package.json, tsconfig"
+  "N-024: apps/agent: package.json, tsconfig",
+  "N-007: checkFreeText для цели задачи"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -19,7 +20,7 @@
   ]
  },
  "outputs": [
-  "`class Tasks { open(agentId, scopeInput, now): BridgeResult<Task>; get(agentId, taskId, now): BridgeResult<Task>; charge(task, verb, url?): BridgeResult<void>; closeAllOf(agentId); list(now) }`; `Task {id, agentId, scope, openedAt, stepsUsed, windowId?}`; `checkLanded(task, actualUrl): BridgeResult<void>` (аудит #39); SessionOpenResult.sessionId = Task.id"
+  "`class Tasks { open(agentId, scopeInput, now): BridgeResult<Task>; get(agentId, taskId, now): BridgeResult<Task>; charge(task, verb, url?): BridgeResult<void>; closeAllOf(agentId); list(now) }`; `Task {id, agentId, scope, openedAt, stepsUsed, windowId?, windowOpen: boolean /* SCR-24 taskWindowOpen/taskWindowClosed; ставит N-011 по событию окна N-010 */}`; `checkLanded(task, actualUrl): BridgeResult<void>` (аудит #39); SessionOpenResult.sessionId = Task.id"
  ],
  "acceptance": [
   "каждый отказ BRIDGE_REFUSALS, который выдают задачи (invalid_scope, no_such_task, origin_not_in_task, verb_not_in_task, budget_exhausted, task_expired), — свой тест",
@@ -28,6 +29,9 @@
   "checkLanded(task, actualUrl): фактический origin вне origins.read → origin_not_in_task (ревью F9)",
   "отказ тоже списывает шаг (спека §2.3)",
   "фрагмент URL не влияет на проверку origin",
+  "цель задачи проходит checkFreeText из apps/agent/src/pairing/name.ts (одно правило с именем агента, без белого списка и без счёта цифр): без символов управления, двунаправленного текста и невидимых знаков; на странице выводится текстом, с подписью «словами агента», не длиннее 200 видимых знаков с многоточием (проверки N-013 круг 5)",
+  "close работает и у задачи, израсходовавшей все шаги (не списывает шаг и не отказывает budget_exhausted) (проверки N-013 круг 7)",
+  "отказ checkFreeText для цели задачи отдаётся агенту как invalid_scope с полем goal (проверка seam N-007 круг 6)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/tasks && pnpm -s run typecheck"
  ],
  "guards": [

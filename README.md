@@ -81,7 +81,8 @@ deploying the Worker reads `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `OKO
 the Worker secret `APPEALS_TOKEN` ([Worker deploy](docs/runbooks/worker-deploy.md)). Ask the
 maintainers for access; values never go in the repository.
 
-**MCP.** Okolos neither exposes nor uses an MCP server, and none is planned yet: the
+**MCP.** Okolos exposes no MCP server yet. The MCP door of Okolos Agent, through which paired
+agents read pages, is decided (ADR-0018, Б1 spec REQ-57) and being built (B-142); until it ships the
 organisation's knowledge base lists it under *MCP gaps* (fabric-workspace `knowledge/products.md`).
 
 **Develop.** `pnpm gates` is the gate (lint, typecheck, build, tests, UX and brand checks,

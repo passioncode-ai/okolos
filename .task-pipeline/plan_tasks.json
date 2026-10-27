@@ -206,7 +206,7 @@
    "лог только для чтения после старта: два запроса к well-known получают 200, close() завершается (unit N-005 круг 3, break)",
    "два одновременных close() при зависшем запросе пишут eventDrainCutOff один раз (unit N-005 круг 3, риск)",
    "eventDrainCutOff: ru «Okolos Agent остановился, не дождавшись конца вызовов. Оборвано: $COUNT$.» en «Okolos Agent stopped before all calls finished. Cut off: $COUNT$.» (Copylot ru 8748c348-95f2-4054-9401-70cde29d7d72, en 4658bee7-8c88-425b-aff6-d1ae2996bf48; слово «запрос» закреплено за доступом, product N-005 круг 3)",
-   "eventsUnreadable: ru «В файле событий нашлись нечитаемые строки: $COUNT$. При запуске они удалены, остальные события сохранены.» en «The events file had unreadable lines: $COUNT$. They were removed at start; the other events are kept.» как разовое событие warning при старте; well-known после старта без degraded источника events (product N-005 круг 3)",
+   "eventsUnreadable: ru «В файле событий нашлись нечитаемые строки: $COUNT$. При запуске они удалены.» en «The events file had unreadable lines: $COUNT$. They were removed at start.» как разовое событие warning при старте; well-known после старта без degraded источника events (product N-005 круг 3) (уточнено проверкой N-013 круг 4: обрезка по сроку при том же старте может удалить старые события)",
    "запрос во время остановки: onRefused вызывается с причиной 'stopping' до записи 503 (product N-005 круг 3, break 3)"
   ],
   "dod": "vitest apps/agent/src/service зелёный; typecheck, lint, pnpm gates 0"
@@ -236,14 +236,16 @@
   "n": "N-006",
   "title": "K3: журнал до ответа",
   "deps": [
-   "N-024"
+   "N-024",
+   "N-023"
   ],
   "req": [
    "REQ-60"
   ],
   "files": [
    "Create: apps/agent/src/journal/journal.ts",
-   "Test: apps/agent/src/journal/journal.test.ts"
+   "Test: apps/agent/src/journal/journal.test.ts",
+   "Modify: tools/reachable.test.ts (проверка seam N-007 круг 2)"
   ],
   "consumes": "serviceDirs().data",
   "produces": "`class Journal { static open(dir, {retentionDays}): Journal; record(e: JournalEntry): Promise<void> /* append + fsync, бросает при сбое */; recent(limit): JournalEntry[]; sweep(now) }`; `JournalEntry {at, agent, task?, verb, origin?, outcome: 'answered'|'refused'|'rejected', code?: BridgeRefusal | DoorRejection, bytes?, verdict?}`; `DoorRejection = 'bad_host'|'bad_origin'|'cross_site'|'stopping'|'bad_content_type'|'bad_request'` (значения onRefused оболочки N-024); JournalEntry — объединение по outcome: у 'rejected' нет agent и verb (аудит #38); verb: AnyBridgeVerb, канонический (аудит #19); `answerAfterRecord(journal, entry, send)` — единственная обёртка «запись до ответа», при сбое записи отправляет конверт отказа internal без содержимого страницы (аудит #18); RETENTION_DAYS_JOURNAL = 90, тест сверяет с RETENTION_DAYS.journal из @okolos/storage (аудит #30) (проверка seam N-001 круг 2) — без текста страницы и значений полей",
@@ -251,7 +253,17 @@
    "record дописывает строку и делает fsync до возврата (шпион на fd.sync)",
    "каталог только для чтения → record бросает, и обёртка answerAfterRecord отдаёт internal, а не ответ",
    "запись с полем text или value отвергается типом и рантайм-проверкой",
-   "sweep удаляет записи старше срока; срок берётся из RETENTION_DAYS журнала расширения"
+   "sweep удаляет записи старше срока; срок берётся из RETENTION_DAYS журнала расширения",
+   "запись журнала несёт agentId рядом с именем агента: два агента с одинаковым именем различимы в журнале и на SCR-24 (проверки N-013 круг 3, N-007 круг 2)",
+   "answerAfterRecord отдаёт вызывающему причину сбоя записи закрытым набором кодов (no_space, no_permission, other, по errno), а не только false: из неё N-011 берёт $WHAT$ строки journalError (проверки N-013 круг 4)",
+   "DoorRejection дополнен store_unreadable (список доступов не читался, ключ не проверен); у каждого кода rejected есть строка rejection_<код> в каталоге демона (проверки N-013 круг 4)",
+   "recent отдаёт отказы отдельно от ответов (фильтр по outcome), так что поток ответов не вытесняет отказы со страницы; нечитаемые строки журнала считаются и отдаются странице, а не пропускаются молча (проверки N-013 круг 5)",
+   "у журнала есть выгрузка (export) для GET /api/journal: отдаёт JSONL без содержимого страниц и при сбое бросает ошибку с кодом причины (no_space, no_permission, other), из которой N-015 берёт $WHAT$ строк journalExportFailed и journalUnreadable (проверки N-013 круг 7)",
+   "запись журнала несёт рядом с agentId дату выдачи доступа (pairedAt), чтобы SCR-24 показал отозванного агента строкой agentLabelRevoked с датой (проверки N-013 круг 8)",
+   "recent при сбое чтения бросает ошибку с кодом причины (no_space не бывает, no_permission, unreadable, other): из неё N-015 берёт $WHAT$ строки journalUnreadable (проверки N-013 круг 9)",
+   "ответы протокола MCP привязанному агенту (initialize, tools/list, ошибка разбора) пишутся записью с outcome answered и глаголом протокола (mcp.initialize, mcp.tools_list, mcp.parse_error) или явно не пишутся с причиной в спеке §3; решение одно для N-006 и N-008 (проверки N-013 круг 9)",
+   "ответы агенту «неизвестный инструмент», «неверные аргументы» и ошибки протокола пишутся в журнал как refused с кодом bad_call (журнальный код, не BridgeRefusal) и глаголом unknown, если глагол не распознан; страница показывает их строками refusal_bad_call и verb_unknown (проверка product N-013 круг 15)",
+   "журнальные коды bad_call и local_answer допустимы в записях refused наряду с BridgeRefusal; ошибка разбора пишется одним способом (refused, bad_call, глагол unknown), тесты 12 и 13 согласованы (проверки N-013 круг 16)"
   ],
   "dod": "vitest apps/agent/src/journal зелёный; плант «ответ до записи» наблюдён красным"
  },
@@ -266,16 +278,17 @@
   ],
   "files": [
    "Create: apps/agent/src/pairing/pairing.ts, apps/agent/src/pairing/name.ts",
-   "Test: apps/agent/src/pairing/pairing.test.ts, apps/agent/src/pairing/name.test.ts"
+   "Test: apps/agent/src/pairing/pairing.test.ts, apps/agent/src/pairing/name.test.ts",
+   "Modify: apps/agent/package.json, apps/agent/tsconfig.json, pnpm-lock.yaml, tools/reachable.test.ts (зависимость @okolos/core-lookalike добавлена в fix 1 и снята в fix 4; проверка seam N-007 круг 2)"
   ],
   "consumes": "serviceDirs().data",
-  "produces": "`class Pairing { static open(file): Pairing; request(agentName, now): {requestId, code, expiresAt} | {refused: reason}; confirm(requestId, now); decline(requestId); claim(requestId, now): {key} | {pending: true} | null; verify(key): AgentRecord | null; revoke(agentId); list(now): {requests: PublicRequest[] /* без requestId, с handle для страницы */, agents}; confirmByHandle(handle, now); declineByHandle(handle) }`; `checkAgentName(name): string | null` (причина отказа)",
+  "produces": "`class Pairing { static open(file, options?): Pairing /* записи проверяются мягким правилом хранения isStorableName; отказ при повторе agentId или keyHash, лишних полях, файле больше 1 МБ */; verify(key): AgentRecord | null /* по stat замечает изменённый файл и перечитывает его */; touch(agentId, now): boolean; flush(): void; close(now): void /* открытые запросы истекают с cause 'stopped' */; request(agentName, now): {requestId, code, expiresAt} | {refused: RequestRefusal}; confirmByHandle(handle, now): boolean; declineByHandle(handle, now): boolean; claim(requestId, now): {key} | {pending: true} | {refused: ClaimRefusal /* declined|expired|claim_expired|claimed|stopped|unknown */}; revoke(agentId, now): AgentRecord | null; list(now) /* тоже перечитывает изменённый файл */ }`; запись перечитывает изменённый на диске файл и применяет действие к нему; `PairingOptions {random, onNotice, onNoticeError, onReload({removed: agentId[]})}`; при перечитывании агенты, пропавшие из файла или со сменённым keyHash, получают событие revoked; каждый метод с `now` бросает TypeError, если `now` не целое безопасное число ≥ 0; list сначала завершает истёкшие запросы, потом перечитывает файл; `PairingNotice {kind, handle?, agentId?, name, at, cause?: 'timeout'|'stopped'}`; `StoreRefusal = unreadable|not_json|not_a_store|bad_record|unwritable|too_large`; `NameRefusal = name_not_text|name_empty|name_too_long|name_digits|name_bidi|name_control|name_script|name_reserved`; `checkAgentName`, `checkFreeText(text, maxLength)` (длина в единицах UTF-16, как validateScope; ZWJ, ZWNJ и селекторы вариантов разрешены), `nameKeys`, `namesLookAlike`, `isStorableName`",
   "tests": [
    "requestId 128 бит (32 hex), не появляется в list() для страницы, в журнале и событиях",
-   "claim до confirm → {pending: true}, нового запроса не создаёт; claim после confirm → ключ 256 бит; второй claim → null; claim позже 5 минут после confirm → null",
+   "claim до confirm → {pending: true}, нового запроса не создаёт; claim после confirm → ключ 256 бит; второй claim → {refused: ClaimRefusal}; claim позже 5 минут после confirm → {refused: ClaimRefusal}",
    "запрос истекает через 5 минут с создания; больше 3 ожидающих → новый отвергается; больше 6 новых в минуту → отвергается",
    "два ожидающих запроса с одним именем помечены duplicateName оба",
-   "имя агента: > 40 знаков, три цифры подряд, символы управления или bidi → отвергается с причиной (ревью F12)",
+   "имя: до 40 знаков, только латиница A–Z или только базовая кириллица, цифры 0–9 не больше двух, пробел и знаки - _ . ( ) ' / +; ничего, что читается как «Okolos» без пробелов и знаков; без управляющих, невидимых и двунаправленных знаков (решения прогона по adversarial-кругам 3 и 4)",
    "verify через timingSafeEqual по SHA-256; отозванный ключ → null; хранилище 0600, атомарная запись; чужое содержимое файла не открывает хранилище, а даёт ошибку хранилища",
    "confirmByHandle и declineByHandle работают по handle из list(); requestId в роли handle отвергается (аудит #9)"
   ],
@@ -307,10 +320,10 @@
    "POST /pair {name} создаёт запрос и возвращает {requestId, code}; POST /pair/claim с X-Okolos-Pairing-Request до подтверждения → pending",
    "токен хоста в Authorization: 403 not_paired, не 200",
    "Host rebinding (attacker.example:47871) → 403 до разбора, запись в журнале, запроса привязки нет",
-   "любой Origin (в том числе http://localhost:3000) или Sec-Fetch-Site → 403, запроса привязки нет (ревью F7)",
+   "любой Origin (в том числе http://localhost:3000) или Sec-Fetch-Site → 403, запроса привязки нет (ревью F7); любой заголовок Sec-Fetch-* (Site, Mode, Dest, User), а не только Sec-Fetch-Site: cross-site, отвергается как cross_site; оболочка N-024 правится в N-008 (проверки N-013 круг 9)",
    "Content-Type не application/json → 415",
    "журнал недоступен (ответ — конверт internal из answerAfterRecord, без содержимого; аудит #18): каждый маршрут и вид ответа (отказ двери, ошибка разбора, ошибка протокола, ответ инструмента) уходит без тела (ревью F14)",
-   "ключ отозван → 403 not_paired и вызван onRevoke(agentId); закрытие задач и окон проверяет N-011",
+   "ключ отозван → 403 not_paired (verify отозванного ключа отдаёт null, как неизвестного); onRevoke зовёт тот, кто вызвал Pairing.revoke (страница N-015, действие agent.revoke) с AgentRecord, один тип onRevoke(record: AgentRecord) в N-008 и N-011 (проверки N-013 круг 3, N-007 круг 2)",
    "stdio-шим: читает ключ из файла 0600 клиента, проксирует stdin/stdout ↔ /mcp; без файла ключа печатает в stderr, как пройти привязку, и выходит 2",
    "CLI pair: печатает код, ждёт подтверждения, пишет ключ в clients/<имя>.key 0600; отказ человека → выход 1 без файла",
    "тестовый MCP-клиент (@modelcontextprotocol/client) получает tools/list после привязки",
@@ -319,7 +332,22 @@
    "ключ пишется во временный файл и переименовывается только после успешного забора; существующий файл заменяется только с --replace; привязка того же имени после отзыва проходит с --replace (ревью S5)",
    "маршруты /mcp, /pair, /pair/claim объявляют paths, и well-known показывает surfaces.mcp (проверка seam N-005 круг 2)",
    "тексты, которые читает человек, идут ключами каталога, которые заранее добавил N-014; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
-   "долгий поток /mcp при остановке: дверь закрывает его сама до срока слива и пишет ответ в журнал; агент за stdio-шимом получает отказ контракта internal с retryable, а не голый 503 (product N-005 круг 3, риски)"
+   "долгий поток /mcp при остановке: дверь закрывает его сама до срока слива и пишет ответ в журнал; агент за stdio-шимом получает отказ контракта internal с retryable, а не голый 503 (product N-005 круг 3, риски)",
+   "журнал двери не записывает тела /pair и /pair/claim (в них requestId); без заголовка X-Okolos-Agent-Key дверь отказывает not_paired, не вызывая Pairing.verify (отчёт N-007)",
+   "каждый принятый вызов двери зовёт Pairing.touch(agentId, now): «последний вызов» на SCR-23 берётся отсюда (проверки N-007)",
+   "сбой записи в Pairing.touch не роняет вызов агента: ответ уходит, сбой пишется в лог службы (отчёт N-007 fix 1)",
+   "ни один маршрут двери не подтверждает и не отклоняет запрос: у Pairing нет confirm по requestId, только confirmByHandle со страницы; тест обходит маршруты /mcp, /pair, /pair/claim и проверяет, что запрос остаётся pending (проверки N-013 круг 3, N-007 круг 2)",
+   "сбой записи хранилища в claim: /pair/claim отвечает отказом internal с retryable, ключ не выдан, запрос остаётся, следующий claim после починки выдаёт ключ (проверки N-013 круг 3, N-007 круг 2)",
+   "отказы двери в журнале несут только коды DoorRejection | not_paired, у каждого есть строка rejection_<код>; при нечитаемом хранилище привязок дверь пишет store_unreadable, а агент получает internal с retryable, не not_paired: его ключ не проверялся (проверки N-013 круг 4)",
+   "/pair и /pair/claim: отказы по правилам двери (Host, Origin, Sec-Fetch, формат) пишутся в журнал как rejected; отказы по имени, по числу запросов и сбой записи при claim в журнал и события не пишутся, они идут в лог службы; CLI получает причину своей строкой (проверки N-013 круг 4)",
+   "CLI pair называет настоящую причину отказа claim: declined, expired, claim_expired, claimed, unknown (перезапуск демона или чужой id), каждая своей строкой каталога (проверка seam N-007 круг 3)",
+   "вызов с отозванным ключом: шим печатает в stderr, что доступ отозван или ключ неверен, и как попросить снова: okolos-agent pair --name \"<имя>\" --replace (проверка seam N-013 круг 5)",
+   "один тип onRevoke(record: AgentRecord) в выходах и в проверках N-008 и N-011 (проверка seam N-007 круг 3)",
+   "CLI pair после кода печатает, где человек подтверждает запрос: страница Okolos Agent в Fabric Dashboards (строка каталога из N-014) (проверки N-013 круг 7)",
+   "правило «любой Sec-Fetch-*» действует только на маршрутах двери (/mcp, /pair, /pair/claim); страница /dashboard и /api со своим Origin и Sec-Fetch-Site: same-origin им не отвергаются (проверки N-013 круг 10)",
+   "CLI pair и шим понимают ответ 503 при остановке службы и обрыв соединения: печатают, что Okolos Agent останавливается, и выходят с отдельным кодом (проверка seam N-007 круг 6)",
+   "пока список доступов не читается, POST /pair отвечает отказом (internal, retryable) и запроса не создаёт; вызов без ключа по-прежнему not_paired (проверки N-013 круг 13)",
+   "pair --replace отзывает прежнего агента, чей ключ лежал в том же файле clients/ (по agentId из файла), а не всех одноимённых; страница показывает отзыв обычным уведомлением (решения при закрытии N-007, 2026-10-27)"
   ],
   "dod": "vitest apps/agent/src/door зелёный"
  },
@@ -328,7 +356,8 @@
   "title": "K3: задачи",
   "deps": [
    "N-023",
-   "N-024"
+   "N-024",
+   "N-007"
   ],
   "req": [
    "REQ-59"
@@ -338,14 +367,17 @@
    "Test: apps/agent/src/tasks/tasks.test.ts"
   ],
   "consumes": "validateScope, inScope, refuse, verbAllowed (close разрешён всегда) (bridge.ts)",
-  "produces": "`class Tasks { open(agentId, scopeInput, now): BridgeResult<Task>; get(agentId, taskId, now): BridgeResult<Task>; charge(task, verb, url?): BridgeResult<void>; closeAllOf(agentId); list(now) }`; `Task {id, agentId, scope, openedAt, stepsUsed, windowId?}`; `checkLanded(task, actualUrl): BridgeResult<void>` (аудит #39); SessionOpenResult.sessionId = Task.id",
+  "produces": "`class Tasks { open(agentId, scopeInput, now): BridgeResult<Task>; get(agentId, taskId, now): BridgeResult<Task>; charge(task, verb, url?): BridgeResult<void>; closeAllOf(agentId); list(now) }`; `Task {id, agentId, scope, openedAt, stepsUsed, windowId?, windowOpen: boolean /* SCR-24 taskWindowOpen/taskWindowClosed; ставит N-011 по событию окна N-010 */}`; `checkLanded(task, actualUrl): BridgeResult<void>` (аудит #39); SessionOpenResult.sessionId = Task.id",
   "tests": [
    "каждый отказ BRIDGE_REFUSALS, который выдают задачи (invalid_scope, no_such_task, origin_not_in_task, verb_not_in_task, budget_exhausted, task_expired), — свой тест",
    "чужая задача (другой agentId) → no_such_task (ревью F8)",
    "sessionId — 128 случайных бит (32 hex), два открытия дают разные id",
    "checkLanded(task, actualUrl): фактический origin вне origins.read → origin_not_in_task (ревью F9)",
    "отказ тоже списывает шаг (спека §2.3)",
-   "фрагмент URL не влияет на проверку origin"
+   "фрагмент URL не влияет на проверку origin",
+   "цель задачи проходит checkFreeText из apps/agent/src/pairing/name.ts (одно правило с именем агента, без белого списка и без счёта цифр): без символов управления, двунаправленного текста и невидимых знаков; на странице выводится текстом, с подписью «словами агента», не длиннее 200 видимых знаков с многоточием (проверки N-013 круг 5)",
+   "close работает и у задачи, израсходовавшей все шаги (не списывает шаг и не отказывает budget_exhausted) (проверки N-013 круг 7)",
+   "отказ checkFreeText для цели задачи отдаётся агенту как invalid_scope с полем goal (проверка seam N-007 круг 6)"
   ],
   "dod": "vitest apps/agent/src/tasks зелёный"
  },
@@ -377,7 +409,9 @@
    "на настоящем Chrome: kill -9 браузера даёт CdpError kind exited у ожидающего запроса в пределах окна EXIT_AFTER_PIPE_MS (проверка seam N-022, риск 4)",
    "onCloseIncomplete при close() окна агента: демон пишет событие с pid, отмечает degraded источник window и не считает окно закрытым; спека §3 получает это исключение (проверка seam N-022)",
    "AgentWindows зовёт close() только с константой graceMs (close(NaN) в cdp-pipe может зависнуть: риск вердикта N-022); хелперы Chrome (crashpad) после kill -9 не остаются сиротами",
-   "тексты, которые читает человек, идут ключами каталога, которые заранее добавил N-014; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)"
+   "тексты, которые читает человек, идут ключами каталога, которые заранее добавил N-014; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
+   "временный профиль (profile disposable) создаётся в своём временном каталоге на задачу и удаляется при её закрытии; это обещает строка taskProfileDisposable (проверки N-013 круг 12)",
+   "профиль агента переживает перезапуск Chrome и демона: cookie с Expires остаются (тест с фикстурой, ставящей постоянную и сеансовую cookie), сеансовая уходит; так держится строка taskProfileAgent (проверка product N-013 круг 15)"
   ],
   "dod": "vitest apps/agent/src/window зелёный на этой машине с Chrome stable"
  },
@@ -391,7 +425,8 @@
    "N-009",
    "N-010",
    "N-012",
-   "N-022"
+   "N-022",
+   "N-007"
   ],
   "req": [
    "REQ-55"
@@ -430,7 +465,26 @@
    "CdpError превращается в отказ контракта: kind exited/closed → browser_offline, ошибка CDP о пропавшей цели (cdpCode) → tab_gone, timeout → internal; тест на каждый (проверка seam N-022)",
    "createAgent передаёт оболочке N-005 version, buildRoot и localesDir; при неизвестном каталоге строк служба не стартует молча с ключами вместо фраз (отчёт N-005, fix 1)",
    "в журнал агентов попадают только отказы маршрутов двери (/mcp, /pair, /pair/claim); опросы Fabric и загрузки страницы во время остановки туда не пишутся (проверки N-024)",
-   "сбой accept (ошибка сервера после bind) не завершает демон; close() дожидается начатых onRefused; предупреждение о вычищенных строках доходит до событий и после неудачного старта (проверка unit N-024)"
+   "сбой accept (ошибка сервера после bind) не завершает демон; close() дожидается начатых onRefused; предупреждение о вычищенных строках доходит до событий и после неудачного старта (проверка unit N-024)",
+   "onRevoke получает AgentRecord из Pairing.revoke и закрывает задачи и окна именно этого агента; хранилище привязок не читается при старте: служба стартует, страница показывает состояние error SCR-23, вызов с ключом кончается сбоем store_unreadable (агент получает internal с retryable), вызов без ключа по-прежнему not_paired, POST /pair новых запросов не принимает (как N-008 и SCR-23) (проверки N-007; N-013 круг 4)",
+   "Pairing onNotice связан с событиями службы: requested, confirmed, declined, expired, claim_expired, paired, revoked пишутся в events.jsonl фиксированными фразами без requestId; отклонённый и истёкший запрос оставляют запись (SCN-044 alt path); onNoticeError идёт в лог службы (проверки N-013 круг 3, N-007 круг 2)",
+   "последний сбой записи журнала (время и код причины) хранится и отдаётся странице: SCR-24 error и строка journalError берут его, причина в словах из каталога (проверки N-013 круг 3, N-007 круг 2)",
+   "остановка демона зовёт Pairing.flush(): время последнего вызова каждого агента переживает перезапуск (проверки N-013 круг 3, N-007 круг 2)",
+   "Task.windowOpen падает в false, когда окно задачи закрыто не через close, и SCR-24 показывает taskWindowClosed (проверки N-013 круг 3, N-007 круг 2)",
+   "пока есть открытые запросы привязки, таймер раз в минуту зовёт Pairing.list(now): истёкший запрос попадает в события не позже чем через минуту после срока, событие несёт время срока, а не время обнаружения (проверки N-013 круг 4)",
+   "тот же минутный таймер закрывает задачи, чьё время вышло, вместе с окнами (часы через createAgent): задача уходит из списка SCR-24 не позже чем через минуту после срока; задача без шагов остаётся до срока (проверки N-013 круг 5)",
+   "у оболочки службы есть точка остановки для владельца: при слиянии и выходе демон зовёт Pairing.flush() и ловит PairingStoreError в лог службы (проверка seam N-007 круг 3)",
+   "хранилище привязок, нечитаемое при старте, открывается заново при следующем вызове двери или загрузке страницы, когда его починили: перезапуск не нужен (проверка seam N-007 круг 3)",
+   "createAgent принимает часы (now: () => number) для e2e N-017 и тестов таймеров (проверка seam N-007 круг 3)",
+   "сохранённый «последний сбой записи журнала» снимается после следующей успешной записи: состояние error SCR-24 не залипает до перезапуска (проверки N-013 круг 7)",
+   "последний сбой записи списка доступов (claim или revoke) хранится и отдаётся странице, снимается после следующей успешной записи (проверки N-013 круг 9)",
+   "минутный таймер ловит PairingStoreError от list и пишет его в лог службы, таймер не останавливается (проверки N-013 круг 10)",
+   "последний перерыв записи журнала (начало и конец) хранится и отдаётся странице, пока он в пределах срока хранения журнала; при остановке демон зовёт Pairing.close(now), а не только flush; событие истечения берёт слова по cause (timeout или stopped) (проверки N-013 круг 11, N-007 круг 6)",
+   "onReload с removed закрывает задачи и окна пропавших агентов так же, как отзыв (отчёт N-007 fix 6)",
+   "перерыв записи журнала сохраняется на диск и переживает перезапуск демона: refusalsGap показывается и после рестарта (проверки N-013 круг 12)",
+   "сбой записи списка доступов при заборе ключа дверью (N-008) попадает в «последний сбой записи» и показывает store-unwritable на SCR-23 (проверки N-013 круг 12)",
+   "перечитывание списка доступов, в котором появился агент, которого не было в памяти (восстановленная копия файла), пишет событие о вернувшемся доступе с agentId и именем (решения при закрытии N-007, 2026-10-27)",
+   "сайт из задачи, ответивший с адреса этой машины или локальной сети, даёт агенту origin_not_in_task по контракту, а в журнал пишется журнальный код local_answer: страница показывает refusal_local_answer, а не «сайт вне задачи» (проверки N-013 круг 16)"
   ],
   "dod": "vitest apps/agent/src/verbs зелёный на Chrome stable"
  },
@@ -464,12 +518,14 @@
  {
   "n": "N-013",
   "title": "UX: экраны SCR-23/24, потоки, сценарии",
-  "deps": [],
+  "deps": [
+   "N-024"
+  ],
   "req": [
    "REQ-64"
   ],
   "files": [
-   "Modify: docs/ux/screens.md, docs/ux/flows.md, docs/ux/scenarios.md"
+   "Modify: docs/ux/screens.md, docs/ux/flows.md, docs/ux/scenarios.md, docs/ux/foundation.md, docs/design/agent-dashboard/director-record.md, docs/superpowers/specs/2026-10-06-bridge-b1-design.md, apps/agent/_locales/ru/messages.json, apps/agent/_locales/en/messages.json"
   ],
   "consumes": "—",
   "produces": "SCR-23, SCR-24 со состояниями; FLW-21/22 ведут к ним",
@@ -483,14 +539,15 @@
   "title": "Термины и строки (каталог apps/agent/_locales, ревью F22)",
   "deps": [
    "N-013",
-   "N-024"
+   "N-024",
+   "N-007"
   ],
   "req": [
    "REQ-66"
   ],
   "files": [
    "Modify: docs/brand/terminology.md",
-   "Create: apps/agent/_locales/ru/messages.json, apps/agent/_locales/en/messages.json",
+   "Modify: apps/agent/_locales/ru/messages.json, apps/agent/_locales/en/messages.json (созданы N-013)",
    "Modify: tools/locales.test.ts (каталог демона: одинаковые ключи в двух языках, плейсхолдеры объявлены)",
    "Modify: docs/superpowers/specs/2026-10-06-bridge-b1-design.md (§9: число строк и отчёты Copylot), tools/locales.test.ts (каталог демона: одинаковые ключи ru и en)"
   ],
@@ -499,11 +556,26 @@
   "tests": [
    "оба каталога с одинаковыми ключами; каждый $X$ объявлен в placeholders",
    "python3 docs/brand/lint.py → 0",
-   "ключ строки rejection_door в обоих каталогах для отказов двери до разбора; copylot_check (seam N-001 круг 3, break 3)",
-   "refusal_invalid_scope говорит «этого устройства»/«this device», как остальной продукт, и читается внутри строки refusalLine без двух двоеточий подряд; copylot_check на собранной строке (проверка product N-001 круг 2)",
+   "refusal_invalid_scope читается внутри строки refusalLine без двух двоеточий подряд; copylot_check на собранной строке (проверка product N-001 круг 2; «этого устройства» снято проверкой N-013 круг 5: отказ говорит о задаче, а не об устройстве)",
    "ключи taskProfileAgent и taskProfileDisposable в обоих каталогах, copylot_check (аудит #20)",
    "тексты службы уже идут через каталог (N-024): служба не стартует без своих ключей; N-014 переносит в каталог английские тексты набора Fabric (403, занятый замок) или записывает, почему они остаются протокольными",
-   "eventsUnreadable не утверждает, что сохранены все остальные события: обрезка по сроку при том же старте может удалить старые (проверка product N-024 круг 2)"
+   "eventsUnreadable не утверждает, что сохранены все остальные события: обрезка по сроку при том же старте может удалить старые (проверка product N-024 круг 2)",
+   "слова для машинных причин привязки: name_not_text, name_empty, name_too_long, name_digits, name_bidi, name_control, too_many_pending, too_many_requests и причин хранилища unreadable, not_json, not_a_store, bad_record; copylot_check (проверка product N-007); также name_reserved (имя похоже на «Okolos») и unwritable (хранилище не записалось) (отчёт N-007 fix 2)",
+   "ключи verb_<глагол> для каждого AnyBridgeVerb (точки как подчёркивания: verb_session_open), исчерпывающая функция verbKey как refusalKey; на странице не появляется идентификатор глагола (проверки N-013 круг 3, N-007 круг 2)",
+   "слова для причин сбоя журнала (то, что подставляется в $WHAT$ строки journalError) и хранилища (pairingStoreError, agentRevokeFailed), copylot_check (проверки N-013 круг 3, N-007 круг 2)",
+   "ключи для семи событий привязки (requested, confirmed, declined, expired, claim_expired, paired, revoked) с именем после слова «агент»; N-011 добавляет их в проверку ключей при старте (проверки N-013 круг 4)",
+   "слова для кодов сбоя журнала no_space, no_permission, other (подставляются в $WHAT$ строк journalError и journalUnreadable) (проверки N-013 круг 4)",
+   "строки CLI для ClaimRefusal (declined, expired, claim_expired, claimed, unknown) и подсказка про --replace; copylot_check (проверки N-013 круг 5)",
+   "слова для name_script (имя пишется только латиницей A–Z или только кириллицей, цифры 0–9, пробел и знаки - _ . ( ) ' / +) и для name_reserved, которые описывают правило, а не утверждают «похоже на Okolos»: правило отказывает и честным именам вроде «Echo Kolos» (проверки N-007 круг 4)",
+   "строки «запроса уже нет» и «у агента уже нет доступа» для действий страницы над ушедшей строкой; строка CLI pair после кода: где подтвердить (Okolos Agent в Fabric Dashboards) (проверки N-013 круг 7)",
+   "слова для name_script, closed (Okolos Agent останавливается) и too_large (список доступов больше 1 МБ); changed_on_disk снят исправлением N-007 fix 5: изменённый файл перечитывается (отчёт N-007 fix 4)",
+   "проверку одинаковых ключей ru и en каталога демона уже держит tools/agent-locales.test.ts (N-013): N-014 её не дублирует в tools/locales.test.ts и запускает этот файл в своей проверке узла (проверки N-013 круг 8)",
+   "слово для причины unwritable в $WHAT$ не повторяет «не записывается» (например «нет места на диске», «нет прав на файл»), по errno (проверки N-013 круг 9)",
+   "слова событий истечения различают cause: timeout («запрос истёк») и stopped («Okolos Agent остановился»); CLI получает stopped своей строкой (отчёт N-007 fix 5)",
+   "слово для кода сбоя чтения unreadable в $WHAT$ не повторяет «не читается» (например «файл повреждён», «нет прав на чтение»); verbKey живёт в apps/agent/src/dashboard/verbs.ts, его создаёт N-014, N-015 импортирует (проверки N-013 круг 10)",
+   "гейт: каждый ключ, который страница и CLI зовут через t(), есть в обоих каталогах демона (поиск по apps/agent/src), иначе сборка падает; слова для $WHAT$ строки journalExportFailed (проверки N-013 круг 12)",
+   "английские строки каталога демона адаптированы через copylot_prepare из русских (правило оператора 2026-10-25), отчёты в спеке §9; до того английский текст считается черновиком (проверки N-013 круг 13)",
+   "проверка «без двух двоеточий подряд в refusalLine» распространяется на все refusal_* и журнальные коды, не только на refusal_invalid_scope (проверки N-013 круг 16)"
   ],
   "dod": "строки и термины сделаны на стадии 3; узел добавляет проверку каталога демона в tools/locales.test.ts"
  },
@@ -533,20 +605,41 @@
    "без куки → 401; запись без X-Okolos-Request → 403; запись без Origin или с чужим Origin → 403; чужой Host на любом маршруте → 403 (ревью F4)",
    "requestId не попадает в HTML и /api/state; подтверждение идёт по handle, который страница получила в своей сессии",
    "имя агента выводится текстом (textContent), код в отдельном элементе [data-role=pairing-code]",
-   "состояния SCR-23: loading, empty, error, success, expired; SCR-24: loading, empty, error, success — каждое по data-role",
-   "инструмент pairing.confirm через MCP отвечает human-step-required со ссылкой /dashboard",
+   "состояния SCR-23: loading, empty, error, success, expired, confirmed, claim-expired, revoke-failed (у confirmed и claim-expired нет кнопок); SCR-24: loading, empty, error, success; каждое по data-role (проверки N-013 круг 3, N-007 круг 2)",
+   "инструмент pairing.confirm через MCP отвечает human-step-required со ссылкой Fabric Dashboards fabric-dashboards://service/okolos-agent.default?path=/dashboard, не http://127.0.0.1 (проверки N-013 круг 3, N-007 круг 2)",
    "строки берутся из каталога; ключ без строки виден как [key]",
-   "отказ двери (DoorRejection) в списке отказов показывается одной строкой rejection_door, refusalKey для него не вызывается и не бросает (проверка seam N-001 круг 2)",
+   "отказ двери до разбора и отказ not_paired без агента показываются строкой refusalDoorLine с причиной rejection_<код>; refusalKey для них не вызывается и не бросает (проверка seam N-001 круг 2)",
    "страница принимает только сессию, выданную N-005; атрибуты куки проверяет N-005 (аудит #12)",
-   "строка задачи SCR-24 показывает профиль: с логинами человека или без них; SCN-045 шаг 1 и FLW-22 называют цель задачи (проверка product N-001 круг 2)",
+   "строка задачи SCR-24 показывает профиль строкой taskProfileAgent или taskProfileDisposable; ни одна не утверждает, что в профиле есть входы человека; SCN-045 шаг 1 и FLW-22 называют цель задачи (проверка product N-001 круг 2) (проверки N-013 круг 7)",
    "GET /api/journal выгружает журнал агентов (JSONL, без содержимого страниц) для [data-role=agent-journal-link] (аудит #40)",
    "состояние «сессия истекла» на SCR-23 и SCR-24: страница отвечает 401, хост входит заново, экран называет причину; запись в screens.md (проверка product N-005)",
    "страница ставит свой Content-Security-Policy (script-src 'self', без inline) и читает сессию через operatorSession запущенной службы (проверка seam N-005)",
    "маршрут страницы объявляет paths /dashboard и /api, well-known показывает surfaces.dashboard; таблица действий проходит проверку набора при старте (проверка seam N-005 круг 2)",
    "состояние «служба останавливается» на SCR-23 и SCR-24: страница получает 503 во время слива и говорит об этом (проверка product N-024)",
-   "во время слива загрузка /dashboard получает страницу «служба останавливается» (маршрут страницы отвечает сам до слива или N-011 даёт оболочке страницу 503), а не сырой JSON 503 (проверка seam N-024 круг 2)"
+   "во время слива загрузка /dashboard получает страницу «служба останавливается» (маршрут страницы отвечает сам до слива или N-011 даёт оболочке страницу 503), а не сырой JSON 503 (проверка seam N-024 круг 2)",
+   "SCR-23 и screens.md говорят, что перезапуск демона закрывает открытые запросы: CLI получает отказ, агенту нужно попросить снова (проверка product N-007)",
+   "элементы SCR-23: pairing-duplicate (похоже на другой ждущий запрос), pairing-lookalike (похоже на агента с доступом, строка pairingLooksLikeAgent называет его), pairing-asked, pairing-notice, pairing-how с --name, строка pairedSinceNever (проверки N-013 круг 3, N-007 круг 2)",
+   "строка отказа SCR-24 показывает вызов словами verb_*: ни один идентификатор глагола (session.open, waitFor) не доходит до страницы (проверки N-013 круг 3, N-007 круг 2)",
+   "отзыв, который не записался: POST /api/agents/:id/revoke получает PairingStoreError, страница показывает agentRevokeFailed, строка агента остаётся, onRevoke не вызван (проверки N-013 круг 3, N-007 круг 2)",
+   "строка агента везде через agentLabel (имя и дата доступа) или agentLabelRevoked: два агента с одинаковым именем различимы в строке задачи и в строке отказа; pairingLooksLikeAgent стоит одной строкой без списка, под ней по одной строке agentLabel на каждого похожего агента (проверки N-013 круг 4) (проверки N-013 круг 7)",
+   "журнал не пишется: список отказов помечен refusalsIncomplete и никогда не показывает refusalsEmpty; журнал не читается: состояние journal-unreadable со строкой journalUnreadable вместо пустого списка (проверки N-013 круг 4)",
+   "строка задачи показывает профиль строкой taskProfileAgent или taskProfileDisposable; состояния session-expired и stopping берут строки pageSessionExpired и pageStopping (проверки N-013 круг 4)",
+   "значения строк проверены на опорных данных: время осталось (мс → минуты), шаги, сайты, число открытых задач, адрес двери; время привязки (мс) и журнала (ISO) выводятся в одном формате (проверки N-013 круг 5)",
+   "ссылка выгрузки журнала скрыта в состоянии journal-unreadable; сбой выгрузки показывает journalExportFailed (проверки N-013 круг 5)",
+   "сбои Okolos Agent (internal, browser_offline, cleaning_incomplete) показываются строкой refusalFailureLine, отказы по правилам задачи строкой refusalLine; ни один сбой не стоит под словом «Отказ» (проверки N-013 круг 7)",
+   "подтверждение, отклонение или отзыв уже ушедшего запроса или агента (confirmByHandle false, revoke null) показывает строку уведомления, что запроса или агента уже нет; ключи в N-014 (проверки N-013 круг 7)",
+   "страница SCR-23, пока открыта, запрашивает список запросов каждые 2 секунды: новый запрос и его код появляются без перезагрузки (тест с часами) (проверки N-013 круг 8)",
+   "сбой записи списка доступов (при заборе ключа или при отзыве) N-011 хранит как последний сбой записи; страница показывает состояние store-unwritable строкой pairingStoreUnwritable с причиной словами, пока следующая запись не пройдёт; уведомления pairingGone и agentGone на ушедшую строку (проверки N-013 круг 9)",
+   "элемент agent-journal-skipped со строкой journalLinesSkipped виден только при нечитаемых строках журнала (счёт из N-006) (проверки N-013 круг 9)",
+   "пока виден agent-journal-skipped, список отказов не показывает refusalsEmpty (проверки N-013 круг 10)",
+   "PairingStoreError с причиной unreadable, not_json, not_a_store или bad_record (при list или revoke) показывает состояние error SCR-23 (pairingStoreError), а unwritable или too_large показывает store-unwritable; тест на каждый вид (проверки N-013 круг 10)",
+   "перерыв журнала показывается строкой refusalsGap, и refusalsEmpty не показывается, пока перерыв в пределах срока хранения; нечитаемый список доступов показывается строкой refusalDoorFailureLine, а не refusalDoorLine (проверки N-013 круг 11)",
+   "строки pairingConfirmed, pairingDeclined, agentRevoked и pairingCompare проверены по data-role; код показывается тремя и тремя цифрами одинаково на странице и в CLI (N-008); дата в формате бренда, «Осталось 0 мин» не показывается после срока (строка уходит со списка) (проверки N-013 круг 12)",
+   "при переводе SCN-045 в implemented из alt path убрано «записи задачи идут к человеку» (в Б1 записей нет) или помечено как Б2 (проверки N-013 круг 12)",
+   "refusalsEmpty показывается только когда журнал прочитан целиком за срок хранения и в нём нет отказов и сбоев; дата агента в agentLabel до минуты; цель задачи выводится текстом с подписью «словами агента»; Confirm в состоянии store-unwritable показывает pairingStoreUnwritable, а не pairingConfirmed (проверки N-013 круг 13)",
+   "элементы pairing-grants (строка pairingGrants рядом с кнопками) и строка окна задачи (taskWindowOpen или taskWindowClosed) проверены по data-role; журнальные коды bad_call и local_answer показываются строками refusal_bad_call и refusal_local_answer, глагол unknown строкой verb_unknown; сборка строки отказа без двух двоеточий подряд для каждого кода (проверки N-013 круг 16)"
   ],
-  "dod": "vitest apps/agent/src/dashboard зелёный; SCN-044, SCN-045 переведены в built в том же изменении, python3 docs/ux/lint.py 0"
+  "dod": "vitest apps/agent/src/dashboard зелёный; SCN-044, SCN-045 переведены в implemented (SCR-23, SCR-24 в built) в том же изменении, python3 docs/ux/lint.py 0"
  },
  {
   "n": "N-016",
@@ -554,7 +647,8 @@
   "deps": [
    "N-011",
    "N-012",
-   "N-015"
+   "N-015",
+   "N-007"
   ],
   "req": [
    "REQ-63"
@@ -573,7 +667,15 @@
    "install пишет plist через launchdPlist набора и зовёт capStdoutLog при старте",
    "дескриптор берёт auth.tokenFile из servicePaths(dirs) N-005, а не из своей копии пути (проверка seam N-005)",
    "релиз содержит apps/agent/_locales; buildIdentity от корня релиза даёт digest, не коммит чужого git (отчёт N-005, fix 1)",
-   "serviceDirs из dirs.ts и serviceDirs набора Fabric дают одни и те же каталоги (их использует uninstall --purge); тест держит их вместе (проверка seam N-005 круг 2)"
+   "serviceDirs из dirs.ts и serviceDirs набора Fabric дают одни и те же каталоги (их использует uninstall --purge); тест держит их вместе (проверка seam N-005 круг 2)",
+   "okolos-agent doctor --json на нечитаемом хранилище привязок и на журнале, который не пишется или не читается, называет каждую проблему с путём и причиной: строки pairingStoreError, journalError, journalUnreadable и agentRevokeFailed обещают именно это (проверки N-013 круг 4)",
+   "установка кладёт okolos-agent в ~/.local/bin (ссылка на текущий релиз), --uninstall её убирает; если ~/.local/bin нет в PATH, установщик говорит, какую строку добавить в профиль оболочки; после установки `okolos-agent doctor` и `okolos-agent pair --name x --help` запускаются из новой оболочки (проверки N-013 круг 5)",
+   "okolos-agent doctor без --json печатает человеку то же, что --json, словами; называет отсутствующий Chrome и политику, запрещающую нужные флаги (причина browser_offline) (проверки N-013 круг 5)",
+   "--uninstall --purge удаляет и данные Okolos Agent: список доступов, журнал агентов, события, логи; без --purge они остаются, и установщик это говорит (SCN-023, SCN-024: стирание и выгрузка расширения их не касаются) (проверка product N-013 круг 6)",
+   "--uninstall --purge удаляет и профиль Chrome агента (проверки N-013 круг 7)",
+   "okolos-agent doctor на списке доступов, который не записывается (нет прав на файл или каталог, нет места), называет проблему с путём и причиной: это обещают pairingStoreUnwritable и agentRevokeFailed (проверки N-013 круг 10)",
+   "okolos-agent doctor называет и сбой выгрузки журнала (права на каталог журнала, место на диске), который обещает journalExportFailed (проверки N-013 круг 11)",
+   "--uninstall --purge удаляет и папку clients/ с ключами агентов; без --purge она остаётся (SCN-023, SCN-024) (проверки N-013 круг 12)"
   ],
   "dod": "vitest tools/install-agent.test.ts tools/runbook.test.ts зелёные"
  },
@@ -596,8 +698,8 @@
   "produces": "`pnpm test:e2e:bridge`",
   "tests": [
    "skeleton: MCP-клиент вызывает инструменты по toolName (session_open …), журнал хранит каноническое написание (session.open) → привязка через страницу → session.open → open → snapshot без скрытой инструкции → close",
-   "SCN-044: неверный код → отклонить; отзыв → следующий вызов not_paired, задача закрыта",
-   "SCN-045: страница показывает задачу агента и отказ origin_not_in_task",
+   "SCN-044: неверный код → отклонить; истёкший запрос (часы через createAgent) показан строкой expired; вызов с заголовком Origin виден на SCR-24 как отказ на двери; отзыв → следующий вызов not_paired, задача закрыта (проверки N-013 круг 3, N-007 круг 2)",
+   "SCN-045: страница показывает задачу агента и отказ origin_not_in_task; без задач SCR-24 в состоянии empty (проверки N-013 круг 3, N-007 круг 2)",
    "playwright test --list основного конфига не показывает e2e/bridge (аудит #15)"
   ],
   "dod": "pnpm test:e2e:bridge зелёный; все процессы Chrome и демона закрыты после прогона"
@@ -655,12 +757,15 @@
   ],
   "files": [
    "Modify: AGENTS.md (Commands: MCP; Lifecycle: app.okolos.agent), docs/README.md (Статус, карта кода), docs/privacy.md (демон не выходит в сеть; его хранилища со сроками: события службы (7 дней или 1000; названы иначе, чем «журнал событий» расширения), лог, токен хоста, сессии, хранилище привязок, журнал агентов; проверка product N-005), docs/brand/facts.md, docs/backlog.md (Touch ID для подтверждения: строка на Б2), docs/superpowers/backlog.md, SECURITY.md (граница угроз Б1)",
-   "Modify: AGENTS.md (LC-15: команда очистки включает apps/agent/dist, проверка seam N-024)"
+   "Modify: AGENTS.md (LC-15: команда очистки включает apps/agent/dist, проверка seam N-024)",
+   "Modify: README.md (строка «MCP-сервера нет и не планируется» устарела: дверь Okolos Agent решена ADR-0018 и строится в Б1) (проверки N-013 круг 4)",
+   "Modify: docs/brand/facts.md (таблица «Что уходит с устройства»: окно агента загружает страницы, которые открывают агенты, это сеть Chrome по задаче, а не адресат Okolos) (проверки N-013 круг 7)"
   ],
   "consumes": "команды N-016, N-017",
   "produces": "доки в синхроне",
   "tests": [
-   "tools/docs.test.ts, tools/runbook.test.ts зелёные"
+   "tools/docs.test.ts, tools/runbook.test.ts зелёные",
+   "docs/privacy.md и docs/brand/facts.md называют хранилища Okolos Agent (список доступов, журнал агентов, события, логи, профиль агента, ключи в clients/) отдельно от хранилищ расширения, со сроками; тест сверяет перечень с путями в apps/agent/src/service/dirs.ts (решения при закрытии N-007, 2026-10-27)"
   ],
   "dod": "vitest зелёный; README «Статус» не утверждает ложного"
  },

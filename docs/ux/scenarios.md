@@ -54,7 +54,7 @@ are specified once in [screens.md](screens.md).
 | SCN-042 | A message arrives and is judged before it is read | mail-guard | P-01 | ST-022, FLW-20 | draft | — |
 | SCN-043 | Who reviewed, where it ran, and what left | mail-guard | P-01 | ST-026, FLW-19 | draft | — |
 | SCN-044 | An agent is paired once, by the person, and can be taken back | agent-bridge | P-01 | ST-027, FLW-21 | draft | — |
-| SCN-045 | An agent reads a logged-in page, cleaned, in its own background window | agent-bridge | P-01 | ST-028, FLW-22 | draft | — |
+| SCN-045 | An agent reads a page, cleaned, in its own background window | agent-bridge | P-01 | ST-028, FLW-22 | draft | — |
 | SCN-046 | An action that spends, sends, deletes or signs in waits for the person | agent-bridge | P-01 | ST-029, FLW-22 | draft | — |
 | SCN-047 | The person takes over a step, hands back, or stops every agent | agent-bridge | P-01 | ST-030, FLW-22 | draft | — |
 | SCN-048 | What agents left behind is cleaned, and nothing in use is touched | agent-bridge | P-01 | ST-031, FLW-23 | draft | — |
@@ -554,6 +554,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Traces:** ST-019, FLW-14 (JTBD-05)
 - **Entry point:** settings screen
 - **Preconditions:** local data exists
+- **Scope:** the Okolos extension's local data. Okolos Agent, the separate daemon of the agents' bridge, keeps its own data: the access list, the agents' journal, its service events and logs, and the agent Chrome profile (history and cache of the pages agents opened, and everything sites keep in it between runs, including what they keep from a sign-in a person made by hand); the access key the CLI collects for an agent lives in Okolos Agent's `clients/` folder. The journal is exported from Okolos Agent's page (SCR-24); all of this, the `clients/` key files included, is removed by its uninstaller with `--purge`
 - **Steps:**
   1. User clicks "Wipe all data" -> system asks for confirmation and lists exactly what will be deleted — **one kind per store, nine of them.** The word "exactly" was here before the list was: the confirmation named five while `wipeAll` cleared nine, so `models`, `feeds`, `snapshots` and the password-reuse index went unmentioned and the user agreed to five while nine went. Safe in direction, and still a confirmation that had not asked. Completeness now lives in `DATA_KIND_KEY: Record<StoreName, string>`, so a new store fails the build until the dialog has words for it
   2. User confirms -> system deletes all local data
@@ -573,6 +574,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Traces:** ST-019, FLW-14 (JTBD-05)
 - **Entry point:** settings screen
 - **Preconditions:** local data exists
+- **Scope:** the Okolos extension's local data. Okolos Agent, the separate daemon of the agents' bridge, keeps its own data: the access list, the agents' journal, its service events and logs, and the agent Chrome profile (history and cache of the pages agents opened, and everything sites keep in it between runs, including what they keep from a sign-in a person made by hand); the access key the CLI collects for an agent lives in Okolos Agent's `clients/` folder. The journal is exported from Okolos Agent's page (SCR-24); all of this, the `clients/` key files included, is removed by its uninstaller with `--purge`
 - **Steps:**
   1. User clicks "Export all data" -> system produces a JSON file containing findings, journal, settings, and the outbound log
   2. User saves the file -> system confirms and states what the file contains
@@ -970,32 +972,32 @@ every rule below; where they differ, the scenario says so.
 - **Entry point:** an agent's first call to the local door
 - **Preconditions:** Okolos Agent is running; the agent has never connected
 - **Steps:**
-  1. The agent asks for access through `okolos-agent pair` -> it shows a six-digit code; a call to the door without a key is refused and creates no request
+  1. The agent asks for access through `okolos-agent pair --name "<name>"` (`POST /pair`, a door route that needs no key) -> the terminal shows a six-digit code; a call to `/mcp` without a key is refused and creates no request
   2. The person sees the agent's name and the same six-digit code on the Okolos Agent page and confirms -> a key is issued to that agent once; the daemon keeps only its SHA-256
   3. The person later revokes the agent -> its next call is refused and any task it holds stops
-- **Expected result:** only agents the person confirmed can reach the browser, and each one can be taken back on its own
-- **Alt paths:** the codes differ, or the person refuses or does not answer -> no key, and the attempt is recorded
-- **UI elements:** SCR-23: `[data-role=pairing-requests]` with the code, `[data-role=pairing-confirm]`, `[data-role=pairing-refuse]`, `[data-role=agent-revoke]`
-- **States covered:** success, error, empty
-- **Errors & recovery:** a call carrying no key or a wrong key -> refused and recorded; a call carrying any `Origin` or `Sec-Fetch-*` header (a web page) -> refused before any pairing request is made, and recorded, never treated as "local, so the person". Loopback is not a person: the research behind this feature found that every 2025–2026 bridge breach came through a door that believed it was
+- **Expected result:** only agents the person confirmed reach the browser through the door, and each one can be taken back on its own. Access also lets an agent call the read-only process census (`hygiene.census`): the processes on this machine that the census classifies (automation processes, the person's own Chrome, system services, live sessions), with executable path, pid, parent, owner, age, classifier flags and whether a process must be left alone, never their command lines; census calls are in the agents' journal like any other call. Code already running as the person is outside Б1's boundary (spec §11 F4)
+- **Alt paths:** the same agent asks again under a name that already has access -> the CLI refuses unless `okolos-agent pair --name "<name>" --replace` is used; with it, the earlier access of that client is revoked and the page shows the usual revoke notice; the codes differ, or the person declines or does not answer within five minutes -> no key, and the attempt is recorded in the service's events (declined, expired; a normal stop records open requests as ended by the stop, a crash leaves only the events written before it: «requested», and «confirmed» if the person had confirmed); the person confirms but the agent does not collect its key within five minutes of the confirmation -> no access, the row says the key was not collected, and the agent has to ask again
+- **UI elements:** SCR-23: `[data-role=pairing-requests]`, `[data-role=pairing-code]`, `[data-role=pairing-asked]`, `[data-role=pairing-duplicate]`, `[data-role=pairing-lookalike]`, `[data-role=pairing-grants]`, `[data-role=pairing-confirm]`, `[data-role=pairing-decline]`, `[data-role=pairing-notice]`, `[data-role=paired-agents]`, `[data-role=agent-revoke]`, `[data-role=pairing-how]`
+- **States covered:** loading, success, error, empty, expired, confirmed (the agent has not collected its key yet), claim-expired (the key was not collected), store-unwritable (the access list cannot be written; agents with access keep working), revoke-failed (the access list could not be written; the agent keeps access and the page says so), session-expired, stopping
+- **Errors & recovery:** a call carrying no key or a wrong key -> refused and recorded; a call carrying any `Origin` or `Sec-Fetch-*` header (a web page) -> refused before any pairing request is made, and recorded, never treated as "local, so the person". Loopback is not a person: the research behind this feature found that every 2025–2026 bridge breach came through a door that believed loopback meant the person. A call that cannot be tied to an agent with access is shown on SCR-24 as refused at the door, from the agents' journal, except while the access list cannot be read: then a call that carries a key is an Okolos Agent failure at the door (its key was not checked) and a call with no key is still refused as `not_paired`; declined and expired requests go to the service's events
 - **Status:** draft
 - **Coverage:** none — designed 2026-10-06, not built
 
-### SCN-045: An agent reads a logged-in page, cleaned, in its own background window
+### SCN-045: An agent reads a page, cleaned, in its own background window
 - **Persona:** P-01
 - **Feature:** agent-bridge
 - **Traces:** ST-028, FLW-22 (JTBD-10, JTBD-01, JRN-05/#2–#4)
 - **Entry point:** a paired agent opens a task naming its sites
-- **Preconditions:** the agent is paired; the person is logged in to the site in the profile the task uses
+- **Preconditions:** the agent is paired. In Б1 the agent profile starts with no sign-ins and Б1 has no sign-in step, so the agent is meant for pages that need no sign-in; a person can still sign in by hand in a visible agent window; the agent profile, shared by every agent with access, keeps what the site keeps between browser runs (a sign-in that lasts only for the session is gone when the agents' Chrome stops). The designed sign-in step is SCN-047 in Б2. The Okolos extension does not guard the agent profile: stable Chrome refuses `--load-extension`, and the snapshot cleaning is what stands between the page and the agent
 - **Steps:**
-  1. The agent opens a task with its sites, verbs, time limit and step budget -> the task gets its own window, in the background, with an active tab
+  1. The agent opens a task with its goal in its own words, its sites, verbs, profile (the agent profile or a temporary one), time limit and step budget -> the task gets its own window, in the background, with an active tab; a site that is an address of this machine or the local network, or a name reserved for local networks (the one list is `LOCAL_NAME_SUFFIXES` in `packages/contracts/src/bridge.ts`: `localhost`, `.local`, `.home.arpa`, `.internal`, `.lan`, `.intranet`, `.corp`, `.home`, `.private`, and any single-label name), is refused with `invalid_scope`; addresses in 100.64.0.0/10 (CGNAT, Tailscale) count as the local network
   2. The agent opens a page in the task -> the page loads in that window; the person's app stays in front
   3. The agent asks for a snapshot -> it receives the page's accessibility tree with references it can name back, hidden instructions removed, the page's verdict attached, and fields for passwords, cards and one-time codes shown without their values
   4. The page is very large -> the snapshot arrives in parts the agent pages through, never as one answer
-- **Expected result:** the agent reads what the job needs, cannot be steered by text the page hid from people, and never sees a secret
-- **Alt paths:** the agent asks for a site outside the task -> refused with `origin_not_in_task`; the page has a finding -> the finding travels with the snapshot and the task's writes go to the person (SCN-046)
-- **UI elements:** SCR-24: `[data-role=agent-tasks]`, `[data-role=agent-refusals]`
-- **States covered:** success, error, partial
+- **Expected result:** the agent reads what the job needs, cannot be steered by text the page hid from people, and never sees the values in password, card or one-time-code fields; a secret the page shows openly as text (such as a code in a message) does reach the agent
+- **Alt paths:** the agent asks for a site outside the task -> refused with `origin_not_in_task`; a public name that resolves to an address on this machine or the local network (such as a router's own domain) -> refused when the page answers from that address; the page has a finding -> the finding travels with the snapshot and the task's writes go to the person (SCN-046)
+- **UI elements:** SCR-24: `[data-role=agent-tasks]`, `[data-role=agent-refusals]`, `[data-role=agent-journal-skipped]`, `[data-role=agent-journal-link]`
+- **States covered:** loading, success, error (journal cannot be written), journal-unreadable, empty, session-expired, stopping (SCR-24); partial (the snapshot arrives in parts, on the agent's side)
 - **Errors & recovery:** the browser is closed -> the agent is told `browser_offline`, marked retryable, not that the page is empty; nothing is queued; the snapshot could not be cleaned -> the agent receives nothing rather than an uncleaned tree
 - **Why a window and not a tab.** Measured 2026-10-06: input to a background tab never reaches the page, while a separate background window's tab is visible and receives trusted input, and an open agent window took the person's focus in none of the readings (`docs/superpowers/evidence/2026-10-06-b0-agent-window.md`)
 - **Why the snapshot comes in parts.** Measured the same day: Wikipedia's raw tree is about 10.5 MB, and even compacted it is about 66 thousand tokens

@@ -4,7 +4,8 @@
  "intent": "K3: журнал до ответа",
  "inputs": [
   "serviceDirs().data",
-  "N-024: каталоги данных службы, servicePaths, setup после замка"
+  "N-024: каталоги данных службы, servicePaths, setup после замка",
+  "N-023: BridgeRefusal, AnyBridgeVerb, canonicalVerb для типа JournalEntry"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -14,7 +15,8 @@
  "source_scope": {
   "edit_targets": [
    "apps/agent/src/journal/journal.ts",
-   "apps/agent/src/journal/journal.test.ts"
+   "apps/agent/src/journal/journal.test.ts",
+   "tools/reachable.test.ts"
   ]
  },
  "outputs": [
@@ -25,6 +27,16 @@
   "каталог только для чтения → record бросает, и обёртка answerAfterRecord отдаёт internal, а не ответ",
   "запись с полем text или value отвергается типом и рантайм-проверкой",
   "sweep удаляет записи старше срока; срок берётся из RETENTION_DAYS журнала расширения",
+  "запись журнала несёт agentId рядом с именем агента: два агента с одинаковым именем различимы в журнале и на SCR-24 (проверки N-013 круг 3, N-007 круг 2)",
+  "answerAfterRecord отдаёт вызывающему причину сбоя записи закрытым набором кодов (no_space, no_permission, other, по errno), а не только false: из неё N-011 берёт $WHAT$ строки journalError (проверки N-013 круг 4)",
+  "DoorRejection дополнен store_unreadable (список доступов не читался, ключ не проверен); у каждого кода rejected есть строка rejection_<код> в каталоге демона (проверки N-013 круг 4)",
+  "recent отдаёт отказы отдельно от ответов (фильтр по outcome), так что поток ответов не вытесняет отказы со страницы; нечитаемые строки журнала считаются и отдаются странице, а не пропускаются молча (проверки N-013 круг 5)",
+  "у журнала есть выгрузка (export) для GET /api/journal: отдаёт JSONL без содержимого страниц и при сбое бросает ошибку с кодом причины (no_space, no_permission, other), из которой N-015 берёт $WHAT$ строк journalExportFailed и journalUnreadable (проверки N-013 круг 7)",
+  "запись журнала несёт рядом с agentId дату выдачи доступа (pairedAt), чтобы SCR-24 показал отозванного агента строкой agentLabelRevoked с датой (проверки N-013 круг 8)",
+  "recent при сбое чтения бросает ошибку с кодом причины (no_space не бывает, no_permission, unreadable, other): из неё N-015 берёт $WHAT$ строки journalUnreadable (проверки N-013 круг 9)",
+  "ответы протокола MCP привязанному агенту (initialize, tools/list, ошибка разбора) пишутся записью с outcome answered и глаголом протокола (mcp.initialize, mcp.tools_list, mcp.parse_error) или явно не пишутся с причиной в спеке §3; решение одно для N-006 и N-008 (проверки N-013 круг 9)",
+  "ответы агенту «неизвестный инструмент», «неверные аргументы» и ошибки протокола пишутся в журнал как refused с кодом bad_call (журнальный код, не BridgeRefusal) и глаголом unknown, если глагол не распознан; страница показывает их строками refusal_bad_call и verb_unknown (проверка product N-013 круг 15)",
+  "журнальные коды bad_call и local_answer допустимы в записях refused наряду с BridgeRefusal; ошибка разбора пишется одним способом (refused, bad_call, глагол unknown), тесты 12 и 13 согласованы (проверки N-013 круг 16)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/journal && pnpm -s run typecheck"
  ],
  "guards": [
@@ -35,5 +47,5 @@
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "без длинного тире в текстах для людей"
  ],
- "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/journal/journal.ts apps/agent/src/journal/journal.test.ts; затем первый непройденный тест в списке acceptance"
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/journal/journal.ts apps/agent/src/journal/journal.test.ts tools/reachable.test.ts; затем первый непройденный тест в списке acceptance"
 }

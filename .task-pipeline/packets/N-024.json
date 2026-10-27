@@ -27,7 +27,7 @@
   "лог только для чтения после старта: два запроса к well-known получают 200, close() завершается (unit N-005 круг 3, break)",
   "два одновременных close() при зависшем запросе пишут eventDrainCutOff один раз (unit N-005 круг 3, риск)",
   "eventDrainCutOff: ru «Okolos Agent остановился, не дождавшись конца вызовов. Оборвано: $COUNT$.» en «Okolos Agent stopped before all calls finished. Cut off: $COUNT$.» (Copylot ru 8748c348-95f2-4054-9401-70cde29d7d72, en 4658bee7-8c88-425b-aff6-d1ae2996bf48; слово «запрос» закреплено за доступом, product N-005 круг 3)",
-  "eventsUnreadable: ru «В файле событий нашлись нечитаемые строки: $COUNT$. При запуске они удалены, остальные события сохранены.» en «The events file had unreadable lines: $COUNT$. They were removed at start; the other events are kept.» как разовое событие warning при старте; well-known после старта без degraded источника events (product N-005 круг 3)",
+  "eventsUnreadable: ru «В файле событий нашлись нечитаемые строки: $COUNT$. При запуске они удалены.» en «The events file had unreadable lines: $COUNT$. They were removed at start.» как разовое событие warning при старте; well-known после старта без degraded источника events (product N-005 круг 3) (уточнено проверкой N-013 круг 4: обрезка по сроку при том же старте может удалить старые события)",
   "запрос во время остановки: onRefused вызывается с причиной 'stopping' до записи 503 (product N-005 круг 3, break 3)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/service && pnpm -s run typecheck && pnpm -s run lint && pnpm -s run i18n:sweep"
  ],
