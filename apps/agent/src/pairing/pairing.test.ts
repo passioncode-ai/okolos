@@ -586,6 +586,17 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
       [JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: [{ agentId: 1, name: 'x', pairedAt: 0, keyHash: 'a'.repeat(64) }] }), 'bad_record'],
       [JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: [{ agentId: 'a1', name: 'x', pairedAt: 0, keyHash: 'not a hash' }] }), 'bad_record'],
       [JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: [null] }), 'bad_record'],
+      // Fix round 3: one agent id twice would make a revoke ambiguous.
+      [
+        JSON.stringify({
+          schema: 'okolos-agent/pairings/1',
+          agents: [
+            { agentId: 'a1', name: 'x', pairedAt: 0, lastCallAt: null, keyHash: 'a'.repeat(64) },
+            { agentId: 'a1', name: 'y', pairedAt: 1, lastCallAt: null, keyHash: 'b'.repeat(64) },
+          ],
+        }),
+        'bad_record',
+      ],
     ]
     for (const [content, reason] of foreign) {
       const file = storeFile()

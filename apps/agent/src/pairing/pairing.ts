@@ -442,6 +442,8 @@ function readStore(file: string): StoredAgent[] {
   }
   const agents = value['agents'] as unknown[]
   if (!agents.every(isStoredAgent)) throw new PairingStoreError(file, 'bad_record')
+  // One agent id twice would make a revoke and a last call ambiguous (fix round 3).
+  if (new Set(agents.map((agent) => agent.agentId)).size !== agents.length) throw new PairingStoreError(file, 'bad_record')
   return agents
 }
 
