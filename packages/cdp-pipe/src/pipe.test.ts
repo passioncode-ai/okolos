@@ -509,6 +509,26 @@ describe('closing ends the whole process group', () => {
     expect(incomplete).toEqual([pipe.pid])
   })
 
+  it('reports a group whose browser left but another member of which it could not end', async () => {
+    const incomplete: number[] = []
+    const pipe = await fake([], {
+      // Signals to the group are refused (EPERM); asking whether it exists is real.
+      kill: ((pid: number, signal?: string | number) => {
+        if (signal === 0) return process.kill(pid, 0)
+        throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' })
+      }) as typeof process.kill,
+      onCloseIncomplete: (pid) => incomplete.push(pid),
+    })
+    const { pid: grandchild } = await pipe.send<{ pid: number }>('Fake.spawnGrandchild')
+
+    await pipe.close(200)
+
+    // The browser left on Browser.close; its child, in the same group, did not.
+    expect(alive(pipe.pid)).toBe(false)
+    expect(alive(grandchild)).toBe(true)
+    expect(incomplete).toEqual([pipe.pid])
+  })
+
   it('reports a group it could not end, by default, as one stderr line naming the pid', async () => {
     const pipe = await fake(['--ignore-close'], {
       kill: (() => {

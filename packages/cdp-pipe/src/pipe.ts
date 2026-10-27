@@ -33,9 +33,9 @@ export interface LaunchOptions {
    */
   readonly onListenerError?: (error: unknown, event: string) => void
   /**
-   * Hears that close() gave up: the browser had not exited graceMs after
-   * SIGKILL to its group (a group it may not signal, EPERM). close() resolves
-   * anyway. Default: one stderr line naming the pid.
+   * Hears that close() gave up: at its deadline the browser's group still had
+   * a process in it, the browser or a child of it (a group it may not signal,
+   * EPERM). close() resolves anyway. Default: one stderr line naming the pid.
    */
   readonly onCloseIncomplete?: (pid: number) => void
   /** The signal sender; tests inject a failing one. Default: process.kill. */
@@ -43,7 +43,7 @@ export interface LaunchOptions {
 }
 
 function reportCloseIncomplete(pid: number): void {
-  process.stderr.write(`cdp-pipe: browser ${pid} had not exited after SIGKILL to its group; close() gave up\n`)
+  process.stderr.write(`cdp-pipe: the group of browser ${pid} still had a process after SIGKILL; close() gave up\n`)
 }
 
 function reportListenerError(error: unknown, event: string): void {
@@ -261,10 +261,11 @@ export class CdpPipe implements CdpTransport {
    * the browser has exited. Asks first (`Browser.close`), waits graceMs; then
    * SIGTERM to the group, waits graceMs; then SIGKILL to the group, waits
    * graceMs. The group is swept even when the browser left on its own, because
-   * a child of it may not have. Hard deadline: 3 x graceMs; a browser still
-   * there then is reported through onCloseIncomplete and close() resolves
-   * anyway, with the group alive. Requests waiting are rejected as `closed` at
-   * once. Calling it again returns the same promise.
+   * a child of it may not have. Hard deadline: 3 x graceMs; a group with any
+   * process still in it then (the browser or a child of it) is reported through
+   * onCloseIncomplete and close() resolves anyway, with that process alive.
+   * Requests waiting are rejected as `closed` at once. Calling it again returns
+   * the same promise.
    */
   close(graceMs = 2000): Promise<void> {
     this.closing ??= this.shutdown(graceMs)
@@ -292,7 +293,10 @@ export class CdpPipe implements CdpTransport {
     }
     // A group that is gone has an exit event on its way; a group that could
     // not be signalled (EPERM) may never give one, and close() must not hang.
-    if (!(await until(exited, Math.max(deadline - Date.now(), POLL_MS)))) {
+    // Ended means both: the browser exited and no process of its group is left,
+    // since a helper of the browser can outlive it.
+    const ended = (): boolean => exited() && !this.groupAlive()
+    if (!(await until(ended, Math.max(deadline - Date.now(), POLL_MS)))) {
       this.onCloseIncomplete(this.pid)
     }
     for (const stream of this.child.stdio) stream?.destroy()
