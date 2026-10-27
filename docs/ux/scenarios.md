@@ -994,7 +994,7 @@ every rule below; where they differ, the scenario says so.
   2. The agent opens a page in the task -> the page loads in that window; the person's app stays in front
   3. The agent asks for a snapshot -> it receives the page's accessibility tree with references it can name back, hidden instructions removed, the page's verdict attached, and fields for passwords, cards and one-time codes shown without their values
   4. The page is very large -> the snapshot arrives in parts the agent pages through, never as one answer
-- **Expected result:** the agent reads what the job needs, cannot be steered by text the page hid from people, and never sees a secret
+- **Expected result:** the agent reads what the job needs, cannot be steered by text the page hid from people, and never sees the values in password, card or one-time-code fields; a secret the page shows openly as text (such as a code in a message) does reach the agent
 - **Alt paths:** the agent asks for a site outside the task -> refused with `origin_not_in_task`; a public name that resolves to an address on this machine or the local network (such as a router's own domain) -> refused when the page answers from that address; the page has a finding -> the finding travels with the snapshot and the task's writes go to the person (SCN-046)
 - **UI elements:** SCR-24: `[data-role=agent-tasks]`, `[data-role=agent-refusals]`, `[data-role=agent-journal-skipped]`, `[data-role=agent-journal-link]`
 - **States covered:** loading, success, error (journal cannot be written), journal-unreadable, empty, session-expired, stopping (SCR-24); partial (the snapshot arrives in parts, on the agent's side)

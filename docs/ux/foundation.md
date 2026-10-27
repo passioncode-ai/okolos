@@ -164,7 +164,7 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 | 4 | Reading | — (the agent reads pages) | the agent's window | 3 | Pages carry instructions written for the agent; the agent reads them as orders | What the agent reads is cleaned first, and the page's verdict travels with it |
 | 5 | Decision | Is asked about something that matters | the bridge's panel | 2 | Either asked about everything, or about nothing | Asked only for money, sending, deleting, signing in, sharing — in a panel a page cannot draw |
 | 6 | Hand-off | Logs in, solves a CAPTCHA, takes over | the agent's window | 3 | The agent fights the CAPTCHA, or asks for the password in chat | The task pauses, the person does that one step, the task resumes; the agent never sees the secret |
-| 7 | After | Wants to know what happened, and wants the machine back | journal, machine | 4 | No record of what the agent did as me; leftover browser processes eat the memory | Every step recorded before it happened; the task's windows and processes gone when it ends |
+| 7 | After | Wants to know what happened, and wants the machine back | journal, machine | 4 | No record of what the agent did as me; leftover browser processes eat the memory | Every answer recorded in the agents' journal before it is sent; the task's windows and processes gone when it ends |
 
 ## User stories
 
