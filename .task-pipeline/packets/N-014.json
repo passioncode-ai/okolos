@@ -44,6 +44,7 @@
   "проверку одинаковых ключей ru и en каталога демона уже держит tools/agent-locales.test.ts (N-013): N-014 её не дублирует в tools/locales.test.ts и запускает этот файл в своей проверке узла (проверки N-013 круг 8)",
   "слово для причины unwritable в $WHAT$ не повторяет «не записывается» (например «нет места на диске», «нет прав на файл»), по errno (проверки N-013 круг 9)",
   "слова событий истечения различают cause: timeout («запрос истёк») и stopped («Okolos Agent остановился»); CLI получает stopped своей строкой (отчёт N-007 fix 5)",
+  "слово для кода сбоя чтения unreadable в $WHAT$ не повторяет «не читается» (например «файл повреждён», «нет прав на чтение»); verbKey живёт в apps/agent/src/dashboard/verbs.ts, его создаёт N-014, N-015 импортирует (проверки N-013 круг 10)",
   "проверка узла: python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts tools/agent-locales.test.ts"
  ],
  "guards": [

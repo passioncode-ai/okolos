@@ -62,6 +62,7 @@
   "вызов с отозванным ключом: шим печатает в stderr, что доступ отозван или ключ неверен, и как попросить снова: okolos-agent pair --name \"<имя>\" --replace (проверка seam N-013 круг 5)",
   "один тип onRevoke(record: AgentRecord) в выходах и в проверках N-008 и N-011 (проверка seam N-007 круг 3)",
   "CLI pair после кода печатает, где человек подтверждает запрос: страница Okolos Agent в Fabric Dashboards (строка каталога из N-014) (проверки N-013 круг 7)",
+  "правило «любой Sec-Fetch-*» действует только на маршрутах двери (/mcp, /pair, /pair/claim); страница /dashboard и /api со своим Origin и Sec-Fetch-Site: same-origin им не отвергаются (проверки N-013 круг 10)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/door apps/agent/src/cli && pnpm -s run typecheck && pnpm -s run i18n:sweep"
  ],
  "guards": [

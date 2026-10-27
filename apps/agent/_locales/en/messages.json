@@ -442,7 +442,7 @@
     }
   },
   "pairingStoreUnwritable": {
-    "message": "The access list cannot be written: $WHAT$. Access cannot be given or revoked right now; agents with access work as before. Run okolos-agent doctor to see what is wrong with the file.",
+    "message": "The access list could not be written: $WHAT$. Until a write succeeds, access cannot be given or revoked; agents with access work as before. Run okolos-agent doctor to see what is wrong with the file.",
     "placeholders": {
       "what": {
         "content": "$1"

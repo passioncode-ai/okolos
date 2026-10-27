@@ -40,6 +40,7 @@
   "okolos-agent doctor без --json печатает человеку то же, что --json, словами; называет отсутствующий Chrome и политику, запрещающую нужные флаги (причина browser_offline) (проверки N-013 круг 5)",
   "--uninstall --purge удаляет и данные Okolos Agent: список доступов, журнал агентов, события, логи; без --purge они остаются, и установщик это говорит (SCN-023, SCN-024: стирание и выгрузка расширения их не касаются) (проверка product N-013 круг 6)",
   "--uninstall --purge удаляет и профиль Chrome агента (проверки N-013 круг 7)",
+  "okolos-agent doctor на списке доступов, который не записывается (нет прав на файл или каталог, нет места), называет проблему с путём и причиной: это обещают pairingStoreUnwritable и agentRevokeFailed (проверки N-013 круг 10)",
   "проверка узла: pnpm -s exec vitest run tools/install-agent.test.ts tools/runbook.test.ts"
  ],
  "guards": [

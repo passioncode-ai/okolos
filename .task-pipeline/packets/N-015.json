@@ -64,6 +64,8 @@
   "страница SCR-23, пока открыта, запрашивает список запросов каждые 2 секунды: новый запрос и его код появляются без перезагрузки (тест с часами) (проверки N-013 круг 8)",
   "сбой записи списка доступов (при заборе ключа или при отзыве) N-011 хранит как последний сбой записи; страница показывает состояние store-unwritable строкой pairingStoreUnwritable с причиной словами, пока следующая запись не пройдёт; уведомления pairingGone и agentGone на ушедшую строку (проверки N-013 круг 9)",
   "элемент agent-journal-skipped со строкой journalLinesSkipped виден только при нечитаемых строках журнала (счёт из N-006) (проверки N-013 круг 9)",
+  "пока виден agent-journal-skipped, список отказов не показывает refusalsEmpty (проверки N-013 круг 10)",
+  "PairingStoreError с причиной unreadable, not_json, not_a_store или bad_record (при list или revoke) показывает состояние error SCR-23 (pairingStoreError), а unwritable или too_large показывает store-unwritable; тест на каждый вид (проверки N-013 круг 10)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/dashboard && pnpm -s run typecheck"
  ],
  "guards": [
