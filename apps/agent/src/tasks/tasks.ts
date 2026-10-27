@@ -15,7 +15,17 @@
 
 import { randomBytes } from 'node:crypto'
 
-import { SCOPE_LIMITS, refuse, validateScope, type BridgeError, type BridgeResult, type TaskScope } from '@okolos/contracts'
+import {
+  SCOPE_LIMITS,
+  inScope,
+  refuse,
+  validateScope,
+  verbAllowed,
+  type BridgeError,
+  type BridgeResult,
+  type BridgeVerb,
+  type TaskScope,
+} from '@okolos/contracts'
 
 import { checkFreeText, type FreeTextRefusal } from '../pairing/name.js'
 
@@ -103,6 +113,47 @@ export class Tasks {
     return { success: true, data: task }
   }
 
+  /**
+   * The task `taskId` of `agentId`. Another agent's task is `no_such_task`, the same answer, word for
+   * word, as an id no task has, so an agent learns nothing about tasks it does not hold (ревью F8). A
+   * task whose ttl has run out is `task_expired` until it is closed or swept.
+   */
+  get(agentId: string, taskId: string, now: number): BridgeResult<Task> {
+    const task = this.table.get(taskId)
+    if (task === undefined || task.agentId !== agentId) return noSuchTask()
+    if (expired(task, now)) return refuse('task_expired', 'the task has run out of time') // i18n-exempt: a refusal read by the agent over MCP, not by the person
+    return { success: true, data: task }
+  }
+
+  /**
+   * Charges one call of `verb` to `task`, checking it against the scope; `url` is the URL the call
+   * targets, when it names one. The order is the contract's: a spent budget refuses before anything
+   * is charged (`budget_exhausted`, and `stepsUsed` stays at the budget); otherwise the step is
+   * charged first and then the verb (`verb_not_in_task`) and the URL's origin, fragment ignored
+   * (`origin_not_in_task`) are checked, so a refused call costs its step as an allowed one does
+   * (spec §2.3). `close` is neither charged nor refused: it only gives back what the task holds.
+   *
+   * `task` must be the object `open` or `get` returned and still in the table; a closed task, or a
+   * copy, is `no_such_task` and is not charged. The ttl is `get`'s to check, with the clock.
+   */
+  charge(task: Task, verb: BridgeVerb, url?: string): BridgeResult<void> {
+    const record = this.table.get(task.id)
+    if (record === undefined || record !== task) return noSuchTask()
+    if (verb === 'close') return DONE
+    if (record.stepsUsed >= record.scope.stepBudget) return refuse('budget_exhausted', `the task has used all ${record.scope.stepBudget} of its steps`) // i18n-exempt: a refusal read by the agent over MCP, not by the person
+    record.stepsUsed += 1
+    if (!verbAllowed(record.scope, verb)) return refuse('verb_not_in_task', `the task does not name the verb ${verb}`) // i18n-exempt: a refusal read by the agent over MCP, not by the person
+    if (url !== undefined && !inScope(record.scope, url)) return notInTask()
+    return DONE
+  }
+
+  /** Closes every task of `agentId` (the agent's access was revoked) and returns them, so the caller closes their windows. */
+  closeAllOf(agentId: string): Task[] {
+    const closed = [...this.table.values()].filter((task) => task.agentId === agentId)
+    for (const task of closed) this.table.delete(task.id)
+    return closed
+  }
+
   /** The tasks still alive at `now`, oldest first. */
   list(now: number): Task[] {
     return [...this.table.values()].filter((task) => !expired(task, now))
@@ -119,4 +170,24 @@ export class Tasks {
 /** A task is over once `ttlSeconds` have passed since it opened: at `openedAt + ttl` it is already expired. */
 function expired(task: Task, now: number): boolean {
   return now >= task.openedAt + task.scope.ttlSeconds * 1000
+}
+
+/**
+ * Whether the URL a navigation actually landed on is still inside the task (ревью F9, аудит #39): a
+ * redirect from a named origin to one the task did not name is `origin_not_in_task`. The fragment
+ * does not count. Charges nothing: the call that navigated was the step.
+ */
+export function checkLanded(task: Task, actualUrl: string): BridgeResult<void> {
+  return inScope(task.scope, actualUrl) ? DONE : notInTask()
+}
+
+const DONE: BridgeResult<void> = { success: true, data: undefined }
+
+function noSuchTask(): BridgeResult<never> {
+  return refuse('no_such_task', 'no task with this id is open for this agent') // i18n-exempt: a refusal read by the agent over MCP, not by the person
+}
+
+/** The origin is not named: the message does not repeat the URL, which may carry what the page put in it. */
+function notInTask(): BridgeResult<never> {
+  return refuse('origin_not_in_task', 'the URL is outside the origins the task may read') // i18n-exempt: a refusal read by the agent over MCP, not by the person
 }

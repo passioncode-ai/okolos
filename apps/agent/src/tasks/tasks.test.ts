@@ -1,7 +1,7 @@
 import { REFUSAL_RETRYABLE, SCOPE_LIMITS, type BridgeResult, type TaskScope } from '@okolos/contracts'
 import { describe, expect, it } from 'vitest'
 
-import { Tasks, type Task } from './tasks.js'
+import { Tasks, checkLanded, type Task } from './tasks.js'
 
 const T0 = 1_800_000_000_000
 
@@ -146,5 +146,157 @@ describe('the goal: checkFreeText, the rule the agent name shares', () => {
     ]) {
       expect(ok(new Tasks().open('agent-a', scope({ goal }), T0)).scope.goal).toBe(goal)
     }
+  })
+})
+
+describe('Tasks.get', () => {
+  it('returns the task to the agent that opened it', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks)
+    expect(ok(tasks.get('agent-a', task.id, T0 + 1000))).toBe(task)
+  })
+
+  it('refuses an id no task has as no_such_task, not retryable', () => {
+    const error = refusal(new Tasks().get('agent-a', 'f'.repeat(32), T0))
+    expect(error.code).toBe('no_such_task')
+    expect(error.retryable).toBe(false)
+  })
+
+  it("refuses another agent's task as no_such_task, the same answer as an id that does not exist (ревью F8)", () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a')
+    const foreign = refusal(tasks.get('agent-b', task.id, T0))
+    const missing = refusal(tasks.get('agent-b', 'f'.repeat(32), T0))
+    expect(foreign.code).toBe('no_such_task')
+    expect(foreign).toEqual(missing)
+    expect(foreign.message).not.toContain(task.id)
+    expect(foreign.message).not.toContain('agent-a')
+  })
+
+  it('refuses a task whose ttl has run out as task_expired, from openedAt + ttlSeconds on', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a', { ttlSeconds: 60 })
+    expect(ok(tasks.get('agent-a', task.id, T0 + 59_999)).id).toBe(task.id)
+    const error = refusal(tasks.get('agent-a', task.id, T0 + 60_000))
+    expect(error.code).toBe('task_expired')
+    expect(error.retryable).toBe(false)
+    expect(tasks.list(T0 + 60_000)).toEqual([])
+  })
+
+  it("answers no_such_task, not task_expired, for another agent's expired task", () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a', { ttlSeconds: 60 })
+    expect(refusal(tasks.get('agent-b', task.id, T0 + 120_000)).code).toBe('no_such_task')
+  })
+})
+
+describe('Tasks.charge', () => {
+  it('charges one step for an allowed call inside the task', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks)
+    expect(tasks.charge(task, 'open', 'https://example.com/flights?to=LIS')).toEqual({ success: true, data: undefined })
+    expect(tasks.charge(task, 'snapshot')).toEqual({ success: true, data: undefined })
+    expect(task.stepsUsed).toBe(2)
+  })
+
+  it('refuses a verb the task did not name as verb_not_in_task, and charges the step', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a', { verbs: ['open'] })
+    const error = refusal(tasks.charge(task, 'read'))
+    expect(error.code).toBe('verb_not_in_task')
+    expect(error.retryable).toBe(false)
+    expect(task.stepsUsed).toBe(1)
+  })
+
+  it('refuses a URL outside origins.read as origin_not_in_task, and charges the step', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a', { stepBudget: 10 })
+    for (const url of ['https://evil.example.net/', 'http://example.com/', 'https://example.com:8443/', 'https://sub.example.com/', 'file:///etc/passwd', 'not a url']) {
+      expect(refusal(tasks.charge(task, 'open', url)).code).toBe('origin_not_in_task')
+    }
+    expect(refusal(tasks.charge(task, 'open', 'https://evil.example.net/')).retryable).toBe(false)
+    expect(task.stepsUsed).toBe(7)
+  })
+
+  it('refuses the call after the last step as budget_exhausted, and the count stays at the budget', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a', { stepBudget: 2 })
+    ok(tasks.charge(task, 'snapshot'))
+    ok(tasks.charge(task, 'snapshot'))
+    const error = refusal(tasks.charge(task, 'snapshot'))
+    expect(error.code).toBe('budget_exhausted')
+    expect(error.retryable).toBe(false)
+    expect(refusal(tasks.charge(task, 'open', 'https://evil.example.net/')).code).toBe('budget_exhausted')
+    expect(task.stepsUsed).toBe(2)
+  })
+
+  it('a refusal spends a step too: refused calls alone exhaust the budget (spec §2.3)', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a', { stepBudget: 2, verbs: ['open'] })
+    expect(refusal(tasks.charge(task, 'read')).code).toBe('verb_not_in_task')
+    expect(refusal(tasks.charge(task, 'open', 'https://evil.example.net/')).code).toBe('origin_not_in_task')
+    expect(task.stepsUsed).toBe(2)
+    expect(refusal(tasks.charge(task, 'open', 'https://example.com/')).code).toBe('budget_exhausted')
+  })
+
+  it('the fragment of a URL does not change the origin check', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks)
+    ok(tasks.charge(task, 'open', 'https://example.com/page#https://evil.example.net/'))
+    ok(tasks.charge(task, 'open', 'https://shop.example.org/#'))
+    expect(refusal(tasks.charge(task, 'open', 'https://evil.example.net/#https://example.com')).code).toBe('origin_not_in_task')
+  })
+
+  it('close is never charged and never refused, not even with every step used or unnamed in verbs', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a', { stepBudget: 1, verbs: ['snapshot'] })
+    ok(tasks.charge(task, 'snapshot'))
+    expect(refusal(tasks.charge(task, 'snapshot')).code).toBe('budget_exhausted')
+    expect(tasks.charge(task, 'close')).toEqual({ success: true, data: undefined })
+    expect(task.stepsUsed).toBe(1)
+  })
+
+  it('refuses a task that is no longer in the table as no_such_task, without charging it', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks)
+    tasks.closeAllOf('agent-a')
+    expect(refusal(tasks.charge(task, 'snapshot')).code).toBe('no_such_task')
+    expect(task.stepsUsed).toBe(0)
+  })
+
+  it('refuses a copy of a task that is not the one in the table as no_such_task', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks)
+    const forged = { ...task, stepsUsed: 0, scope: { ...task.scope, stepBudget: 500 } }
+    expect(refusal(tasks.charge(forged, 'snapshot')).code).toBe('no_such_task')
+  })
+})
+
+describe('checkLanded: where the navigation actually ended (ревью F9, аудит #39)', () => {
+  it('passes a landing inside origins.read', () => {
+    const task = opened(new Tasks())
+    expect(checkLanded(task, 'https://shop.example.org/cart?id=7')).toEqual({ success: true, data: undefined })
+  })
+
+  it('refuses a landing outside origins.read as origin_not_in_task, a redirect included', () => {
+    const task = opened(new Tasks())
+    for (const url of ['https://evil.example.net/login', 'http://example.com/', 'about:blank', 'chrome-error://chromewebdata/', '']) {
+      const error = refusal(checkLanded(task, url))
+      expect(error.code).toBe('origin_not_in_task')
+      expect(error.retryable).toBe(false)
+    }
+  })
+
+  it('ignores the fragment of the URL it landed on', () => {
+    const task = opened(new Tasks())
+    ok(checkLanded(task, 'https://example.com/#evil.example.net'))
+    expect(refusal(checkLanded(task, 'https://evil.example.net/#https://example.com')).code).toBe('origin_not_in_task')
+  })
+
+  it('charges nothing: the open that navigated was the step', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks)
+    checkLanded(task, 'https://evil.example.net/')
+    expect(task.stepsUsed).toBe(0)
   })
 })
