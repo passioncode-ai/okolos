@@ -40,9 +40,10 @@
   "строки CLI для ClaimRefusal (declined, expired, claim_expired, claimed, unknown) и подсказка про --replace; copylot_check (проверки N-013 круг 5)",
   "слова для name_script (имя пишется только латиницей A–Z или только кириллицей, цифры 0–9, пробел и знаки - _ . ( ) ' / +) и для name_reserved, которые описывают правило, а не утверждают «похоже на Okolos»: правило отказывает и честным именам вроде «Echo Kolos» (проверки N-007 круг 4)",
   "строки «запроса уже нет» и «у агента уже нет доступа» для действий страницы над ушедшей строкой; строка CLI pair после кода: где подтвердить (Okolos Agent в Fabric Dashboards) (проверки N-013 круг 7)",
-  "слова для name_script, closed (Okolos Agent останавливается) и changed_on_disk (список доступов изменили на диске, запись остановлена, нужен перезапуск) (отчёт N-007 fix 4)",
+  "слова для name_script, closed (Okolos Agent останавливается) и too_large (список доступов больше 1 МБ); changed_on_disk снят исправлением N-007 fix 5: изменённый файл перечитывается (отчёт N-007 fix 4)",
   "проверку одинаковых ключей ru и en каталога демона уже держит tools/agent-locales.test.ts (N-013): N-014 её не дублирует в tools/locales.test.ts и запускает этот файл в своей проверке узла (проверки N-013 круг 8)",
   "слово для причины unwritable в $WHAT$ не повторяет «не записывается» (например «нет места на диске», «нет прав на файл»), по errno (проверки N-013 круг 9)",
+  "слова событий истечения различают cause: timeout («запрос истёк») и stopped («Okolos Agent остановился»); CLI получает stopped своей строкой (отчёт N-007 fix 5)",
   "проверка узла: python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts tools/agent-locales.test.ts"
  ],
  "guards": [
