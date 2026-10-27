@@ -170,7 +170,27 @@
     "packages/core-snapshot/src/corpus.test.ts",
     "packages/core-snapshot/src/secrets.test.ts"
    ],
-   "risk": "R3"
+   "risk": "R3",
+   "certification": {
+    "round": 1,
+    "tiers": {
+     "unit": "fail",
+     "seam": "fail",
+     "product": "fail"
+    },
+    "at": "bb2aeb434c4692a9ec4bee8090428c334f752d20",
+    "history": [
+     {
+      "unit": "fail",
+      "seam": "fail",
+      "product": "fail"
+     }
+    ],
+    "kinds": [
+     "blind"
+    ],
+    "tree": "e25aaf51856a5e107164a552b04b02fee09fe8d2"
+   }
   },
   {
    "id": "N-004",
@@ -269,13 +289,13 @@
    ],
    "risk": "R3",
    "certification": {
-    "round": 2,
+    "round": 3,
     "tiers": {
      "unit": "fail",
      "seam": "fail",
-     "product": "pass"
+     "product": "fail"
     },
-    "at": "7777a58ba0b8d2e51f3cc768b613fcfcc6481951",
+    "at": "4fcdfd4b3e1b0d7836333bf9c8d5b77a6fce4d68",
     "history": [
      {
       "unit": "fail",
@@ -286,13 +306,19 @@
       "unit": "fail",
       "seam": "fail",
       "product": "pass"
+     },
+     {
+      "unit": "fail",
+      "seam": "fail",
+      "product": "fail"
      }
     ],
     "kinds": [
      "blind",
-     "blind"
+     "blind",
+     "adversarial"
     ],
-    "tree": "014dc21e43c19d176f65c6fd7b134237a3ffdcf2"
+    "tree": "0861c7fc0b87b43b75be43a51e2c1fd905da5e72"
    }
   },
   {
