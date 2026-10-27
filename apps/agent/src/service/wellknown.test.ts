@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { ACTIONS_EXTENSION_KEY } from '../fabric/fabric-service.mjs'
-import { buildIdentity, wellKnown } from './wellknown.js'
+import { buildIdentity, gitEnv, wellKnown } from './wellknown.js'
 
 /** apps/agent in this checkout. */
 const AGENT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -45,22 +45,60 @@ describe('which build is answering', () => {
 
   it('names a digest, not the commit, when the code sits in someone else’s git checkout', () => {
     // A release under a home that is itself a repository (dotfiles) must not report that repository's commit.
-    const home = temp('okolos-agent-dotfiles-')
-    const git = (...args: string[]) =>
-      execFileSync('git', ['-C', home, '-c', 'user.name=t', '-c', 'user.email=t@example.test', ...args], { stdio: 'ignore' })
-    git('init', '-q')
-    // Not under `releases/`, so only the foreign checkout tells it apart.
-    const release = path.join(home, '.local', 'share', 'okolos-agent', 'current')
-    mkdirSync(release, { recursive: true })
-    writeFileSync(path.join(release, 'http.js'), 'one')
-    git('add', '-A')
-    git('commit', '-q', '-m', 'dotfiles')
-
+    const release = dotfilesRelease()
     const build = buildIdentity(release)
     expect(build.commit).toBeUndefined()
     expect(build.digest).toMatch(/^sha256:[0-9a-f]{64}$/)
   })
+
+  it('cannot reach another repository through a GIT_DIR inherited from a git hook', () => {
+    // The pre-push hook runs these tests with GIT_DIR naming this repository. A git command that
+    // inherits it acts on that repository whatever `-C` says: on 2026-10-27 the dotfiles case
+    // above committed its one file into this checkout's branch. A sacrificial repository stands
+    // in for this one here, so a regression costs nothing but a red test.
+    const victim = temp('okolos-agent-victim-')
+    runGit(victim, 'init', '-q')
+    writeFileSync(path.join(victim, 'kept'), 'kept')
+    runGit(victim, 'add', '-A')
+    runGit(victim, 'commit', '-q', '-m', 'the only commit')
+
+    const saved = process.env.GIT_DIR
+    process.env.GIT_DIR = path.join(victim, '.git')
+    let build
+    try {
+      build = buildIdentity(dotfilesRelease())
+    } finally {
+      if (saved === undefined) delete process.env.GIT_DIR
+      else process.env.GIT_DIR = saved
+    }
+
+    const log = execFileSync('git', ['-C', victim, 'log', '--format=%s'], { encoding: 'utf8', env: gitEnv() }).trim()
+    expect(log).toBe('the only commit')
+    expect(build.commit).toBeUndefined()
+    expect(build.digest).toMatch(/^sha256:[0-9a-f]{64}$/)
+  })
 })
+
+/** git in `dir`, never in a repository a parent process named through GIT_DIR and friends. */
+function runGit(dir: string, ...args: string[]): void {
+  execFileSync('git', ['-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@example.test', ...args], {
+    stdio: 'ignore',
+    env: gitEnv(),
+  })
+}
+
+/** A release folder inside a home that is itself a git repository with one commit. */
+function dotfilesRelease(): string {
+  const home = temp('okolos-agent-dotfiles-')
+  runGit(home, 'init', '-q')
+  // Not under `releases/`, so only the foreign checkout tells it apart.
+  const release = path.join(home, '.local', 'share', 'okolos-agent', 'current')
+  mkdirSync(release, { recursive: true })
+  writeFileSync(path.join(release, 'http.js'), 'one')
+  runGit(home, 'add', '-A')
+  runGit(home, 'commit', '-q', '-m', 'dotfiles')
+  return release
+}
 
 describe('the well-known document', () => {
   const base = {

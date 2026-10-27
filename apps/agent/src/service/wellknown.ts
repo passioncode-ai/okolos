@@ -55,10 +55,38 @@ export function buildIdentity(root: string): Build {
   return { digest: `sha256:${hash.digest('hex')}` }
 }
 
+/**
+ * Variables through which a parent process (a git hook above all) points git at its own
+ * repository. A child that inherits them acts on that repository whatever `-C` says, so every
+ * git command here runs without them.
+ */
+const GIT_LOCATION = [
+  'GIT_DIR',
+  'GIT_WORK_TREE',
+  'GIT_INDEX_FILE',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_COMMON_DIR',
+  'GIT_NAMESPACE',
+  'GIT_PREFIX',
+] as const
+
+/** The environment for a git child process: this process's, minus GIT_LOCATION. */
+export function gitEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env }
+  for (const name of GIT_LOCATION) delete env[name]
+  return env
+}
+
 function ourCommit(root: string): string | null {
   if (path.resolve(root).split(path.sep).includes('releases')) return null
   const git = (...args: string[]) =>
-    execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5_000 }).trim()
+    execFileSync('git', ['-C', root, ...args], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 5_000,
+      env: gitEnv(),
+    }).trim()
   try {
     const top = git('rev-parse', '--show-toplevel')
     const manifest = path.join(top, 'apps', 'agent', 'package.json')
