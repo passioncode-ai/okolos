@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { REFUSAL_RETRYABLE, SCOPE_LIMITS, type BridgeResult, type TaskScope } from '@okolos/contracts'
 import { describe, expect, it } from 'vitest'
 
-import { GOAL_SHOWN_MAX, Tasks, checkLanded, goalShown, type Task } from './tasks.js'
+import { GOAL_SHOWN_MAX, Tasks, checkLanded, goalShown, type Task, type TaskSnapshot } from './tasks.js'
 
 const T0 = 1_800_000_000_000
 
@@ -31,6 +31,11 @@ function refusal<T>(result: BridgeResult<T>): { code: string; message: string; r
 
 function opened(tasks: Tasks, agentId = 'agent-a', overrides: Record<string, unknown> = {}, now = T0): Task {
   return ok(tasks.open(agentId, scope(overrides), now))
+}
+
+/** What `list` shows of `task`: its fields as they are now, and whether its time has run out. */
+function listed(task: Task, expired = false): TaskSnapshot {
+  return { ...task, expired }
 }
 
 describe('Tasks.open', () => {
@@ -182,7 +187,7 @@ describe('Tasks.get', () => {
     const error = refusal(tasks.get('agent-a', task.id, T0 + 60_000))
     expect(error.code).toBe('task_expired')
     expect(error.retryable).toBe(false)
-    expect(tasks.list(T0 + 60_000)).toEqual([])
+    expect(tasks.list(T0 + 60_000)).toEqual([listed(task, true)])
   })
 
   it("answers no_such_task, not task_expired, for another agent's expired task", () => {
@@ -310,7 +315,7 @@ describe('Tasks.close and closeAllOf', () => {
     const other = opened(tasks)
     expect(ok(tasks.close('agent-a', task.id))).toBe(task)
     expect(refusal(tasks.get('agent-a', task.id, T0)).code).toBe('no_such_task')
-    expect(tasks.list(T0)).toEqual([other])
+    expect(tasks.list(T0)).toEqual([listed(other)])
   })
 
   it('close works on a task that used all its steps, and on one whose time ran out', () => {
@@ -337,19 +342,58 @@ describe('Tasks.close and closeAllOf', () => {
     const b1 = opened(tasks, 'agent-b')
     const a2 = opened(tasks, 'agent-a')
     expect(tasks.closeAllOf('agent-a')).toEqual([a1, a2])
-    expect(tasks.list(T0)).toEqual([b1])
+    expect(tasks.list(T0)).toEqual([listed(b1)])
     expect(refusal(tasks.get('agent-a', a1.id, T0)).code).toBe('no_such_task')
     expect(tasks.closeAllOf('agent-a')).toEqual([])
   })
 })
 
 describe('Tasks.list and sweep', () => {
-  it('list gives the live tasks of every agent, oldest first, with what the page row needs', () => {
+  it('list gives the tasks of every agent, oldest first, with what the page row needs', () => {
     const tasks = new Tasks()
     const a = opened(tasks, 'agent-a', {}, T0)
     const b = opened(tasks, 'agent-b', { ttlSeconds: 30 }, T0 + 1_000)
-    expect(tasks.list(T0 + 2_000)).toEqual([a, b])
-    expect(tasks.list(T0 + 31_000)).toEqual([a])
+    expect(tasks.list(T0 + 2_000)).toEqual([listed(a), listed(b)])
+    // Round 2: a task whose time ran out stays in the list, marked expired, until sweep removes it.
+    expect(tasks.list(T0 + 31_000)).toEqual([listed(a), listed(b, true)])
+  })
+
+  // Fix round 2 (spec §2.1, SCR-24 taskTimeOver): the page keeps an expired task in its list until
+  // the timer closes its window, so list shows it with expired true; get and charge still refuse it.
+  it('an expired task not yet swept is listed with expired true and its window as set', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a', { ttlSeconds: 10 })
+    ok(tasks.setWindow(task, { windowId: 'TARGET-1', windowOpen: true }))
+    const [shown] = tasks.list(T0 + 20_000)
+    expect(shown).toEqual({ ...task, windowId: 'TARGET-1', windowOpen: true, expired: true })
+    expect(shown!.expired).toBe(true)
+    expect(shown!.windowOpen).toBe(true)
+    expect(Object.isFrozen(shown)).toBe(true)
+    expect(refusal(tasks.get('agent-a', task.id, T0 + 20_000)).code).toBe('task_expired')
+    expect(refusal(tasks.charge(task, 'snapshot', T0 + 20_000)).code).toBe('task_expired')
+  })
+
+  it('after sweep the expired task is gone from the list', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a', { ttlSeconds: 10 })
+    expect(tasks.list(T0 + 20_000)).toEqual([listed(task, true)])
+    expect(tasks.sweep(T0 + 20_000)).toEqual([task])
+    expect(tasks.list(T0 + 20_000)).toEqual([])
+  })
+
+  it('a task whose time has not run out is listed with expired false', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a', { ttlSeconds: 10 })
+    expect(tasks.list(T0)[0]!.expired).toBe(false)
+    expect(tasks.list(T0 + 9_999)).toEqual([listed(task, false)])
+  })
+
+  it('the boundary instant openedAt + ttlSeconds * 1000 is already expired in the list', () => {
+    const tasks = new Tasks()
+    const task = opened(tasks, 'agent-a', { ttlSeconds: 10 }, T0 + 5)
+    expect(tasks.list(T0 + 5 + 9_999)[0]!.expired).toBe(false)
+    expect(tasks.list(T0 + 5 + 10_000)).toEqual([listed(task, true)])
+    expect(refusal(tasks.get('agent-a', task.id, T0 + 5 + 10_000)).code).toBe('task_expired')
   })
 
   it('sweep removes the tasks whose time ran out and returns them, so their windows are closed', () => {
@@ -359,7 +403,7 @@ describe('Tasks.list and sweep', () => {
     expect(tasks.sweep(T0 + 9_999)).toEqual([])
     expect(tasks.sweep(T0 + 10_000)).toEqual([short])
     expect(refusal(tasks.get('agent-a', short.id, T0 + 10_000)).code).toBe('no_such_task')
-    expect(tasks.list(T0 + 10_000)).toEqual([long])
+    expect(tasks.list(T0 + 10_000)).toEqual([listed(long)])
   })
 })
 
@@ -371,7 +415,7 @@ describe('list and sweep give snapshots, not the tasks themselves', () => {
     const mine = opened(tasks, 'agent-a')
     const theirs = opened(tasks, 'agent-b')
     const [mineShown, theirsShown] = tasks.list(T0)
-    expect(mineShown).toEqual(mine)
+    expect(mineShown).toEqual(listed(mine))
     expect(mineShown).not.toBe(mine)
     expect(refusal(tasks.charge(mineShown!, 'snapshot', T0)).code).toBe('no_such_task')
     expect(refusal(tasks.charge(theirsShown!, 'snapshot', T0)).code).toBe('no_such_task')
@@ -476,7 +520,7 @@ describe('the clock a caller passes', () => {
     }
     expect(() => tasks.get('agent-a', task.id, Number.POSITIVE_INFINITY)).toThrow(/^Tasks\.get: now must be a safe integer >= 0, got Infinity$/)
     expect(task.stepsUsed).toBe(0)
-    expect(tasks.list(T0)).toEqual([task])
+    expect(tasks.list(T0)).toEqual([listed(task)])
   })
 })
 
@@ -547,7 +591,7 @@ describe('the task id draw', () => {
     const first = opened(tasks)
     expect(() => tasks.open('agent-a', scope(), T0)).toThrow(/^Tasks: no free task id after 8 draws$/)
     expect(sizes).toHaveLength(1 + 8)
-    expect(tasks.list(T0)).toEqual([first])
+    expect(tasks.list(T0)).toEqual([listed(first)])
   })
 
   it('throws when the random source gives other than 16 bytes, and opens nothing', () => {

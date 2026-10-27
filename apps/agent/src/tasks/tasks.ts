@@ -19,6 +19,10 @@
  * copies for reading (the page, N-015, and the windows to close): `charge`, `checkLanded` and
  * `setWindow` answer `no_such_task` to a copy, so whoever reads the list cannot spend another agent's
  * steps or move its window fields. The scope is frozen at `open`, on the handle and on every copy.
+ *
+ * A task whose time ran out stays in the table until `sweep` removes it (fix round 2, spec §2.1,
+ * SCR-24 `taskTimeOver`): `get` and `charge` already refuse it as `task_expired`, but `list` still
+ * shows it, marked `expired`, so the page keeps the row until the timer closes its window.
  */
 
 import { randomBytes } from 'node:crypto'
@@ -52,6 +56,15 @@ export interface Task {
   readonly windowId?: string
   /** Whether the task's window is open (SCR-24 taskWindowOpen / taskWindowClosed); N-011 sets it with `setWindow` from N-010's window events. */
   readonly windowOpen: boolean
+}
+
+/**
+ * What `list` gives for one task: a frozen copy of its fields at `now`, and whether its time has run
+ * out by then (`openedAt + ttlSeconds * 1000` and after). Only the copy carries `expired`: the live
+ * handle would hold a value that goes stale as the clock moves.
+ */
+export interface TaskSnapshot extends Task {
+  readonly expired: boolean
 }
 
 /** What `setWindow` records; a field left out keeps its value. */
@@ -216,10 +229,14 @@ export class Tasks {
     return closed
   }
 
-  /** Frozen copies of the tasks still alive at `now`, oldest first; a copy is for reading only. */
-  list(now: number): Task[] {
+  /**
+   * Frozen copies of every task in the table at `now`, oldest first, each marked `expired` when its
+   * time has run out: an expired task stays listed until `sweep` removes it (fix round 2). A copy is
+   * for reading only.
+   */
+  list(now: number): TaskSnapshot[] {
     checkClock(now, 'list')
-    return [...this.table.values()].filter((task) => !expired(task, now)).map(snapshot)
+    return [...this.table.values()].map((task) => Object.freeze({ ...snapshot(task), expired: expired(task, now) }))
   }
 
   /** Removes the tasks whose time ran out by `now` and returns frozen copies, so the caller closes their windows. */
