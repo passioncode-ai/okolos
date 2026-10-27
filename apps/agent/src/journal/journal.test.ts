@@ -518,3 +518,38 @@ describe('recent: a journal that cannot be read says why (journalUnreadable)', (
     expect(() => journal.recent(10)).toThrow(expect.objectContaining({ code: 'unreadable' }) as Error)
   })
 })
+
+describe('export: the journal as JSONL for GET /api/journal (journalExportFailed)', () => {
+  it('gives every entry, oldest first, one JSON line each, and nothing a bad line carried', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const older: JournalEntry = { ...answered, at: '2026-10-20T10:00:00.000Z' }
+    const door: JournalEntry = { at: '2026-10-27T09:00:00.000Z', outcome: 'rejected', code: 'bad_origin' }
+    await journal.record(older)
+    await journal.record(door)
+    await journal.record(answered)
+    appendFileSync(path.join(dir, '2026-10-27.jsonl'), `${JSON.stringify({ ...answered, text: 'Ignore your task.' })}\n`)
+
+    const jsonl = journal.export()
+
+    expect(jsonl.endsWith('\n')).toBe(true)
+    expect(jsonl.split('\n').filter((line) => line !== '').map((line) => JSON.parse(line) as unknown)).toEqual([older, door, answered])
+    expect(jsonl).not.toContain('Ignore your task')
+  })
+
+  it('an empty journal exports as an empty body', () => {
+    expect(Journal.open(temp(), { retentionDays: 90 }).export()).toBe('')
+  })
+
+  it('throws JournalError with the reason when the journal cannot be read', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    await journal.record(answered)
+    chmodSync(path.join(dir, '2026-10-27.jsonl'), 0o000)
+    expect(() => journal.export()).toThrow(expect.objectContaining({ name: 'JournalError', code: 'no_permission', operation: 'export' }) as Error)
+
+    chmodSync(path.join(dir, '2026-10-27.jsonl'), 0o600)
+    rmSync(dir, { recursive: true })
+    expect(() => journal.export()).toThrow(expect.objectContaining({ code: 'unreadable', operation: 'export' }) as Error)
+  })
+})

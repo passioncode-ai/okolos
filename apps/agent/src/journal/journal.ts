@@ -322,6 +322,21 @@ export class Journal {
     return { answers: newest(answers), refusals: newest(refusals), unreadable }
   }
 
+  /**
+   * The whole journal as JSON lines, oldest first, for GET /api/journal. Every line is an entry
+   * checked again on the way out and written with the journal's members only, so a line edited
+   * on disk to carry page text is not exported; such lines are left out, as `recent` counts them.
+   * Reads only, so its reasons are a read's: throws JournalError (no_permission, unreadable,
+   * other), operation `export`, for `journalExportFailed`.
+   */
+  export(): string {
+    let out = ''
+    for (const day of this.reading(() => this.days(), 'export')) {
+      for (const entry of this.reading(() => this.read(day), 'export').entries) out += `${JSON.stringify(entry)}\n`
+    }
+    return out
+  }
+
   /** Runs a read of the journal, turning a failure into a JournalError with its reason. */
   private reading<T>(read: () => T, operation: 'read' | 'export' = 'read'): T {
     try {
