@@ -736,7 +736,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  T[Task opened: sites, verbs, TTL, budget] --> W[Own window, in the background, active tab]
+  T[Task opened: goal, sites, verbs, profile, TTL, budget] --> W[Own window, in the background, active tab]
   W --> S[Snapshot: cleaned, verdict attached, in parts]
   S --> A{Action}
   A -->|outside the task's sites| X1[Refused: origin_not_in_task]
