@@ -31,6 +31,7 @@
  ],
  "acceptance": [
   "tools/docs.test.ts, tools/runbook.test.ts зелёные",
+  "docs/privacy.md и docs/brand/facts.md называют хранилища Okolos Agent (список доступов, журнал агентов, события, логи, профиль агента, ключи в clients/) отдельно от хранилищ расширения, со сроками; тест сверяет перечень с путями в apps/agent/src/service/dirs.ts (решения при закрытии N-007, 2026-10-27)",
   "проверка узла: pnpm -s exec vitest run tools/docs.test.ts tools/runbook.test.ts"
  ],
  "guards": [

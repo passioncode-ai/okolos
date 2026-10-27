@@ -273,7 +273,7 @@
    "id": "N-007",
    "title": "K3 привязка: коды, ключи, связка ключей, отзыв",
    "owner": "implementer",
-   "status": "pending",
+   "status": "done",
    "blocked_by": [
     "N-024"
    ],
@@ -291,13 +291,13 @@
    ],
    "risk": "R3",
    "certification": {
-    "round": 9,
+    "round": 10,
     "tiers": {
      "unit": "pass",
      "seam": "pass",
-     "product": "fail"
+     "product": "pass"
     },
-    "at": "28a4ed4c69bf84887144f788ae850b9c7548a255",
+    "at": "5ff2e73808dbaf8c6b2f04b795ba499424e3e8b9",
     "history": [
      {
       "unit": "pass",
@@ -343,6 +343,11 @@
       "unit": "pass",
       "seam": "pass",
       "product": "fail"
+     },
+     {
+      "unit": "pass",
+      "seam": "pass",
+      "product": "pass"
      }
     ],
     "kinds": [
@@ -354,10 +359,44 @@
      "adversarial",
      "adversarial",
      "blind",
+     "blind",
      "blind"
     ],
-    "tree": "457410b5b852d84b78dea4e88c1cb98dfec435a2"
-   }
+    "tree": "4731e6cf302c4aaf5aec9b684dc10257c3a00d21"
+   },
+   "proof": {
+    "head": "5ff2e73808dbaf8c6b2f04b795ba499424e3e8b9",
+    "tree": "4731e6cf302c4aaf5aec9b684dc10257c3a00d21",
+    "graph_revision": "23"
+   },
+   "evidence": [
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-007 -s exec vitest run apps/agent/src/pairing -> 2 files, 133 tests passed (name.test.ts 34, pairing.test.ts 99)",
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-007 -s run typecheck -> exit 0 (tsc -b covers apps/agent via the root tsconfig reference, tsconfig.json:47)",
+    "unit: git diff bridge/b1-run2..HEAD --stat: 5 files, name.ts/pairing.ts and their tests new, tools/reachable.test.ts +2 EXEMPT rows; all inside the packet's edit_targets",
+    "unit: node probe of name.ts (scratchpad probe-name.mjs) over 26 names: reserved, script, digits, empty, too_long outcomes as listed in confirms; checkFreeText('a\\u200db',10) null, bidi refused, emoji-only text refused as text_empty",
+    "unit: read atomicWrite at apps/agent/src/fabric/fabric-paths.mjs:70-92: open wx with mode, fsync, chmod, rename, temp removed on failure",
+    "seam: certified at HEAD 5ff2e73808dbaf8c6b2f04b795ba499424e3e8b9, round 10, blind",
+    "seam: git diff --stat bridge/b1-run2..HEAD -> 5 files: pairing.ts, name.ts, their tests, tools/reachable.test.ts",
+    "seam: git merge-tree --write-tree HEAD b1/n-006 -> 70d93a076dc9455f636ca760f48023f8aedd9891, exit 0",
+    "seam: pnpm -s exec vitest run apps/agent/src/pairing tools/reachable.test.ts apps/agent/src/service -> 9 files, 240 passed",
+    "seam: pnpm -s exec vitest run tools/agent-locales.test.ts tools/docs.test.ts -> 2 files, 73 passed",
+    "seam: pnpm -s run typecheck -> exit 0",
+    "seam: pnpm -s run i18n:sweep -> exit 0, 0 sentences outside the catalogue",
+    "seam: pnpm -s exec eslint apps/agent/src/pairing tools/reachable.test.ts -> exit 0",
+    "seam: grep for pairing symbols outside apps/agent/src/pairing -> reachable.test.ts, docs and plan only",
+    "seam: node --experimental-strip-types probe: checkAgentName('Агент И\\u0306') -> null; raw !== NFC; sha256 prefixes a19907b7de8f vs 5b1ebdc20a03",
+    "seam: diff -rq of .task-pipeline/packets between okolos-b1-n-007 and okolos-bridge-b1 -> exit 0",
+    "seam: python3 over apps/agent/_locales -> ru 95 keys, en 95 keys, no name_*, claim, store-reason or notice keys yet",
+    "product: git -C okolos-b1-n-007 diff --stat bridge/b1-run2..HEAD: 5 files, pairing.ts, name.ts, their tests, tools/reachable.test.ts (+2 exemption rows); no package.json change",
+    "product: read apps/agent/src/pairing/pairing.ts: REQUEST_LIFETIME_MS and CLAIM_WINDOW_MS 5 min, MAX_PENDING 3, MAX_NEW_PER_MINUTE 6, hex(16) request id, hex(32) key, save() writes before taking agents into memory, close() ends with cause 'stopped'",
+    "product: read apps/agent/src/pairing/name.ts: ALLOWED allowlist, MAX_DIGITS 2, MAX_NAME_LENGTH 40 code points, reservedKeys and nameKeys tables",
+    "product: python3 read of apps/agent/_locales/{ru,en}/messages.json: 95 keys each; pairing, store and rejection strings listed and read against the code",
+    "product: grep -n -i 'agent|агент|pairing|привяз' docs/privacy.md docs/licences.md: no Okolos Agent mention; docs/brand/facts.md: no pairing claim",
+    "product: python3 read of .task-pipeline/plan_tasks.json: N-008 tests 20-33, N-011, N-014 lines on store reasons and claim refusals, N-015, N-016, N-017 SCN-044, N-020 (docs.test and runbook.test only)",
+    "product: python3 docs/ux/lint.py → exit 0; python3 docs/brand/lint.py → 'brand pack is clean'",
+    "product: grep for SCR-23 wireframe in docs/ux/wireframes: none (outside this node)",
+    "proven at 5ff2e73808dbaf8c6b2f04b795ba499424e3e8b9 (tree 4731e6cf302c4aaf5aec9b684dc10257c3a00d21)"
+   ]
   },
   {
    "id": "N-008",
@@ -1111,6 +1150,11 @@
    "payload": "buildIdentity и тест dotfiles"
   },
   {
+   "from": "N-024",
+   "to": "N-007",
+   "payload": "каталоги данных и токен хоста"
+  },
+  {
    "from": "N-023",
    "to": "N-003",
    "payload": "toSnapshotFinding, SnapshotFinding, TaskScope"
@@ -1134,11 +1178,6 @@
    "from": "N-023",
    "to": "N-006",
    "payload": "BridgeRefusal, AnyBridgeVerb, canonicalVerb для типа JournalEntry"
-  },
-  {
-   "from": "N-024",
-   "to": "N-007",
-   "payload": "каталоги данных и токен хоста"
   },
   {
    "from": "N-023",
@@ -1481,6 +1520,12 @@
    "node": "N-023",
    "why": "certified at all 3 tiers in round 6",
    "precondition": "3623ca51150c87b485a2ab51f08c7b1ab3cef6f7"
+  },
+  {
+   "verb": "close",
+   "node": "N-007",
+   "why": "certified at all 3 tiers in round 10",
+   "precondition": "5ff2e73808dbaf8c6b2f04b795ba499424e3e8b9"
   }
  ]
 }
