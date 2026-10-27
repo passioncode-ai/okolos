@@ -1,10 +1,10 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { open } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { Journal, type JournalEntry } from './journal.js'
+import { answerAfterRecord, Journal, type JournalEntry } from './journal.js'
 
 const temps: string[] = []
 afterEach(() => {
@@ -75,5 +75,43 @@ describe('record writes the entry down before it returns', () => {
     await pending
     expect(returned).toBe(true)
     expect(sync).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('an answer that is not in the journal is not sent (ADR-0019)', () => {
+  it('a read-only folder makes record throw, and answerAfterRecord sends internal instead of the answer', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    chmodSync(dir, 0o500)
+    try {
+      await expect(journal.record(answered)).rejects.toThrow()
+
+      const sent: unknown[] = []
+      const recorded = await answerAfterRecord(journal, answered, (refusal) => {
+        sent.push(refusal ?? 'the page content')
+      })
+
+      expect(recorded).toBe(false)
+      expect(sent).toEqual([
+        { success: false, error: { code: 'internal', message: expect.any(String) as string, retryable: true } },
+      ])
+    } finally {
+      chmodSync(dir, 0o700)
+    }
+    expect(onDisk(dir)).toEqual([])
+  })
+
+  it('sends the answer once, and only after its entry is on disk', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const seenAtSend: unknown[][] = []
+
+    const recorded = await answerAfterRecord(journal, answered, (refusal) => {
+      expect(refusal).toBeUndefined()
+      seenAtSend.push(onDisk(dir))
+    })
+
+    expect(recorded).toBe(true)
+    expect(seenAtSend).toEqual([[answered]])
   })
 })

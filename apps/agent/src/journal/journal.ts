@@ -5,7 +5,7 @@ import { mkdirSync } from 'node:fs'
 import { open } from 'node:fs/promises'
 import path from 'node:path'
 
-import type { BridgeRefusal, BridgeVerb } from '@okolos/contracts'
+import { refuse, type BridgeRefusal, type BridgeVerb } from '@okolos/contracts'
 
 import type { RefusalReason } from '../service/http.js'
 
@@ -52,4 +52,29 @@ export class Journal {
       await handle.close()
     }
   }
+}
+
+/** The envelope an agent gets instead of an answer the journal could not record. */
+export type JournalRefusal = ReturnType<typeof refuse>
+
+/**
+ * The one way an answer leaves the daemon: the entry is recorded (appended and fsynced) first,
+ * and only then is `send()` called to send the answer. When the record fails, `send` is called
+ * with the `internal` refusal instead, which the wrapper builds itself and which carries nothing
+ * of the page. Resolves whether the entry was recorded, so the caller can log the failure.
+ */
+export async function answerAfterRecord(
+  journal: Journal,
+  entry: JournalEntry,
+  send: (refusal?: JournalRefusal) => void | Promise<void>,
+): Promise<boolean> {
+  try {
+    await journal.record(entry)
+  } catch {
+    // i18n-exempt: a refusal read by the agent over MCP, not by the person
+    await send(refuse('internal', 'The journal could not record this answer, so it was not sent.'))
+    return false
+  }
+  await send()
+  return true
 }
