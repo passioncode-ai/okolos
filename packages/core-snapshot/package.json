@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
-  "description": "Turns a page's accessibility tree into what an agent may read: compact, cleaned, paged. Pure — no DOM, no clock.",
+  "description": "Turns a page's accessibility tree into what an agent may read: compact, cleaned, paged. Pure: no DOM, no clock.",
   "exports": { ".": "./src/index.ts" },
-  "scripts": { "build": "tsc -b" }
+  "scripts": { "build": "tsc -b" },
+  "dependencies": { "@okolos/contracts": "workspace:*" },
+  "devDependencies": { "@okolos/core-injection": "workspace:*" }
 }
