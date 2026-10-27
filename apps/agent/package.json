@@ -4,5 +4,12 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
-  "description": "Okolos Agent: the local door through which paired agents read the person's browser, cleaned."
+  "description": "Okolos Agent: the local door through which paired agents read the person's browser, cleaned.",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@okolos/cdp-pipe": "workspace:*",
+    "@okolos/contracts": "workspace:*"
+  }
 }

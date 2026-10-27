@@ -60,7 +60,14 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(happy-dom@20.11.1)
 
-  apps/agent: {}
+  apps/agent:
+    dependencies:
+      '@okolos/cdp-pipe':
+        specifier: workspace:*
+        version: link:../../packages/cdp-pipe
+      '@okolos/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
 
   apps/extension:
     dependencies:
