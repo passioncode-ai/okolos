@@ -615,7 +615,7 @@
    "id": "N-013",
    "title": "UX: FLW-21/22 к экранам, SCR привязки и активности, вайрфреймы, сценарии",
    "owner": "ux",
-   "status": "parked",
+   "status": "pending",
    "blocked_by": [
     "N-024"
    ],
@@ -765,8 +765,7 @@
      "blind"
     ],
     "tree": "8eed553e256485eb293ac3178107958c1ca3246d"
-   },
-   "parked_reason": "certification ceiling: 20 failing round(s), ceiling 20; failing tier(s) product; stuck on product; first break apps/extension/_locales/ru/messages.json:1887 (storageResetNote, en twin), packages/ui/src/storage/storage-problem.ts:103, docs/ux/scenarios.md:747 SCN-032, docs/backlog.md B-156: A neighbouring extension string becomes false once Okolos Agent is installed, and nothing records it. The SCR-20 storage-problem screen says «Очистка удалит всё, что Okolos хранит на этом устройстве: находки, журнал, …» / 'Clearing removes everything Okolos kept on this device'. With Okolos Agent on the device, its access list, agents' journal, service events, logs, agent profile (with what sites keep from sign-ins) and clients/ keys all survive that clearing. N-013 handled the same collision for SCN-023 and SCN-024 (scope lines, B-156), and terminology.md cites SCR-20's «Очистить локальные данные», but SCN-032, storageResetNote, B-156 and every plan node leave this sentence out; check: grep -n 'storageResetNote\\|SCN-032' docs/backlog.md prints a row, and grep -n 'Okolos Agent' docs/ux/scenarios.md shows a hit inside SCN-032; then judgement: SCN-032 reads true for a device with Okolos Agent installed. Blocker row owed on the board"
+   }
   },
   {
    "id": "N-014",
@@ -1669,6 +1668,11 @@
    "node": "N-009",
    "why": "certified at all 3 tiers in round 4",
    "precondition": "7913bc3b93c3be402e776e25f73e42ff639742f5"
+  },
+  {
+   "verb": "resume",
+   "node": "N-013",
+   "why": "B-157 second option, chosen 2026-10-27 under the operator's «давай все доделаем» by the run's rule for an open question (safest reversible: the stricter of the two options; accepting with risks would close it unread): the product tier is narrowed to the node's own files (docs/ux SCR-23, SCR-24, FLW-21, FLW-22, SCN-044, SCN-045, JRN-05 rows, apps/agent/_locales, the spec sections the node edited) read against the code that exists and the spec; neighbouring extension screens and other runs' docs go to B-156 as before. One round (21), ceiling 21: a failing round parks the node again for the operator."
   }
  ]
 }
