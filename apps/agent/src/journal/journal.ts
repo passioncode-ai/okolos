@@ -886,7 +886,6 @@ async function takeBack(handle: FileHandle, size: number): Promise<void> {
 
 /** What a record after `close()` gets: the journal no longer holds its folder. */
 function closedError(): JournalError {
-  // i18n-exempt: a cause kept for the daemon's log, never shown to the person
   return new JournalError('other', 'write', { cause: new Error('journal closed') })
 }
 
