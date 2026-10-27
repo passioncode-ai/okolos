@@ -10,7 +10,8 @@
   "N-009: Task.charge и проверки области",
   "N-010: AgentWindow.open/close",
   "N-012: census, readCensus, CensusEntry[]",
-  "N-022: CdpError.kind и cdpCode для перевода в отказы контракта"
+  "N-022: CdpError.kind и cdpCode для перевода в отказы контракта",
+  "N-007: Pairing: open, close, flush, list, onNotice, onReload"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -76,6 +77,8 @@
   "сохранённый «последний сбой записи журнала» снимается после следующей успешной записи: состояние error SCR-24 не залипает до перезапуска (проверки N-013 круг 7)",
   "последний сбой записи списка доступов (claim или revoke) хранится и отдаётся странице, снимается после следующей успешной записи (проверки N-013 круг 9)",
   "минутный таймер ловит PairingStoreError от list и пишет его в лог службы, таймер не останавливается (проверки N-013 круг 10)",
+  "последний перерыв записи журнала (начало и конец) хранится и отдаётся странице, пока он в пределах срока хранения журнала; при остановке демон зовёт Pairing.close(now), а не только flush; событие истечения берёт слова по cause (timeout или stopped) (проверки N-013 круг 11, N-007 круг 6)",
+  "onReload с removed закрывает задачи и окна пропавших агентов так же, как отзыв (отчёт N-007 fix 6)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/agent.test.ts apps/agent/src/verbs && pnpm -s run typecheck"
  ],
  "guards": [

@@ -142,7 +142,7 @@ Contract: brand-contract v1
 | Шаг задачи, который считается в бюджет | **шаг** | step | `stepBudget` |
 | Ответ «нет» по правилам задачи или двери | **отказ** | refusal | `BridgeRefusal`, кроме трёх кодов сбоя; `DoorRejection` |
 | Файл Okolos Agent, где хранятся агенты с доступом (только SHA-256 ключей) | **список доступов** | access list | `Pairing`, `pairings.json` |
-| Секрет, который агент получает один раз и предъявляет двери | **ключ доступа** (после первого упоминания в той же строке или на той же странице допустимо «ключ») | access key (likewise «key») | `X-Okolos-Agent-Key` |
+| Секрет, который агент получает один раз и предъявляет двери | **ключ доступа**, на странице Okolos Agent и в CLI допустимо короткое **ключ** | access key, short form key | `X-Okolos-Agent-Key` |
 | Постоянный профиль Chrome, где работают задачи агентов | **профиль агента** | agent profile | `profile: 'agent'` |
 | Профиль Chrome на одну задачу, удаляется после неё | **временный профиль** | temporary profile | `profile: 'disposable'` |
 | Chrome, который Okolos Agent запускает для окон агентов | **Chrome для агентов** | the agents' Chrome | `AgentWindows`, `browser_offline` |

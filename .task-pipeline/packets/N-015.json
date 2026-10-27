@@ -66,6 +66,7 @@
   "элемент agent-journal-skipped со строкой journalLinesSkipped виден только при нечитаемых строках журнала (счёт из N-006) (проверки N-013 круг 9)",
   "пока виден agent-journal-skipped, список отказов не показывает refusalsEmpty (проверки N-013 круг 10)",
   "PairingStoreError с причиной unreadable, not_json, not_a_store или bad_record (при list или revoke) показывает состояние error SCR-23 (pairingStoreError), а unwritable или too_large показывает store-unwritable; тест на каждый вид (проверки N-013 круг 10)",
+  "перерыв журнала показывается строкой refusalsGap, и refusalsEmpty не показывается, пока перерыв в пределах срока хранения; нечитаемый список доступов показывается строкой refusalDoorFailureLine, а не refusalDoorLine (проверки N-013 круг 11)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/dashboard && pnpm -s run typecheck"
  ],
  "guards": [

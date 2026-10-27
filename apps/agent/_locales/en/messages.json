@@ -116,7 +116,7 @@
     "message": "Agents' tasks now"
   },
   "tasksEmpty": {
-    "message": "No agent is working in the browser now."
+    "message": "No agent has an open task now."
   },
   "taskGoal": {
     "message": "Goal, in the agent's words: $GOAL$",
@@ -460,6 +460,28 @@
     "placeholders": {
       "count": {
         "content": "$1"
+      }
+    }
+  },
+  "refusalsGap": {
+    "message": "From $FROM$ to $TO$ the agents' journal was not written: refusals and failures in that time are not recorded.",
+    "placeholders": {
+      "from": {
+        "content": "$1"
+      },
+      "to": {
+        "content": "$2"
+      }
+    }
+  },
+  "refusalDoorFailureLine": {
+    "message": "$WHEN$, Okolos Agent failure at the door: $WHAT$",
+    "placeholders": {
+      "when": {
+        "content": "$1"
+      },
+      "what": {
+        "content": "$2"
       }
     }
   }

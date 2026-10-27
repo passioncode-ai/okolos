@@ -347,7 +347,8 @@
    "status": "pending",
    "blocked_by": [
     "N-023",
-    "N-024"
+    "N-024",
+    "N-007"
    ],
    "serves": "REQ-59",
    "check": "pnpm -s exec vitest run apps/agent/src/tasks && pnpm -s run typecheck",
@@ -389,7 +390,8 @@
     "N-009",
     "N-010",
     "N-012",
-    "N-022"
+    "N-022",
+    "N-007"
    ],
    "serves": "REQ-55",
    "check": "pnpm -s exec vitest run apps/agent/src/agent.test.ts apps/agent/src/verbs && pnpm -s run typecheck",
@@ -476,7 +478,8 @@
    "status": "pending",
    "blocked_by": [
     "N-013",
-    "N-024"
+    "N-024",
+    "N-007"
    ],
    "serves": "REQ-66",
    "check": "python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts tools/agent-locales.test.ts",
@@ -529,7 +532,8 @@
    "blocked_by": [
     "N-011",
     "N-012",
-    "N-015"
+    "N-015",
+    "N-007"
    ],
    "serves": "REQ-63",
    "check": "pnpm -s exec vitest run tools/install-agent.test.ts tools/runbook.test.ts",
@@ -965,6 +969,11 @@
    "payload": "apps/agent: package.json, tsconfig"
   },
   {
+   "from": "N-007",
+   "to": "N-009",
+   "payload": "checkFreeText для цели задачи"
+  },
+  {
    "from": "N-022",
    "to": "N-010",
    "payload": "CdpTransport, onExit, CdpError, timeoutMs на вызов"
@@ -1015,6 +1024,11 @@
    "payload": "CdpError.kind и cdpCode для перевода в отказы контракта"
   },
   {
+   "from": "N-007",
+   "to": "N-011",
+   "payload": "Pairing: open, close, flush, list, onNotice, onReload"
+  },
+  {
    "from": "N-023",
    "to": "N-012",
    "payload": "CensusEntry"
@@ -1043,6 +1057,11 @@
    "from": "N-024",
    "to": "N-014",
    "payload": "resource: apps/agent/_locales/{ru,en}/messages.json; N-014 дописывает строки страницы после строк службы N-024"
+  },
+  {
+   "from": "N-007",
+   "to": "N-014",
+   "payload": "NameRefusal, StoreRefusal, ClaimRefusal, EndCause: коды, которым нужны слова"
   },
   {
    "from": "N-006",
@@ -1088,6 +1107,11 @@
    "from": "N-015",
    "to": "N-016",
    "payload": "статика страницы"
+  },
+  {
+   "from": "N-007",
+   "to": "N-016",
+   "payload": "путь и формат списка доступов для doctor"
   },
   {
    "from": "N-015",

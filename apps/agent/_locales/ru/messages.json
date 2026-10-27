@@ -116,7 +116,7 @@
     "message": "Задачи агентов сейчас"
   },
   "tasksEmpty": {
-    "message": "Сейчас ни один агент не работает в браузере."
+    "message": "Сейчас ни у одного агента нет открытой задачи."
   },
   "taskGoal": {
     "message": "Цель словами агента: $GOAL$",
@@ -460,6 +460,28 @@
     "placeholders": {
       "count": {
         "content": "$1"
+      }
+    }
+  },
+  "refusalsGap": {
+    "message": "С $FROM$ до $TO$ журнал агентов не писался: отказы и сбои за это время не записаны.",
+    "placeholders": {
+      "from": {
+        "content": "$1"
+      },
+      "to": {
+        "content": "$2"
+      }
+    }
+  },
+  "refusalDoorFailureLine": {
+    "message": "$WHEN$, сбой Okolos Agent на двери: $WHAT$",
+    "placeholders": {
+      "when": {
+        "content": "$1"
+      },
+      "what": {
+        "content": "$2"
       }
     }
   }

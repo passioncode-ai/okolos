@@ -6,7 +6,8 @@
   "бандл из tools/build-agent.mjs; набор Fabric: writeDescriptor, launchdPlist, launchdInstall, launchdUninstall, pruneReleases",
   "N-011: точка входа main",
   "N-012: инструмент переписи",
-  "N-015: статика страницы"
+  "N-015: статика страницы",
+  "N-007: путь и формат списка доступов для doctor"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -41,6 +42,7 @@
   "--uninstall --purge удаляет и данные Okolos Agent: список доступов, журнал агентов, события, логи; без --purge они остаются, и установщик это говорит (SCN-023, SCN-024: стирание и выгрузка расширения их не касаются) (проверка product N-013 круг 6)",
   "--uninstall --purge удаляет и профиль Chrome агента (проверки N-013 круг 7)",
   "okolos-agent doctor на списке доступов, который не записывается (нет прав на файл или каталог, нет места), называет проблему с путём и причиной: это обещают pairingStoreUnwritable и agentRevokeFailed (проверки N-013 круг 10)",
+  "okolos-agent doctor называет и сбой выгрузки журнала (права на каталог журнала, место на диске), который обещает journalExportFailed (проверки N-013 круг 11)",
   "проверка узла: pnpm -s exec vitest run tools/install-agent.test.ts tools/runbook.test.ts"
  ],
  "guards": [

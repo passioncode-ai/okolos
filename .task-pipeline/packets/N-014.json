@@ -5,7 +5,8 @@
  "inputs": [
   "—",
   "N-013: список строк экранов",
-  "N-024: resource: apps/agent/_locales/{ru,en}/messages.json; N-014 дописывает строки страницы после строк службы N-024"
+  "N-024: resource: apps/agent/_locales/{ru,en}/messages.json; N-014 дописывает строки страницы после строк службы N-024",
+  "N-007: NameRefusal, StoreRefusal, ClaimRefusal, EndCause: коды, которым нужны слова"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
