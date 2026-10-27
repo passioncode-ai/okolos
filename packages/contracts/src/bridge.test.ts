@@ -46,6 +46,7 @@ import {
   inScope,
   isLocalAddress,
   isLocalHost,
+  isLocalName,
   originOf,
   refusalKey,
   refuse,
@@ -179,6 +180,65 @@ describe('a task scope', () => {
     ]) {
       expect(validateScope({ ...base, origins: { read: [url], write: [] } }).ok, url).toBe(true)
       expect(isLocalHost(new URL(url).hostname), url).toBe(false)
+    }
+  })
+
+  it('refuses a name reserved or conventional for the local network, in any case and with a trailing dot', () => {
+    // A name like printer.lan or nas.home.arpa reaches a machine inside the
+    // person's network whatever address it resolves to (unit N-023, r2).
+    const refused: Record<string, string> = {
+      'http://localhost/': 'http://localhost',
+      'http://app.localhost/': 'http://app.localhost',
+      'http://printer.local/': 'http://printer.local',
+      'http://home.arpa/': 'http://home.arpa',
+      'http://router.home.arpa/': 'http://router.home.arpa',
+      'http://ROUTER.HOME.ARPA./': 'http://router.home.arpa.',
+      'http://db.internal/': 'http://db.internal',
+      'http://DB.Internal./': 'http://db.internal.',
+      'http://nas.lan/': 'http://nas.lan',
+      'http://NAS.LAN./': 'http://nas.lan.',
+      'http://wiki.intranet/': 'http://wiki.intranet',
+      'http://mail.corp/': 'http://mail.corp',
+      'http://tv.home/': 'http://tv.home',
+      'http://vault.private/': 'http://vault.private',
+      'http://router/': 'http://router',
+      'http://nas:5000/': 'http://nas:5000',
+      'http://internal/': 'http://internal',
+      'http://Router./': 'http://router.',
+      // Punycode: an internationalised label under a local suffix, and a
+      // single internationalised label, are refused like their ASCII peers.
+      'http://xn--80ak6aa92e.local/': 'http://xn--80ak6aa92e.local',
+      'http://пример.lan/': 'http://xn--e1afmkfd.lan',
+      'http://xn--p1ai/': 'http://xn--p1ai',
+      // The parser maps full-width letters to ASCII before the rule reads them.
+      'http://printer.\uff4c\uff41\uff4e/': 'http://printer.lan',
+    }
+    for (const [url, origin] of Object.entries(refused)) {
+      expect(validateScope({ ...base, origins: { read: [url], write: [] } }), url).toEqual({
+        ok: false,
+        reason: `origins.read: not a public origin: ${origin}`,
+      })
+      expect(isLocalName(new URL(url).hostname), url).toBe(true)
+    }
+  })
+
+  it('accepts a delegated name, which the daemon judges by the address it resolves to', () => {
+    // fritz.box resolves to the router, but .box is a delegated TLD: the
+    // response-address check (N-011) refuses it, not the name.
+    for (const url of [
+      'http://fritz.box/',
+      'https://example.com/',
+      'https://example.com./',
+      'https://local.example/',
+      'https://internal.example.com/',
+      'https://lan.example/',
+      'https://home.arpa.example/',
+      'https://corp.example/',
+      'https://xn--e1afmkfd.xn--p1ai/',
+      'https://пример.рф/',
+    ]) {
+      expect(validateScope({ ...base, origins: { read: [url], write: [] } }).ok, url).toBe(true)
+      expect(isLocalName(new URL(url).hostname), url).toBe(false)
     }
   })
 
@@ -356,6 +416,67 @@ describe('this machine or the local network', () => {
   it('is exported from the package entry', () => {
     expect(typeof isLocalHost).toBe('function')
     expect(contracts.isLocalHost).toBe(isLocalHost)
+  })
+})
+
+describe('a name reserved or conventional for the local network', () => {
+  it('is each listed suffix and the bare reserved names, in any case, with or without a trailing dot', () => {
+    for (const name of [
+      'localhost',
+      'LOCALHOST.',
+      'app.localhost',
+      'printer.local',
+      'Printer.Local.',
+      'home.arpa',
+      'nas.home.arpa',
+      'NAS.HOME.ARPA.',
+      'db.internal',
+      'nas.lan',
+      'wiki.intranet',
+      'mail.corp',
+      'tv.home',
+      'vault.private',
+      'xn--80ak6aa92e.internal',
+    ]) {
+      expect(isLocalName(name), name).toBe(true)
+    }
+  })
+
+  it('is any single-label host, including one that is itself a reserved word', () => {
+    for (const name of ['router', 'nas', 'internal', 'INTERNAL.', 'lan', 'corp', 'arpa', 'xn--p1ai', 'пример']) {
+      expect(isLocalName(name), name).toBe(true)
+    }
+  })
+
+  it('is not a delegated name, nor a reserved word used as an ordinary label', () => {
+    for (const name of [
+      'fritz.box',
+      'example.com',
+      'example.com.',
+      'local.example',
+      'localhost.example',
+      'internal.example.com',
+      'home.arpa.example',
+      'myhome.arpa',
+      'xn--e1afmkfd.xn--p1ai',
+      'пример.рф',
+    ]) {
+      expect(isLocalName(name), name).toBe(false)
+    }
+  })
+
+  it('leaves addresses to isLocalHost, so an address is never judged as a name', () => {
+    for (const address of ['8.8.8.8', '127.0.0.1', '2130706433', '[::1]', '::1', '[2001:db8::1]', 'fe80::1%en0']) {
+      expect(isLocalName(address), address).toBe(false)
+    }
+  })
+
+  it('is assumed for anything that is not a host at all, so a garbled answer never reads as public', () => {
+    for (const junk of UNREADABLE_HOSTS) expect(isLocalName(junk), junk).toBe(true)
+  })
+
+  it('is exported from the package entry', () => {
+    expect(contracts.isLocalName).toBe(isLocalName)
   })
 })
 

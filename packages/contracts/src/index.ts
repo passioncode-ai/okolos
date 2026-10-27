@@ -88,6 +88,7 @@ export {
   inScope,
   isLocalAddress,
   isLocalHost,
+  isLocalName,
   originOf,
   refusalKey,
   refuse,

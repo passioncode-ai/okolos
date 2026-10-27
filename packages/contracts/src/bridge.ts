@@ -526,7 +526,8 @@ function normaliseOrigins(value: unknown): { ok: true; list: string[] } | { ok: 
     if (typeof item !== 'string') return { ok: false, reason: 'every origin must be a string' } // i18n-exempt: a refusal read by the agent over MCP, not by the person
     const origin = originOf(item)
     if (origin === null) return { ok: false, reason: `not an http(s) origin: ${item}` } // i18n-exempt: a refusal read by the agent over MCP, not by the person
-    if (isLocalHost(new URL(origin).hostname)) return { ok: false, reason: `not a public origin: ${origin}` } // i18n-exempt: a refusal read by the agent over MCP, not by the person
+    const host = new URL(origin).hostname
+    if (isLocalHost(host) || isLocalName(host)) return { ok: false, reason: `not a public origin: ${origin}` } // i18n-exempt: a refusal read by the agent over MCP, not by the person
     if (!list.includes(origin)) list.push(origin)
   }
   return { ok: true, list }
@@ -580,6 +581,55 @@ export function isLocalHost(host: string): boolean {
   if (name === 'local' || name.endsWith('.local')) return true
   const v4 = ipv4Octets(name)
   return v4 !== null && isLocalIPv4(v4)
+}
+
+/**
+ * Names reserved or conventional for local networks: a name under one of these
+ * suffixes reaches a machine inside the person's network whatever address it
+ * resolves to. Sources: RFC 6761 §6.3 (`localhost`), RFC 6762 (`local`, mDNS),
+ * RFC 6762 Appendix G (`intranet`, `internal`, `private`, `corp`, `home`, `lan`,
+ * the names private networks use), RFC 8375 (`home.arpa`), and the ICANN board's
+ * 2024 reservation of `internal` for private use.
+ */
+const LOCAL_NAME_SUFFIXES: readonly string[] = [
+  'localhost',
+  'local',
+  'home.arpa',
+  'internal',
+  'lan',
+  'intranet',
+  'corp',
+  'home',
+  'private',
+]
+
+/**
+ * Whether a hostname is a name reserved or conventional for the local network
+ * (unit N-023, r2): `localhost` and `*.localhost`, `*.local`, `home.arpa` and
+ * `*.home.arpa`, `*.internal`, `*.lan`, `*.intranet`, `*.corp`, `*.home`,
+ * `*.private` (sources at `LOCAL_NAME_SUFFIXES`), and any single-label host
+ * (`router`, `nas`), which only a local resolver or search domain can answer.
+ *
+ * Case and a trailing dot do not matter, and the URL parser first maps the name
+ * to its ASCII form (punycode, full-width letters folded), so each name has one
+ * spelling to recognise. An address literal is not a name and is `false` here:
+ * `isLocalHost` judges addresses. A string that is not a host at all is `true`,
+ * as in `isLocalHost`.
+ *
+ * A name outside this list is judged by the address it resolves to: a delegated
+ * TLD such as `.box` (`fritz.box` answers with the router's address) passes
+ * here, and the daemon refuses it when the response comes from a local address
+ * (`isLocalAddress`, N-011).
+ */
+export function isLocalName(host: string): boolean {
+  const canonical = canonicalHost(host)
+  if (canonical === null) return true
+  if (canonical.startsWith('[')) return false
+  const name = canonical.replace(/\.+$/, '')
+  if (name === '') return true
+  if (ipv4Octets(name) !== null) return false
+  if (!name.includes('.')) return true
+  return LOCAL_NAME_SUFFIXES.some((suffix) => name === suffix || name.endsWith(`.${suffix}`))
 }
 
 /**
