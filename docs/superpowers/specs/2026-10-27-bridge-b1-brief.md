@@ -62,7 +62,9 @@
 - **Не входит (с причиной):** действия `click`/`fill`/… и панель подтверждений (Б2); расширение
   Okolos Bridge и native host (Б2); завершение чужих процессов уборщиком (Б3); сторож дрейфа (Б3);
   Firefox и Safari (Б5); вызов через хаб Fabric `agent.call` (хаб не готов, `knowledge/roadmap.md`);
-  замеры B-143…B-145.
+  замеры B-143…B-145; Windows и Linux: Б1 ставится и работает только на macOS (каталоги в `~/Library`,
+  launchd, `security`: `apps/agent/src/service/dirs.ts`), Windows идёт отдельной фазой, строка B-171
+  (решение 2026-10-27, B-167).
 
 ## Требования
 
