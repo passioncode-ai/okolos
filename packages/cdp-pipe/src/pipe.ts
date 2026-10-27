@@ -110,7 +110,7 @@ const POLL_MS = 25
  */
 const EXIT_AFTER_PIPE_MS = 500
 
-export class CdpPipe {
+export class CdpPipe implements CdpTransport {
   readonly pid: number
 
   private readonly child: ChildProcess
@@ -203,8 +203,12 @@ export class CdpPipe {
     })
   }
 
-  /** Sends one CDP command, to the browser or (with sessionId) to an attached target. */
-  send<T = unknown>(method: string, params?: object, sessionId?: string): Promise<T> {
+  /**
+   * Sends one CDP command, to the browser or (with sessionId) to an attached
+   * target. opts.timeoutMs replaces requestTimeoutMs for this call alone.
+   */
+  send<T = unknown>(method: string, params?: object, sessionId?: string, opts?: SendOptions): Promise<T> {
+    const timeoutMs = opts?.timeoutMs ?? this.requestTimeoutMs
     const id = this.nextId++
     const message = { id, method, params: params ?? {}, ...(sessionId === undefined ? {} : { sessionId }) }
     return new Promise<T>((resolve, reject) => {
@@ -214,8 +218,8 @@ export class CdpPipe {
       }
       const timer = setTimeout(() => {
         this.waiting.delete(id)
-        reject(new CdpError('timeout', method, `no answer within ${this.requestTimeoutMs} ms`))
-      }, this.requestTimeoutMs)
+        reject(new CdpError('timeout', method, `no answer within ${timeoutMs} ms`))
+      }, timeoutMs)
       this.waiting.set(id, {
         method,
         resolve: (result) => {

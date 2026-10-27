@@ -216,6 +216,13 @@ describe('the transport a consumer depends on', () => {
     expect(created.targetId).toBe('T-1')
     expect(sent).toEqual([{ method: 'Target.createTarget', timeoutMs: 500 }])
   })
+
+  it('is what CdpPipe.launch hands out, held unbound as the consumer holds it', async () => {
+    const launch: (options: LaunchOptions) => Promise<CdpTransport> = CdpPipe.launch
+    const transport = await launch({ binary: process.execPath, args: [FAKE], userDataDir: PROFILE })
+    launched.push(transport.pid)
+    expect(await transport.send('Fake.echo', { n: 1 }, undefined, { timeoutMs: 5000 })).toEqual({ n: 1 })
+  })
 })
 
 describe('every failure of send is a CdpError of its kind', () => {
@@ -260,6 +267,26 @@ describe('every failure of send is a CdpError of its kind', () => {
     expect(error.kind).toBe('closed')
     expect(error.method).toBe('Fake.silence')
     expect((await rejectionOf(pipe.send('Fake.echo'))).kind).toBe('closed')
+  })
+})
+
+describe('a deadline for one request', () => {
+  it('shortens the pipe default for that call only', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    // With the default of 60 s this would outlive the test; 200 ms must win.
+    const error = await rejectionOf(pipe.send('Fake.silence', {}, undefined, { timeoutMs: 200 }))
+    expect(error.kind).toBe('timeout')
+    expect(error.message).toContain('within 200 ms')
+  })
+
+  it('lengthens the pipe default for that call only, and the next call has the default again', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 200 })
+    // The answer comes after 600 ms: past the default, well inside the call's 5 s.
+    expect(await pipe.send('Fake.delay', { ms: 600 }, undefined, { timeoutMs: 5000 })).toEqual({ after: 600 })
+
+    const error = await rejectionOf(pipe.send('Fake.silence'))
+    expect(error.kind).toBe('timeout')
+    expect(error.message).toContain('within 200 ms')
   })
 })
 

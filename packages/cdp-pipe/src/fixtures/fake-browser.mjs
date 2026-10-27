@@ -8,6 +8,7 @@
  *   Fake.echo            -> result: the params it was sent, plus the sessionId if any
  *   Fake.argv            -> result: { argv } (the arguments after the script path)
  *   Fake.silence         -> never answers (the timeout test)
+ *   Fake.delay           -> answers { after: params.ms } once params.ms have passed
  *   Fake.garbage         -> writes a frame that is not JSON, then answers
  *   Fake.fail            -> error: { code: -32000, message: params.message }
  *   Fake.emit            -> sends the event params.event (with params.sessionId, if
@@ -64,6 +65,8 @@ function handle(message) {
       return write({ id, result: { argv } })
     case 'Fake.silence':
       return undefined
+    case 'Fake.delay':
+      return setTimeout(() => write({ id, result: { after: params.ms } }), params.ms)
     case 'Fake.garbage':
       toOwner.write('this is not JSON\0')
       return write({ id, result: { after: 'garbage' } })
