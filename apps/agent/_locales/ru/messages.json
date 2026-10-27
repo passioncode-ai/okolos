@@ -9,7 +9,7 @@
     "message": "Просят доступ"
   },
   "pairingAgentName": {
-    "message": "$NAME$ (так агент назвал себя сам)",
+    "message": "Агент $NAME$ (имя он дал себе сам)",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -45,7 +45,7 @@
     "message": "Отклонить"
   },
   "pairingConfirmed": {
-    "message": "Доступ для агента $NAME$ подтверждён. Агент заберёт ключ в течение пяти минут.",
+    "message": "Доступ для агента $NAME$ подтверждён. Ключ можно забрать в течение пяти минут.",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -74,9 +74,6 @@
       }
     }
   },
-  "pairedNever": {
-    "message": "вызовов ещё не было"
-  },
   "pairedTasks": {
     "message": "Открытых задач: $COUNT$",
     "placeholders": {
@@ -97,10 +94,10 @@
     }
   },
   "pairingEmpty": {
-    "message": "Ни один агент не подключён."
+    "message": "Ни у одного агента нет доступа."
   },
   "pairingHow": {
-    "message": "Агент просит доступ командой okolos-agent pair в терминале. Его код появится здесь. Адрес двери: $URL$.",
+    "message": "Агент просит доступ командой okolos-agent pair --name \"<имя>\" в терминале. Его код появится здесь. Адрес двери: $URL$",
     "placeholders": {
       "url": {
         "content": "$1"
@@ -108,7 +105,7 @@
     }
   },
   "pairingStoreError": {
-    "message": "Список доступов не читается: $WHAT$. Пока его не починить, дверь отказывает всем агентам.",
+    "message": "Список доступов не читается: $WHAT$. Пока его не починят, каждый вызов с ключом кончается сбоем Okolos Agent: ключ проверить нельзя. Новые запросы доступа не принимаются. Запустите okolos-agent doctor: он покажет, что с файлом.",
     "placeholders": {
       "what": {
         "content": "$1"
@@ -119,7 +116,7 @@
     "message": "Задачи агентов сейчас"
   },
   "tasksEmpty": {
-    "message": "Сейчас ни один агент не работает в браузере."
+    "message": "Сейчас ни у одного агента нет открытой задачи."
   },
   "taskGoal": {
     "message": "Цель словами агента: $GOAL$",
@@ -138,7 +135,7 @@
     }
   },
   "taskSteps": {
-    "message": "Шагов $USED$ из $BUDGET$",
+    "message": "Шаги: $USED$ из $BUDGET$",
     "placeholders": {
       "used": {
         "content": "$1"
@@ -162,31 +159,26 @@
   "taskWindowClosed": {
     "message": "Окно агента закрыто"
   },
-  "tasksError": {
-    "message": "Список задач не читается: $WHAT$. Пока его не починить, новые задачи не открываются.",
-    "placeholders": {
-      "what": {
-        "content": "$1"
-      }
-    }
-  },
   "refusalsHeading": {
-    "message": "Последние отказы"
+    "message": "Последние отказы и сбои"
   },
   "refusalsEmpty": {
-    "message": "Отказов не было."
+    "message": "В журнале агентов отказов и сбоев нет."
   },
   "refusalLine": {
-    "message": "$AGENT$: $WHAT$, $WHEN$",
+    "message": "$WHEN$. $AGENT$, вызов «$ASKED$». Отказ: $WHAT$",
     "placeholders": {
-      "agent": {
+      "when": {
         "content": "$1"
       },
-      "what": {
+      "agent": {
         "content": "$2"
       },
-      "when": {
+      "asked": {
         "content": "$3"
+      },
+      "what": {
+        "content": "$4"
       }
     }
   },
@@ -203,7 +195,7 @@
     "message": "сайт вне задачи"
   },
   "refusal_verb_not_in_task": {
-    "message": "действие вне задачи"
+    "message": "задача этого не разрешает"
   },
   "refusal_budget_exhausted": {
     "message": "шаги задачи кончились"
@@ -212,22 +204,22 @@
     "message": "время задачи вышло"
   },
   "refusal_tab_gone": {
-    "message": "вкладку задачи закрыли"
+    "message": "вкладки задачи уже не было"
   },
   "refusal_busy": {
-    "message": "браузер занят другой задачей"
+    "message": "Okolos Agent был занят другой задачей"
   },
   "refusal_in_use_by_person": {
-    "message": "этим окном пользуется человек"
+    "message": "окном агента пользовались вы"
   },
   "refusal_browser_offline": {
-    "message": "Chrome не запущен или недоступен"
+    "message": "Chrome для агентов не запустился или не ответил"
   },
   "refusal_blocked_by_shield": {
-    "message": "защита Okolos остановила действие"
+    "message": "защита Okolos не пропустила вызов"
   },
   "refusal_internal": {
-    "message": "сбой Okolos Agent, ответ не выдан"
+    "message": "ответ не выдан"
   },
   "journalLink": {
     "message": "Выгрузить журнал агентов"
@@ -236,7 +228,7 @@
     "message": "очистка не завершилась, текст не выдан"
   },
   "refusal_stale_cursor": {
-    "message": "эта страница снимка устарела, нужен новый снимок"
+    "message": "курсор не от последнего снимка"
   },
   "eventStarted": {
     "message": "Okolos Agent запущен."
@@ -256,7 +248,7 @@
     "message": "Okolos Agent останавливается и новую работу не берёт. Повторите, когда он снова запустится."
   },
   "eventsUnreadable": {
-    "message": "В файле событий нашлись нечитаемые строки: $COUNT$. При запуске они удалены, остальные события сохранены.",
+    "message": "В файле событий нашлись нечитаемые строки: $COUNT$. При запуске они удалены.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -264,7 +256,7 @@
     }
   },
   "pairingCollecting": {
-    "message": "Подтверждено. Агент забирает ключ до $TIME$.",
+    "message": "Подтверждено. Ключ ждёт агента до $TIME$.",
     "placeholders": {
       "time": {
         "content": "$1"
@@ -272,10 +264,10 @@
     }
   },
   "pairingClaimExpired": {
-    "message": "Агент не забрал ключ за пять минут. Доступ не выдан, агенту нужно попросить снова."
+    "message": "Ключ не забран за пять минут. Доступ не выдан, агенту нужно попросить снова."
   },
   "pairingDuplicate": {
-    "message": "Ещё один запрос с таким же именем. Сверьте код особенно внимательно."
+    "message": "Имя похоже на имя другого запроса. Сверьте код особенно внимательно."
   },
   "pairingAsked": {
     "message": "Запросил в $TIME$",
@@ -284,5 +276,216 @@
         "content": "$1"
       }
     }
+  },
+  "pairedSinceNever": {
+    "message": "Доступ с $DATE$, вызовов ещё не было",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "refusalDoorLine": {
+    "message": "$WHEN$, отказ на двери: $WHAT$",
+    "placeholders": {
+      "when": {
+        "content": "$1"
+      },
+      "what": {
+        "content": "$2"
+      }
+    }
+  },
+  "rejection_bad_host": {
+    "message": "вызов не был адресован Okolos Agent"
+  },
+  "rejection_bad_origin": {
+    "message": "вызов нёс заголовок Origin, как у веб-страницы"
+  },
+  "rejection_cross_site": {
+    "message": "вызов нёс заголовки Sec-Fetch-*, как у браузера"
+  },
+  "rejection_bad_content_type": {
+    "message": "вызов в неверном формате"
+  },
+  "rejection_bad_request": {
+    "message": "вызов не удалось разобрать"
+  },
+  "rejection_stopping": {
+    "message": "Okolos Agent останавливался"
+  },
+  "rejection_not_paired": {
+    "message": "у вызова нет действующего ключа доступа"
+  },
+  "journalError": {
+    "message": "Журнал агентов не записался: $WHAT$. Пока запись не пройдёт, каждый вызов агента кончается сбоем Okolos Agent, а содержимое страниц агентам не выдаётся. Запустите okolos-agent doctor: он покажет, что с журналом.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingLooksLikeAgent": {
+    "message": "Похожее имя есть среди агентов с доступом, они перечислены ниже. Сверьте код особенно внимательно."
+  },
+  "agentRevokeFailed": {
+    "message": "Доступ агента $NAME$ не отозван: список доступов не записался. Агент по-прежнему может работать. Попробуйте ещё раз. Если не выйдет, запустите okolos-agent doctor.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "verb_open": {
+    "message": "открыть страницу"
+  },
+  "verb_snapshot": {
+    "message": "сделать снимок страницы"
+  },
+  "verb_read": {
+    "message": "прочитать текст страницы"
+  },
+  "verb_get": {
+    "message": "узнать адрес, заголовок, текст или число элементов"
+  },
+  "verb_waitFor": {
+    "message": "подождать на странице"
+  },
+  "verb_close": {
+    "message": "закрыть окно агента"
+  },
+  "verb_session_open": {
+    "message": "открыть задачу"
+  },
+  "verb_hygiene_census": {
+    "message": "провести перепись процессов"
+  },
+  "agentLabel": {
+    "message": "Агент $NAME$ (доступ с $DATE$)",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "date": {
+        "content": "$2"
+      }
+    }
+  },
+  "agentLabelRevoked": {
+    "message": "Агент $NAME$ (доступ с $DATE$, отозван)",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "date": {
+        "content": "$2"
+      }
+    }
+  },
+  "rejection_store_unreadable": {
+    "message": "список доступов не читался, ключ не проверен"
+  },
+  "journalUnreadable": {
+    "message": "Журнал агентов не читается: $WHAT$. Отказы и сбои здесь не показаны. Запустите okolos-agent doctor: он покажет, что с журналом.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
+  },
+  "refusalsIncomplete": {
+    "message": "Список неполный: пока запись в журнал агентов не проходит, отказы и сбои в него не попадают."
+  },
+  "pageSessionExpired": {
+    "message": "Сеанс страницы истёк. Откройте Okolos Agent заново в Fabric Dashboards."
+  },
+  "pageStopping": {
+    "message": "Okolos Agent останавливается. Откройте страницу снова, когда он запустится."
+  },
+  "taskProfileAgent": {
+    "message": "Профиль агента, где сохраняются входы на сайты"
+  },
+  "taskProfileDisposable": {
+    "message": "Временный профиль, входы на сайты не сохраняются"
+  },
+  "pairedAgentName": {
+    "message": "Агент $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "journalExportFailed": {
+    "message": "Журнал агентов не выгрузился: $WHAT$. Запустите okolos-agent doctor: он покажет, что с журналом.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
+  },
+  "refusalFailureLine": {
+    "message": "$WHEN$. $AGENT$, вызов «$ASKED$». Сбой Okolos Agent: $WHAT$",
+    "placeholders": {
+      "when": {
+        "content": "$1"
+      },
+      "agent": {
+        "content": "$2"
+      },
+      "asked": {
+        "content": "$3"
+      },
+      "what": {
+        "content": "$4"
+      }
+    }
+  },
+  "pairingStoreUnwritable": {
+    "message": "Список доступов не записался: $WHAT$. Пока запись не пройдёт, выдать или отозвать доступ нельзя, агенты с доступом работают как прежде. Запустите okolos-agent doctor: он покажет, что с файлом.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingGone": {
+    "message": "Этого запроса уже нет: он истёк или его отклонили."
+  },
+  "agentGone": {
+    "message": "У этого агента уже нет доступа."
+  },
+  "journalLinesSkipped": {
+    "message": "В журнале агентов нашлись нечитаемые строки: $COUNT$. Здесь они пропущены.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "refusalsGap": {
+    "message": "С $FROM$ до $TO$ журнал агентов не писался: отказы и сбои за это время не записаны.",
+    "placeholders": {
+      "from": {
+        "content": "$1"
+      },
+      "to": {
+        "content": "$2"
+      }
+    }
+  },
+  "refusalDoorFailureLine": {
+    "message": "$WHEN$, сбой Okolos Agent на двери: $WHAT$",
+    "placeholders": {
+      "when": {
+        "content": "$1"
+      },
+      "what": {
+        "content": "$2"
+      }
+    }
+  },
+  "pairingGrants": {
+    "message": "Доступ позволит агенту открывать сайты своих задач в окне агента и читать перепись процессов этого компьютера, без командных строк."
   }
 }

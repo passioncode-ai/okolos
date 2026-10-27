@@ -16,18 +16,22 @@
    "apps/agent/src/pairing/pairing.ts",
    "apps/agent/src/pairing/name.ts",
    "apps/agent/src/pairing/pairing.test.ts",
-   "apps/agent/src/pairing/name.test.ts"
+   "apps/agent/src/pairing/name.test.ts",
+   "apps/agent/package.json",
+   "apps/agent/tsconfig.json",
+   "pnpm-lock.yaml",
+   "tools/reachable.test.ts"
   ]
  },
  "outputs": [
-  "`class Pairing { static open(file): Pairing; request(agentName, now): {requestId, code, expiresAt} | {refused: reason}; confirm(requestId, now); decline(requestId); claim(requestId, now): {key} | {pending: true} | null; verify(key): AgentRecord | null; revoke(agentId); list(now): {requests: PublicRequest[] /* без requestId, с handle для страницы */, agents}; confirmByHandle(handle, now); declineByHandle(handle) }`; `checkAgentName(name): string | null` (причина отказа)"
+  "`class Pairing { static open(file, options?): Pairing /* записи проверяются мягким правилом хранения isStorableName; отказ при повторе agentId или keyHash, лишних полях, файле больше 1 МБ */; verify(key): AgentRecord | null /* по stat замечает изменённый файл и перечитывает его */; touch(agentId, now): boolean; flush(): void; close(now): void /* открытые запросы истекают с cause 'stopped' */; request(agentName, now): {requestId, code, expiresAt} | {refused: RequestRefusal}; confirmByHandle(handle, now): boolean; declineByHandle(handle, now): boolean; claim(requestId, now): {key} | {pending: true} | {refused: ClaimRefusal /* declined|expired|claim_expired|claimed|stopped|unknown */}; revoke(agentId, now): AgentRecord | null; list(now) /* тоже перечитывает изменённый файл */ }`; запись перечитывает изменённый на диске файл и применяет действие к нему; `PairingOptions {random, onNotice, onNoticeError, onReload({removed: agentId[]})}`; при перечитывании агенты, пропавшие из файла или со сменённым keyHash, получают событие revoked; каждый метод с `now` бросает TypeError, если `now` не целое безопасное число ≥ 0; list сначала завершает истёкшие запросы, потом перечитывает файл; `PairingNotice {kind, handle?, agentId?, name, at, cause?: 'timeout'|'stopped'}`; `StoreRefusal = unreadable|not_json|not_a_store|bad_record|unwritable|too_large`; `NameRefusal = name_not_text|name_empty|name_too_long|name_digits|name_bidi|name_control|name_script|name_reserved`; `checkAgentName`, `checkFreeText(text, maxLength)` (длина в единицах UTF-16, как validateScope; ZWJ, ZWNJ и селекторы вариантов разрешены), `nameKeys`, `namesLookAlike`, `isStorableName`"
  ],
  "acceptance": [
   "requestId 128 бит (32 hex), не появляется в list() для страницы, в журнале и событиях",
   "claim до confirm → {pending: true}, нового запроса не создаёт; claim после confirm → ключ 256 бит; второй claim → null; claim позже 5 минут после confirm → null",
   "запрос истекает через 5 минут с создания; больше 3 ожидающих → новый отвергается; больше 6 новых в минуту → отвергается",
   "два ожидающих запроса с одним именем помечены duplicateName оба",
-  "имя агента: > 40 знаков, три цифры подряд, символы управления или bidi → отвергается с причиной (ревью F12)",
+  "имя: до 40 знаков, только латиница A–Z или только базовая кириллица, цифры 0–9 не больше двух, пробел и знаки - _ . ( ) ' / +; ничего, что читается как «Okolos» без пробелов и знаков; без управляющих, невидимых и двунаправленных знаков (решения прогона по adversarial-кругам 3 и 4)",
   "verify через timingSafeEqual по SHA-256; отозванный ключ → null; хранилище 0600, атомарная запись; чужое содержимое файла не открывает хранилище, а даёт ошибку хранилища",
   "confirmByHandle и declineByHandle работают по handle из list(); requestId в роли handle отвергается (аудит #9)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/pairing && pnpm -s run typecheck"

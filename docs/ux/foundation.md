@@ -408,14 +408,14 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 - **Traces:** JTBD-10, JRN-05/#1
 - **Acceptance criteria:**
   - Given an agent that has never connected, when it asks for access through `okolos-agent pair`, then nothing is reachable until the person confirms on the Okolos Agent page, comparing the six-digit code shown in both places.
-  - Given a call to the door without the agent's key, or carrying any `Origin` or `Sec-Fetch-*` header (a web page), then it is refused before any request is made, and the refusal is recorded.
+  - Given a call to `/mcp` without the agent's key, or any call to the door carrying an `Origin` or `Sec-Fetch-*` header (a web page), then it is refused before any request is made, and the refusal is recorded. Asking for access (`POST /pair`) needs no key: that is how a request starts.
   - Code already running as the person is outside what Б1 defends against (spec §11 F4); the story promises protection from agents and pages, not from the person's own processes.
   - Given a paired agent, when the person revokes it, then its next call is refused and any task it holds stops.
 - **Priority:** must
 - **Status:** proposed
 
 ### ST-028: An agent reads my logged-in pages, cleaned, without disturbing me
-- **Story:** As P-01, I want an agent to read pages behind my logins in its own background window, with hidden instructions removed and the page's verdict attached, so that I can delegate reading without the page steering the agent or the agent stealing my focus.
+- **Story:** As P-01, I want an agent to read pages behind my logins in its own background window, with hidden instructions removed and the page's verdict attached, so that I can delegate reading without the page steering the agent or the agent stealing my focus. In Б1 the agent profile has no sign-ins, so the read covers pages that need none; pages behind my logins come with the sign-in step of SCN-047 in Б2.
 - **Traces:** JTBD-10, JTBD-01, JRN-05/#2, JRN-05/#3, JRN-05/#4
 - **Acceptance criteria:**
   - Given a task with its sites named, when the agent asks for a site outside them, then it is refused with a reason it can act on.

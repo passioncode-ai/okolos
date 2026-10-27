@@ -695,7 +695,7 @@ flowchart TD
 
 ### FLW-21: Connect an agent to the browser
 - **Traces:** ST-027 (JTBD-10, JRN-05/#1)
-- **Goal:** an agent the person chose can use the browser, and no other agent and no web page can; code running as the person is outside Б1's boundary (spec §11 F4)
+- **Goal:** an agent the person chose can use the browser, and no other agent through the door and no web page can; code running as the person is outside Б1's boundary (spec §11 F4), and a coding agent with a shell on this machine is such code: in Б1 only the snapshot cleaning stands between a page and it (spec §11 R9)
 - **Entry points:** `okolos-agent pair --name "<name>"` in the terminal; the Okolos Agent page in Fabric Dashboards
 - **Success exit:** the agent is paired, listed with when it got access and its last call, and revocable in one place
 - **Task analysis:**
@@ -709,10 +709,12 @@ flowchart TD
   A[Agent calls the local door] --> K{Paired key?}
   PR[okolos-agent pair: POST /pair] --> P
   K -->|yes| OK[Request handled under the agent's scope]
-  K -->|no key| N
+  K -->|no key| N[Refused and recorded in the agents' journal, SCR-24]
   P[Page: agent X asks for access, code 123 456]
-  P -->|person confirms, codes match| R[Key issued to the agent once; the daemon keeps only its SHA-256]
-  P -->|person refuses or no answer| N[Refused and recorded]
+  P -->|person confirms, codes match| C[Confirmed: the CLI collects the key within five minutes]
+  C -->|collected| R[Key issued to the agent once; the daemon keeps only its SHA-256]
+  C -->|not collected in time| NE
+  P -->|person declines or no answer| NE[Declined or expired, recorded in the service's events]
   R --> OK
   K -->|any Origin or Sec-Fetch header| N
 ```
@@ -734,7 +736,9 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  T[Task opened: sites, verbs, TTL, budget] --> W[Own window, in the background, active tab]
+  ASK[Agent asks to open a task] -->|an address of this machine or the local network, or a reserved local name| IS[Refused: invalid_scope, no task]
+  ASK -->|scope valid| T
+  T[Task opened: goal, sites, verbs, profile, TTL, budget] --> W[Own window, in the background, active tab]
   W --> S[Snapshot: cleaned, verdict attached, in parts]
   S --> A{Action}
   A -->|outside the task's sites| X1[Refused: origin_not_in_task]
@@ -748,7 +752,7 @@ flowchart TD
   STOP[Stop control] -.-> E
 ```
 
-- **Screens traversed:** SCR-24 (Agent activity) in Б1. The approval panel and the hand-off notice are designed in Б2, with the actions they gate.
+- **Screens traversed:** SCR-24 (Agent activity) in Б1. The approval panel, the hand-off notice and the stop control are designed in Б2, with the actions they gate; in Б1 a task whose time limit has passed is closed with its window within a minute by Okolos Agent's timer; a task out of steps refuses further calls and stays until its time runs out, the agent's `close` or the person revokes the agent's access.
 - **The task gets its own window, not a background tab.** Measured 2026-10-06 (`docs/superpowers/evidence/2026-10-06-b0-agent-window.md`): input sent to a background tab never reaches the page, even with focus emulation, while a tab in a separate background window is visible and receives trusted input — and the window does not take the person's focus once it is open.
 - **"Refused" is a policy answer, not an error.** An agent that reads a refusal as a failure retries it; the codes say which kind of no it was, and a retry after a refusal counts against the task's budget.
 

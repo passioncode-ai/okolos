@@ -11,5 +11,6 @@
  "N-012": "pnpm -s exec vitest run apps/agent/src/hygiene && pnpm -s run typecheck && pnpm -s run i18n:sweep",
  "N-015": "pnpm -s exec vitest run apps/agent/src/dashboard && pnpm -s run typecheck",
  "N-024": "pnpm -s exec vitest run apps/agent/src/service && pnpm -s run typecheck && pnpm -s run lint && pnpm -s run i18n:sweep",
- "N-025": "pnpm -s exec vitest run apps/agent/src/service/wellknown.test.ts tools/git-env.test.ts && pnpm -s run gates"
+ "N-025": "pnpm -s exec vitest run apps/agent/src/service/wellknown.test.ts tools/git-env.test.ts && pnpm -s run gates",
+ "N-014": "python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts tools/agent-locales.test.ts"
 }
