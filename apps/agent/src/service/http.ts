@@ -124,8 +124,9 @@ export interface StartOptions {
   readonly handleSignals?: boolean
   /**
    * Told of every request the shell refuses before a route sees it (a foreign Host or Origin, a
-   * cross-site fetch, a target that is not a URL), and awaited before the 403 or 400 is written,
-   * so the daemon can journal the refusal first. A hook that throws makes the answer a 500 with no body.
+   * cross-site fetch, a target that is not a URL, a request that arrives while stopping), and
+   * awaited before the 403, 400 or 503 is written, so the daemon can journal the refusal first.
+   * A hook that throws makes the answer a 500 with no body. The URL comes without its query.
    */
   readonly onRefused?: (req: IncomingMessage, url: URL | null, reason: RefusalReason) => Promise<void>
 }
@@ -232,10 +233,6 @@ export async function startService(options: StartOptions): Promise<RunningServic
   const routes: readonly Route[] = [builtIn, ...(options.routes ?? []), ...added]
   const served = routes.flatMap((route) => route.paths ?? [])
 
-  /** The shell's own degraded sources: unreadable lines found in the events file at start. */
-  const own: readonly DegradedSource[] =
-    events.unreadable > 0 ? [{ source: 'events', reason: say.unreadableEvents(events.unreadable) }] : []
-
   const document = () => {
     const extras = options.wellKnownExtras?.() ?? {}
     return wellKnown({
@@ -244,7 +241,7 @@ export async function startService(options: StartOptions): Promise<RunningServic
       startedAt,
       pid: process.pid,
       status,
-      degraded: [...own, ...(options.degraded?.() ?? [])],
+      degraded: [...(options.degraded?.() ?? [])],
       served,
       ...(extras.actions === undefined ? {} : { actions: extras.actions }),
       ...(extras.extensions === undefined ? {} : { extensions: extras.extensions }),
@@ -284,8 +281,11 @@ export async function startService(options: StartOptions): Promise<RunningServic
     // Defaults a route may replace: a header it sets or writes wins over these.
     for (const [name, value] of Object.entries(COMMON_HEADERS)) res.setHeader(name, value)
     const url = parseTarget(req.url, port)
+    // A throw in this listener would be an uncaught exception that ends the daemon: the log write is quiet.
     res.on('finish', () =>
-      log.write('info', 'request', { method: req.method, path: url?.pathname ?? null, status: res.statusCode }),
+      quietly(() =>
+        log.write('info', 'request', { method: req.method, path: url?.pathname ?? null, status: res.statusCode }),
+      ),
     )
     // The guard answers first, whatever the target looks like.
     const refusal = guard(port, req)
@@ -320,7 +320,10 @@ export async function startService(options: StartOptions): Promise<RunningServic
       })
     } catch (error) {
       if (error instanceof Stopping) {
-        json(res, 503, { error: 'stopping', message: say.refusingWhileStopping() })
+        // Through onRefused like the guard's refusals, so the door journals it before the 503 goes out.
+        await refuse(req, res, url, 'stopping', () =>
+          json(res, 503, { error: 'stopping', message: say.refusingWhileStopping() }),
+        )
         return
       }
       log.write('error', 'route failed', { path: url.pathname, error: errorName(error) })
@@ -380,6 +383,11 @@ export async function startService(options: StartOptions): Promise<RunningServic
   // start rejects: the caller gets no handle, so nothing may be left listening or locked.
   try {
     status = 'ready'
+    // Unreadable lines were removed from the file at this start: told once, as a warning, not a standing
+    // degraded state (nothing is failing after the removal).
+    if (events.unreadable > 0) {
+      events.append('service.events_unreadable', 'warning', say.unreadableEvents(events.unreadable))
+    }
     events.append('service.started', 'info', say.started())
     log.write('info', 'started', { port, pid: process.pid })
   } catch (error) {
@@ -394,8 +402,12 @@ export async function startService(options: StartOptions): Promise<RunningServic
   }
 
   /** The drain's deadline passed with requests open: say so before they are cut. */
+  // One stop, one cut-off: overlapping close() calls (or close() during a signal's drain) all wait on
+  // the same drain, and only the first to see it run out writes the event.
+  let cutOffTold = false
   const markCutOff = (drained: boolean) => {
-    if (drained) return
+    if (drained || cutOffTold) return
+    cutOffTold = true
     const open = drain.inflight
     quietly(() => events.append('service.drain_cut_off', 'warning', say.drainCutOff(open)))
     quietly(() => log.write('warning', 'drain_cut_off', { open }))
@@ -438,7 +450,7 @@ export function operatorSession(codes: LoginCodes, req: { readonly headers: { re
 }
 
 /** Why the shell refused a request before any route saw it. */
-export type RefusalReason = 'bad_host' | 'bad_origin' | 'cross_site' | 'bad_request'
+export type RefusalReason = 'bad_host' | 'bad_origin' | 'cross_site' | 'bad_request' | 'stopping'
 
 /**
  * The kit's checkRequest, asked one header at a time so the refusal carries its reason. The

@@ -478,7 +478,7 @@ describe('what a person reads comes from the agent catalogue', () => {
     expect(started?.text).toBe(message('en', 'eventStarted'))
   })
 
-  it('the refusal while stopping, and the degraded reason for unreadable events lines', async () => {
+  it('the refusal while stopping, and the one-time warning for unreadable events lines', async () => {
     let release: () => void = () => {}
     const held = new Promise<void>((resolve) => (release = resolve))
     let entered: () => void = () => {}
@@ -495,8 +495,8 @@ describe('what a person reads comes from the agent catalogue', () => {
     writeFileSync(servicePaths(dirs).events, 'torn', { mode: 0o600 })
     const { service } = await start({ dirs, routes: [slow, later], locale: 'en' })
 
-    const doc = JSON.parse((await call(service.port, '/.well-known/fabric-service')).body)
-    expect(doc.degraded[0].reason).toBe(message('en', 'eventsUnreadable')?.replace('$COUNT$', '1'))
+    const warned = (await feed(service.port, dirs)).find((e) => e.kind === 'service.events_unreadable')
+    expect(warned?.text).toBe('The events file had unreadable lines: 1. They were removed at start; the other events are kept.')
 
     const inFlight = call(service.port, '/slow')
     await inside
@@ -566,6 +566,67 @@ describe('fix round 2: a start that fails lets everything go, and stopping tells
     chmodSync(servicePaths(dirs).events, 0o600)
     const next = await start({ dirs })
     expect((await call(next.service.port, '/.well-known/fabric-service')).status).toBe(200)
+  })
+
+  it('a log that turns read-only after the start ends no request and no stop', async () => {
+    const dirs = serviceDirs(tempHome())
+    const { service } = await start({ dirs })
+    chmodSync(servicePaths(dirs).serviceLog, 0o400)
+    try {
+      expect((await call(service.port, '/.well-known/fabric-service')).status).toBe(200)
+      expect((await call(service.port, '/.well-known/fabric-service')).status).toBe(200)
+      await service.close()
+      expect(await refused(service.port)).toBe(true)
+    } finally {
+      chmodSync(servicePaths(dirs).serviceLog, 0o600)
+    }
+  })
+
+  it('a request that arrives while stopping goes through onRefused (reason stopping) before its 503', async () => {
+    let release: () => void = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    let entered: () => void = () => {}
+    const inside = new Promise<void>((resolve) => (entered = resolve))
+    const slow: Route = async (_req, res, ctx) => {
+      if (ctx.url.pathname !== '/slow') return false
+      entered()
+      await held
+      res.end('done')
+      return true
+    }
+    const seen: Array<{ path: string | undefined; reason: RefusalReason }> = []
+    let open: () => void = () => {}
+    const gate = new Promise<void>((resolve) => (open = resolve))
+    let called: () => void = () => {}
+    const hooked = new Promise<void>((resolve) => (called = resolve))
+    const { service } = await start({
+      routes: [slow],
+      onRefused: async (_req, url, reason) => {
+        seen.push({ path: url?.pathname, reason })
+        called()
+        await gate
+      },
+    })
+
+    const inFlight = call(service.port, '/slow')
+    await inside
+    const closing = service.close()
+
+    let answered = false
+    const reply = call(service.port, '/mcp?key=never-journaled', { method: 'POST' }).then((r) => {
+      answered = true
+      return r
+    })
+    await hooked
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(answered).toBe(false)
+    open()
+    expect((await reply).status).toBe(503)
+    expect(seen).toEqual([{ path: '/mcp', reason: 'stopping' }])
+
+    release()
+    await inFlight
+    await closing
   })
 
   it('close() finishes shutting down even when its stopping event cannot be written', async () => {
@@ -640,8 +701,9 @@ describe('fix round 2: a start that fails lets everything go, and stopping tells
     const open = call(service.port, '/stuck').catch(() => 'cut')
     await inside
 
+    // Two overlapping close() calls (an owner's stop beside a signal's) are one stop: one cut-off event.
     const started = Date.now()
-    await service.close()
+    await Promise.all([service.close(), service.close()])
     expect(Date.now() - started).toBeGreaterThanOrEqual(7_500)
     expect(await open).toBe('cut')
     release()
@@ -650,9 +712,10 @@ describe('fix round 2: a start that fails lets everything go, and stopping tells
       .trim()
       .split('\n')
       .map((l) => JSON.parse(l) as { kind: string; level: string; text: string })
-    const cut = lines.find((e) => e.kind === 'service.drain_cut_off')
-    expect(cut?.level).toBe('warning')
-    expect(cut?.text).toBe('Okolos Agent остановился, не дождавшись конца запросов (1): они оборваны.')
+    const cuts = lines.filter((e) => e.kind === 'service.drain_cut_off')
+    expect(cuts).toHaveLength(1)
+    expect(cuts[0]?.level).toBe('warning')
+    expect(cuts[0]?.text).toBe('Okolos Agent остановился, не дождавшись конца вызовов. Оборвано: 1.')
     expect(await refused(service.port)).toBe(true)
   })
 
@@ -864,7 +927,7 @@ describe('the host’s routes take the host token', () => {
     expect(answer.status).toBe(400)
   })
 
-  it('a torn line in the events file: the service starts, says so in degraded, and serves the rest', async () => {
+  it('a torn line in the events file: one warning event at start, no degraded source, the rest served', async () => {
     const dirs = serviceDirs(tempHome())
     const paths = servicePaths(dirs)
     mkdirSync(dirs.data, { recursive: true })
@@ -873,13 +936,32 @@ describe('the host’s routes take the host token', () => {
 
     const { service } = await start({ dirs })
     const doc = JSON.parse((await call(service.port, '/.well-known/fabric-service')).body)
-    expect(doc.status).toBe('degraded')
-    expect(doc.degraded).toHaveLength(1)
-    expect(doc.degraded[0].source).toBe('events')
-    expect(doc.degraded[0].reason).toContain('1')
+    expect(doc.status).toBe('ready')
+    expect(doc.degraded).toEqual([])
 
-    const page = JSON.parse((await call(service.port, '/fabric/v1/events', { headers: bearer(dirs) })).body)
-    expect(page.events.map((e: { id: string }) => e.id)).toEqual(['1', '2'])
+    const page = JSON.parse((await call(service.port, '/fabric/v1/events', { headers: bearer(dirs) })).body) as {
+      events: Array<{ id: string; kind: string; level: string; text: string }>
+    }
+    const warnings = page.events.filter((e) => e.kind === 'service.events_unreadable')
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]?.level).toBe('warning')
+    expect(warnings[0]?.text).toBe(
+      'В файле событий нашлись нечитаемые строки: 1. При запуске они удалены, остальные события сохранены.',
+    )
+    expect(page.events.map((e) => e.id)).toEqual(['1', '2', '3'])
+  })
+
+  it('the warning is written once: the next start on the cleaned file writes none', async () => {
+    const dirs = serviceDirs(tempHome())
+    mkdirSync(dirs.data, { recursive: true })
+    writeFileSync(servicePaths(dirs).events, 'torn', { mode: 0o600 })
+    const first = await start({ dirs })
+    await first.service.close()
+    const second = await start({ dirs })
+    const page = JSON.parse((await call(second.service.port, '/fabric/v1/events', { headers: bearer(dirs) })).body) as {
+      events: Array<{ kind: string }>
+    }
+    expect(page.events.filter((e) => e.kind === 'service.events_unreadable')).toHaveLength(1)
   })
 
   it('a clean events file adds no degraded source', async () => {

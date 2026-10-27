@@ -245,7 +245,7 @@
     "message": "Okolos Agent is stopping and takes on no new work."
   },
   "eventDrainCutOff": {
-    "message": "Okolos Agent stopped before $COUNT$ requests finished: they were cut off.",
+    "message": "Okolos Agent stopped before all calls finished. Cut off: $COUNT$.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -256,7 +256,7 @@
     "message": "Okolos Agent is stopping and takes on no new work. Try again once it has started."
   },
   "eventsUnreadable": {
-    "message": "Some lines in the events file cannot be read ($COUNT$). They were skipped at start; the other events are kept.",
+    "message": "The events file had unreadable lines: $COUNT$. They were removed at start; the other events are kept.",
     "placeholders": {
       "count": {
         "content": "$1"

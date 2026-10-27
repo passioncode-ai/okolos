@@ -36,8 +36,15 @@ describe('the sentences the service shell says to a person', () => {
     expect(catalogue('en').eventStopping?.message).toBe('Okolos Agent is stopping and takes on no new work.')
     const ru = serviceMessages('ru', LOCALES)
     const en = serviceMessages('en', LOCALES)
-    expect(ru.drainCutOff(2)).toBe('Okolos Agent остановился, не дождавшись конца запросов (2): они оборваны.')
-    expect(en.drainCutOff(2)).toBe('Okolos Agent stopped before 2 requests finished: they were cut off.')
+    // «Запрос» / "request" is the brand pack's word for an agent's access request: these say «вызов» / "call".
+    expect(ru.drainCutOff(2)).toBe('Okolos Agent остановился, не дождавшись конца вызовов. Оборвано: 2.')
+    expect(en.drainCutOff(1)).toBe('Okolos Agent stopped before all calls finished. Cut off: 1.')
+    expect(ru.unreadableEvents(3)).toBe(
+      'В файле событий нашлись нечитаемые строки: 3. При запуске они удалены, остальные события сохранены.',
+    )
+    expect(en.unreadableEvents(3)).toBe(
+      'The events file had unreadable lines: 3. They were removed at start; the other events are kept.',
+    )
   })
 
   it('refuses a catalogue that lacks a key the service says, naming the key', () => {
