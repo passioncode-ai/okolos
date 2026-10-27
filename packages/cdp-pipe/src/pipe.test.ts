@@ -3,7 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { CdpPipe } from './pipe.js'
+import { CdpPipe, type LaunchOptions } from './pipe.js'
 
 /**
  * Every test here drives a real process: a node script that speaks CDP over
@@ -15,13 +15,10 @@ const PROFILE = path.join(tmpdir(), 'okolos-cdp-pipe-test-profile')
 
 const launched: number[] = []
 
-async function fake(flags: string[] = [], requestTimeoutMs?: number): Promise<CdpPipe> {
-  const pipe = await CdpPipe.launch({
-    binary: process.execPath,
-    args: [FAKE, ...flags],
-    userDataDir: PROFILE,
-    ...(requestTimeoutMs === undefined ? {} : { requestTimeoutMs }),
-  })
+type Extra = Omit<LaunchOptions, 'binary' | 'args' | 'userDataDir'>
+
+async function fake(flags: string[] = [], extra: Extra = {}): Promise<CdpPipe> {
+  const pipe = await CdpPipe.launch({ binary: process.execPath, args: [FAKE, ...flags], userDataDir: PROFILE, ...extra })
   launched.push(pipe.pid)
   return pipe
 }
@@ -79,7 +76,7 @@ describe('launching a browser on a pipe', () => {
   })
 
   it('rejects a request with no answer within requestTimeoutMs, naming the method', async () => {
-    const pipe = await fake([], 300)
+    const pipe = await fake([], { requestTimeoutMs: 300 })
     const started = Date.now()
     await expect(pipe.send('Fake.silence')).rejects.toThrow(/Fake\.silence/)
     expect(Date.now() - started).toBeGreaterThanOrEqual(250)
@@ -130,6 +127,46 @@ describe('launching a browser on a pipe', () => {
     await expect(
       CdpPipe.launch({ binary: path.join(tmpdir(), 'okolos-no-such-browser'), args: [], userDataDir: PROFILE }),
     ).rejects.toThrow(/okolos-no-such-browser/)
+  })
+})
+
+describe('a listener that throws', () => {
+  it('does not stop delivery to the other listeners, nor the pipe, and is reported once', async () => {
+    const reported: Array<{ error: unknown; event: string }> = []
+    const pipe = await fake([], { onListenerError: (error, event) => reported.push({ error, event }) })
+    const boom = new Error('listener bug')
+    pipe.on('Page.loadEventFired', () => {
+      throw boom
+    })
+    const seen: unknown[] = []
+    pipe.on('Page.loadEventFired', (params) => seen.push(params))
+
+    await pipe.send('Fake.emit', { event: 'Page.loadEventFired', params: { timestamp: 7 } })
+
+    expect(seen).toEqual([{ timestamp: 7 }])
+    expect(await pipe.send('Fake.echo', { still: 'answering' })).toEqual({ still: 'answering' })
+    expect(reported).toEqual([{ error: boom, event: 'Page.loadEventFired' }])
+  })
+
+  it('is reported by default as one stderr line naming the event and never the params', async () => {
+    const lines: string[] = []
+    const write = process.stderr.write.bind(process.stderr)
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      lines.push(String(chunk))
+      return true
+    }) as typeof process.stderr.write
+    try {
+      const pipe = await fake()
+      pipe.on('Network.requestWillBeSent', () => {
+        throw new Error('listener bug')
+      })
+      await pipe.send('Fake.emit', { event: 'Network.requestWillBeSent', params: { secret: 'p4ssw0rd-in-params' } })
+    } finally {
+      process.stderr.write = write
+    }
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain('Network.requestWillBeSent')
+    expect(lines[0]).not.toContain('p4ssw0rd-in-params')
   })
 })
 

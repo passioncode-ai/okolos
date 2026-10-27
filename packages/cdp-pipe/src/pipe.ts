@@ -24,6 +24,17 @@ export interface LaunchOptions {
   readonly userDataDir: string
   /** How long a request may wait for its answer before it is rejected. */
   readonly requestTimeoutMs?: number
+  /**
+   * Hears a listener registered with on() that threw. The other listeners and
+   * the pipe go on either way. Default: one stderr line naming the event and
+   * the error's class, never the params (they can carry page content).
+   */
+  readonly onListenerError?: (error: unknown, event: string) => void
+}
+
+function reportListenerError(error: unknown, event: string): void {
+  const kind = error instanceof Error ? error.name : typeof error
+  process.stderr.write(`cdp-pipe: a listener of ${event} threw (${kind})\n`)
 }
 
 /** One message from the browser: an answer (id) or an event (method). */
@@ -55,6 +66,7 @@ export class CdpPipe {
   private readonly child: ChildProcess
   private readonly toBrowser: Writable
   private readonly requestTimeoutMs: number
+  private readonly onListenerError: (error: unknown, event: string) => void
   private nextId = 1
   private pending = ''
   private readonly waiting = new Map<number, Waiting>()
@@ -65,10 +77,11 @@ export class CdpPipe {
   private readonly exit: Promise<void>
   private closing: Promise<void> | undefined
 
-  private constructor(child: ChildProcess, requestTimeoutMs: number) {
+  private constructor(child: ChildProcess, options: LaunchOptions) {
     this.child = child
     this.pid = child.pid as number
-    this.requestTimeoutMs = requestTimeoutMs
+    this.requestTimeoutMs = options.requestTimeoutMs ?? 10_000
+    this.onListenerError = options.onListenerError ?? reportListenerError
     this.toBrowser = child.stdio[3] as Writable
     const fromBrowser = child.stdio[4] as Readable
     fromBrowser.setEncoding('utf8')
@@ -97,7 +110,7 @@ export class CdpPipe {
     )
     return new Promise((resolve, reject) => {
       child.once('error', (cause) => reject(new Error(`cannot start ${options.binary}: ${cause.message}`)))
-      child.once('spawn', () => resolve(new CdpPipe(child, options.requestTimeoutMs ?? 10_000)))
+      child.once('spawn', () => resolve(new CdpPipe(child, options)))
     })
   }
 
@@ -191,7 +204,13 @@ export class CdpPipe {
       } else if (typeof message.method === 'string') {
         // A copy: a listener may unsubscribe while the event is being delivered.
         for (const listener of [...(this.listeners.get(message.method) ?? [])]) {
-          listener(message.params, message.sessionId)
+          // Thrown from the stream's handler, a listener's bug would end the
+          // owner's process and every session on the pipe with it.
+          try {
+            listener(message.params, message.sessionId)
+          } catch (error) {
+            this.onListenerError(error, message.method)
+          }
         }
       }
     }
