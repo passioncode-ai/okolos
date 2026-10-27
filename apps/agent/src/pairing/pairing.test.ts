@@ -4,7 +4,16 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { CLAIM_WINDOW_MS, Pairing, REQUEST_LIFETIME_MS, type PairingNotice, type RandomSource } from './pairing.js'
+import {
+  CLAIM_WINDOW_MS,
+  EXPIRED_SHOWN_MS,
+  MAX_NEW_PER_MINUTE,
+  MAX_PENDING,
+  Pairing,
+  REQUEST_LIFETIME_MS,
+  type PairingNotice,
+  type RandomSource,
+} from './pairing.js'
 
 const temps: string[] = []
 afterEach(() => {
@@ -141,6 +150,66 @@ describe('claiming the key (spec §11 F5)', () => {
     const pairing = open()
     expect(pairing.claim('0'.repeat(32), T0)).toBeNull()
     expect(pairing.confirm('0'.repeat(32), T0)).toBe(false)
+  })
+})
+
+describe('how long a request lives and how many there may be (spec §11 F5)', () => {
+  it('ends five minutes after its creation when nobody confirms it', () => {
+    const notices: PairingNotice[] = []
+    const pairing = open(storeFile(), notices)
+    const { requestId } = asked(pairing.request('Claude Code', T0))
+    expect(pairing.claim(requestId, T0 + REQUEST_LIFETIME_MS - 1)).toEqual({ pending: true })
+    expect(pairing.claim(requestId, T0 + REQUEST_LIFETIME_MS)).toBeNull()
+    expect(pairing.confirm(requestId, T0 + REQUEST_LIFETIME_MS)).toBe(false)
+    expect(notices.filter((n) => n.kind === 'expired')).toHaveLength(1)
+  })
+
+  it('stays on the page as expired, with nothing to press, then leaves it (SCR-23)', () => {
+    expect(EXPIRED_SHOWN_MS).toBe(5 * MINUTE)
+    const pairing = open()
+    asked(pairing.request('Claude Code', T0))
+    const [row] = pairing.list(T0 + REQUEST_LIFETIME_MS).requests
+    expect(row).toMatchObject({ name: 'Claude Code', state: 'expired', expiresAt: T0 + REQUEST_LIFETIME_MS })
+    expect(pairing.confirmByHandle(row!.handle, T0 + REQUEST_LIFETIME_MS + 1)).toBe(false)
+    expect(pairing.list(T0 + REQUEST_LIFETIME_MS + 1).requests[0]).toMatchObject({ state: 'expired' })
+    expect(pairing.list(T0 + REQUEST_LIFETIME_MS + EXPIRED_SHOWN_MS).requests).toEqual([])
+  })
+
+  it('refuses a fourth waiting request; a confirmed one still waits for its claim', () => {
+    expect(MAX_PENDING).toBe(3)
+    const pairing = open()
+    const first = asked(pairing.request('Agent one', T0))
+    asked(pairing.request('Agent two', T0 + 1))
+    const third = asked(pairing.request('Agent three', T0 + 2))
+    expect(pairing.request('Agent four', T0 + 3)).toEqual({ refused: 'too_many_pending' })
+    expect(pairing.confirm(first.requestId, T0 + 4)).toBe(true)
+    expect(pairing.request('Agent four', T0 + 5)).toEqual({ refused: 'too_many_pending' })
+    expect(pairing.claim(first.requestId, T0 + 6)).toHaveProperty('key')
+    asked(pairing.request('Agent four', T0 + 7))
+    expect(pairing.decline(third.requestId)).toBe(true)
+    asked(pairing.request('Agent five', T0 + 8))
+    // An expired request waits for nothing.
+    asked(pairing.request('Agent six', T0 + 8 + REQUEST_LIFETIME_MS))
+  })
+
+  it('refuses a seventh new request within a minute, and takes one again when the minute moves on', () => {
+    expect(MAX_NEW_PER_MINUTE).toBe(6)
+    const pairing = open()
+    for (let n = 0; n < 6; n++) {
+      const { requestId } = asked(pairing.request(`Agent ${n}`, T0 + n * 1000))
+      pairing.decline(requestId)
+    }
+    expect(pairing.request('Agent seven', T0 + MINUTE - 1)).toEqual({ refused: 'too_many_requests' })
+    // A refused request is not a new one: the count stays at six, and the first leaves at T0 + 1 min.
+    asked(pairing.request('Agent seven', T0 + MINUTE))
+    expect(pairing.request('Agent eight', T0 + MINUTE + 1)).toEqual({ refused: 'too_many_requests' })
+  })
+
+  it('refuses a name the rules refuse, and that refusal counts toward nothing', () => {
+    const pairing = open()
+    expect(pairing.request('agent 123', T0)).toEqual({ refused: 'name_digits' })
+    expect(pairing.request('a'.repeat(41), T0)).toEqual({ refused: 'name_too_long' })
+    expect(pairing.list(T0).requests).toEqual([])
   })
 })
 

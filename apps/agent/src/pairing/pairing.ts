@@ -24,11 +24,20 @@ import { checkAgentName, type NameRefusal } from './name.js'
 export const REQUEST_LIFETIME_MS = 5 * 60_000
 /** After the confirm, the key can be claimed for this long. */
 export const CLAIM_WINDOW_MS = 5 * 60_000
+/**
+ * An ended request stays on the page this long as "expired", with nothing to press (SCR-23), then
+ * leaves the list. Its request id is forgotten at the end itself, not after this.
+ */
+export const EXPIRED_SHOWN_MS = 5 * 60_000
+/** At most this many requests wait at once: for the person's decision, or confirmed for the claim. */
+export const MAX_PENDING = 3
+/** At most this many new requests in any minute. */
+export const MAX_NEW_PER_MINUTE = 6
 
 /** Gives `size` random bytes; tests pass a seeded one. */
 export type RandomSource = (size: number) => Buffer
 
-export type RequestRefusal = NameRefusal
+export type RequestRefusal = NameRefusal | 'too_many_pending' | 'too_many_requests'
 
 /** A paired agent as the page and the door see it. The key's hash stays inside this module. */
 export interface AgentRecord {
@@ -45,9 +54,10 @@ export interface PublicRequest {
   readonly name: string
   readonly code: string
   readonly createdAt: number
-  /** Until the confirm, the request's end; after it, the end of the claim window. */
+  /** Until the confirm, the request's end; after it, the end of the claim window; once expired, when it ended. */
   readonly expiresAt: number
-  readonly state: 'pending' | 'confirmed'
+  /** An expired row is shown for EXPIRED_SHOWN_MS with nothing to press; its handle does nothing. */
+  readonly state: 'pending' | 'confirmed' | 'expired'
 }
 
 /**
@@ -73,6 +83,15 @@ interface Entry {
   confirmedAt: number | null
 }
 
+/** What the page still shows of an expired request: no request id, nothing to act on. */
+interface Ended {
+  readonly handle: string
+  readonly name: string
+  readonly code: string
+  readonly createdAt: number
+  readonly endedAt: number
+}
+
 interface StoredAgent extends AgentRecord {
   /** SHA-256 of the key, hex. */
   readonly keyHash: string
@@ -92,6 +111,9 @@ export class Pairing {
   private agents: StoredAgent[]
   private readonly byRequestId = new Map<string, Entry>()
   private readonly byHandle = new Map<string, Entry>()
+  private readonly ended = new Map<string, Ended>()
+  /** When each request of the last minute was created. */
+  private created: number[] = []
 
   private constructor(file: string, agents: StoredAgent[], options: PairingOptions) {
     this.file = file
@@ -110,6 +132,10 @@ export class Pairing {
     const refused = checkAgentName(agentName)
     if (refused !== null) return { refused }
     this.sweep(now)
+    if (this.byHandle.size >= MAX_PENDING) return { refused: 'too_many_pending' }
+    this.created = this.created.filter((at) => now - at < 60_000)
+    if (this.created.length >= MAX_NEW_PER_MINUTE) return { refused: 'too_many_requests' }
+    this.created.push(now)
     const entry: Entry = {
       requestId: this.hex(16),
       handle: this.hex(8),
@@ -166,7 +192,7 @@ export class Pairing {
 
   list(now: number): { requests: PublicRequest[]; agents: AgentRecord[] } {
     this.sweep(now)
-    const requests = [...this.byHandle.values()].map((entry): PublicRequest => ({
+    const live = [...this.byHandle.values()].map((entry): PublicRequest => ({
       handle: entry.handle,
       name: entry.name,
       code: entry.code,
@@ -174,6 +200,10 @@ export class Pairing {
       expiresAt: deadline(entry),
       state: entry.confirmedAt === null ? 'pending' : 'confirmed',
     }))
+    const gone = [...this.ended.values()].map(
+      ({ handle, name, code, createdAt, endedAt }): PublicRequest => ({ handle, name, code, createdAt, expiresAt: endedAt, state: 'expired' }),
+    )
+    const requests = [...live, ...gone]
     const agents = this.agents.map(({ agentId, name, pairedAt }) => ({ agentId, name, pairedAt }))
     return { requests, agents }
   }
@@ -193,12 +223,21 @@ export class Pairing {
     return true
   }
 
-  /** Ends every request past its deadline; its request id is forgotten with it. */
+  /**
+   * Ends every request past its deadline: its request id is forgotten there and then, and the page
+   * keeps a row without it for EXPIRED_SHOWN_MS.
+   */
   private sweep(now: number): void {
     for (const entry of [...this.byHandle.values()]) {
-      if (now < deadline(entry)) continue
+      const endedAt = deadline(entry)
+      if (now < endedAt) continue
       this.forget(entry)
-      this.notify({ kind: 'expired', handle: entry.handle, name: entry.name })
+      const { handle, name, code, createdAt } = entry
+      this.ended.set(handle, { handle, name, code, createdAt, endedAt })
+      this.notify({ kind: 'expired', handle, name })
+    }
+    for (const row of [...this.ended.values()]) {
+      if (now - row.endedAt >= EXPIRED_SHOWN_MS) this.ended.delete(row.handle)
     }
   }
 
