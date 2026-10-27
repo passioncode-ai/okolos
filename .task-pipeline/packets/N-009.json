@@ -20,7 +20,7 @@
   ]
  },
  "outputs": [
-  "`class Tasks { open(agentId, scopeInput, now): BridgeResult<Task>; get(agentId, taskId, now): BridgeResult<Task>; charge(task, verb, url?): BridgeResult<void>; closeAllOf(agentId); list(now) }`; `Task {id, agentId, scope, openedAt, stepsUsed, windowId?, windowOpen: boolean /* SCR-24 taskWindowOpen/taskWindowClosed; ставит N-011 по событию окна N-010 */}`; `checkLanded(task, actualUrl): BridgeResult<void>` (аудит #39); SessionOpenResult.sessionId = Task.id"
+  "`class Tasks { open(agentId, scopeInput, now): OpenTaskResult; get(agentId, taskId, now): BridgeResult<Task>; charge(task, verb, now, url?): BridgeResult<void>; setWindow(task, {windowId?, windowOpen?}): BridgeResult<void>; close(agentId, taskId): BridgeResult<Task>; closeAllOf(agentId): Task[]; list(now): TaskSnapshot[] /* снимки, включая истёкшие и ещё не убранные таймером; TaskSnapshot = Task & {expired: boolean} */; sweep(now): Task[] /* снимки убранных */ }`; `Task {id, agentId, scope, openedAt, stepsUsed, windowId?, windowOpen /* SCR-24 taskWindowOpen/taskWindowClosed; ставит N-011 через setWindow по событию окна N-010 */}`; `checkLanded(task, actualUrl): BridgeResult<void>` (аудит #39); `goalShown(goal)`, `GOAL_SHOWN_MAX` (200 видимых символов вместе с «…»); часы: `now` целое ≥ 0, иначе TypeError; SessionOpenResult.sessionId = Task.id"
  ],
  "acceptance": [
   "каждый отказ BRIDGE_REFUSALS, который выдают задачи (invalid_scope, no_such_task, origin_not_in_task, verb_not_in_task, budget_exhausted, task_expired), — свой тест",
