@@ -1181,6 +1181,26 @@ describe('a store changed on disk (fix rounds 4 and 5)', () => {
     expect(readFileSync(file, 'utf8')).toBe('not json')
   })
 
+  // Fix round 6: the end of a request does not wait for the store. list ends what is past its
+  // deadline first, with its notice, and only then reads the changed file again.
+  it('ends a request past its deadline at list even when the store no longer opens', () => {
+    const file = storeFile()
+    const notices: PairingNotice[] = []
+    const pairing = open(file, notices)
+    pair(pairing, 'Claude Code', T0)
+    const valid = readFileSync(file, 'utf8')
+    const request = asked(pairing.request('Codex', T0 + 10))
+    writeFileSync(file, 'not json', { mode: 0o600 })
+    const late = T0 + 10 + REQUEST_LIFETIME_MS
+
+    expect(() => pairing.list(late)).toThrow(expect.objectContaining({ name: 'PairingStoreError', reason: 'not_json' }))
+    expect(notices.at(-1)).toMatchObject({ kind: 'expired', name: 'Codex', at: late, cause: 'timeout' })
+    expect(pairing.claim(request.requestId, late + 1)).toEqual({ refused: 'expired' })
+    writeFileSync(file, valid, { mode: 0o600 })
+    expect(pairing.list(late + 2).requests).toMatchObject([{ name: 'Codex', state: 'expired' }])
+    expect(notices.filter((notice) => notice.kind === 'expired')).toHaveLength(1)
+  })
+
   it('reads nothing again while the file is as it was last read or written', () => {
     const file = storeFile()
     const { pairing, reloads } = watched(file)

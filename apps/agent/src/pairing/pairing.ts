@@ -453,14 +453,15 @@ export class Pairing {
   }
 
   /**
-   * The page's view. Like `verify`, it first looks at the file and reads it again when it changed
-   * (fix round 5), so an agent revoked by another process leaves the page at the next list; a store
-   * that no longer opens throws PairingStoreError, and the page shows its error state.
+   * The page's view. First it ends every request past its deadline, with its notice (fix round 6:
+   * expiry does not wait for the store). Then, like `verify`, it looks at the file and reads it again
+   * when it changed (fix round 5), so an agent revoked by another process leaves the page at the next
+   * list; a store that no longer opens throws PairingStoreError, and the page shows its error state.
    */
   list(now: number): { requests: PublicRequest[]; agents: AgentRecord[] } {
     checkClock(now, 'list')
-    this.sync(false)
     this.sweep(now)
+    this.sync(false)
     const waiting = [...this.byHandle.values()]
     const live = waiting.map((entry): PublicRequest => {
       const sameNameAgents = this.agents
