@@ -41,13 +41,19 @@ That one line carried four defects the audit measured:
    detached worktree at `~/.okolos/agent-checkout` and fast-forwards it before each run; a manual
    run from a clone that is not at origin/main is refused unless `--unpinned` is given, which is
    recorded. The installer itself refuses to install unless the clone's HEAD equals a freshly
-   fetched origin/main (on `main` or detached); `--allow-branch` overrides, and is recorded in
-   `feed.log` and as `installedOffMain` in every run's record. wrangler is a pinned devDependency of `apps/proxy`, run through `pnpm exec` with the
+   fetched origin/main (the commit is checked, not the branch name) and every file it installs
+   from the working tree (the bootstrap's sources and the plist template, `INSTALLED_SOURCES`)
+   is HEAD's: nothing edited, staged, deleted or untracked. `--allow-branch` overrides, and is
+   recorded in `feed.log` and as `installedOffMain` in every record of a run: the launch line's,
+   the bootstrap's and the job's, a stop by signal and a record adopted from an older job
+   included. wrangler is a pinned devDependency of `apps/proxy`, run through `pnpm exec` with the
    install-before-run check off and telemetry off.
 4. **Every run is bounded, exclusive and observable**: each stage a child in its own process
    group with a deadline, a thirty-minute watchdog over the run, a lock shared with every manual
    entry point, retries with backoff, and a status record per run that counts failures in a row.
-   The Cloudflare token reaches only the publish step. Since B-159 one deadline covers the whole
+   The Cloudflare token reaches only the publish step: one list of credential variables
+   (`tools/feed/bounded.mjs`) is dropped from every other child of the job, the bootstrap and the
+   installer. Since B-159 one deadline covers the whole
    run, the checkout repair included (45 minutes; the job's watchdog is what is left minus two
    minutes, at most thirty).
 5. **A login is not a publish**: the agent's run skips when the served feed is younger than its
@@ -105,6 +111,9 @@ That one line carried four defects the audit measured:
 | The launch line records `stage: launch` with `/bin/sh` alone; bootstrap copy installed and removed; drift in `--status`; install from main only | `tools/install-feed-agent.test.ts` |
 | The run id and `recoveredCheckout` in the job's record; the watchdog handed down | `tools/feed-job.test.ts` |
 | A tool or job started through a linked path still runs (one check, `tools/is-main.mjs`) | `tools/is-main.test.ts` |
-| One failed job run counts once: the launch line and the bootstrap agree on `runId` | `tools/install-feed-agent.test.ts`, `tools/feed/status.test.ts` |
+| One failed job run counts once: the launch line and the bootstrap agree on `runId`; a launch record holds one `runId`, its own, after a stamped one | `tools/install-feed-agent.test.ts`, `tools/feed/status.test.ts` |
+| The installer refuses uncommitted edits to what it installs, named in one line (a git double and real git) | `tools/install-feed-agent.test.ts` |
+| `installedOffMain` in every writer: launch line, bootstrap failure, crash and signal records, the job's records and signal record, an adopted record | `tools/install-feed-agent.test.ts`, `tools/feed/bootstrap.test.ts`, `tools/feed-job.test.ts` |
+| A stop by signal is recorded as the stop (exit 143), not as the job's crash it caused | `tools/feed/bootstrap.test.ts` |
 | State paths outside the working tree | `tools/feed/paths.test.ts` |
 | Release gate reads the newer of snapshot and state | `tools/feed-age.test.ts` |
