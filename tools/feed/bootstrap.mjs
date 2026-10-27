@@ -102,10 +102,16 @@ function describe(result) {
   return `exited ${result.code ?? result.signal}${said ? ` — ${said}` : ''}`
 }
 
-/** The canonical spelling: `.native` expands Windows 8.3 short names and forward slashes, as git prints them. */
+/**
+ * The canonical spelling. On Windows `.native` expands 8.3 short names
+ * (RUNNER~1), which git never prints; elsewhere the ordinary realpath, as node
+ * itself resolves paths.
+ */
+const realpath = process.platform === 'win32' ? realpathSync.native : realpathSync
+
 function real(file) {
   try {
-    return realpathSync.native(file)
+    return realpath(file)
   } catch {
     return path.resolve(file)
   }
