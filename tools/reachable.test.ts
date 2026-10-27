@@ -59,6 +59,7 @@ const EXEMPT: ReadonlyArray<{ readonly file: string; readonly why: string }> = [
   { file: 'packages/cdp-pipe/src/frames.ts', why: 'Okolos Bridge Б1: the daemon apps/agent (module K3, node N-011, B-142) is the caller and is not written yet; the spike tools/agent-window-spike.mjs imports it, but a tool is not an entry that ships. Branch bridge/b1 does not merge to main until K3 removes this row' },
   { file: 'apps/agent/src/pairing/pairing.ts', why: 'Okolos Bridge Б1: agent pairing of the daemon apps/agent (node N-007); its callers, the door /pair and /pair/claim (node N-008) and the page (node N-015), and the entry point apps/agent/src/main.ts (node N-011, B-142) are not written yet. Branch bridge/b1 does not merge to main until K3 removes this row' },
   { file: 'apps/agent/src/pairing/name.ts', why: 'Okolos Bridge Б1: the agent name rules (node N-007), imported by apps/agent/src/pairing/pairing.ts, which no entry point reaches yet (see its row). Branch bridge/b1 does not merge to main until K3 removes this row' },
+  { file: 'apps/agent/src/tasks/tasks.ts', why: 'Okolos Bridge Б1: the task table of the daemon apps/agent (node N-009); its callers, the verbs (node N-011) and the page (node N-015), and the entry point apps/agent/src/main.ts (node N-011, B-142) are not written yet. Branch bridge/b1 does not merge to main until K3 removes this row' },
 ]
 
 // ---------------------------------------------------------------------------
