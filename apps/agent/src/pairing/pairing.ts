@@ -433,7 +433,13 @@ export class Pairing {
     return record(agent)
   }
 
+  /**
+   * The page's view. Like `verify`, it first looks at the file and reads it again when it changed
+   * (fix round 5), so an agent revoked by another process leaves the page at the next list; a store
+   * that no longer opens throws PairingStoreError, and the page shows its error state.
+   */
   list(now: number): { requests: PublicRequest[]; agents: AgentRecord[] } {
+    this.sync(false)
     this.sweep(now)
     const waiting = [...this.byHandle.values()]
     const live = waiting.map((entry): PublicRequest => {

@@ -1166,6 +1166,21 @@ describe('a store changed on disk (fix rounds 4 and 5)', () => {
     expect(reloads()).toBe(1)
   })
 
+  it('sees a revoke another pairing wrote at the next list, and throws over an invalid file as verify does', () => {
+    const file = storeFile()
+    const { pairing: a, reloads } = watched(file)
+    const gone = pair(a, 'Claude Code', T0)
+    pair(a, 'Codex', T0 + 10)
+    const b = open(file)
+    b.revoke(b.verify(gone)!.agentId, T0 + 20)
+
+    expect(a.list(T0 + 30).agents.map((x) => x.name)).toEqual(['Codex'])
+    expect(reloads()).toBe(1)
+    writeFileSync(file, 'not json', { mode: 0o600 })
+    expect(() => a.list(T0 + 40)).toThrow(expect.objectContaining({ name: 'PairingStoreError', reason: 'not_json', file }))
+    expect(readFileSync(file, 'utf8')).toBe('not json')
+  })
+
   it('reads nothing again while the file is as it was last read or written', () => {
     const file = storeFile()
     const { pairing, reloads } = watched(file)
@@ -1193,13 +1208,15 @@ describe('a store changed on disk (fix rounds 4 and 5)', () => {
       const refused = expect.objectContaining({ name: 'PairingStoreError', reason, file })
       expect(() => pairing.claim(request.requestId, T0 + 12), reason).toThrow(refused)
       expect(() => pairing.verify(key), reason).toThrow(refused)
+      expect(() => pairing.list(T0 + 13), reason).toThrow(refused)
       expect(readFileSync(file, 'utf8')).toBe(content)
-      expect(pairing.list(T0 + 13).agents.map((a) => a.name)).toEqual(['Claude Code'])
-      expect(pairing.list(T0 + 13).requests[0]).toMatchObject({ name: 'Codex', state: 'confirmed' })
     }
     expect(reloads()).toBe(0)
 
     writeFileSync(file, valid, { mode: 0o600 })
+    // Memory stayed as it was: the agent, and the request still confirmed.
+    expect(pairing.list(T0 + 13).agents.map((a) => a.name)).toEqual(['Claude Code'])
+    expect(pairing.list(T0 + 13).requests[0]).toMatchObject({ name: 'Codex', state: 'confirmed' })
     expect(pairing.verify(key)).toMatchObject({ name: 'Claude Code' })
     expect(pairing.claim(request.requestId, T0 + 14)).toHaveProperty('key')
     expect(names(file)).toEqual(['Claude Code', 'Codex'])
