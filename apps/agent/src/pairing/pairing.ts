@@ -187,7 +187,8 @@ export interface PairingOptions {
    * Hears that the store was read again because it changed on disk and the pairing took what it
    * holds now (fix round 5), for the service log. `removed` (fix round 6) holds the ids of the agents
    * that were in memory and are not in the file any more (another process revoked them, a hand edit,
-   * the file removed), in the order memory held them; empty when none left. Each of them also gets
+   * the file removed), or are in it under another key hash (the old key no longer opens; the id stays
+   * listed with the new one), in the order memory held them; empty when none left. Each of them also gets
    * a `revoked` notice, sent after this handler. A handler that throws is ignored: the reload stands.
    */
   onReload?: (reload: { readonly removed: readonly string[] }) => void
@@ -585,12 +586,14 @@ export class Pairing {
    * Takes the agents the file holds now in place of those in memory. A last call held in memory
    * only is kept when it is newer than the file's and the agent is still there under the same key:
    * the file cannot know it, and the next write or `flush` saves it. An agent in memory that the file
-   * no longer holds has lost its access (fix round 6): `onReload` hears its id, and then it gets a
+   * no longer holds, or holds under another key hash, has lost its access (fix round 6): its old key
+   * no longer opens. `onReload` hears its id, and then it gets a
    * `revoked` notice dated `now`, as a revoke would send, so the daemon closes its tasks and windows.
    */
   private adopt(store: Snapshot, now: number): void {
-    const kept = new Set(store.agents.map((agent) => agent.agentId))
-    const removed = this.agents.filter((agent) => !kept.has(agent.agentId))
+    // Kept means the same id under the same key; an id whose key changed has lost the old key's access.
+    const kept = new Set(store.agents.map((agent) => `${agent.agentId}:${agent.keyHash}`))
+    const removed = this.agents.filter((agent) => !kept.has(`${agent.agentId}:${agent.keyHash}`))
     const mine = new Map(this.agents.map((agent) => [agent.agentId, agent]))
     let unsaved = false
     this.agents = store.agents.map((agent) => {

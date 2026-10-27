@@ -1439,6 +1439,24 @@ describe('agents gone from a reloaded store (fix round 6)', () => {
     expect(notices.at(-1)).toEqual({ kind: 'revoked', agentId: a.agentId, name: 'Claude Code', at: T0 + 60 })
   })
 
+  it('counts an agent whose key hash changed on disk as removed: its old key no longer opens', () => {
+    const file = storeFile()
+    const { pairing, notices, reloads } = watchedAll(file)
+    const oldKey = pair(pairing, 'Claude Code', T0)
+    const a = pairing.verify(oldKey)!
+    const kept = pairing.verify(pair(pairing, 'Codex', T0 + 10))!
+    const stored = JSON.parse(readFileSync(file, 'utf8')) as { schema: string; agents: Array<{ agentId: string; keyHash: string }> }
+    const newKey = 'n'.repeat(64)
+    const agents = stored.agents.map((x) => (x.agentId === a.agentId ? { ...x, keyHash: createHash('sha256').update(newKey, 'utf8').digest('hex') } : x))
+    writeFileSync(file, JSON.stringify({ ...stored, agents }), { mode: 0o600 })
+
+    expect(pairing.list(T0 + 20).agents.map((x) => x.agentId)).toEqual([a.agentId, kept.agentId])
+    expect(reloads).toEqual([{ removed: [a.agentId] }])
+    expect(notices.filter((notice) => notice.kind === 'revoked')).toEqual([{ kind: 'revoked', agentId: a.agentId, name: 'Claude Code', at: T0 + 20 }])
+    expect(pairing.verify(oldKey)).toBeNull()
+    expect(pairing.verify(newKey)).toMatchObject({ agentId: a.agentId })
+  })
+
   it('keeps the reload when a notice handler throws', () => {
     const file = storeFile()
     const errors: unknown[] = []
