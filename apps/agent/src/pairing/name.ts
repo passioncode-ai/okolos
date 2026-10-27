@@ -35,29 +35,47 @@ const BIDI = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u
 
 /**
  * Control and invisible characters: C0 and C1 controls, the other format characters (zero-width
- * space, joiners, byte order mark), line and paragraph separators, lone surrogates, and every
- * character Unicode calls default-ignorable whatever its category (the combining grapheme joiner
- * U+034F, variation selectors, the Hangul fillers U+115F, U+1160, U+3164, U+FFA0).
+ * space, joiners, byte order mark), line and paragraph separators, lone surrogates, every character
+ * Unicode calls default-ignorable whatever its category (the combining grapheme joiner U+034F,
+ * variation selectors, the Hangul fillers U+115F, U+1160, U+3164, U+FFA0), and the enclosing marks
+ * (a circle, a keycap; fix round 5), which draw over the letters around them.
  */
-const CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{Default_Ignorable_Code_Point}]/u
+const CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{Default_Ignorable_Code_Point}\p{Me}]/u
+
+/**
+ * The default-ignorable characters ordinary text needs (fix round 5), allowed in free text and never
+ * in a name: ZWNJ U+200C (Persian), ZWJ U+200D (Indic scripts, emoji sequences) and the variation
+ * selectors U+FE0E and U+FE0F (text or emoji presentation).
+ */
+const TEXT_JOINERS = /[\u200c\u200d\ufe0e\ufe0f]/gu
 
 /** More than two combining marks in a row stack above or below one letter and crowd the page. */
 const STACKED_MARKS = /\p{M}{3,}/u
 
 type Fault = 'not_text' | 'empty' | 'too_long' | 'bidi' | 'control'
 
+interface TextRules {
+  /** The longest text, in the unit `length` counts. */
+  readonly maxLength: number
+  readonly length: (text: string) => number
+  readonly isEmpty: (text: string) => boolean
+  /** Characters taken out before the control check: what this kind of text may carry though invisible. */
+  readonly allowedInvisible?: RegExp
+}
+
 /**
  * The checks a name and free text share, in their order: not text, empty (as `isEmpty` says), longer
- * than `maxLength` code points, a bidirectional control, a control or invisible character or a stack
- * of combining marks. Bidirectional controls are format characters too; they are named first, for a
- * precise reason.
+ * than `maxLength`, a bidirectional control, a control or invisible character (other than
+ * `allowedInvisible`) or a stack of combining marks. Bidirectional controls are format characters
+ * too; they are named first, for a precise reason.
  */
-function textFault(text: unknown, maxLength: number, isEmpty: (text: string) => boolean): Fault | null {
+function textFault(text: unknown, rules: TextRules): Fault | null {
   if (typeof text !== 'string') return 'not_text'
-  if (isEmpty(text)) return 'empty'
-  if ([...text].length > maxLength) return 'too_long'
+  if (rules.isEmpty(text)) return 'empty'
+  if (rules.length(text) > rules.maxLength) return 'too_long'
   if (BIDI.test(text)) return 'bidi'
-  if (CONTROL.test(text) || STACKED_MARKS.test(text)) return 'control'
+  const visible = rules.allowedInvisible === undefined ? text : text.replace(rules.allowedInvisible, '')
+  if (CONTROL.test(visible) || STACKED_MARKS.test(visible)) return 'control'
   return null
 }
 
@@ -66,10 +84,21 @@ const SHOWS_SOMETHING = /[\p{L}\p{N}]/u
 
 /**
  * Checks free text the page shows as the agent's own words (a task goal, N-009): the same checks as
- * a name up to the control one, without the allowlist and the digit rule. Null when it may be shown.
+ * a name up to the control one, without the allowlist and the digit rule, and with the joiners and
+ * emoji variation selectors ordinary text needs allowed (`TEXT_JOINERS`, fix round 5). `maxLength`
+ * is in UTF-16 code units (`string.length`), the unit validateScope in packages/contracts counts a
+ * goal in, so the two agree on what is too long; a name is counted in code points instead. Null when
+ * it may be shown. Throws a TypeError when `maxLength` is not a positive integer: that is the
+ * caller's bug, not the agent's text.
  */
 export function checkFreeText(text: string, maxLength: number): FreeTextRefusal | null {
-  const fault = textFault(text, maxLength, (value) => !SHOWS_SOMETHING.test(value))
+  if (!Number.isInteger(maxLength) || maxLength <= 0) throw new TypeError(`checkFreeText: maxLength must be a positive integer, got ${String(maxLength)}`)
+  const fault = textFault(text, {
+    maxLength,
+    length: (value) => value.length,
+    isEmpty: (value) => !SHOWS_SOMETHING.test(value),
+    allowedInvisible: TEXT_JOINERS,
+  })
   return fault === null ? null : `text_${fault}`
 }
 
@@ -102,7 +131,7 @@ const RESERVED = 'okolos'
 export function checkAgentName(raw: string): NameRefusal | null {
   if (typeof raw !== 'string') return 'name_not_text'
   const name = raw.normalize('NFC')
-  const fault = textFault(name, MAX_NAME_LENGTH, (value) => BLANK.test(value))
+  const fault = textFault(name, { maxLength: MAX_NAME_LENGTH, length: (value) => [...value].length, isEmpty: (value) => BLANK.test(value) })
   if (fault !== null) return `name_${fault}`
   if (!ALLOWED.test(name) || (LATIN.test(name) && CYRILLIC.test(name))) return 'name_script'
   if ((name.match(/[0-9]/g)?.length ?? 0) > MAX_DIGITS) return 'name_digits'

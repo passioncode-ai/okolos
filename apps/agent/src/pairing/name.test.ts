@@ -267,7 +267,52 @@ describe('free text the page shows', () => {
     expect(checkFreeText('goal\u202ex', 20)).toBe('text_bidi')
     expect(checkFreeText('goal\nx', 20)).toBe('text_control')
     expect(checkFreeText('goal\u200bx', 20)).toBe('text_control')
-    expect(checkFreeText('goal\ufe0fx', 20)).toBe('text_control')
+    expect(checkFreeText('goal\ufe00x', 20)).toBe('text_control')
     expect(checkFreeText('e\u0301\u0302\u0303goal', 20)).toBe('text_control')
+  })
+})
+
+// Fix round 5: a task goal is ordinary text in any language. The joiners and the emoji variation
+// selectors are default-ignorable, but Persian, Hindi and emoji need them; length is in UTF-16 code
+// units, the unit validateScope in packages/contracts counts a goal in.
+describe('free text in any language (fix round 5)', () => {
+  it('accepts ZWNJ, ZWJ and the variation selectors U+FE0E and U+FE0F', () => {
+    for (const text of [
+      '\u2764\ufe0f \u043f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u043f\u043e\u0447\u0442\u0443', // ❤️ проверить почту
+      // A ZWJ family next to a word: emoji alone shows no letter or numeral and stays text_empty.
+      '\u{1f468}\u200d\u{1f469}\u200d\u{1f467} \u0441\u0435\u043c\u044c\u044f',
+      '\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645', // Persian میخواهم with ZWNJ
+      '\u0915\u094d\u200d\u0937', // Hindi क्‍ष with ZWJ
+      'snow \u2603\ufe0e',
+    ]) {
+      expect(checkFreeText(text, 200), text).toBeNull()
+    }
+  })
+
+  it('still refuses bidi controls, Cc controls and the other default-ignorables', () => {
+    expect(checkFreeText('goal\u202ex', 200)).toBe('text_bidi')
+    expect(checkFreeText('goal\u0007x', 200)).toBe('text_control')
+    for (const mark of ['\u200b', '\u2060', '\u034f', '\ufe00', '\u3164', '\u00ad']) {
+      expect(checkFreeText(`goal${mark}x`, 200), mark.codePointAt(0)!.toString(16)).toBe('text_control')
+    }
+  })
+
+  it('counts the length in UTF-16 code units, as validateScope does', () => {
+    // 'goal ' is 5 units and each fox 2: 7 foxes make 19 units, 8 make 21 (13 code points).
+    expect(checkFreeText(`goal ${'\u{1f98a}'.repeat(7)}`, 20)).toBeNull()
+    expect(checkFreeText(`goal ${'\u{1f98a}'.repeat(8)}`, 20)).toBe('text_too_long')
+  })
+
+  it('refuses enclosing marks as control, in free text and in a name', () => {
+    expect(checkFreeText('1\ufe0f\u20e3 goal', 200)).toBe('text_control') // keycap
+    expect(checkFreeText('a\u20dd goal', 200)).toBe('text_control')
+    expect(checkAgentName('a\u20dd agent')).toBe('name_control')
+  })
+
+  it('throws a TypeError when maxLength is not a positive integer', () => {
+    for (const max of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, '20' as unknown as number]) {
+      expect(() => checkFreeText('goal', max), String(max)).toThrow(TypeError)
+    }
+    expect(checkFreeText('goal', 1)).toBe('text_too_long')
   })
 })
