@@ -1,6 +1,26 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 import { describe, expect, it } from 'vitest'
 
-import { BRIDGE_REFUSALS, REFUSAL_RETRYABLE, SCOPE_LIMITS, inScope, originOf, refuse, validateScope } from './bridge.js'
+import {
+  BRIDGE_REFUSALS,
+  REFUSAL_RETRYABLE,
+  SCOPE_LIMITS,
+  inScope,
+  originOf,
+  refusalKey,
+  refuse,
+  validateScope,
+} from './bridge.js'
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
+
+function messageKeys(locale: string): Set<string> {
+  const file = path.join(root, 'apps/agent/_locales', locale, 'messages.json')
+  return new Set(Object.keys(JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>))
+}
 
 const base = {
   goal: 'Read the invoices page',
@@ -88,6 +108,16 @@ describe('a refusal', () => {
       expect(BRIDGE_REFUSALS, code).toContain(code)
       expect(REFUSAL_RETRYABLE[code], code).toBe(false)
       expect(refuse(code, 'x').error.retryable, code).toBe(false)
+    }
+  })
+
+  it('has a string for the person in both languages, for every code', () => {
+    const keys = BRIDGE_REFUSALS.map(refusalKey)
+    expect(keys).toEqual(BRIDGE_REFUSALS.map((code) => `refusal_${code}`))
+    expect(new Set(keys).size).toBe(BRIDGE_REFUSALS.length)
+    for (const locale of ['ru', 'en']) {
+      const present = messageKeys(locale)
+      expect(keys.filter((key) => !present.has(key)), locale).toEqual([])
     }
   })
 })

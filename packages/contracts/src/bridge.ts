@@ -67,6 +67,54 @@ export const REFUSAL_RETRYABLE: Readonly<Record<BridgeRefusal, boolean>> = {
   internal: true,
 }
 
+/**
+ * The key of the string that tells the person what a refusal means, in
+ * `apps/agent/_locales/{ru,en}/messages.json`.
+ *
+ * A switch and not a template: `refusal_${code}` would compile for a code added
+ * tomorrow and leave the page showing a raw key. Here a new code without its
+ * branch is a type error at the `never` line, which sends whoever adds it to the
+ * locale files before anything ships.
+ */
+export function refusalKey(code: BridgeRefusal): string {
+  switch (code) {
+    case 'not_paired':
+      return 'refusal_not_paired'
+    case 'invalid_scope':
+      return 'refusal_invalid_scope'
+    case 'no_such_task':
+      return 'refusal_no_such_task'
+    case 'origin_not_in_task':
+      return 'refusal_origin_not_in_task'
+    case 'verb_not_in_task':
+      return 'refusal_verb_not_in_task'
+    case 'budget_exhausted':
+      return 'refusal_budget_exhausted'
+    case 'task_expired':
+      return 'refusal_task_expired'
+    case 'tab_gone':
+      return 'refusal_tab_gone'
+    case 'busy':
+      return 'refusal_busy'
+    case 'in_use_by_person':
+      return 'refusal_in_use_by_person'
+    case 'browser_offline':
+      return 'refusal_browser_offline'
+    case 'blocked_by_shield':
+      return 'refusal_blocked_by_shield'
+    case 'cleaning_incomplete':
+      return 'refusal_cleaning_incomplete'
+    case 'stale_cursor':
+      return 'refusal_stale_cursor'
+    case 'internal':
+      return 'refusal_internal'
+    default: {
+      const unhandled: never = code
+      throw new Error(`no string for refusal ${String(unhandled)}`) // i18n-exempt: a programming error that the type check makes unreachable
+    }
+  }
+}
+
 export interface BridgeError {
   readonly code: BridgeRefusal
   readonly message: string
