@@ -80,10 +80,23 @@ function holdsRules(file: string): boolean {
   )
 }
 
+/**
+ * Folders of vendored code: copied in byte for byte from where it is made and tested there.
+ *
+ * A sibling test here would be a second copy of someone else's suite, and an edit made to pass
+ * it would be undone by the next install. A folder is listed with the command that fills it and
+ * the place its tests live; anything of ours beside the vendored files is still swept.
+ */
+const VENDORED: Record<string, string> = {
+  'apps/agent/src/fabric/':
+    'the Fabric service kit for Node (Okolos Bridge Б1, node N-005), installed by `fabric_kit.py install apps/agent/src/fabric --lang node --module fabric-service` from the fabric-agent-adapter plugin; its tests run in that plugin, `fabric_kit.py status` says whether each copy is current, and the service that uses it is tested in apps/agent/src/service.',
+}
+
 const modules = ['packages', 'apps', 'tools']
   .filter((dir) => existsSync(path.join(root, dir)))
   .flatMap((dir) => sources(path.join(root, dir)))
   .map((file) => path.relative(root, file))
+  .filter((file) => !Object.keys(VENDORED).some((dir) => file.startsWith(dir) && file.endsWith('.mjs')))
   .filter(holdsRules)
 
 describe('a rule is tested where it lives', () => {
@@ -108,6 +121,13 @@ describe('a rule is tested where it lives', () => {
     // open for a module nobody is looking at any more.
     const stale = Object.keys(EXEMPT).filter((file) => !existsSync(path.join(root, file)))
     expect(stale, `exempted but absent: ${stale.join(', ')}`).toEqual([])
+  })
+
+  it('every vendored folder exists and says why it is not swept', () => {
+    for (const [dir, why] of Object.entries(VENDORED)) {
+      expect(existsSync(path.join(root, dir)), `vendored folder is absent: ${dir}`).toBe(true)
+      expect(why.trim().length, `vendored folder ${dir} needs a reason`).toBeGreaterThan(40)
+    }
   })
 
   it('every exemption gives a reason long enough to be one', () => {
