@@ -1,9 +1,12 @@
+import type { ChildProcess } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type { Readable, Writable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { CdpPipe, type LaunchOptions } from './pipe.js'
+import { CdpError } from './errors.js'
+import { CdpPipe, type CdpTransport, type LaunchOptions } from './pipe.js'
 
 /**
  * Every test here drives a real process: a node script that speaks CDP over
@@ -33,6 +36,17 @@ function alive(pid: number): boolean {
   }
 }
 
+/**
+ * The upper bound for a wall-clock assertion: five times what the step is
+ * expected to take. These tests run real processes, and a loaded machine runs
+ * them 3-5x slower (vitest.config.ts); a bound any thinner fails a gate when
+ * nothing hangs, which the runbook promises it does not
+ * (docs/runbooks/development.md, "Под большой нагрузкой машины").
+ */
+function atMost(expectedMs: number): number {
+  return 5 * expectedMs
+}
+
 /** Waits until the predicate holds or the deadline passes; returns the last answer. */
 async function eventually(predicate: () => boolean, ms = 3000): Promise<boolean> {
   const until = Date.now() + ms
@@ -41,6 +55,26 @@ async function eventually(predicate: () => boolean, ms = 3000): Promise<boolean>
     await new Promise((resolve) => setTimeout(resolve, 25))
   }
   return predicate()
+}
+
+/**
+ * One of the browser's streams as the pipe holds it. The stream is private; a
+ * test reaches it only to inject the fault an OS read or write error raises
+ * (Node destroys the stream with the error), which no fake browser can cause on
+ * demand.
+ */
+function streamOf(pipe: CdpPipe, fd: 2 | 3 | 4): Readable | Writable {
+  return (pipe as unknown as { child: ChildProcess }).child.stdio[fd] as Readable | Writable
+}
+
+/** The settled rejection of a promise, for assertions on its fields. */
+async function rejectionOf(promise: Promise<unknown>): Promise<CdpError> {
+  try {
+    await promise
+  } catch (error) {
+    return error as CdpError
+  }
+  throw new Error('expected the promise to reject, and it resolved')
 }
 
 // Whatever a test did, no fake browser outlives it: the group is killed here
@@ -123,10 +157,14 @@ describe('launching a browser on a pipe', () => {
     expect(await pipe.send('Fake.echo', { still: 'reading' })).toEqual({ still: 'reading' })
   })
 
-  it('refuses a binary that does not exist', async () => {
-    await expect(
+  it('refuses a binary that does not exist with a CdpError of kind launch', async () => {
+    const error = await rejectionOf(
       CdpPipe.launch({ binary: path.join(tmpdir(), 'okolos-no-such-browser'), args: [], userDataDir: PROFILE }),
-    ).rejects.toThrow(/okolos-no-such-browser/)
+    )
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('launch')
+    expect(error.method).toBe('launch')
+    expect(error.message).toMatch(/okolos-no-such-browser/)
   })
 })
 
@@ -170,12 +208,275 @@ describe('a listener that throws', () => {
   })
 })
 
+describe('the transport a consumer depends on', () => {
+  // The consumer (the daemon's agent windows, N-010) holds a CdpTransport, not
+  // a CdpPipe, so its tests hand it a plain object. CdpPipe has private members,
+  // and TypeScript compares classes with private members by name: a fake could
+  // never pass as one. `pnpm typecheck` checks this file.
+  it('is satisfied by a plain object with pid, send, on, onExit and close', async () => {
+    const sent: Array<{ method: string; timeoutMs: number | undefined }> = []
+    const transport: CdpTransport = {
+      pid: 4242,
+      send: async <T>(method: string, _params?: object, _sessionId?: string, opts?: { timeoutMs?: number }) => {
+        sent.push({ method, timeoutMs: opts?.timeoutMs })
+        return { targetId: 'T-1' } as T
+      },
+      on: () => () => undefined,
+      onExit: () => () => undefined,
+      close: async () => undefined,
+    }
+
+    const created = await transport.send<{ targetId: string }>('Target.createTarget', {}, undefined, { timeoutMs: 500 })
+
+    expect(created.targetId).toBe('T-1')
+    expect(sent).toEqual([{ method: 'Target.createTarget', timeoutMs: 500 }])
+  })
+
+  it('is what CdpPipe.launch hands out, held unbound as the consumer holds it', async () => {
+    const launch: (options: LaunchOptions) => Promise<CdpTransport> = CdpPipe.launch
+    const transport = await launch({ binary: process.execPath, args: [FAKE], userDataDir: PROFILE })
+    launched.push(transport.pid)
+    expect(await transport.send('Fake.echo', { n: 1 }, undefined, { timeoutMs: 5000 })).toEqual({ n: 1 })
+  })
+})
+
+describe('every failure of send is a CdpError of its kind', () => {
+  it('timeout: no answer within the deadline', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 300 })
+    const error = await rejectionOf(pipe.send('Fake.silence'))
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('timeout')
+    expect(error.method).toBe('Fake.silence')
+    expect(error.cdpCode).toBeUndefined()
+  })
+
+  it('cdp: the browser answered with an error, and its code comes along', async () => {
+    const pipe = await fake()
+    const failed = await rejectionOf(pipe.send('Fake.fail', { message: 'No target with given id found' }))
+    expect(failed).toBeInstanceOf(CdpError)
+    expect(failed.kind).toBe('cdp')
+    expect(failed.method).toBe('Fake.fail')
+    expect(failed.cdpCode).toBe(-32000)
+    expect(failed.message).toContain('No target with given id found')
+
+    const unknown = await rejectionOf(pipe.send('Page.noSuchThing'))
+    expect(unknown.kind).toBe('cdp')
+    expect(unknown.cdpCode).toBe(-32601)
+  })
+
+  it('exited: the browser process ended', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    const error = await rejectionOf(pipe.send('Fake.exit', { code: 1 }))
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('exited')
+  })
+
+  it('closed: its owner closed the pipe, for a request waiting then and for one sent after', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    const waiting = rejectionOf(pipe.send('Fake.silence'))
+
+    await pipe.close(300)
+
+    const error = await waiting
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('closed')
+    expect(error.method).toBe('Fake.silence')
+    expect((await rejectionOf(pipe.send('Fake.echo'))).kind).toBe('closed')
+  })
+})
+
+describe('a deadline for one request', () => {
+  it('shortens the pipe default for that call only', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    // With the default of 60 s this would outlive the test; 200 ms must win.
+    const error = await rejectionOf(pipe.send('Fake.silence', {}, undefined, { timeoutMs: 200 }))
+    expect(error.kind).toBe('timeout')
+    expect(error.message).toContain('within 200 ms')
+  })
+
+  it('lengthens the pipe default for that call only, and the next call has the default again', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 200 })
+    // The answer comes after 600 ms: past the default, well inside the call's 5 s.
+    expect(await pipe.send('Fake.delay', { ms: 600 }, undefined, { timeoutMs: 5000 })).toEqual({ after: 600 })
+
+    const error = await rejectionOf(pipe.send('Fake.silence'))
+    expect(error.kind).toBe('timeout')
+    expect(error.message).toContain('within 200 ms')
+  })
+})
+
+describe('a deadline that is not a whole number of milliseconds in 1..2^31-1', () => {
+  // setTimeout turns each of these into about 1 ms, so a caller asking for a
+  // longer or no deadline would get an instant timeout. Refused at the call.
+  const refused = [Infinity, Number.NaN, 0, -1, 2 ** 31, 1.5]
+
+  it.each(refused)('timeoutMs %s is refused at send() with a TypeError', async (timeoutMs) => {
+    const pipe = await fake()
+    expect(() => pipe.send('Fake.echo', {}, undefined, { timeoutMs })).toThrow(TypeError)
+  })
+
+  it.each(refused)('requestTimeoutMs %s is refused at launch() with a TypeError, before any process starts', (requestTimeoutMs) => {
+    expect(() =>
+      CdpPipe.launch({ binary: process.execPath, args: [FAKE], userDataDir: PROFILE, requestTimeoutMs }),
+    ).toThrow(TypeError)
+  })
+
+  it('accepts the largest deadline setTimeout keeps, 2^31-1 ms', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 2 ** 31 - 1 })
+    expect(await pipe.send('Fake.echo', { n: 1 }, undefined, { timeoutMs: 2 ** 31 - 1 })).toEqual({ n: 1 })
+  })
+})
+
+describe('a browser that exits on its own', () => {
+  it('is heard by onExit with its exit code, and requests waiting are rejected as exited', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    const exits: unknown[] = []
+    pipe.onExit((info) => exits.push(info))
+    const waiting = rejectionOf(pipe.send('Fake.silence'))
+
+    const error = await rejectionOf(pipe.send('Fake.exit', { code: 3 }))
+
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('exited')
+    expect(error.method).toBe('Fake.exit')
+    expect((await waiting).kind).toBe('exited')
+    expect(exits).toEqual([{ code: 3, signal: null, requested: false }])
+    // A request after the exit is refused at once, with the same kind.
+    expect((await rejectionOf(pipe.send('Fake.echo'))).kind).toBe('exited')
+  })
+
+  it('is heard by onExit with the signal that ended it', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    const exits: unknown[] = []
+    pipe.onExit((info) => exits.push(info))
+    const waiting = rejectionOf(pipe.send('Fake.silence'))
+
+    process.kill(pipe.pid, 'SIGKILL')
+
+    expect((await waiting).kind).toBe('exited')
+    // Killed by someone else, not by close(): a crash to its owner.
+    expect(exits).toEqual([{ code: null, signal: 'SIGKILL', requested: false }])
+  })
+
+  it('is heard by a listener that subscribed after the exit, and not by one that unsubscribed', async () => {
+    const pipe = await fake()
+    const before: unknown[] = []
+    pipe.onExit((info) => before.push(info))()
+    await rejectionOf(pipe.send('Fake.exit', { code: 0 }))
+
+    const after: unknown[] = []
+    pipe.onExit((info) => after.push(info))
+
+    expect(await eventually(() => after.length > 0)).toBe(true)
+    expect(after).toEqual([{ code: 0, signal: null, requested: false }])
+    expect(before).toEqual([])
+  })
+
+  it('a listener of onExit that throws does not end the owner nor stop the others, and is reported', async () => {
+    const reported: Array<{ error: unknown; event: string }> = []
+    const pipe = await fake([], { onListenerError: (error, event) => reported.push({ error, event }) })
+    const boom = new Error('exit listener bug')
+    pipe.onExit(() => {
+      throw boom
+    })
+    const exits: unknown[] = []
+    pipe.onExit((info) => exits.push(info))
+
+    await rejectionOf(pipe.send('Fake.exit', { code: 0 }))
+
+    expect(await eventually(() => exits.length > 0)).toBe(true)
+    expect(reported).toEqual([{ error: boom, event: 'exit' }])
+  })
+})
+
+describe('a browser its owner closed', () => {
+  // A crash handler must tell its own shutdown from a crash: the exit after
+  // close() is marked requested.
+  it('is heard by onExit as a requested exit', async () => {
+    const pipe = await fake()
+    const exits: unknown[] = []
+    pipe.onExit((info) => exits.push(info))
+
+    await pipe.close(300)
+
+    expect(exits).toEqual([{ code: 0, signal: null, requested: true }])
+  })
+
+  it('is a requested exit also when close() had to kill it', async () => {
+    const pipe = await fake(['--ignore-close', '--ignore-term'])
+    const exits: unknown[] = []
+    pipe.onExit((info) => exits.push(info))
+
+    await pipe.close(200)
+
+    expect(exits).toEqual([{ code: null, signal: 'SIGKILL', requested: true }])
+  })
+})
+
+describe('a stream of the browser that breaks', () => {
+  it('a read error on fd 4 does not end the owner: requests waiting are rejected as closed', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    const waiting = rejectionOf(pipe.send('Fake.silence'))
+
+    streamOf(pipe, 4).destroy(Object.assign(new Error('read EIO'), { code: 'EIO' }))
+
+    const error = await waiting
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('closed')
+    expect(error.method).toBe('Fake.silence')
+    expect(error.message).toContain('EIO')
+    // Nothing can answer any more, so a new request is refused at once, not timed out.
+    expect((await rejectionOf(pipe.send('Fake.echo'))).kind).toBe('closed')
+  })
+
+  it('a read error on stderr does not end the owner: requests waiting are rejected as closed', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    const waiting = rejectionOf(pipe.send('Fake.silence'))
+
+    streamOf(pipe, 2).destroy(Object.assign(new Error('read EIO'), { code: 'EIO' }))
+
+    const error = await waiting
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('closed')
+    expect(error.method).toBe('Fake.silence')
+  })
+
+  it('a write that fails with EPIPE does not end the owner: requests waiting are rejected as closed', async () => {
+    // A browser still running behind the broken pipe; one that exits is `exited`.
+    const pipe = await fake(['--stay-after-eof'], { requestTimeoutMs: 60_000 })
+    const waiting = rejectionOf(pipe.send('Fake.silence'))
+
+    streamOf(pipe, 3).destroy(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }))
+
+    const error = await waiting
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('closed')
+    expect(error.method).toBe('Fake.silence')
+    expect(error.message).toContain('the pipe to the browser broke')
+    expect(error.message).toContain('EPIPE')
+  })
+
+  it('a browser that stops reading its fd 3 is noticed: the next request is refused as closed, not timed out', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    // Its own answer may come before or after the pipe notices fd 3 closed;
+    // either is right, so only the request after it is asserted.
+    await pipe.send('Fake.closeInput').catch(() => undefined)
+
+    const error = await rejectionOf(pipe.send('Fake.echo', { n: 1 }))
+
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('closed')
+    expect(error.method).toBe('Fake.echo')
+  })
+})
+
 describe('closing ends the whole process group', () => {
   it('asks first: a browser that leaves on Browser.close is not waited out to the grace', async () => {
     const pipe = await fake()
     const started = Date.now()
     await pipe.close(5000)
-    expect(Date.now() - started).toBeLessThan(2500)
+    // Expected: under 500 ms (the fake leaves at once); the grace is 5000.
+    expect(Date.now() - started).toBeLessThan(atMost(500))
     expect(alive(pipe.pid)).toBe(false)
   })
 
@@ -228,12 +529,77 @@ describe('closing ends the whole process group', () => {
 
     await pipe.close(grace)
 
-    // Three graces (ask, SIGTERM, SIGKILL) and timer jitter, nothing more.
-    expect(Date.now() - started).toBeLessThan(3 * grace + 50)
+    // Three graces (ask, SIGTERM, SIGKILL), each waited out in full, and no hang.
+    const took = Date.now() - started
+    expect(took).toBeGreaterThanOrEqual(3 * grace)
+    expect(took).toBeLessThan(atMost(3 * grace))
     expect(incomplete).toEqual([pipe.pid])
     expect(refused).toContainEqual([-pipe.pid, 'SIGKILL'])
     // The browser really is still there: close said so rather than pretending.
     expect(alive(pipe.pid)).toBe(true)
+  })
+
+  it('never hangs on a loaded machine either: each signal call slow, the deadline still holds', async () => {
+    const incomplete: number[] = []
+    const pipe = await fake(['--ignore-close'], {
+      kill: (() => {
+        // A busy machine: every call costs 30 ms of CPU before it fails.
+        const until = Date.now() + 30
+        let spins = 0
+        while (Date.now() < until) spins++
+        throw Object.assign(new Error(`kill EPERM after ${spins} spins`), { code: 'EPERM' })
+      }) as typeof process.kill,
+      onCloseIncomplete: (pid) => incomplete.push(pid),
+    })
+    const grace = 200
+    const started = Date.now()
+
+    await pipe.close(grace)
+
+    expect(Date.now() - started).toBeLessThan(atMost(3 * grace))
+    expect(incomplete).toEqual([pipe.pid])
+  })
+
+  it('reports a group whose browser left but another member of which it could not end', async () => {
+    const incomplete: number[] = []
+    const pipe = await fake([], {
+      // Signals to the group are refused (EPERM); asking whether it exists is real.
+      kill: ((pid: number, signal?: string | number) => {
+        if (signal === 0) return process.kill(pid, 0)
+        throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' })
+      }) as typeof process.kill,
+      onCloseIncomplete: (pid) => incomplete.push(pid),
+    })
+    const { pid: grandchild } = await pipe.send<{ pid: number }>('Fake.spawnGrandchild')
+
+    await pipe.close(200)
+
+    // The browser left on Browser.close; its child, in the same group, did not.
+    expect(alive(pipe.pid)).toBe(false)
+    expect(alive(grandchild)).toBe(true)
+    expect(incomplete).toEqual([pipe.pid])
+  })
+
+  it('reports a group it could not end, by default, as one stderr line naming the pid', async () => {
+    const pipe = await fake(['--ignore-close'], {
+      kill: (() => {
+        throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' })
+      }) as typeof process.kill,
+    })
+    const lines: string[] = []
+    const write = process.stderr.write.bind(process.stderr)
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      lines.push(String(chunk))
+      return true
+    }) as typeof process.stderr.write
+    try {
+      await pipe.close(100)
+    } finally {
+      process.stderr.write = write
+    }
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain(`browser ${pipe.pid} `)
+    expect(lines[0]).toContain('close() gave up')
   })
 
   it('is idempotent', async () => {

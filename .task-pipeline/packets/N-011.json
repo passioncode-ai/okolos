@@ -3,11 +3,14 @@
  "node": "N-011",
  "intent": "K3: глаголы и walking skeleton",
  "inputs": [
-  "Tasks, AgentWindows, Journal, buildSnapshot, snapshotVerdict, paginate, runProbe (бандл apps/extension/src/agent-probe.ts)",
+  "Tasks и checkLanded (N-009), AgentWindows (N-010), Journal и answerAfterRecord (N-006), doorRoute, pair, mcp-stdio (N-008), buildSnapshot, snapshotVerdict, paginate (N-003, N-004), census и readCensus (N-012), VerbIO, toolName, canonicalVerb, isLocalAddress, toSnapshotFinding (N-023), service из N-024 (capStdoutLog, buildIdentity с корнем релиза), runProbe (бандл apps/extension/src/agent-probe.ts)",
   "N-004: pageOf с курсором",
+  "N-006: Journal, answerAfterRecord",
   "N-008: регистрация инструментов на запрос",
   "N-009: Task.charge и проверки области",
-  "N-010: AgentWindow.open/close"
+  "N-010: AgentWindow.open/close",
+  "N-012: census, readCensus, CensusEntry[]",
+  "N-022: CdpError.kind и cdpCode для перевода в отказы контракта"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -16,16 +19,20 @@
  ],
  "source_scope": {
   "edit_targets": [
+   "apps/agent/src/agent.ts",
+   "apps/agent/src/main.ts",
    "apps/agent/src/verbs/verbs.ts",
-   "src/verbs/probe.ts",
-   "src/main.ts",
+   "apps/agent/src/verbs/probe.ts",
    "tools/build-agent.mjs",
+   "apps/agent/package.json",
+   "tools/imports.mjs",
+   "apps/agent/src/agent.test.ts",
    "apps/agent/src/verbs/verbs.test.ts",
-   "src/verbs/skeleton.chrome.test.ts"
+   "apps/agent/src/verbs/skeleton.chrome.test.ts"
   ]
  },
  "outputs": [
-  "инструменты MCP под именами toolName(verb) из N-001 (точка заменяется на _): session_open, open, snapshot, read, get, waitFor, close, hygiene_census (без screenshot); находки в ответе строятся только через toSnapshotFinding из N-001, без текста страницы; каждый ответ проходит journal.record до отправки; `main.ts` собирает службу"
+  "`createAgent({home?, port, allowLoopbackForTests?, extraChromeArgs?}): Promise<Agent>` (каталоги из serviceDirs(home); тесты передают временный home; журнал, привязки и окна строятся в setup N-005 после замка, проверка seam N-005) в src/agent.ts: служба, дверь, задачи, окна, журнал, перепись; onRevoke(agentId) закрывает задачи агента и их окна (аудит #13); таймер Journal.sweep раз в сутки (аудит #30); main.ts: serve → createAgent, pair, mcp-stdio; bin okolos-agent указывает на собранный бандл (исходники импортируют ./x.js, обычный node их не запустит; проверка seam N-005 круг 2); инструменты MCP под toolName: session_open, open, snapshot, read, get, waitFor, close, hygiene_census; схемы zod типа z.ZodType<VerbIO[V]['input']> (аудит #26); журнал хранит canonicalVerb (аудит #19); SessionOpenResult.sessionId = Task.id, cdpSessionId не уходит агенту (аудит #28); находки только через toSnapshotFinding"
  ],
  "acceptance": [
   "skeleton на Chrome: session.open → open локальной фикстуры со скрытой инструкцией из корпуса → snapshot не содержит текста инструкции, verdict.level = finding → close: окна нет",
@@ -33,7 +40,7 @@
   "read, get text|title, waitFor {text} строятся только из очищенных строк снимка",
   "open {ref} на ссылку вне origins.read → origin_not_in_task до перехода; редирект за область → snapshot и read отвечают origin_not_in_task",
   "каждый глагол, возвращающий URL, срезает фрагмент",
-  "ответ главного фрейма пришёл с адреса loopback, частной сети или 100.64.0.0/10 (Tailscale, CGNAT; решение: это локальная сеть) (Network.responseReceived remoteIPAddress), например по имени 127.0.0.1.nip.io: snapshot и read отвечают origin_not_in_task (проверка unit N-001, риск 2)",
+  "ответ главного фрейма пришёл с адреса loopback, частной сети или 100.64.0.0/10 (Tailscale, CGNAT; решение: это локальная сеть) (Network.responseReceived remoteIPAddress; правило — isLocalHost из N-023, своей копии нет), например по имени 127.0.0.1.nip.io: snapshot и read отвечают origin_not_in_task (проверка unit N-001, риск 2)",
   "ни один ответ агенту и ни одна запись журнала не содержат текста вырезанной инструкции: находки идут через toSnapshotFinding (проверка seam N-001, break 1)",
   "фикстуры тестов открываются по имени fixture.test через --host-resolver-rules; разрешение на loopback даёт только параметр конструктора allowLoopbackForTests, который main.ts не передаёт, и тест читает main.ts на его отсутствие (проверка product N-001, риск 2)",
   "tools/list не содержит screenshot (ревью R2)",
@@ -43,15 +50,24 @@
   "snapshot большой фикстуры приходит частями ≤ 32 КБ с курсором",
   "read возвращает boundary с nonce и origin; get title/url без фрагмента",
   "поля password, cc-number, one-time-code, <label> вокруг поля, aria-labelledby на поле кода, contenteditable без роли, с введёнными значениями (fuzz, фиксированное зерно): значений нет ни в одном ответе ни одного глагола (ревью R4)",
-  "проверка узла: pnpm -s exec vitest run apps/agent/src/verbs"
+  "remoteIPAddress пуст или отсутствует: snapshot и read отказывают cleaning_incomplete (аудит #27)",
+  "отзыв доступа закрывает задачи агента и их окна: окна с targetId задачи больше нет (аудит #13)",
+  "журнал несёт глагол в каноническом виде (session.open), инструмент зовётся session_open (аудит #19)",
+  "бандл несёт apps/agent/src/fabric (.mjs набор не копирует tsc)",
+  "тот же таймер раз в сутки обрезает events.jsonl по правилу N-005 (7 дней или 1000 событий), а не только при старте (отчёт N-005, fix 0)",
+  "вторая копия демона на том же home выходит с 75, не открыв журнал, хранилище привязок и Chrome (setup после замка, проверка seam N-005)",
+  "отказы двери до разбора пишутся в журнал через onRefused оболочки N-005 с DoorRejection (проверка seam N-005)",
+  "CdpError превращается в отказ контракта: kind exited/closed → browser_offline, ошибка CDP о пропавшей цели (cdpCode) → tab_gone, timeout → internal; тест на каждый (проверка seam N-022)",
+  "createAgent передаёт оболочке N-005 version, buildRoot и localesDir; при неизвестном каталоге строк служба не стартует молча с ключами вместо фраз (отчёт N-005, fix 1)",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/agent.test.ts apps/agent/src/verbs && pnpm -s run typecheck"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
-  "никакого секрета в argv, логах, журнале и URL",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
   "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
   "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "без длинного тире в текстах для людей"
  ],
- "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/verbs/verbs.ts src/verbs/probe.ts src/main.ts; затем первый непройденный тест в списке acceptance"
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/agent.ts apps/agent/src/main.ts apps/agent/src/verbs/verbs.ts; затем первый непройденный тест в списке acceptance"
 }

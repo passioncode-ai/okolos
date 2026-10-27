@@ -83,7 +83,7 @@
 | REQ-65 | Вид активности: открытые задачи агентов и последние отказы (отзыв доступа живёт в SCR-23) | e2e SCN-045 читает страницу | open |
 | REQ-66 | Термины моста (Okolos Bridge, Okolos Agent, окно агента, привязка, задача агента) в `docs/brand/terminology.md` до первых строк для людей (B-147) | `python3 docs/brand/lint.py`; `tools/docs.test.ts` | open |
 | REQ-67 | ADR «мост — часть Okolos Agent; две двери; задача — своё окно» (B-146) и ADR «снимок частями, не больше 32 КБ»; строки механизмов моста в ADR-0019 | `tools/adr.test.ts` (каждый названный файл существует) | open |
-| REQ-68 | Три исключения `tools/reachable.test.ts` для моста сняты | `tools/reachable.test.ts` без строк `Okolos Bridge Б1` | open |
+| REQ-68 | Все исключения `tools/reachable.test.ts` для моста сняты (строки, добавленные узлами Б1; их число растёт по ходу сборки) | `tools/reachable.test.ts` без строк `Okolos Bridge Б1` | open |
 | REQ-69 | Документы: строка демона в `AGENTS.md` → Lifecycle и строка MCP в Commands, раннбук, `docs/README.md` (статус и карта), строка в `org-index/repositories.json`, `knowledge/products.md` (MCP gaps) и RM-18 в roadmap | `tools/runbook.test.ts`, `tools/docs.test.ts`; `check_index.py` в org-index | open |
 | REQ-70 | Ничего работающего не сломано: защита людей в расширении и права его манифеста те же | `pnpm gates`, `pnpm test:e2e`, `tools/manifest.test.ts` «the line between Okolos and Okolos Bridge» | open |
 

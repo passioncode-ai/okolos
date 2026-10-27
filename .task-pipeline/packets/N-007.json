@@ -4,7 +4,7 @@
  "intent": "K3: привязка",
  "inputs": [
   "serviceDirs().data",
-  "N-005: каталоги данных и токен хоста"
+  "N-024: каталоги данных и токен хоста"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -20,7 +20,7 @@
   ]
  },
  "outputs": [
-  "`class Pairing { static open(file): Pairing; request(agentName, now): {requestId, code, expiresAt} | {refused: reason}; confirm(requestId, now); decline(requestId); claim(requestId, now): {key} | {pending: true} | null; verify(key): AgentRecord | null; revoke(agentId); list(now): {requests: PublicRequest[] /* без requestId, с handle для страницы */, agents} }`; `checkAgentName(name): string | null` (причина отказа)"
+  "`class Pairing { static open(file): Pairing; request(agentName, now): {requestId, code, expiresAt} | {refused: reason}; confirm(requestId, now); decline(requestId); claim(requestId, now): {key} | {pending: true} | null; verify(key): AgentRecord | null; revoke(agentId); list(now): {requests: PublicRequest[] /* без requestId, с handle для страницы */, agents}; confirmByHandle(handle, now); declineByHandle(handle) }`; `checkAgentName(name): string | null` (причина отказа)"
  ],
  "acceptance": [
   "requestId 128 бит (32 hex), не появляется в list() для страницы, в журнале и событиях",
@@ -29,11 +29,12 @@
   "два ожидающих запроса с одним именем помечены duplicateName оба",
   "имя агента: > 40 знаков, три цифры подряд, символы управления или bidi → отвергается с причиной (ревью F12)",
   "verify через timingSafeEqual по SHA-256; отозванный ключ → null; хранилище 0600, атомарная запись; чужое содержимое файла не открывает хранилище, а даёт ошибку хранилища",
-  "проверка узла: pnpm -s exec vitest run apps/agent/src/pairing"
+  "confirmByHandle и declineByHandle работают по handle из list(); requestId в роли handle отвергается (аудит #9)",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/pairing && pnpm -s run typecheck"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
-  "никакого секрета в argv, логах, журнале и URL",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
   "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
   "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",

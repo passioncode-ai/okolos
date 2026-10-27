@@ -1,0 +1,43 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-024",
+ "intent": "K3: оболочка службы, замена запаркованного N-005",
+ "inputs": [
+  "ветка b1/n-005 (код N-005 до 9dbaf1e; seam прошёл во всех кругах) и bridge/b1-run2 с N-022"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "apps/agent/src/service/http.ts",
+   "apps/agent/src/service/events.ts",
+   "apps/agent/_locales/ru/messages.json",
+   "apps/agent/_locales/en/messages.json",
+   "apps/agent/src/service/http.test.ts",
+   "apps/agent/src/service/events.test.ts"
+  ]
+ },
+ "outputs": [
+  "всё из N-005, плюс: запись лога после запроса не роняет демон (quietly); событие eventDrainCutOff пишется один раз даже при двух close(); eventsUnreadable — разовое событие при старте уровня warning, не постоянный degraded; 503 во время остановки проходит через onRefused с причиной 'stopping', чтобы дверь записала его в журнал"
+ ],
+ "acceptance": [
+  "лог только для чтения после старта: два запроса к well-known получают 200, close() завершается (unit N-005 круг 3, break)",
+  "два одновременных close() при зависшем запросе пишут eventDrainCutOff один раз (unit N-005 круг 3, риск)",
+  "eventDrainCutOff: ru «Okolos Agent остановился, не дождавшись конца вызовов. Оборвано: $COUNT$.» en «Okolos Agent stopped before all calls finished. Cut off: $COUNT$.» (Copylot ru 8748c348-95f2-4054-9401-70cde29d7d72, en 4658bee7-8c88-425b-aff6-d1ae2996bf48; слово «запрос» закреплено за доступом, product N-005 круг 3)",
+  "eventsUnreadable: ru «В файле событий нашлись нечитаемые строки: $COUNT$. При запуске они удалены, остальные события сохранены.» en «The events file had unreadable lines: $COUNT$. They were removed at start; the other events are kept.» как разовое событие warning при старте; well-known после старта без degraded источника events (product N-005 круг 3)",
+  "запрос во время остановки: onRefused вызывается с причиной 'stopping' до записи 503 (product N-005 круг 3, break 3)",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/service && pnpm -s run typecheck && pnpm -s run lint && pnpm -s run i18n:sweep"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/service/http.ts apps/agent/src/service/events.ts apps/agent/_locales/ru/messages.json; затем первый непройденный тест в списке acceptance"
+}

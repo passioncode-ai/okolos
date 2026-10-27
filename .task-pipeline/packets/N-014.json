@@ -4,7 +4,8 @@
  "intent": "Термины и строки (каталог apps/agent/_locales, ревью F22)",
  "inputs": [
   "—",
-  "N-013: список строк экранов"
+  "N-013: список строк экранов",
+  "N-024: resource: apps/agent/_locales/{ru,en}/messages.json; N-014 дописывает строки страницы после строк службы N-024"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -20,17 +21,20 @@
   ]
  },
  "outputs": [
-  "47 ключей строк; термины раздела «Мост для агентов»"
+  "строки страницы; число ключей меряется командой по каталогу ru (аудит #34); термины раздела «Мост для агентов»"
  ],
  "acceptance": [
   "оба каталога с одинаковыми ключами; каждый $X$ объявлен в placeholders",
   "python3 docs/brand/lint.py → 0",
+  "ключ строки rejection_door в обоих каталогах для отказов двери до разбора; copylot_check (seam N-001 круг 3, break 3)",
   "refusal_invalid_scope говорит «этого устройства»/«this device», как остальной продукт, и читается внутри строки refusalLine без двух двоеточий подряд; copylot_check на собранной строке (проверка product N-001 круг 2)",
+  "ключи taskProfileAgent и taskProfileDisposable в обоих каталогах, copylot_check (аудит #20)",
+  "решить, идут ли через каталог тексты службы N-005 (занятый замок, события, 503): человек читает события в Fabric Dashboards",
   "проверка узла: python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
-  "никакого секрета в argv, логах, журнале и URL",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
   "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
   "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",

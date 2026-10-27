@@ -20,7 +20,8 @@
    "packages/cdp-pipe/src/errors.test.ts",
    "package.json",
    "docs/README.md",
-   "docs/superpowers/specs/2026-10-06-bridge-b1-design.md"
+   "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+   "docs/runbooks/development.md"
   ]
  },
  "outputs": [
@@ -38,7 +39,7 @@
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
-  "никакого секрета в argv, логах, журнале и URL",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
   "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
   "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",

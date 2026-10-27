@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
-  "description": "Drives a browser over CDP through --remote-debugging-pipe: NUL frames, requests with deadlines, flat sessions, and a process group that close() ends whole. No network.",
+  "description": "Drives a browser over CDP through --remote-debugging-pipe: NUL frames, requests with deadlines, flat sessions, and a close() that asks, then signals the whole process group, and reports instead of hiding a group with any process left at its deadline. No network.",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "build": "tsc -b" }
 }

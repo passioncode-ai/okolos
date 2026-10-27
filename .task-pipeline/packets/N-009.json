@@ -4,7 +4,8 @@
  "intent": "K3: задачи",
  "inputs": [
   "validateScope, inScope, refuse, verbAllowed (close разрешён всегда) (bridge.ts)",
-  "N-001: validateScope и отказы"
+  "N-023: validateScope, inScope, verbAllowed, refuse",
+  "N-024: apps/agent: package.json, tsconfig"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -18,7 +19,7 @@
   ]
  },
  "outputs": [
-  "`class Tasks { open(agentId, scopeInput, now): BridgeResult<Task>; get(agentId, taskId, now): BridgeResult<Task>; charge(task, verb, url?): BridgeResult<void>; closeAllOf(agentId); list(now) }`; `Task {id, agentId, scope, openedAt, stepsUsed, windowId?}`"
+  "`class Tasks { open(agentId, scopeInput, now): BridgeResult<Task>; get(agentId, taskId, now): BridgeResult<Task>; charge(task, verb, url?): BridgeResult<void>; closeAllOf(agentId); list(now) }`; `Task {id, agentId, scope, openedAt, stepsUsed, windowId?}`; `checkLanded(task, actualUrl): BridgeResult<void>` (аудит #39); SessionOpenResult.sessionId = Task.id"
  ],
  "acceptance": [
   "каждый отказ BRIDGE_REFUSALS, который выдают задачи (invalid_scope, no_such_task, origin_not_in_task, verb_not_in_task, budget_exhausted, task_expired), — свой тест",
@@ -27,11 +28,11 @@
   "checkLanded(task, actualUrl): фактический origin вне origins.read → origin_not_in_task (ревью F9)",
   "отказ тоже списывает шаг (спека §2.3)",
   "фрагмент URL не влияет на проверку origin",
-  "проверка узла: pnpm -s exec vitest run apps/agent/src/tasks"
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/tasks && pnpm -s run typecheck"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
-  "никакого секрета в argv, логах, журнале и URL",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
   "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
   "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",

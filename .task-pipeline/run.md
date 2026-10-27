@@ -29,3 +29,11 @@ event: memory — board request a6191901 (webpilot shield copy) answered 25fd4f3
 finding: hygiene N-002 docs/README.md:122 split-table — noise — round 0 — base-repro n/a (blank line separates the packages table from the applications table; two tables, not one split)
 event: memory — N-002 verdict re-stamped at 09bfbaa after merge; node code identical to certified 6c2227c (git diff --quiet 6c2227c 09bfbaa -- packages/cdp-pipe tools/agent-window-spike.mjs) — 2026-10-27T07:40:00+01:00
 iter: 1 — item N-002 — closed at gate 5
+event: memory — lesson: N-002 implementer and all three certification tiers ran only the node check; i18n:sweep failed at pre-push after merge (5 unexempted strings in cdp-pipe). From N-005 on, every implementer runs `pnpm gates` before DONE — 2026-10-27T07:55:00+01:00
+holds: 5 — blocker N-001 parked at the certification ceiling (3 failing rounds, seam each time); replaced by N-023 with explicit edge change (revisions); plan-wide seam audit dispatched — 2026-10-27T08:10:00+01:00
+event: memory — plan-wide seam audit: 40 findings (22 breaks) applied through plan_tasks.json + apply_audit.py; touches now generated from packets; plan_audit then found 2 real collisions (lockfile N-003/N-008, pipe.ts N-005/N-022), ordered — 2026-10-27T09:10:00+01:00
+finding: hygiene N-022 docs/README.md:122 split-table — noise — round 0 — base-repro yes (same separator between the packages and applications tables as N-002)
+event: memory — merge note: when N-005 merges after N-022, take pipe.ts from N-022 and KEEP both sets of rows in tools/reachable.test.ts (N-022 errors.ts row + N-005 rows) — seam N-022 r1 risk 3
+event: memory — open question for the Fabric Dashboards owner: every local service sets cookie fabric_session on 127.0.0.1 (kit has no name option; check_service.py reads only that name); are sessions of different services kept apart? (N-005 fix 1, item 13)
+iter: 2 — item N-022 — closed at gate 5
+holds: 5 — blocker N-005 parked at the certification ceiling (r1 all, r2 product, r3 unit+product; seam passed r2, r3); replaced by N-024 with explicit edge change

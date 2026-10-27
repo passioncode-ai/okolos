@@ -17,7 +17,7 @@
   "edit_targets": [
    "tools/install-agent.mjs",
    "tools/install-agent.test.ts",
-   "tools/launchd/app.okolos.agent.plist",
+   "apps/agent/src/main.ts",
    "package.json",
    "docs/runbooks/development.md",
    "docs/runbooks/agent.md"
@@ -30,15 +30,20 @@
   "dry-run печатает plist: RunAtLoad, KeepAlive, ThrottleInterval 10, ProcessType Standard, FABRIC_SERVICE_SUPERVISOR=launchd, абсолютный node, путь в релизе, ни одного секрета",
   "tools/runbook.test.ts видит новые скрипты в раннбуке",
   "фальшивый launchctl первым в PATH: install зовёт bootout, ждёт, bootstrap",
+  "релиз содержит бандл, apps/agent/src/fabric и apps/agent/static (аудит #37)",
+  "install пишет plist через launchdPlist набора и зовёт capStdoutLog при старте",
+  "дескриптор берёт auth.tokenFile из servicePaths(dirs) N-005, а не из своей копии пути (проверка seam N-005)",
+  "релиз содержит apps/agent/_locales; buildIdentity от корня релиза даёт digest, не коммит чужого git (отчёт N-005, fix 1)",
+  "serviceDirs из dirs.ts и serviceDirs набора Fabric дают одни и те же каталоги (их использует uninstall --purge); тест держит их вместе (проверка seam N-005 круг 2)",
   "проверка узла: pnpm -s exec vitest run tools/install-agent.test.ts tools/runbook.test.ts"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
-  "никакого секрета в argv, логах, журнале и URL",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
   "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
   "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "без длинного тире в текстах для людей"
  ],
- "resume": "git log --oneline origin/main..bridge/b1-run2 -- tools/install-agent.mjs tools/install-agent.test.ts tools/launchd/app.okolos.agent.plist; затем первый непройденный тест в списке acceptance"
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- tools/install-agent.mjs tools/install-agent.test.ts apps/agent/src/main.ts; затем первый непройденный тест в списке acceptance"
 }

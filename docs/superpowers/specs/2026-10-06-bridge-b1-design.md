@@ -23,7 +23,7 @@ covers: REQ-53, REQ-54, REQ-55, REQ-56, REQ-57, REQ-58, REQ-59, REQ-60, REQ-61, 
 | # | Модуль | Где | Владеет REQ | Зависит от |
 |---|---|---|---|---|
 | **K0** | Контракты моста | `packages/contracts/src/bridge.ts` | REQ-53 | — |
-| **K1** | CDP-клиент по pipe | `packages/cdp-pipe` | REQ-54 | K0 |
+| **K1** | CDP-клиент по pipe | `packages/cdp-pipe` | REQ-54 | ни от чего: `packages/cdp-pipe/package.json` без зависимостей; отказ отдаёт своим `CdpError`, код отказа моста из K0 по нему выбирает K3 |
 | **K2** | Снимок для агента | `packages/core-snapshot` | REQ-55, REQ-56 | K0, `core-injection`, `core-sanitizer` |
 | **K3** | Демон Okolos Agent | `apps/agent` | REQ-57, REQ-58, REQ-59, REQ-60 | K0, K1, K2, `net` |
 | **K4** | Окно агента | `apps/agent/src/window` | REQ-61 | K1, K3 |
@@ -67,6 +67,13 @@ interface TaskScope {
 | `waitFor` | `{ ms } \| { text } \| { url }` | `{ text }` ищется только в очищенном снимке |
 | `close` | нет | окно и процессы задачи закрыты; разрешён всегда, даже если не назван в `verbs` |
 | `hygiene.census` | нет | перепись (K5) без командных строк чужих процессов |
+
+**Формы входа и выхода, принятые в N-023** (тип `VerbIO` в `packages/contracts/src/bridge.ts`, их
+единственный дом): каждый глагол внутри задачи принимает `sessionId` задачи (`TaskCall`);
+`WaitForResult` равен `{met: boolean}`; `GetResult` помечен по `what` (`count` даёт число, остальные
+строку); `CloseResult` равен `{closed: true}`; `CensusResult` равен `readonly CensusEntry[]`. Глагол
+пишется с точкой (`session.open`) в контрактах и журнале; имя инструмента MCP даёт `toolName(verb)`
+(`session_open`), обратно `canonicalVerb`.
 
 `screenshot` перенесён в Б2 (ревью 2026-10-27, F3): пиксели обходят движок и показывают введённые
 номера карт и коды. Вернётся вместе с маскированием полей.
@@ -190,13 +197,14 @@ covers: REQ-63, REQ-64, REQ-65, REQ-66, REQ-67, REQ-68, REQ-69, REQ-70
 
 covers: REQ-64, REQ-65, REQ-66
 
-- **Тексты.** 49 строк (47 в первом проходе) в `apps/agent/_locales/{ru,en}/messages.json`. Голос Okolos сохранён в Copylot
+- **Тексты.** 54 строки (47 в первом проходе) в `apps/agent/_locales/{ru,en}/messages.json`. Голос Okolos сохранён в Copylot
   (`266030ff-8cfb-415f-8ed9-6269a66167ed`, версия 1) из `docs/brand/voice.md`. `copylot_check`,
   регистр `ui`: ru `e88f88b3-c221-4a25-8e0f-ca664440aac5` (одно замечание-совет, пассив с деятелем,
   исправлено, повтор `268e1a50-5925-4528-8be5-c1fd45fd7fb2` чистый), en
   `d306f7d8-cb94-4f0e-a676-964e61bdf100` (чисто); строки о доступе после замены слова «привязка»:
   ru `daaa9a32-924f-4fd1-908c-c54987ff5999`, en `d00fa757-a29a-4d89-bbcf-031220b43811` (чисто). Отказы `cleaning_incomplete` и `stale_cursor` (второй круг ревью): ru
-  `ea3bd9ab-0c6c-4002-9c61-d2da09c4df44`, en `aa4bfe27-8b83-4812-a284-f6959a826fb1` (чисто). Всего строк 49.
+  `ea3bd9ab-0c6c-4002-9c61-d2da09c4df44`, en `aa4bfe27-8b83-4812-a284-f6959a826fb1` (чисто). Строки службы N-005 (события запуска и остановки, ответ 503, причина degraded файла событий): ru
+  `f151b377-0656-42df-b567-296c562b8c3b`, en `510d3ad7-9ac3-4db0-baac-7fdb336a5edc` (чисто). Фраза остановки без обещания завершить работу и событие об оборванных запросах (проверка product N-005, круг 2): ru `bb3a7be2-1033-44e0-9381-eea36e467816`, en `9f797e22-bd0d-46f9-ad3c-99fe83065a2c` (чисто). Всего строк 54.
   Английский написан тем же голосом, а не адаптирован `copylot_prepare`: строки короткие и
   интерфейсные, это записано как решение, а не пропуск.
 - **Вид.** Визуальный трек отклонён с причиной:
