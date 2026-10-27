@@ -45,7 +45,7 @@
     "message": "Отклонить"
   },
   "pairingConfirmed": {
-    "message": "Доступ выдан агенту $NAME$.",
+    "message": "Доступ для агента $NAME$ подтверждён. Агент заберёт ключ в течение пяти минут.",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -100,7 +100,7 @@
     "message": "Ни один агент не подключён."
   },
   "pairingHow": {
-    "message": "Агент подключается по адресу $URL$. Первый вызов покажет здесь код.",
+    "message": "Агент просит доступ командой okolos-agent pair в терминале. Его код появится здесь. Адрес двери: $URL$.",
     "placeholders": {
       "url": {
         "content": "$1"
@@ -259,6 +259,28 @@
     "message": "В файле событий нашлись нечитаемые строки: $COUNT$. При запуске они удалены, остальные события сохранены.",
     "placeholders": {
       "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingCollecting": {
+    "message": "Подтверждено. Агент забирает ключ до $TIME$.",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingClaimExpired": {
+    "message": "Агент не забрал ключ за пять минут. Доступ не выдан, агенту нужно попросить снова."
+  },
+  "pairingDuplicate": {
+    "message": "Ещё один запрос с таким же именем. Сверьте код особенно внимательно."
+  },
+  "pairingAsked": {
+    "message": "Запросил в $TIME$",
+    "placeholders": {
+      "time": {
         "content": "$1"
       }
     }

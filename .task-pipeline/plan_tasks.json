@@ -236,7 +236,8 @@
   "n": "N-006",
   "title": "K3: журнал до ответа",
   "deps": [
-   "N-024"
+   "N-024",
+   "N-023"
   ],
   "req": [
    "REQ-60"
@@ -319,7 +320,8 @@
    "ключ пишется во временный файл и переименовывается только после успешного забора; существующий файл заменяется только с --replace; привязка того же имени после отзыва проходит с --replace (ревью S5)",
    "маршруты /mcp, /pair, /pair/claim объявляют paths, и well-known показывает surfaces.mcp (проверка seam N-005 круг 2)",
    "тексты, которые читает человек, идут ключами каталога, которые заранее добавил N-014; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
-   "долгий поток /mcp при остановке: дверь закрывает его сама до срока слива и пишет ответ в журнал; агент за stdio-шимом получает отказ контракта internal с retryable, а не голый 503 (product N-005 круг 3, риски)"
+   "долгий поток /mcp при остановке: дверь закрывает его сама до срока слива и пишет ответ в журнал; агент за stdio-шимом получает отказ контракта internal с retryable, а не голый 503 (product N-005 круг 3, риски)",
+   "журнал двери не записывает тела /pair и /pair/claim (в них requestId); без заголовка X-Okolos-Agent-Key дверь отказывает not_paired, не вызывая Pairing.verify (отчёт N-007)"
   ],
   "dod": "vitest apps/agent/src/door зелёный"
  },
@@ -464,12 +466,14 @@
  {
   "n": "N-013",
   "title": "UX: экраны SCR-23/24, потоки, сценарии",
-  "deps": [],
+  "deps": [
+   "N-024"
+  ],
   "req": [
    "REQ-64"
   ],
   "files": [
-   "Modify: docs/ux/screens.md, docs/ux/flows.md, docs/ux/scenarios.md"
+   "Modify: docs/ux/screens.md, docs/ux/flows.md, docs/ux/scenarios.md, docs/ux/foundation.md, docs/design/agent-dashboard/director-record.md, docs/superpowers/specs/2026-10-06-bridge-b1-design.md, apps/agent/_locales/ru/messages.json, apps/agent/_locales/en/messages.json"
   ],
   "consumes": "—",
   "produces": "SCR-23, SCR-24 со состояниями; FLW-21/22 ведут к ним",

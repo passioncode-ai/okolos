@@ -257,7 +257,8 @@
       "owner": "implementer",
       "status": "pending",
       "blocked_by": [
-        "N-024"
+        "N-024",
+        "N-023"
       ],
       "serves": "REQ-60",
       "check": "pnpm -s exec vitest run apps/agent/src/journal && pnpm -s run typecheck",
@@ -283,7 +284,27 @@
         "apps/agent/src/pairing/pairing.test.ts",
         "apps/agent/src/pairing/name.test.ts"
       ],
-      "risk": "R3"
+      "risk": "R3",
+      "certification": {
+        "round": 1,
+        "tiers": {
+          "unit": "pass",
+          "seam": "pass",
+          "product": "fail"
+        },
+        "at": "b251f87eafe1cc14778c914120a51b987c7b5137",
+        "history": [
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          }
+        ],
+        "kinds": [
+          "blind"
+        ],
+        "tree": "4f1cefec206cdf4af790ec9e75e5ca6c06de5788"
+      }
     },
     {
       "id": "N-008",
@@ -406,16 +427,22 @@
       "title": "UX: FLW-21/22 к экранам, SCR привязки и активности, вайрфреймы, сценарии",
       "owner": "ux",
       "status": "pending",
-      "blocked_by": [],
+      "blocked_by": [
+        "N-024"
+      ],
       "serves": "REQ-64",
       "check": "python3 docs/ux/lint.py",
       "touches": [
         "docs/ux/screens.md",
         "docs/ux/flows.md",
-        "docs/ux/scenarios.md"
+        "docs/ux/scenarios.md",
+        "docs/ux/foundation.md",
+        "docs/design/agent-dashboard/director-record.md",
+        "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+        "apps/agent/_locales/ru/messages.json",
+        "apps/agent/_locales/en/messages.json"
       ],
-      "risk": "R2",
-      "surface_class": "product"
+      "risk": "R2"
     },
     {
       "id": "N-014",
@@ -841,6 +868,11 @@
       "payload": "resource: packages/cdp-pipe/src/pipe.ts; N-022 вливается первым, при слиянии N-005 файл берётся из N-022 (его пометки i18n-exempt покрывают весь файл)"
     },
     {
+      "from": "N-024",
+      "to": "N-025",
+      "payload": "buildIdentity и тест dotfiles"
+    },
+    {
       "from": "N-023",
       "to": "N-003",
       "payload": "toSnapshotFinding, SnapshotFinding, TaskScope"
@@ -857,13 +889,13 @@
     },
     {
       "from": "N-024",
-      "to": "N-025",
-      "payload": "buildIdentity и тест dotfiles"
-    },
-    {
-      "from": "N-024",
       "to": "N-006",
       "payload": "каталоги данных службы, servicePaths, setup после замка"
+    },
+    {
+      "from": "N-023",
+      "to": "N-006",
+      "payload": "BridgeRefusal, AnyBridgeVerb, canonicalVerb для типа JournalEntry"
     },
     {
       "from": "N-024",
@@ -969,6 +1001,11 @@
       "from": "N-014",
       "to": "N-012",
       "payload": "ключи причин переписи"
+    },
+    {
+      "from": "N-024",
+      "to": "N-013",
+      "payload": "resource: каталоги строк агента; N-013 дописывает строки SCR-23 после строк службы"
     },
     {
       "from": "N-013",
@@ -1150,6 +1187,16 @@
       "node": "N-025",
       "why": "certified at all 1 tiers in round 1",
       "precondition": "da814f658b78bac3874c960f6b9704da8e01d351"
+    },
+    {
+      "verb": "add",
+      "node": "N-006",
+      "why": "N-006 типизирует JournalEntry кодами отказов и глаголами контракта; ребро N-023→N-006 делает это явным. Сборка N-006 начата на старом контракте с именами из b1/n-023; узел закрывается после N-023"
+    },
+    {
+      "verb": "add",
+      "node": "N-013",
+      "why": "surface_class снят: N-013 меняет документы UX-цепочки и строки, не пиксели; визуальный трек отклонён записью режиссёра (docs/design/agent-dashboard/director-record.md); страницу рисует N-015, класс product остаётся на нём"
     }
   ]
 }

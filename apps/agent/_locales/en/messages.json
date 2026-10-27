@@ -45,7 +45,7 @@
     "message": "Decline"
   },
   "pairingConfirmed": {
-    "message": "$NAME$ has access now.",
+    "message": "Access for $NAME$ is confirmed. The agent collects its key within five minutes.",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -100,7 +100,7 @@
     "message": "No agent is connected."
   },
   "pairingHow": {
-    "message": "An agent connects to $URL$. Its first call shows a code here.",
+    "message": "An agent asks for access with okolos-agent pair in a terminal. Its code then appears here. The door's address: $URL$.",
     "placeholders": {
       "url": {
         "content": "$1"
@@ -259,6 +259,28 @@
     "message": "The events file had unreadable lines: $COUNT$. They were removed at start; the other events are kept.",
     "placeholders": {
       "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingCollecting": {
+    "message": "Confirmed. The agent is collecting its key until $TIME$.",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingClaimExpired": {
+    "message": "The agent did not collect its key within five minutes. No access was given; it has to ask again."
+  },
+  "pairingDuplicate": {
+    "message": "Another request uses the same name. Compare the code with special care."
+  },
+  "pairingAsked": {
+    "message": "Asked at $TIME$",
+    "placeholders": {
+      "time": {
         "content": "$1"
       }
     }

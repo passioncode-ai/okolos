@@ -695,12 +695,12 @@ flowchart TD
 
 ### FLW-21: Connect an agent to the browser
 - **Traces:** ST-027 (JTBD-10, JRN-05/#1)
-- **Goal:** an agent the person chose can use the browser, and nothing else on the machine can
-- **Entry points:** an agent's first call to the local door of Okolos Agent (through `okolos-agent pair` or the stdio shim); the Okolos Agent page in Fabric Dashboards
-- **Success exit:** the agent is paired, listed with what it may reach, and revocable in one place
+- **Goal:** an agent the person chose can use the browser, and no other agent and no web page can; code running as the person is outside Б1's boundary (spec §11 F4)
+- **Entry points:** `okolos-agent pair --name "<name>"` in the terminal; the Okolos Agent page in Fabric Dashboards
+- **Success exit:** the agent is paired, listed with when it got access and its last call, and revocable in one place
 - **Task analysis:**
   1. See which agent is asking
-  2. Compare the code it shows with the code the panel shows
+  2. Compare the code the terminal shows with the code the page shows
   3. Allow, or refuse
 - **Flow:**
 

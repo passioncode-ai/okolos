@@ -158,7 +158,7 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 ### JRN-05: P-01 — an agent does a job in my browser (JTBD-10)
 | # | Stage | User action | Touchpoint | Emotion (1-5) | Pain | Opportunity |
 |---|-------|------------|------------|---------------|------|-------------|
-| 1 | Connect | Lets an agent use the browser for the first time | agent's terminal, the bridge's prompt | 2 | Every bridge today asks for "read and change all your data" once and never again, for any agent that asks | One pairing per agent, confirmed by the person with a matching code, revocable, scoped |
+| 1 | Connect | Lets an agent use the browser for the first time | `okolos-agent pair` in the terminal, the Okolos Agent page in Fabric Dashboards | 2 | Every bridge today asks for "read and change all your data" once and never again, for any agent that asks | One pairing per agent, confirmed by the person with a matching code, revocable, scoped |
 | 2 | Hand over | Gives the agent a job | the agent | 3 | The agent gets the whole browser: every tab, every login | The job carries its own reach: which sites to read, which to write, for how long |
 | 3 | Working | Keeps working in their own apps | own apps | 3 | Agent windows jump in front and type into whatever has focus | The agent works in its own window, in the background, and never takes the focus |
 | 4 | Reading | — (the agent reads pages) | the agent's window | 3 | Pages carry instructions written for the agent; the agent reads them as orders | What the agent reads is cleaned first, and the page's verdict travels with it |
@@ -404,11 +404,12 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 - **Status:** proposed
 
 ### ST-027: Connect an agent once, and be able to take it back
-- **Story:** As P-01, I want each agent to be paired with my browser once, by me, with a code I can compare, so that no process on my machine can drive my browser just by asking.
+- **Story:** As P-01, I want each agent to be paired with my browser once, by me, with a code I can compare, so that no agent and no web page can drive my browser just by asking.
 - **Traces:** JTBD-10, JRN-05/#1
 - **Acceptance criteria:**
-  - Given an agent that has never connected, when it asks to use the browser, then nothing is reachable until the person confirms a pairing in the bridge's own panel, comparing a code shown in both places.
-  - Given a request without the pairing's key, or from an origin that is not the bridge, when it reaches the local door, then it is refused and the refusal is recorded.
+  - Given an agent that has never connected, when it asks for access through `okolos-agent pair`, then nothing is reachable until the person confirms on the Okolos Agent page, comparing the six-digit code shown in both places.
+  - Given a call to the door without the agent's key, or carrying any `Origin` or `Sec-Fetch-*` header (a web page), then it is refused before any request is made, and the refusal is recorded.
+  - Code already running as the person is outside what Б1 defends against (spec §11 F4); the story promises protection from agents and pages, not from the person's own processes.
   - Given a paired agent, when the person revokes it, then its next call is refused and any task it holds stops.
 - **Priority:** must
 - **Status:** proposed

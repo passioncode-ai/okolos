@@ -133,8 +133,8 @@ Contract: brand-contract v1
 | Локальная служба, через которую агенты входят в браузер | **Okolos Agent**, не переводится и не склоняется | Okolos Agent | `apps/agent`, служба `okolos-agent` |
 | Отдельное фоновое окно Chrome, в котором работает задача | **окно агента** | agent window | `AgentWindow` |
 | Разрешение одному агенту ходить в браузер | **доступ** (выдать, отозвать) | access (grant, revoke) | `Pairing` |
-| Запрос агента на доступ | **запрос** | request | `PairingRequest` |
-| Число, которое человек сверяет | **код** | code | `PairingRequest.code` |
+| Запрос агента на доступ | **запрос** | request | `PublicRequest` (строка страницы), `Pairing.request` |
+| Число, которое человек сверяет | **код** | code | `PublicRequest.code` |
 | Подтвердить запрос | **Подтвердить** | Confirm | `[data-role=pairing-confirm]` |
 | Отказать в запросе | **Отклонить** | Decline | `[data-role=pairing-refuse]` |
 | Забрать доступ | **Отозвать доступ** | Revoke access | `[data-role=agent-revoke]` |

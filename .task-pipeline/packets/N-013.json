@@ -3,7 +3,8 @@
  "node": "N-013",
  "intent": "UX: экраны SCR-23/24, потоки, сценарии",
  "inputs": [
-  "—"
+  "—",
+  "N-024: resource: каталоги строк агента; N-013 дописывает строки SCR-23 после строк службы"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -14,7 +15,12 @@
   "edit_targets": [
    "docs/ux/screens.md",
    "docs/ux/flows.md",
-   "docs/ux/scenarios.md"
+   "docs/ux/scenarios.md",
+   "docs/ux/foundation.md",
+   "docs/design/agent-dashboard/director-record.md",
+   "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+   "apps/agent/_locales/ru/messages.json",
+   "apps/agent/_locales/en/messages.json"
   ]
  },
  "outputs": [

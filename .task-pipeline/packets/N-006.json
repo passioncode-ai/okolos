@@ -4,7 +4,8 @@
  "intent": "K3: журнал до ответа",
  "inputs": [
   "serviceDirs().data",
-  "N-024: каталоги данных службы, servicePaths, setup после замка"
+  "N-024: каталоги данных службы, servicePaths, setup после замка",
+  "N-023: BridgeRefusal, AnyBridgeVerb, canonicalVerb для типа JournalEntry"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
