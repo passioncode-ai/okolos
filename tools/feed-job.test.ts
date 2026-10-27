@@ -277,6 +277,27 @@ describe('a failure is retried inside the run, then recorded (F3)', () => {
   })
 })
 
+describe('the record carries what the bootstrap knows (B-159, B-150)', () => {
+  it('records that the checkout was recreated before this run, and the bootstrap’s run id', async () => {
+    const w = world()
+    await job(w, {}, { OKOLOS_RUN_ID: 'run-1', OKOLOS_RECOVERED_CHECKOUT: 'missing' }).promise
+    expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'published', runId: 'run-1', recoveredCheckout: true, recovery: 'missing' })
+  })
+
+  it('says so on a failed run too', async () => {
+    const w = world()
+    await job(w, {}, { OKOLOS_RUN_ID: 'run-2', OKOLOS_RECOVERED_CHECKOUT: 'missing', FAKE_PUBLISH: 'fail' }).promise
+    expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'failed', runId: 'run-2', recoveredCheckout: true })
+  })
+
+  it('records false when nothing was recovered', async () => {
+    const w = world()
+    await job(w).promise
+    expect(readStatus(w.paths.status)).toMatchObject({ recoveredCheckout: false })
+    expect(readStatus(w.paths.status)?.recovery).toBeUndefined()
+  })
+})
+
 describe('production publishes run from origin/main (F2)', () => {
   it('refuses a checkout that is not at origin/main, before anything runs', async () => {
     const w = world()
