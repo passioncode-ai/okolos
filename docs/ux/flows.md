@@ -736,8 +736,8 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  Q[Agent asks to open a task] -->|an address of this machine or the local network, or a reserved local name| IS[Refused: invalid_scope, no task]
-  Q -->|scope valid| T
+  ASK[Agent asks to open a task] -->|an address of this machine or the local network, or a reserved local name| IS[Refused: invalid_scope, no task]
+  ASK -->|scope valid| T
   T[Task opened: goal, sites, verbs, profile, TTL, budget] --> W[Own window, in the background, active tab]
   W --> S[Snapshot: cleaned, verdict attached, in parts]
   S --> A{Action}
