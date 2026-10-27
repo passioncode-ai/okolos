@@ -323,7 +323,9 @@
    "shutdown закрывает группу (фальшивый браузер)",
    "Chrome: окно открывается, document.visibilityState = visible, фронтальное приложение не меняется (osascript), outerHeight − innerHeight < 120",
    "Chrome: kill -9 демона-обёртки → процессов с профилем не остаётся после перезапуска (зачистка сирот своего профиля по SingletonLock)",
-   "extraArgs с --enable-automation или --remote-debugging-port → ошибка конструктора; --host-resolver-rules проходит (аудит #21)"
+   "extraArgs с --enable-automation или --remote-debugging-port → ошибка конструктора; --host-resolver-rules проходит (аудит #21)",
+   "onExit: самостоятельный выход браузера отличается от выхода по close() (поле requested), окна задач помечаются закрытыми; send, отклонённый как closed, ведёт к close() группы (проверка seam N-022)",
+   "на настоящем Chrome: kill -9 браузера даёт CdpError kind exited у ожидающего запроса в пределах окна EXIT_AFTER_PIPE_MS (проверка seam N-022, риск 4)"
   ],
   "dod": "vitest apps/agent/src/window зелёный на этой машине с Chrome stable"
  },
@@ -336,7 +338,8 @@
    "N-008",
    "N-009",
    "N-010",
-   "N-012"
+   "N-012",
+   "N-022"
   ],
   "req": [
    "REQ-55"
@@ -370,7 +373,8 @@
    "бандл несёт apps/agent/src/fabric (.mjs набор не копирует tsc)",
    "тот же таймер раз в сутки обрезает events.jsonl по правилу N-005 (7 дней или 1000 событий), а не только при старте (отчёт N-005, fix 0)",
    "вторая копия демона на том же home выходит с 75, не открыв журнал, хранилище привязок и Chrome (setup после замка, проверка seam N-005)",
-   "отказы двери до разбора пишутся в журнал через onRefused оболочки N-005 с DoorRejection (проверка seam N-005)"
+   "отказы двери до разбора пишутся в журнал через onRefused оболочки N-005 с DoorRejection (проверка seam N-005)",
+   "CdpError превращается в отказ контракта: kind exited/closed → browser_offline, ошибка CDP о пропавшей цели (cdpCode) → tab_gone, timeout → internal; тест на каждый (проверка seam N-022)"
   ],
   "dod": "vitest apps/agent/src/verbs зелёный на Chrome stable"
  },

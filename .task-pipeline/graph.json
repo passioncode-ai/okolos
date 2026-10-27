@@ -346,7 +346,8 @@
     "N-008",
     "N-009",
     "N-010",
-    "N-012"
+    "N-012",
+    "N-022"
    ],
    "serves": "REQ-55",
    "check": "pnpm -s exec vitest run apps/agent/src/agent.test.ts apps/agent/src/verbs && pnpm -s run typecheck",
@@ -581,7 +582,27 @@
     "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
     "docs/runbooks/development.md"
    ],
-   "risk": "R2"
+   "risk": "R2",
+   "certification": {
+    "round": 1,
+    "tiers": {
+     "unit": "pass",
+     "seam": "pass",
+     "product": "fail"
+    },
+    "at": "fe74452dc2f23142279a974a77a2f7d88cc439a7",
+    "history": [
+     {
+      "unit": "pass",
+      "seam": "pass",
+      "product": "fail"
+     }
+    ],
+    "kinds": [
+     "blind"
+    ],
+    "tree": "979f701ad99964eecc9852a5e4dfdab9575edaad"
+   }
   },
   {
    "id": "N-023",
@@ -709,6 +730,11 @@
    "from": "N-012",
    "to": "N-011",
    "payload": "census, readCensus, CensusEntry[]"
+  },
+  {
+   "from": "N-022",
+   "to": "N-011",
+   "payload": "CdpError.kind и cdpCode для перевода в отказы контракта"
   },
   {
    "from": "N-023",

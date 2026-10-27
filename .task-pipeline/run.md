@@ -32,3 +32,5 @@ iter: 1 — item N-002 — closed at gate 5
 event: memory — lesson: N-002 implementer and all three certification tiers ran only the node check; i18n:sweep failed at pre-push after merge (5 unexempted strings in cdp-pipe). From N-005 on, every implementer runs `pnpm gates` before DONE — 2026-10-27T07:55:00+01:00
 holds: 5 — blocker N-001 parked at the certification ceiling (3 failing rounds, seam each time); replaced by N-023 with explicit edge change (revisions); plan-wide seam audit dispatched — 2026-10-27T08:10:00+01:00
 event: memory — plan-wide seam audit: 40 findings (22 breaks) applied through plan_tasks.json + apply_audit.py; touches now generated from packets; plan_audit then found 2 real collisions (lockfile N-003/N-008, pipe.ts N-005/N-022), ordered — 2026-10-27T09:10:00+01:00
+finding: hygiene N-022 docs/README.md:122 split-table — noise — round 0 — base-repro yes (same separator between the packages and applications tables as N-002)
+event: memory — merge note: when N-005 merges after N-022, take pipe.ts from N-022 and KEEP both sets of rows in tools/reachable.test.ts (N-022 errors.ts row + N-005 rows) — seam N-022 r1 risk 3

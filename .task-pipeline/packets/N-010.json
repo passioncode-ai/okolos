@@ -30,6 +30,8 @@
   "Chrome: окно открывается, document.visibilityState = visible, фронтальное приложение не меняется (osascript), outerHeight − innerHeight < 120",
   "Chrome: kill -9 демона-обёртки → процессов с профилем не остаётся после перезапуска (зачистка сирот своего профиля по SingletonLock)",
   "extraArgs с --enable-automation или --remote-debugging-port → ошибка конструктора; --host-resolver-rules проходит (аудит #21)",
+  "onExit: самостоятельный выход браузера отличается от выхода по close() (поле requested), окна задач помечаются закрытыми; send, отклонённый как closed, ведёт к close() группы (проверка seam N-022)",
+  "на настоящем Chrome: kill -9 браузера даёт CdpError kind exited у ожидающего запроса в пределах окна EXIT_AFTER_PIPE_MS (проверка seam N-022, риск 4)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/window && pnpm -s run typecheck"
  ],
  "guards": [
