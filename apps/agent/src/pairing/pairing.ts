@@ -105,11 +105,15 @@ export interface PublicRequest {
   /** When the person confirmed it, kept on a `claim_expired` row; null when never confirmed. */
   readonly confirmedAt: number | null
   /**
-   * Another waiting request (pending or confirmed) or an agent with access carries a name that
-   * looks the same (see `nameSkeleton`); every such request is marked. Never set on an expired row.
+   * Another waiting request (pending or confirmed) carries a name that looks the same (see
+   * `nameSkeleton`); every such request is marked. Only waiting requests count: a request that
+   * looks like an agent with access is told by `sameNameAgents` alone. Never set on an expired row.
    */
   readonly duplicateName: boolean
-  /** The agents with access whose name looks the same as this request's; empty when none. */
+  /**
+   * The agents with access whose name looks the same as this request's; empty when none. Set
+   * whether or not `duplicateName` is.
+   */
   readonly sameNameAgents: readonly { readonly agentId: string; readonly name: string }[]
 }
 
@@ -334,7 +338,7 @@ export class Pairing {
         expiresAt: deadline(entry),
         state: entry.confirmedAt === null ? 'pending' : 'confirmed',
         confirmedAt: entry.confirmedAt,
-        duplicateName: (perName.get(looks) ?? 0) > 1 || sameNameAgents.length > 0,
+        duplicateName: (perName.get(looks) ?? 0) > 1,
         sameNameAgents,
       }
     })

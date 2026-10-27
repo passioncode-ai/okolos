@@ -671,15 +671,29 @@ describe('two waiting requests under one name (spec §11 F5)', () => {
     expect(Object.values(flags(pairing, T0 + 2))).toEqual([true, true])
   })
 
-  it('marks a request named like an agent that already has access, and says which agent', () => {
+  // Fix round 2: duplicateName is about other waiting requests only; a look-alike of an agent with
+  // access is told by sameNameAgents alone.
+  it('names the agent with access a lone request looks like, without marking it a duplicate', () => {
     const pairing = open()
     const key = pair(pairing, 'Claude Code', T0)
     const agent = pairing.verify(key)!
     asked(pairing.request('claude cоde ', T0 + 10)) // Cyrillic o, trailing space
     asked(pairing.request('Codex', T0 + 11))
     const rows = pairing.list(T0 + 12).requests
-    expect(rows[0]).toMatchObject({ duplicateName: true, sameNameAgents: [{ agentId: agent.agentId, name: 'Claude Code' }] })
+    expect(rows[0]).toMatchObject({ duplicateName: false, sameNameAgents: [{ agentId: agent.agentId, name: 'Claude Code' }] })
     expect(rows[1]).toMatchObject({ duplicateName: false, sameNameAgents: [] })
+  })
+
+  it('marks two waiting look-alikes of an agent with access as duplicates, and names the agent on both', () => {
+    const pairing = open()
+    const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    asked(pairing.request('Claude Code', T0 + 10))
+    asked(pairing.request('claude cоde', T0 + 11)) // Cyrillic o
+    const rows = pairing.list(T0 + 12).requests
+    expect(rows.map((row) => [row.duplicateName, row.sameNameAgents])).toEqual([
+      [true, [{ agentId: agent.agentId, name: 'Claude Code' }]],
+      [true, [{ agentId: agent.agentId, name: 'Claude Code' }]],
+    ])
   })
 
   it('are not marked against an expired row, which waits for nothing', () => {
