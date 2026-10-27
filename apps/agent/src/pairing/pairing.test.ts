@@ -649,7 +649,7 @@ describe('a notice handler that throws (fix round 1)', () => {
         random: seeded(),
         onNotice: (notice) => {
           if (notice.kind === 'requested') throw new Error('journal is full')
-          throw 'not an error' // eslint-disable-line @typescript-eslint/only-throw-error -- a handler may throw anything
+          throw 'not an error' // a handler may throw anything, not only an Error
         },
       })
       const request = asked(pairing.request('Claude Code', T0))
