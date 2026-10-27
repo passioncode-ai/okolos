@@ -84,19 +84,30 @@ export interface DownloadVerdict {
  * `.html` and `.svg` are deliberately absent. They do carry payloads, and a
  * saved page is also the most ordinary download there is; a note on every one
  * of them is how a security extension teaches people to ignore its notes.
+ *
+ * The audit of 2026-10-27 (B-165) found a second gap of the same kind: the
+ * types initial-access campaigns moved to after macros were blocked by default.
+ * A library (`.dll`) run by `rundll32`, a OneNote notebook carrying an embedded
+ * script, an Excel add-in (`.xll`, `.xlam`) that runs on open, the App Installer
+ * and ClickOnce manifests that install from a URL inside them, the shell's saved
+ * searches and settings shortcuts that open a remote folder or run a command,
+ * and Java Web Start. All of them join the program class: none is a container.
  */
 const EXECUTABLE =
   new RegExp(
     '\\.(' +
-      // Native programs and installers.
-      'exe|msi|msp|com|scr|pif|apk|dmg|pkg|deb|rpm|appx|msix|gadget|' +
+      // Native programs, libraries and installers.
+      'exe|dll|msi|msp|com|scr|pif|apk|dmg|pkg|deb|rpm|appx|appxbundle|msix|msixbundle|gadget|' +
+      // Manifests that install or launch from an address written inside them.
+      'appinstaller|application|jnlp|' +
       // Shell and scripting hosts.
       'bat|cmd|ps1|ps2|psc1|vbs|vbe|js|jse|wsf|wsh|sh|jar|hta|mshxml|' +
       // Formats Windows opens with a program attached to them.
       'lnk|scf|url|reg|msc|cpl|chm|inf|ade|adp|' +
-      // Office documents that carry macros. They look like documents, which is
-      // the point of using them.
-      'docm|dotm|xlsm|xltm|xlsb|pptm|potm|ppam' +
+      'library-ms|search-ms|searchconnector-ms|settingcontent-ms|' +
+      // Office documents and add-ins that carry code. They look like documents,
+      // which is the point of using them.
+      'docm|dotm|xlsm|xltm|xlsb|xlam|xll|pptm|potm|ppam|one' +
       ')$',
     'i',
   )
