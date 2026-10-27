@@ -57,13 +57,32 @@ const STACKED_MARKS = /\p{M}{3,}/u
 const VISIBLE = /[\p{L}\p{N}]/u
 
 /**
- * What a name looks like, so two names a person would read as one compare equal: NFKC, case folded,
- * reduced by the Latin, Cyrillic and Greek look-alike table of @okolos/core-lookalike (`skeleton`,
- * the same one the link check uses), with runs of white space collapsed and the ends trimmed. The
- * pairing's duplicate check and the reserved name below both use it.
+ * Look-alikes the shared table of @okolos/core-lookalike leaves apart, folded here (fix round 3):
+ * what reads as a small l (capital I, digit one, pipe, U+01C0, U+04CF, dotless i U+0131, U+2113) and
+ * what reads as an o (digit zero, Armenian U+0585, small capital U+1D0F, Greek and Cyrillic o). A
+ * closed table: every entry is one an agent could use to pass for another on the consent page.
+ */
+const READS_AS: Readonly<Record<string, string>> = {
+  I: 'l', l: 'l', '1': 'l', '|': 'l', '\u01c0': 'l', '\u04cf': 'l', '\u0131': 'l', '\u2113': 'l',
+  '0': 'o', '\u0585': 'o', '\u1d0f': 'o', '\u03bf': 'o', '\u043e': 'o',
+}
+
+function foldReadsAs(text: string): string {
+  return [...text].map((char) => READS_AS[char] ?? char).join('')
+}
+
+/**
+ * What a name looks like, so two names a person would read as one compare equal: NFKC; the
+ * look-alikes above folded while the case is still there (a capital I is an l, a small i is not);
+ * the Latin, Cyrillic and Greek look-alike table of @okolos/core-lookalike (`skeleton`, the same one
+ * the link check uses, which lower-cases as it goes); lower case; the look-alikes above again, for
+ * what lower-casing made of a capital (Cyrillic U+04C0 becomes U+04CF); runs of white space collapsed
+ * and the ends trimmed. So `CIaude Code` is `claude code`. The pairing's duplicate check and the
+ * reserved name below both use it.
  */
 export function nameSkeleton(name: string): string {
-  return skeleton(name.normalize('NFKC').toLowerCase()).replace(/\s+/gu, ' ').trim()
+  const folded = skeleton(foldReadsAs(name.normalize('NFKC'))).toLowerCase()
+  return foldReadsAs(folded).replace(/\s+/gu, ' ').trim()
 }
 
 /** The product's own name, as it looks: a name that contains it is refused (`name_reserved`). */

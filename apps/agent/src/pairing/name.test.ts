@@ -124,6 +124,24 @@ describe('the name an agent gives itself', () => {
     expect(nameSkeleton('ＯＫＯＬＯＳ')).toBe('okolos')
   })
 
+  // Fix round 3: a capital I, a pipe or a digit one read as a small l; a zero and the round letters
+  // of other scripts read as o. The look-alikes are folded before the case is, so `CIaude` (capital
+  // i) is `Claude`.
+  it('folds the letters that read as l and as o, before the case is folded (fix round 3)', () => {
+    expect(nameSkeleton('CIaude Code')).toBe(nameSkeleton('Claude Code'))
+    expect(nameSkeleton('CIaude Code')).toBe('claude code')
+    for (const l of ['I', 'l', '1', '|', '\u01c0', '\u04cf', '\u04c0', '\u0131', '\u2113']) {
+      expect(nameSkeleton(`C${l}aude`), l.codePointAt(0)!.toString(16)).toBe('claude')
+    }
+    for (const o of ['0', 'O', '\u0585', '\u1d0f', '\u03bf', '\u039f', '\u043e', '\u041e']) {
+      expect(nameSkeleton(`C${o}dex`), o.codePointAt(0)!.toString(16)).toBe('codex')
+    }
+    // The small i stays an i: only the capital reads as l.
+    expect(nameSkeleton('Iris')).toBe('lris')
+    expect(nameSkeleton('iris')).toBe('iris')
+    expect(nameSkeleton(' Claude \t  Code ')).toBe('claude code')
+  })
+
   it('refuses an empty or blank name, and a value that is not text', () => {
     expect(checkAgentName('')).toBe('name_empty')
     expect(checkAgentName('   ')).toBe('name_empty')

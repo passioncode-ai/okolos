@@ -779,6 +779,14 @@ describe('two waiting requests under one name (spec §11 F5)', () => {
     expect(rows[1]).toMatchObject({ duplicateName: false, sameNameAgents: [] })
   })
 
+  // Fix round 3: a capital I for the small l is a look-alike too.
+  it('names the agent with access a request mimics with a capital I for an l (fix round 3)', () => {
+    const pairing = open()
+    const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    asked(pairing.request('CIaude Code', T0 + 10))
+    expect(pairing.list(T0 + 11).requests[0]).toMatchObject({ name: 'CIaude Code', sameNameAgents: [{ agentId: agent.agentId, name: 'Claude Code' }] })
+  })
+
   it('marks two waiting look-alikes of an agent with access as duplicates, and names the agent on both', () => {
     const pairing = open()
     const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
