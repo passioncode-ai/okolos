@@ -106,6 +106,16 @@ export type PairingNotice =
 export interface PairingOptions {
   random?: RandomSource
   onNotice?: (notice: PairingNotice) => void
+  /**
+   * Hears a notice the handler threw on. The change the notice describes has already happened and
+   * stands: a request keeps its id for the CLI, a stored key is still given out. Without this
+   * option the failure goes to `process.emitWarning`.
+   */
+  onNoticeError?: (error: unknown, notice: PairingNotice) => void
+}
+
+function warn(error: unknown, notice: PairingNotice): void {
+  process.emitWarning(error instanceof Error ? error : String(error), { code: 'OKOLOS_PAIRING_NOTICE', detail: notice.kind })
 }
 
 interface Entry {
@@ -153,7 +163,19 @@ export class Pairing {
     this.file = file
     this.agents = agents
     this.random = options.random ?? randomBytes
-    this.notify = options.onNotice ?? (() => {})
+    const onNotice = options.onNotice ?? (() => {})
+    const onNoticeError = options.onNoticeError ?? warn
+    this.notify = (notice) => {
+      try {
+        onNotice(notice)
+      } catch (error) {
+        try {
+          onNoticeError(error, notice)
+        } catch {
+          // The reporter failed too; there is nowhere left to say it, and the change stands.
+        }
+      }
+    }
   }
 
   /**

@@ -365,6 +365,38 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
   })
 })
 
+describe('a notice handler that throws (fix round 1)', () => {
+  function failing(): { pairing: Pairing; reported: Array<[unknown, PairingNotice]> } {
+    const reported: Array<[unknown, PairingNotice]> = []
+    const pairing = Pairing.open(storeFile(), {
+      random: seeded(),
+      onNotice: () => {
+        throw new Error('journal is full')
+      },
+      onNoticeError: (error, notice) => reported.push([error, notice]),
+    })
+    return { pairing, reported }
+  }
+
+  it('still gives the CLI its request id, and reports the failed notice', () => {
+    const { pairing, reported } = failing()
+    const result = pairing.request('Claude Code', T0)
+    expect(result).toEqual({ requestId: expect.stringMatching(/^[0-9a-f]{32}$/), code: expect.any(String), expiresAt: T0 + REQUEST_LIFETIME_MS })
+    expect(pairing.list(T0 + 1).requests).toHaveLength(1)
+    expect(reported.map(([error, notice]) => [(error as Error).message, notice.kind])).toEqual([['journal is full', 'requested']])
+  })
+
+  it('still gives the agent its key once the hash is stored, and reports the failed notice', () => {
+    const { pairing, reported } = failing()
+    const { requestId } = asked(pairing.request('Claude Code', T0))
+    expect(pairing.confirm(requestId, T0 + 1)).toBe(true)
+    const claimed = pairing.claim(requestId, T0 + 2)
+    expect(claimed).toEqual({ key: expect.stringMatching(/^[0-9a-f]{64}$/) })
+    expect(pairing.verify((claimed as { key: string }).key)).toMatchObject({ name: 'Claude Code' })
+    expect(reported.map(([, notice]) => notice.kind)).toEqual(['requested', 'confirmed', 'paired'])
+  })
+})
+
 describe('two waiting requests under one name (spec §11 F5)', () => {
   function flags(pairing: Pairing, now: number): Record<string, boolean> {
     return Object.fromEntries(pairing.list(now).requests.map((row) => [`${row.name}#${row.handle}`, row.duplicateName]))
