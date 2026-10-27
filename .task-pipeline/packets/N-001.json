@@ -27,7 +27,7 @@
   "validateScope без поля profile отвергает задачу (ревью F26)",
   "BRIDGE_VERBS не содержит screenshot; close разрешён, даже если не назван в verbs (ревью F3, F16)",
   "BRIDGE_REFUSALS содержит cleaning_incomplete и stale_cursor, оба не повторяемые (ревью R1, R10)",
-  "проверка узла: pnpm -s exec vitest run packages/contracts && pnpm -s typecheck"
+  "проверка узла: pnpm -s exec vitest run packages/contracts && pnpm -s run typecheck"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",

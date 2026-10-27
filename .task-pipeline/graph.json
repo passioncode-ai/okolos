@@ -28,7 +28,7 @@
    "status": "pending",
    "blocked_by": [],
    "serves": "REQ-53",
-   "check": "pnpm -s exec vitest run packages/contracts && pnpm -s typecheck",
+   "check": "pnpm -s exec vitest run packages/contracts && pnpm -s run typecheck",
    "touches": [
     "packages/contracts/src/bridge.ts",
     "packages/contracts/src/bridge.test.ts"
@@ -529,6 +529,11 @@
    "verb": "add",
    "node": "N-005",
    "why": "plan_audit: N-002 и N-005 оба правят корневой tsconfig.json и не были упорядочены; добавлено ресурсное ребро N-002→N-005"
+  },
+  {
+   "verb": "invalidate",
+   "node": "N-001",
+   "why": "проверка узла: pnpm 11 не принимает `pnpm -s typecheck`, только `pnpm -s run typecheck` (отчёт исполнителя N-001); смысл проверки не изменился"
   }
  ]
 }
