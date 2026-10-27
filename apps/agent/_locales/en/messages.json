@@ -237,5 +237,30 @@
   },
   "refusal_stale_cursor": {
     "message": "this snapshot page is out of date; take a new snapshot"
+  },
+  "eventStarted": {
+    "message": "Okolos Agent started."
+  },
+  "eventStopping": {
+    "message": "Okolos Agent is stopping and takes on no new work."
+  },
+  "eventDrainCutOff": {
+    "message": "Okolos Agent stopped before all calls finished. Cut off: $COUNT$.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "serviceStopping": {
+    "message": "Okolos Agent is stopping and takes on no new work. Try again once it has started."
+  },
+  "eventsUnreadable": {
+    "message": "The events file had unreadable lines: $COUNT$. They were removed at start; the other events are kept.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

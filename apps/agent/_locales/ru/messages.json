@@ -237,5 +237,30 @@
   },
   "refusal_stale_cursor": {
     "message": "эта страница снимка устарела, нужен новый снимок"
+  },
+  "eventStarted": {
+    "message": "Okolos Agent запущен."
+  },
+  "eventStopping": {
+    "message": "Okolos Agent останавливается и новую работу не берёт."
+  },
+  "eventDrainCutOff": {
+    "message": "Okolos Agent остановился, не дождавшись конца вызовов. Оборвано: $COUNT$.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "serviceStopping": {
+    "message": "Okolos Agent останавливается и новую работу не берёт. Повторите, когда он снова запустится."
+  },
+  "eventsUnreadable": {
+    "message": "В файле событий нашлись нечитаемые строки: $COUNT$. При запуске они удалены, остальные события сохранены.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

@@ -1,0 +1,28 @@
+{
+  "kit": "fabric-service-kit",
+  "version": "0.52.0",
+  "source": "fabric-agent-adapter 0.52.0, skills/building-fabric-services/scripts/kit.json (node entries); installed with fabric_kit.py install apps/agent/src/fabric --lang node --module fabric-service",
+  "files": {
+    "fabric-a2a.mjs": "51b72fe1d80649d659fcad3a8f96370db3476c4a7b30cbabd8522c138be69346",
+    "fabric-actions.mjs": "42e7b6261a886444b74a3cd5694ab5d5cf46c54d8c9540b090e617e7a93ebd21",
+    "fabric-auth.mjs": "782c2aa732f8320f604194660117640a7ea145e12b8155c04e88cef7c516a5b3",
+    "fabric-backups.mjs": "cfd8c9085e3d597a783099c2bd2ffe2f3faa0daaadab46dedd30523894cfeb06",
+    "fabric-base.mjs": "7804b2df7715dbbf9702a9b61b6b8cef2110f9a52b04cabd8fb0a66458d87512",
+    "fabric-connections.mjs": "303432e547ce563e90ca9ffcd827f5612f51d3582929834e1add0fdaf6485dcc",
+    "fabric-descriptor.mjs": "84c35c7ba0ae09fde1dc3f6ab796cd578d008707e77815a0f7b7a80306fa4cce",
+    "fabric-events.mjs": "c463d6ffcae24229a5c608d8fcea4268d2ccc5024b19fa10e5a452284068fa71",
+    "fabric-identifiers.mjs": "a18c2a501a4aa170bfd3d99e571ad6b7662649b4d3b9d2a540c002ea42811bbf",
+    "fabric-jsvalue.mjs": "dfbdb8c41584972c9389750a41719374a1cfc5652ed438dd1623025190b0106e",
+    "fabric-lock.mjs": "ac219ab0a326d5c43c7c4c255e0c3843d4794de795a60e3af661e7d5350ea052",
+    "fabric-logs.mjs": "58467e5719c16e099d05bbedec47a95712506ab03c33f3cd4be1252e8498a946",
+    "fabric-mandate.mjs": "deaab2bfb929d1bd35ae1bad71e7b9ad9902cc23b8eb51819ed592fd80eddf95",
+    "fabric-paths.mjs": "aa630d611e748a899e7043480f4a4e46b444f2e15ff945f30c2fbef21c1ceea5",
+    "fabric-platform.mjs": "a8119d95ebba4d589a9e401f5d6fc8dda62d59d44e4c1ff811d97fac3771ac0c",
+    "fabric-protocols.mjs": "7da65440a7a08bf27d90a06e9158b1c4ee6d7f9204eecb712d452406bfe59962",
+    "fabric-secrets.mjs": "6ad8ab18ac899ecc2384e8ec6a3fb689b92be3b9a5ce3a59b92a37d52da5d766",
+    "fabric-service.mjs": "6aa673657427211b491a9b63f94b9847a7e6aa3ee1b7353e1af11f46469803a3",
+    "fabric-supervisors.mjs": "d45c38de0cb3ed85e083496c2d3c51dab004454accdd87f4762a512a6d442573",
+    "fabric-time.mjs": "3ff932069038a720df1c68c6492976906737b2e67e5c12d9c81c418597f661de",
+    "fabric-usage.mjs": "1c4d18004639409624ac3516a02f2b60bbf55abdb612e9a96c37e83666eb87a7"
+  }
+}

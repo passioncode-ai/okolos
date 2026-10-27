@@ -37,6 +37,12 @@ export default tseslint.config(
       '**/.wrangler/**',
       '**/coverage/**',
       'graphify-out/**',
+      // Vendored: the Fabric service kit, copied byte for byte by `fabric_kit.py install
+      // apps/agent/src/fabric --lang node --module fabric-service` from the fabric-agent-adapter
+      // plugin (Okolos Bridge Б1, node N-005). It is not our source: an edit here is undone by the
+      // next install, and `fabric_kit.py status` reports it as "edited". Its own tests live with the
+      // plugin. The declarations beside it (`fabric-service.d.mts`) are ours and are linted.
+      'apps/agent/src/fabric/*.mjs',
     ],
   },
 
