@@ -226,16 +226,17 @@ export class Pairing {
    * Records the agent's last call; false when no such agent has access. The value is kept in
    * memory and written to the store (atomically, like every write) at most once a minute per agent,
    * so each agent's stored call is at most LAST_CALL_WRITE_MS older than its newest one, whatever
-   * the other agents do. A write that fails throws PairingStoreError; the call stays in memory for
-   * the next write or `flush`.
+   * the other agents do. A write that fails throws PairingStoreError once; the call stays in memory
+   * for the next write or `flush`, and the failed attempt counts as that agent's write, so the next
+   * one is tried a minute later, not on every call of a busy agent (fix round 3).
    */
   touch(agentId: string, now: number): boolean {
     if (!this.agents.some((a) => a.agentId === agentId)) return false
     this.agents = this.agents.map((a) => (a.agentId === agentId ? { ...a, lastCallAt: now } : a))
     this.callsUnsaved = true
     if (now - (this.lastCallWrite.get(agentId) ?? Number.NEGATIVE_INFINITY) >= LAST_CALL_WRITE_MS) {
-      this.save(this.agents)
       this.lastCallWrite.set(agentId, now)
+      this.save(this.agents)
     }
     return true
   }

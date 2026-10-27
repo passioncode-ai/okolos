@@ -487,6 +487,31 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
     })
   })
 
+  // Fix round 3: a store that cannot be written must not be tried on every call of a busy agent.
+  it('tries a failed last-call write again a minute later, not on the next call (fix round 3)', () => {
+    const file = storeFile()
+    const pairing = open(file)
+    const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    const t1 = T0 + 10_000
+    expect(pairing.touch(agent.agentId, t1)).toBe(true)
+    chmodSync(path.dirname(file), 0o500)
+    try {
+      expect(() => pairing.touch(agent.agentId, t1 + MINUTE)).toThrow(expect.objectContaining({ name: 'PairingStoreError', reason: 'unwritable' }))
+      // The failure is thrown once; the calls of the next minute stay in memory and write nothing.
+      expect(pairing.touch(agent.agentId, t1 + MINUTE + 1)).toBe(true)
+      expect(pairing.touch(agent.agentId, t1 + 2 * MINUTE - 1)).toBe(true)
+      expect(pairing.list(t1 + 2 * MINUTE - 1).agents[0]).toMatchObject({ lastCallAt: t1 + 2 * MINUTE - 1 })
+      // A minute after the failed write, the next one is tried, and fails again while the store is shut.
+      expect(() => pairing.touch(agent.agentId, t1 + 2 * MINUTE)).toThrow(PairingStoreError)
+    } finally {
+      chmodSync(path.dirname(file), 0o700)
+    }
+    expect(pairing.touch(agent.agentId, t1 + 3 * MINUTE - 1)).toBe(true)
+    expect((JSON.parse(readFileSync(file, 'utf8')) as { agents: Array<{ lastCallAt: number }> }).agents[0]!.lastCallAt).toBe(t1)
+    expect(pairing.touch(agent.agentId, t1 + 3 * MINUTE)).toBe(true)
+    expect((JSON.parse(readFileSync(file, 'utf8')) as { agents: Array<{ lastCallAt: number }> }).agents[0]!.lastCallAt).toBe(t1 + 3 * MINUTE)
+  })
+
   it('touches nothing for an agent it does not know', () => {
     const file = storeFile()
     const pairing = open(file)
