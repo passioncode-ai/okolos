@@ -95,6 +95,31 @@ describe('launching a browser on a pipe', () => {
     await expect(pipe.send('Page.noSuchThing')).rejects.toThrow(/'Page\.noSuchThing' wasn't found/)
   })
 
+  it('delivers an event with its sessionId to the subscriber, and stops after unsubscribe', async () => {
+    const pipe = await fake()
+    const seen: Array<{ params: unknown; sessionId: string | undefined }> = []
+    const off = pipe.on('Page.loadEventFired', (params, sessionId) => seen.push({ params, sessionId }))
+    const other: unknown[] = []
+    pipe.on('Target.targetCreated', (params) => other.push(params))
+
+    await pipe.send('Fake.emit', { event: 'Page.loadEventFired', params: { timestamp: 1 }, sessionId: 'S-1' })
+    await pipe.send('Fake.emit', { event: 'Page.loadEventFired', params: { timestamp: 2 } })
+    expect(seen).toEqual([
+      { params: { timestamp: 1 }, sessionId: 'S-1' },
+      { params: { timestamp: 2 }, sessionId: undefined },
+    ])
+    expect(other).toEqual([])
+
+    off()
+    await pipe.send('Fake.emit', { event: 'Page.loadEventFired', params: { timestamp: 3 }, sessionId: 'S-1' })
+    expect(seen).toHaveLength(2)
+  })
+
+  it('sends a request to a session when given its sessionId', async () => {
+    const pipe = await fake()
+    expect(await pipe.send('Fake.echo', { n: 1 }, 'S-2')).toEqual({ n: 1, sessionId: 'S-2' })
+  })
+
   it('refuses a binary that does not exist', async () => {
     await expect(
       CdpPipe.launch({ binary: path.join(tmpdir(), 'okolos-no-such-browser'), args: [], userDataDir: PROFILE }),

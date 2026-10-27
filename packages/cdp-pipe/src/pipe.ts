@@ -31,7 +31,14 @@ interface Incoming {
   readonly id?: number
   readonly result?: unknown
   readonly error?: { readonly code: number; readonly message: string }
+  readonly method?: string
+  readonly params?: unknown
+  /** Set on events from an attached target (flat sessions). */
+  readonly sessionId?: string
 }
+
+/** Receives one CDP event; sessionId is set when the event came from an attached target. */
+export type EventListener<P = unknown> = (params: P, sessionId?: string) => void
 
 interface Waiting {
   readonly method: string
@@ -47,6 +54,7 @@ export class CdpPipe {
   private nextId = 1
   private pending = ''
   private readonly waiting = new Map<number, Waiting>()
+  private readonly listeners = new Map<string, Set<EventListener>>()
 
   private constructor(child: ChildProcess, requestTimeoutMs: number) {
     this.pid = child.pid as number
@@ -96,6 +104,17 @@ export class CdpPipe {
     })
   }
 
+  /** Subscribes to one CDP event; returns the function that unsubscribes. */
+  on<P = unknown>(event: string, listener: EventListener<P>): () => void {
+    const set = this.listeners.get(event) ?? new Set<EventListener>()
+    this.listeners.set(event, set)
+    const entry = listener as EventListener
+    set.add(entry)
+    return () => {
+      set.delete(entry)
+    }
+  }
+
   private read(chunk: string): void {
     const { messages, pending } = splitFrames(this.pending, chunk)
     this.pending = pending
@@ -107,6 +126,11 @@ export class CdpPipe {
         this.waiting.delete(message.id)
         if (message.error === undefined) waiting.resolve(message.result)
         else waiting.reject(new Error(`${waiting.method}: ${message.error.message} (CDP ${message.error.code})`))
+      } else if (typeof message.method === 'string') {
+        // A copy: a listener may unsubscribe while the event is being delivered.
+        for (const listener of [...(this.listeners.get(message.method) ?? [])]) {
+          listener(message.params, message.sessionId)
+        }
       }
     }
   }
