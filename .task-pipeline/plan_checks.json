@@ -1,0 +1,13 @@
+{
+ "N-003": "pnpm -s exec vitest run packages/core-snapshot && pnpm -s run typecheck",
+ "N-004": "pnpm -s exec vitest run packages/core-snapshot && pnpm -s run typecheck",
+ "N-005": "pnpm -s exec vitest run apps/agent/src/service && pnpm -s run typecheck && pnpm -s run lint",
+ "N-006": "pnpm -s exec vitest run apps/agent/src/journal && pnpm -s run typecheck",
+ "N-007": "pnpm -s exec vitest run apps/agent/src/pairing && pnpm -s run typecheck",
+ "N-008": "pnpm -s exec vitest run apps/agent/src/door apps/agent/src/cli && pnpm -s run typecheck",
+ "N-009": "pnpm -s exec vitest run apps/agent/src/tasks && pnpm -s run typecheck",
+ "N-010": "pnpm -s exec vitest run apps/agent/src/window && pnpm -s run typecheck",
+ "N-011": "pnpm -s exec vitest run apps/agent/src/agent.test.ts apps/agent/src/verbs && pnpm -s run typecheck",
+ "N-012": "pnpm -s exec vitest run apps/agent/src/hygiene && pnpm -s run typecheck",
+ "N-015": "pnpm -s exec vitest run apps/agent/src/dashboard && pnpm -s run typecheck"
+}

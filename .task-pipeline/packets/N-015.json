@@ -3,9 +3,11 @@
  "node": "N-015",
  "intent": "Страница демона: SCR-23, SCR-24",
  "inputs": [
-  "Pairing.list/confirm/decline/revoke, Tasks.list, Journal.recent, каталоги строк, refusalKey (N-001) для строк отказов",
+  "Pairing.list/confirmByHandle/declineByHandle/revoke (N-007), Tasks.list (N-009), Journal.recent (N-006), проверка сессии из N-005, createAgent (N-011), refusalKey (N-023), каталоги строк",
+  "N-006: Journal.recent, JournalEntry, DoorRejection",
   "N-007: список привязок и отзыв",
   "N-009: список активных задач",
+  "N-011: createAgent и src/agent.ts, куда страница монтирует маршруты",
   "N-013: состояния экранов SCR",
   "N-014: ключи строк i18n"
  ],
@@ -17,9 +19,16 @@
  "source_scope": {
   "edit_targets": [
    "apps/agent/src/dashboard/page.ts",
-   "src/dashboard/api.ts",
-   "apps/agent/static/",
-   "apps/agent/src/dashboard/*.test.ts"
+   "apps/agent/src/dashboard/api.ts",
+   "apps/agent/src/dashboard/actions.ts",
+   "apps/agent/static/**",
+   "apps/agent/src/agent.ts",
+   "docs/ux/screens.md",
+   "docs/ux/scenarios.md",
+   "docs/ux/flows.md",
+   "apps/agent/src/dashboard/page.test.ts",
+   "apps/agent/src/dashboard/api.test.ts",
+   "apps/agent/src/dashboard/actions.test.ts"
   ]
  },
  "outputs": [
@@ -33,9 +42,10 @@
   "инструмент pairing.confirm через MCP отвечает human-step-required со ссылкой /dashboard",
   "строки берутся из каталога; ключ без строки виден как [key]",
   "отказ двери (DoorRejection) в списке отказов показывается одной строкой rejection_door, refusalKey для него не вызывается и не бросает (проверка seam N-001 круг 2)",
-  "Set-Cookie от /fabric/v1/login несёт HttpOnly и SameSite=Strict (ревью R8)",
+  "страница принимает только сессию, выданную N-005; атрибуты куки проверяет N-005 (аудит #12)",
   "строка задачи SCR-24 показывает профиль: с логинами человека или без них; SCN-045 шаг 1 и FLW-22 называют цель задачи (проверка product N-001 круг 2)",
-  "проверка узла: pnpm -s exec vitest run apps/agent/src/dashboard"
+  "GET /api/journal выгружает журнал агентов (JSONL, без содержимого страниц) для [data-role=agent-journal-link] (аудит #40)",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/dashboard && pnpm -s run typecheck"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
@@ -45,5 +55,5 @@
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "без длинного тире в текстах для людей"
  ],
- "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/dashboard/page.ts src/dashboard/api.ts apps/agent/static/; затем первый непройденный тест в списке acceptance"
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/dashboard/page.ts apps/agent/src/dashboard/api.ts apps/agent/src/dashboard/actions.ts; затем первый непройденный тест в списке acceptance"
 }

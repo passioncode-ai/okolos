@@ -14,6 +14,7 @@
  "source_scope": {
   "edit_targets": [
    "packages/core-snapshot/src/pages.ts",
+   "packages/core-snapshot/src/index.ts",
    "packages/core-snapshot/src/pages.test.ts"
   ]
  },
@@ -26,7 +27,8 @@
   "maxBytes больше потолка обрезается до потолка; меньше 1 КБ поднимается до 1 КБ; NaN, дробь, строка, отрицательное приводятся к границам внутри pageOf (ревью F10)",
   "вердикт целого снимка приложен к каждой странице",
   "страница всегда двигается вперёд, даже если одна строка длиннее maxBytes",
-  "проверка узла: pnpm -s exec vitest run packages/core-snapshot"
+  "paginate возвращает refs строк своей страницы и кладёт вердикт целого снимка в каждую страницу (аудит #29)",
+  "проверка узла: pnpm -s exec vitest run packages/core-snapshot && pnpm -s run typecheck"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
@@ -36,5 +38,5 @@
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "без длинного тире в текстах для людей"
  ],
- "resume": "git log --oneline origin/main..bridge/b1-run2 -- packages/core-snapshot/src/pages.ts packages/core-snapshot/src/pages.test.ts; затем первый непройденный тест в списке acceptance"
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- packages/core-snapshot/src/pages.ts packages/core-snapshot/src/index.ts packages/core-snapshot/src/pages.test.ts; затем первый непройденный тест в списке acceptance"
 }

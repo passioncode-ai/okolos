@@ -154,14 +154,21 @@
    "owner": "implementer",
    "status": "pending",
    "blocked_by": [
-    "N-023"
+    "N-023",
+    "N-005"
    ],
    "serves": "REQ-55",
-   "check": "pnpm -s exec vitest run packages/core-snapshot",
+   "check": "pnpm -s exec vitest run packages/core-snapshot && pnpm -s run typecheck",
    "touches": [
     "packages/core-snapshot/src/verdict.ts",
+    "packages/core-snapshot/src/snapshot.ts",
+    "packages/core-snapshot/src/index.ts",
+    "packages/core-snapshot/package.json",
+    "packages/core-snapshot/tsconfig.json",
+    "pnpm-lock.yaml",
     "packages/core-snapshot/src/verdict.test.ts",
-    "packages/core-snapshot/src/corpus.test.ts"
+    "packages/core-snapshot/src/corpus.test.ts",
+    "packages/core-snapshot/src/secrets.test.ts"
    ],
    "risk": "R3"
   },
@@ -174,9 +181,10 @@
     "N-003"
    ],
    "serves": "REQ-56",
-   "check": "pnpm -s exec vitest run packages/core-snapshot",
+   "check": "pnpm -s exec vitest run packages/core-snapshot && pnpm -s run typecheck",
    "touches": [
     "packages/core-snapshot/src/pages.ts",
+    "packages/core-snapshot/src/index.ts",
     "packages/core-snapshot/src/pages.test.ts"
    ],
    "risk": "R2"
@@ -190,11 +198,22 @@
     "N-002"
    ],
    "serves": "REQ-63",
-   "check": "pnpm -s exec vitest run apps/agent/src/service",
+   "check": "pnpm -s exec vitest run apps/agent/src/service && pnpm -s run typecheck && pnpm -s run lint",
    "touches": [
     "apps/agent/package.json",
+    "pnpm-lock.yaml",
+    "apps/agent/tsconfig.json",
     "apps/agent/src/fabric/**",
-    "apps/agent/src/service/**"
+    "apps/agent/src/service/dirs.ts",
+    "apps/agent/src/service/http.ts",
+    "apps/agent/src/service/wellknown.ts",
+    "apps/agent/src/service/events.ts",
+    "tsconfig.json",
+    "eslint.config.js",
+    "tools/i18n-sweep.mjs",
+    "tools/reachable.test.ts",
+    "packages/cdp-pipe/src/pipe.ts",
+    "apps/agent/src/service/*.test.ts"
    ],
    "risk": "R2"
   },
@@ -207,9 +226,10 @@
     "N-005"
    ],
    "serves": "REQ-60",
-   "check": "pnpm -s exec vitest run apps/agent/src/journal",
+   "check": "pnpm -s exec vitest run apps/agent/src/journal && pnpm -s run typecheck",
    "touches": [
-    "apps/agent/src/journal/**"
+    "apps/agent/src/journal/journal.ts",
+    "apps/agent/src/journal/journal.test.ts"
    ],
    "risk": "R3"
   },
@@ -222,9 +242,12 @@
     "N-005"
    ],
    "serves": "REQ-58",
-   "check": "pnpm -s exec vitest run apps/agent/src/pairing",
+   "check": "pnpm -s exec vitest run apps/agent/src/pairing && pnpm -s run typecheck",
    "touches": [
-    "apps/agent/src/pairing/**"
+    "apps/agent/src/pairing/pairing.ts",
+    "apps/agent/src/pairing/name.ts",
+    "apps/agent/src/pairing/pairing.test.ts",
+    "apps/agent/src/pairing/name.test.ts"
    ],
    "risk": "R3"
   },
@@ -236,12 +259,22 @@
    "blocked_by": [
     "N-023",
     "N-006",
-    "N-007"
+    "N-007",
+    "N-003"
    ],
    "serves": "REQ-57",
-   "check": "pnpm -s exec vitest run apps/agent/src/door",
+   "check": "pnpm -s exec vitest run apps/agent/src/door apps/agent/src/cli && pnpm -s run typecheck",
    "touches": [
-    "apps/agent/src/door/**"
+    "apps/agent/src/door/door.ts",
+    "apps/agent/src/door/guard.ts",
+    "apps/agent/src/door/stdio-shim.ts",
+    "apps/agent/src/cli/pair.ts",
+    "apps/agent/package.json",
+    "pnpm-lock.yaml",
+    "apps/agent/src/door/door.test.ts",
+    "apps/agent/src/door/guard.test.ts",
+    "apps/agent/src/door/stdio-shim.test.ts",
+    "apps/agent/src/cli/pair.test.ts"
    ],
    "risk": "R3"
   },
@@ -255,9 +288,10 @@
     "N-005"
    ],
    "serves": "REQ-59",
-   "check": "pnpm -s exec vitest run apps/agent/src/tasks",
+   "check": "pnpm -s exec vitest run apps/agent/src/tasks && pnpm -s run typecheck",
    "touches": [
-    "apps/agent/src/tasks/**"
+    "apps/agent/src/tasks/tasks.ts",
+    "apps/agent/src/tasks/tasks.test.ts"
    ],
    "risk": "R2"
   },
@@ -271,9 +305,12 @@
     "N-005"
    ],
    "serves": "REQ-61",
-   "check": "pnpm -s exec vitest run apps/agent/src/window",
+   "check": "pnpm -s exec vitest run apps/agent/src/window && pnpm -s run typecheck",
    "touches": [
-    "apps/agent/src/window/**"
+    "apps/agent/src/window/chrome.ts",
+    "src/window/window.ts",
+    "apps/agent/src/window/window.test.ts",
+    "src/window/window.chrome.test.ts"
    ],
    "risk": "R3"
   },
@@ -284,15 +321,25 @@
    "status": "pending",
    "blocked_by": [
     "N-004",
+    "N-006",
     "N-008",
     "N-009",
-    "N-010"
+    "N-010",
+    "N-012"
    ],
    "serves": "REQ-55",
-   "check": "pnpm -s exec vitest run apps/agent/src/verbs",
+   "check": "pnpm -s exec vitest run apps/agent/src/agent.test.ts apps/agent/src/verbs && pnpm -s run typecheck",
    "touches": [
-    "apps/agent/src/verbs/**",
-    "apps/agent/src/main.ts"
+    "apps/agent/src/agent.ts",
+    "apps/agent/src/main.ts",
+    "apps/agent/src/verbs/verbs.ts",
+    "apps/agent/src/verbs/probe.ts",
+    "tools/build-agent.mjs",
+    "apps/agent/package.json",
+    "tools/imports.mjs",
+    "apps/agent/src/agent.test.ts",
+    "apps/agent/src/verbs/verbs.test.ts",
+    "apps/agent/src/verbs/skeleton.chrome.test.ts"
    ],
    "risk": "R3"
   },
@@ -306,9 +353,10 @@
     "N-005"
    ],
    "serves": "REQ-62",
-   "check": "pnpm -s exec vitest run apps/agent/src/hygiene",
+   "check": "pnpm -s exec vitest run apps/agent/src/hygiene && pnpm -s run typecheck",
    "touches": [
-    "apps/agent/src/hygiene/**"
+    "apps/agent/src/hygiene/census.ts",
+    "apps/agent/src/hygiene/census.test.ts"
    ],
    "risk": "R2"
   },
@@ -321,10 +369,9 @@
    "serves": "REQ-64",
    "check": "python3 docs/ux/lint.py",
    "touches": [
-    "docs/ux/flows.md",
     "docs/ux/screens.md",
-    "docs/ux/scenarios.md",
-    "docs/ux/wireframes/**"
+    "docs/ux/flows.md",
+    "docs/ux/scenarios.md"
    ],
    "risk": "R2",
    "surface_class": "product"
@@ -341,7 +388,9 @@
    "check": "python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts",
    "touches": [
     "docs/brand/terminology.md",
-    "packages/i18n/**"
+    "apps/agent/_locales/ru/messages.json",
+    "apps/agent/_locales/en/messages.json",
+    "tools/locales.test.ts"
    ],
    "risk": "R1"
   },
@@ -351,16 +400,27 @@
    "owner": "ui",
    "status": "pending",
    "blocked_by": [
+    "N-006",
     "N-007",
     "N-009",
+    "N-011",
     "N-013",
     "N-014"
    ],
    "serves": "REQ-65",
-   "check": "pnpm -s exec vitest run apps/agent/src/dashboard",
+   "check": "pnpm -s exec vitest run apps/agent/src/dashboard && pnpm -s run typecheck",
    "touches": [
-    "apps/agent/src/dashboard/**",
-    "apps/agent/static/**"
+    "apps/agent/src/dashboard/page.ts",
+    "apps/agent/src/dashboard/api.ts",
+    "apps/agent/src/dashboard/actions.ts",
+    "apps/agent/static/**",
+    "apps/agent/src/agent.ts",
+    "docs/ux/screens.md",
+    "docs/ux/scenarios.md",
+    "docs/ux/flows.md",
+    "apps/agent/src/dashboard/page.test.ts",
+    "apps/agent/src/dashboard/api.test.ts",
+    "apps/agent/src/dashboard/actions.test.ts"
    ],
    "risk": "R3",
    "surface_class": "product"
@@ -380,8 +440,10 @@
    "touches": [
     "tools/install-agent.mjs",
     "tools/install-agent.test.ts",
+    "apps/agent/src/main.ts",
     "package.json",
-    "docs/runbooks/**"
+    "docs/runbooks/development.md",
+    "docs/runbooks/agent.md"
    ],
    "risk": "R2"
   },
@@ -391,14 +453,19 @@
    "owner": "implementer",
    "status": "pending",
    "blocked_by": [
-    "N-011",
-    "N-015"
+    "N-015",
+    "N-016"
    ],
    "serves": "REQ-58",
    "check": "pnpm -s run test:e2e:bridge",
    "touches": [
-    "e2e/bridge/**",
-    "playwright.bridge.config.ts"
+    "e2e/bridge/skeleton.spec.ts",
+    "e2e/bridge/scn-044.spec.ts",
+    "e2e/bridge/scn-045.spec.ts",
+    "playwright.bridge.config.ts",
+    "package.json",
+    "playwright.config.ts",
+    "docs/runbooks/development.md"
    ],
    "risk": "R3"
   },
@@ -413,7 +480,11 @@
    "serves": "REQ-67",
    "check": "pnpm -s exec vitest run tools/adr.test.ts",
    "touches": [
-    "docs/adr/**"
+    "docs/adr/0020-bridge-is-part-of-okolos-agent.md",
+    "docs/adr/0021-agent-snapshot-in-pages-of-32-kb.md",
+    "docs/adr/README.md",
+    "docs/adr/0019-page-content-never-reaches-our-infrastructure.md",
+    "docs/adr/0018-agents-get-their-own-extension.md"
    ],
    "risk": "R1"
   },
@@ -449,7 +520,8 @@
     "docs/privacy.md",
     "docs/brand/facts.md",
     "docs/backlog.md",
-    "docs/superpowers/backlog.md"
+    "docs/superpowers/backlog.md",
+    "SECURITY.md"
    ],
    "risk": "R1"
   },
@@ -473,15 +545,21 @@
    "owner": "implementer",
    "status": "pending",
    "blocked_by": [
-    "N-002"
+    "N-002",
+    "N-005"
    ],
    "serves": "REQ-54",
    "check": "pnpm -s exec vitest run packages/cdp-pipe tools/agent-window-spike.test.ts && pnpm -s run typecheck",
    "touches": [
-    "packages/cdp-pipe/**",
+    "packages/cdp-pipe/src/pipe.ts",
+    "packages/cdp-pipe/src/index.ts",
+    "packages/cdp-pipe/src/errors.ts",
+    "packages/cdp-pipe/src/pipe.test.ts",
+    "packages/cdp-pipe/src/errors.test.ts",
     "package.json",
     "docs/README.md",
-    "docs/superpowers/specs/2026-10-06-bridge-b1-design.md"
+    "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+    "docs/runbooks/development.md"
    ],
    "risk": "R2"
   },
@@ -495,22 +573,42 @@
    "check": "pnpm -s exec vitest run packages/contracts && pnpm -s run typecheck && pnpm -s run gates",
    "touches": [
     "packages/contracts/src/bridge.ts",
-    "packages/contracts/src/bridge.test.ts",
-    "packages/contracts/src/index.ts"
+    "packages/contracts/src/index.ts",
+    "packages/contracts/src/bridge.test.ts"
    ],
    "risk": "R2"
   }
  ],
  "edges": [
   {
+   "from": "N-002",
+   "to": "N-022",
+   "payload": "CdpPipe и его тесты"
+  },
+  {
+   "from": "N-005",
+   "to": "N-022",
+   "payload": "resource: packages/cdp-pipe/src/pipe.ts с пометками i18n-exempt от N-005; N-022 перебазируется на них"
+  },
+  {
    "from": "N-023",
    "to": "N-003",
-   "payload": "TaskScope и BridgeRefusal"
+   "payload": "toSnapshotFinding, SnapshotFinding, TaskScope"
+  },
+  {
+   "from": "N-005",
+   "to": "N-003",
+   "payload": "resource: pnpm-lock.yaml; N-003 правит lockfile после N-005"
   },
   {
    "from": "N-003",
    "to": "N-004",
    "payload": "Snapshot с вердиктом"
+  },
+  {
+   "from": "N-002",
+   "to": "N-005",
+   "payload": "resource: корневой tsconfig.json, ссылки на проекты; N-005 дописывает после N-002"
   },
   {
    "from": "N-005",
@@ -525,7 +623,7 @@
   {
    "from": "N-023",
    "to": "N-008",
-   "payload": "глаголы и конверт"
+   "payload": "BRIDGE_VERBS, toolName, BridgeResult, refuse"
   },
   {
    "from": "N-006",
@@ -538,14 +636,39 @@
    "payload": "Pairing.verify и запрос привязки"
   },
   {
+   "from": "N-003",
+   "to": "N-008",
+   "payload": "resource: pnpm-lock.yaml; N-008 правит lockfile после N-003"
+  },
+  {
    "from": "N-023",
    "to": "N-009",
-   "payload": "validateScope и отказы"
+   "payload": "validateScope, inScope, verbAllowed, refuse"
+  },
+  {
+   "from": "N-005",
+   "to": "N-009",
+   "payload": "apps/agent: package.json, tsconfig"
+  },
+  {
+   "from": "N-022",
+   "to": "N-010",
+   "payload": "CdpTransport, onExit, CdpError, timeoutMs на вызов"
+  },
+  {
+   "from": "N-005",
+   "to": "N-010",
+   "payload": "apps/agent: package.json, tsconfig"
   },
   {
    "from": "N-004",
    "to": "N-011",
    "payload": "pageOf с курсором"
+  },
+  {
+   "from": "N-006",
+   "to": "N-011",
+   "payload": "Journal, answerAfterRecord"
   },
   {
    "from": "N-008",
@@ -563,14 +686,29 @@
    "payload": "AgentWindow.open/close"
   },
   {
+   "from": "N-012",
+   "to": "N-011",
+   "payload": "census, readCensus, CensusEntry[]"
+  },
+  {
    "from": "N-023",
    "to": "N-012",
-   "payload": "тип ответа hygiene.census"
+   "payload": "CensusEntry"
+  },
+  {
+   "from": "N-005",
+   "to": "N-012",
+   "payload": "apps/agent: package.json, tsconfig"
   },
   {
    "from": "N-013",
    "to": "N-014",
    "payload": "список строк экранов"
+  },
+  {
+   "from": "N-006",
+   "to": "N-015",
+   "payload": "Journal.recent, JournalEntry, DoorRejection"
   },
   {
    "from": "N-007",
@@ -581,6 +719,11 @@
    "from": "N-009",
    "to": "N-015",
    "payload": "список активных задач"
+  },
+  {
+   "from": "N-011",
+   "to": "N-015",
+   "payload": "createAgent и src/agent.ts, куда страница монтирует маршруты"
   },
   {
    "from": "N-013",
@@ -608,14 +751,14 @@
    "payload": "статика страницы"
   },
   {
-   "from": "N-011",
-   "to": "N-017",
-   "payload": "рабочий демон"
-  },
-  {
    "from": "N-015",
    "to": "N-017",
    "payload": "страница для подтверждения"
+  },
+  {
+   "from": "N-016",
+   "to": "N-017",
+   "payload": "скрипт agent:build и релиз"
   },
   {
    "from": "N-011",
@@ -646,36 +789,6 @@
    "from": "N-020",
    "to": "N-021",
    "payload": "доки в синхроне"
-  },
-  {
-   "from": "N-002",
-   "to": "N-005",
-   "payload": "resource: корневой tsconfig.json, ссылки на проекты; N-005 дописывает после N-002"
-  },
-  {
-   "from": "N-002",
-   "to": "N-022",
-   "payload": "CdpPipe и его тесты"
-  },
-  {
-   "from": "N-022",
-   "to": "N-010",
-   "payload": "CdpTransport, onExit, CdpError, timeoutMs на вызов"
-  },
-  {
-   "from": "N-005",
-   "to": "N-009",
-   "payload": "apps/agent: package.json с зависимостью @okolos/contracts, tsconfig, каталоги службы"
-  },
-  {
-   "from": "N-005",
-   "to": "N-010",
-   "payload": "apps/agent: package.json с зависимостью @okolos/contracts, tsconfig, каталоги службы"
-  },
-  {
-   "from": "N-005",
-   "to": "N-012",
-   "payload": "apps/agent: package.json с зависимостью @okolos/contracts, tsconfig, каталоги службы"
   }
  ],
  "revisions": [

@@ -4,7 +4,8 @@
  "intent": "cdp-pipe для потребителей",
  "inputs": [
   "CdpPipe из N-002",
-  "N-002: CdpPipe и его тесты"
+  "N-002: CdpPipe и его тесты",
+  "N-005: resource: packages/cdp-pipe/src/pipe.ts с пометками i18n-exempt от N-005; N-022 перебазируется на них"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -20,7 +21,8 @@
    "packages/cdp-pipe/src/errors.test.ts",
    "package.json",
    "docs/README.md",
-   "docs/superpowers/specs/2026-10-06-bridge-b1-design.md"
+   "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+   "docs/runbooks/development.md"
   ]
  },
  "outputs": [

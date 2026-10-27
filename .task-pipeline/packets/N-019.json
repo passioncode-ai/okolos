@@ -20,7 +20,7 @@
   "—"
  ],
  "acceptance": [
-  "tools/reachable.test.ts без строк «Okolos Bridge Б1»",
+  "tools/reachable.test.ts без строк исключений моста (их добавили N-002, N-005 и другие)",
   "проверка узла: pnpm -s exec vitest run tools/reachable.test.ts"
  ],
  "guards": [

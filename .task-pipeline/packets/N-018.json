@@ -15,8 +15,9 @@
   "edit_targets": [
    "docs/adr/0020-bridge-is-part-of-okolos-agent.md",
    "docs/adr/0021-agent-snapshot-in-pages-of-32-kb.md",
+   "docs/adr/README.md",
    "docs/adr/0019-page-content-never-reaches-our-infrastructure.md",
-   "docs/adr/0018-…md"
+   "docs/adr/0018-agents-get-their-own-extension.md"
   ]
  },
  "outputs": [
@@ -36,5 +37,5 @@
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "без длинного тире в текстах для людей"
  ],
- "resume": "git log --oneline origin/main..bridge/b1-run2 -- docs/adr/0020-bridge-is-part-of-okolos-agent.md docs/adr/0021-agent-snapshot-in-pages-of-32-kb.md docs/adr/0019-page-content-never-reaches-our-infrastructure.md; затем первый непройденный тест в списке acceptance"
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- docs/adr/0020-bridge-is-part-of-okolos-agent.md docs/adr/0021-agent-snapshot-in-pages-of-32-kb.md docs/adr/README.md; затем первый непройденный тест в списке acceptance"
 }

@@ -1,0 +1,610 @@
+[
+ {
+  "n": "N-001",
+  "title": "K0: контракты моста",
+  "deps": [],
+  "req": [
+   "REQ-53"
+  ],
+  "files": [
+   "Modify: packages/contracts/src/bridge.ts",
+   "Test: packages/contracts/src/bridge.test.ts"
+  ],
+  "consumes": "—",
+  "produces": "`BRIDGE_SESSION_VERBS = ['session.open','hygiene.census'] as const`; типы ответов `SessionOpenResult {sessionId, windowId}`, `OpenResult {url}`, `SnapshotResult {text, refs: string[], verdict: SnapshotVerdict, cursor?: string, partial: boolean}`, `ReadResult {text, boundary: {nonce, origin}}`, `CensusEntry`; `refusalKey(code: BridgeRefusal): string` — исчерпывающий `switch`, ключ строки `refusal_<code>`",
+  "tests": [
+   "refusalKey даёт ключ для каждого из BRIDGE_REFUSALS, и каждый ключ есть в apps/agent/_locales/{ru,en}/messages.json",
+   "добавление кода в BRIDGE_REFUSALS без ветки в refusalKey — ошибка компиляции (посадка наблюдается: tsc TS2322/TS2366)",
+   "validateScope отвергает write ⊄ read, ttlSeconds > 3600, stepBudget > 500 (уже есть, сохраняется)",
+   "validateScope отвергает localhost, 127.0.0.0/8, ::1, 10/8, 172.16/12, 192.168/16, 169.254/16, fe80::/10 и *.local (ревью F9)",
+   "validateScope без поля profile отвергает задачу (ревью F26)",
+   "BRIDGE_VERBS не содержит screenshot; close разрешён, даже если не назван в verbs (ревью F3, F16)",
+   "BRIDGE_REFUSALS содержит cleaning_incomplete и stale_cursor, оба не повторяемые (ревью R1, R10)"
+  ],
+  "dod": "vitest packages/contracts зелёный; pnpm typecheck 0; посадка удалённой ветки switch наблюдена красной"
+ },
+ {
+  "n": "N-002",
+  "title": "K1: packages/cdp-pipe",
+  "deps": [],
+  "req": [
+   "REQ-54"
+  ],
+  "files": [
+   "Create: packages/cdp-pipe/package.json, packages/cdp-pipe/tsconfig.json, packages/cdp-pipe/src/index.ts, packages/cdp-pipe/src/frames.ts, packages/cdp-pipe/src/pipe.ts",
+   "Modify: tsconfig.json (ссылка на проект)",
+   "Test: packages/cdp-pipe/src/frames.test.ts, packages/cdp-pipe/src/pipe.test.ts",
+   "Modify: tools/agent-window-spike.mjs (splitFrames импортируется из пакета), tools/agent-window-spike.test.ts"
+  ],
+  "consumes": "—",
+  "produces": "`splitFrames(pending, chunk): {messages, pending}`; `class CdpPipe { static launch(o: {binary, args, userDataDir, requestTimeoutMs?}): Promise<CdpPipe>; send<T>(method, params?, sessionId?): Promise<T>; on(event, (params, sessionId?) => void): () => void; readonly pid: number; close(graceMs = 2000): Promise<void> }` — дочерний процесс `detached` в своей группе, fd 3 в браузер, fd 4 из браузера; `close` шлёт `Browser.close`, затем SIGTERM группе, затем SIGKILL",
+  "tests": [
+   "кадры: сообщение, разрезанное между чтениями, собирается; пустые куски пропускаются (переезжают из спайка)",
+   "send без ответа за requestTimeoutMs отклоняется с ошибкой, называющей метод",
+   "ответ с error превращается в отклонение с текстом CDP",
+   "close завершает всю группу: после close процесса с pid нет (фальшивый браузер — node-скрипт, читающий fd 3 и пишущий в fd 4)",
+   "события с sessionId доставляются подписчику с этим sessionId"
+  ],
+  "dod": "vitest packages/cdp-pipe и tools/agent-window-spike.test.ts зелёные; спайк собирается"
+ },
+ {
+  "n": "N-023",
+  "title": "K0: контракты, замена запаркованного N-001",
+  "deps": [],
+  "req": [
+   "REQ-53"
+  ],
+  "files": [
+   "Modify: packages/contracts/src/bridge.ts, packages/contracts/src/index.ts",
+   "Test: packages/contracts/src/bridge.test.ts"
+  ],
+  "consumes": "ветка b1/n-001 (код N-001 до be67de5, сертифицирован unit и product)",
+  "produces": "всё из N-023, плюс: `isLocalHost(host: string): boolean` — одно правило для localhost, *.localhost, 127/8, 0/8, 10/8, 172.16/12, 192.168/16, 169.254/16, 100.64/10, ::, ::1, fe80::/10, fc00::/7, IPv4 внутри IPv6 (::ffff:, ::a.b.c.d, 64:ff9b::), *.local, имена с точкой на конце; IPv6 в скобках и без; validateScope и проверка фактического IP в N-011 зовут его же; типы входа и выхода каждого глагола: `SessionOpenInput = TaskScope`, `OpenInput`, `SnapshotInput`, `ReadInput`, `GetInput`, `GetResult`, `WaitForInput`, `WaitForResult`, `CloseResult`, `CensusResult = CensusEntry[]`, и `VerbIO` — карта глагол → {input, output}; каноническое написание глагола — с точкой (`session.open`); `toolName` только для имени инструмента MCP; журнал хранит каноническое",
+  "tests": [
+   "isLocalHost: каждый диапазон списка true, публичные адреса и имена false; 100.64.0.1 и [::ffff:100.64.0.1] true (seam N-001 круг 3, break 2)",
+   "validateScope отвергает http://100.64.0.1 и вызывает isLocalHost (шпион или общий набор кейсов)",
+   "VerbIO покрывает каждый глагол BRIDGE_VERBS и BRIDGE_SESSION_VERBS: глагол без записи в карте — ошибка компиляции (seam N-001 круг 3, risk 2)",
+   "canonicalVerb(toolName(v)) === v для каждого глагола (seam N-001 круг 3, risk 1)",
+   "canonicalVerb(tool): BridgeVerb | BridgeSessionVerb | null экспортирован; неизвестное имя → null (аудит #19)",
+   "isLocalAddress(ip) нормализует сырой адрес (скобки, зона %en0, IPv4 в IPv6; пустая строка считается локальной, fail-closed) и делит правило с isLocalHost (аудит #27)"
+  ],
+  "dod": "vitest packages/contracts зелёный; typecheck 0; pnpm gates 0"
+ },
+ {
+  "n": "N-022",
+  "title": "cdp-pipe для потребителей",
+  "deps": [
+   "N-002",
+   "N-005"
+  ],
+  "req": [
+   "REQ-54"
+  ],
+  "files": [
+   "Modify: packages/cdp-pipe/src/pipe.ts, packages/cdp-pipe/src/index.ts",
+   "Create: packages/cdp-pipe/src/errors.ts",
+   "Test: packages/cdp-pipe/src/pipe.test.ts, packages/cdp-pipe/src/errors.test.ts",
+   "Modify: package.json (engines node >=22.18), docs/README.md (строка cdp-pipe: close может закончиться с живой группой и сообщает об этом), docs/superpowers/specs/2026-10-06-bridge-b1-design.md (§1: K1 ни от чего не зависит)",
+   "Modify: docs/runbooks/development.md (Node >=22.18, аудит #36)"
+  ],
+  "consumes": "CdpPipe из N-002",
+  "produces": "`interface CdpTransport { readonly pid: number; send<T>(method, params?, sessionId?, opts?: {timeoutMs?}): Promise<T>; on(event, cb): () => void; onExit(cb: (info: {code, signal}) => void): () => void; close(graceMs?): Promise<void> }`, CdpPipe implements CdpTransport; `class CdpError extends Error { kind: 'timeout'|'cdp'|'exited'|'closed'; method; cdpCode? }`; обработчики 'error' на fd 4 и stderr",
+  "tests": [
+   "ошибка чтения на fd 4 или stderr не роняет процесс: pending-запросы отклоняются CdpError kind closed (проверка unit N-002, риск 1)",
+   "ветка EPIPE на записи и строка onCloseIncomplete по умолчанию покрыты тестами (проверка unit N-002, риск 2)",
+   "фальшивый объект {pid, send, on, onExit, close} присваивается CdpTransport без ошибки типов (проверка seam N-002)",
+   "браузер, вышедший сам, вызывает onExit с code и signal, pending-запросы отклоняются kind exited",
+   "каждая ошибка send — CdpError с верным kind: таймаут, ошибка CDP с кодом, выход браузера, закрытие pipe",
+   "send(..., {timeoutMs}) переопределяет срок по умолчанию для одного вызова",
+   "временные границы в тестах не тоньше 5× ожидаемого, чтобы нагрузка машины не роняла гейт (проверка product N-002, раннбук)"
+  ],
+  "dod": "vitest packages/cdp-pipe и спайка зелёные; typecheck 0"
+ },
+ {
+  "n": "N-003",
+  "title": "K2: вердикт к снимку, корпус, fuzz секретов",
+  "deps": [
+   "N-023",
+   "N-005"
+  ],
+  "req": [
+   "REQ-55"
+  ],
+  "files": [
+   "Create: packages/core-snapshot/src/verdict.ts",
+   "Modify: packages/core-snapshot/src/snapshot.ts, packages/core-snapshot/src/index.ts",
+   "Modify: packages/core-snapshot/package.json (зависимость @okolos/contracts), packages/core-snapshot/tsconfig.json (ссылка на contracts), pnpm-lock.yaml",
+   "Test: packages/core-snapshot/src/verdict.test.ts, packages/core-snapshot/src/corpus.test.ts, packages/core-snapshot/src/secrets.test.ts"
+  ],
+  "consumes": "`buildSnapshot`, `AxNode` (packages/core-snapshot/src/snapshot.ts); `Verdict` (@okolos/contracts)",
+  "produces": "`snapshotVerdict(probe: {verdicts: readonly Verdict[], truncated: boolean, unresolved: number}): SnapshotVerdict | {refused: 'cleaning_incomplete'}` — `{level: 'clean'|'finding', findings: SnapshotFinding[]}`, каждая находка строится только через `toSnapshotFinding` из N-023 (без текста, локатора и detail страницы); неполная очистка означает отказ без текста; `refOf(backendId, taskKey)` HMAC; `buildSnapshot` вычищает значения полей из имён",
+  "tests": [
+   "buildSnapshot с rootRef под скрытым предком возвращает пусто; с rootRef под полем ввода текст поля не выдаётся (ревью F2)",
+   "refs непрозрачны: refOf(backendId, taskKey) — HMAC; ref другой задачи не находит узла",
+   "корпус corpora/injections/positives.json: каждый позитив, помещённый в AX-дерево скрытым узлом, отсутствует в renderLine-выдаче (уровень функции; настоящая проверка REQ-55 в Chrome — N-011)",
+   "negatives.json: ни один негатив не вырезан",
+   "fuzz: 200 случайных значений, введённых в textbox/searchbox/combobox и потомки, не встречаются в выдаче (фиксированное зерно)",
+   "truncated или unresolved > 0 дают отказ cleaning_incomplete без текста, а не level clean (ревью R1; правило retro №3)",
+   "значение поля (AX value) вычищается из имени любого узла: <label> вокруг поля, aria-labelledby на поле кода; contenteditable без роли считается полем (ревью R4)",
+   "значение ищется после удаления пробелов и разделителей и только если оно не короче 4 знаков: «4111 1111 1111 1111» в имени как «4111-1111-1111-1111» вычищается; значение «ab» имён не трогает (ревью S4)",
+   "toSnapshotFinding на настоящем выводе detectHidden (stage1) и stage3 по позитивам корпуса: concealment и carrier заполнены; тест падает, если детектор сменит формат detail (проверка seam N-001 круг 2)",
+   "снимок хранит refMap: ref (HMAC) → backendDOMNodeId; buildSnapshot принимает rootRef как ref и разрешает его через refMap снимка той же задачи (аудит #29)",
+   "новые символы импортируются из '@okolos/core-snapshot' (аудит #4)",
+   "pnpm install --frozen-lockfile → 0 (аудит #22)"
+  ],
+  "dod": "vitest packages/core-snapshot зелёный; плант «поле отдаёт значение» наблюдён красным"
+ },
+ {
+  "n": "N-004",
+  "title": "K2: выдача частями",
+  "deps": [
+   "N-003"
+  ],
+  "req": [
+   "REQ-56"
+  ],
+  "files": [
+   "Create: packages/core-snapshot/src/pages.ts",
+   "Modify: packages/core-snapshot/src/index.ts",
+   "Test: packages/core-snapshot/src/pages.test.ts"
+  ],
+  "consumes": "`pageOf`, `utf8Bytes`, `SnapshotLine` (snapshot.ts)",
+  "produces": "`DEFAULT_MAX_BYTES = 32 * 1024`; `encodeCursor({from, digest}) / decodeCursor(c): {from, digest} | null`; `paginate(lines, {cursor?, maxBytes?}): {text, cursor?, partial}` — курсор несёт дайджест снимка, курсор от другого снимка отвергается",
+  "tests": [
+   "дерево формы Википедии (29 714 узлов, детерминированное): каждая страница ≤ 32 КБ UTF-8, страниц ≥ 8, конкатенация страниц равна полному тексту",
+   "курсор чужого снимка → null, демон отвечает stale_cursor (ревью R10)",
+   "maxBytes больше потолка обрезается до потолка; меньше 1 КБ поднимается до 1 КБ; NaN, дробь, строка, отрицательное приводятся к границам внутри pageOf (ревью F10)",
+   "вердикт целого снимка приложен к каждой странице",
+   "страница всегда двигается вперёд, даже если одна строка длиннее maxBytes",
+   "paginate возвращает refs строк своей страницы и кладёт вердикт целого снимка в каждую страницу (аудит #29)"
+  ],
+  "dod": "vitest packages/core-snapshot зелёный"
+ },
+ {
+  "n": "N-005",
+  "title": "K3: оболочка службы fabric-service/0.1",
+  "deps": [
+   "N-002"
+  ],
+  "req": [
+   "REQ-63"
+  ],
+  "files": [
+   "Modify: apps/agent/package.json (зависимости @okolos/contracts, @okolos/cdp-pipe, @okolos/core-snapshot, @okolos/storage — workspace:*), pnpm-lock.yaml",
+   "Create: apps/agent/tsconfig.json, apps/agent/src/fabric/ (набор Fabric для Node), apps/agent/src/service/dirs.ts, apps/agent/src/service/http.ts, apps/agent/src/service/wellknown.ts, apps/agent/src/service/events.ts",
+   "Modify: tsconfig.json (ссылка на apps/agent), eslint.config.js (apps/agent/src/fabric/**), tools/i18n-sweep.mjs (ROOTS += apps/agent/src), tools/reachable.test.ts (строки исключений до N-011), packages/cdp-pipe/src/pipe.ts (пометки i18n-exempt)",
+   "Test: apps/agent/src/service/*.test.ts"
+  ],
+  "consumes": "Node-набор Fabric: holdSingleInstance, ensureToken, checkRequest, buildWellKnown, LoginCodes, makeEvent, eventsPage, Drain, RotatingLog; JsonlEventLog в Node-наборе нет, файл событий пишет service/events.ts (аудит #5)",
+  "produces": "`SERVICE_ID='okolos-agent'`, `PORT=47871`; `serviceDirs(home?)`; `startService({port, dirs, routes}): Promise<{close()}>` — замок до побочных эффектов, токен 0600, guard на каждом пути, маршруты /.well-known/fabric-service, /fabric/v1/events, /fabric/v1/login-code, /fabric/v1/login; `Route = (req, res, ctx) => Promise<boolean>`",
+  "tests": [
+   "вторая копия на тех же данных выходит с 75, первая отвечает",
+   "Host evil.example → 403 на каждом маршруте, включая well-known",
+   "Origin https://evil.example → 403; Sec-Fetch-Site: cross-site → 403",
+   "well-known: id okolos-agent, instance default, build.commit, process.pid, degraded присутствует, surfaces.mcp.auth = own",
+   "события без токена → 401; код входа одноразовый",
+   "@okolos/contracts, cdp-pipe, core-snapshot, storage разрешаются из apps/agent (аудит #2, #3)",
+   "Set-Cookie от /fabric/v1/login: HttpOnly; SameSite=Strict; Path=/; функция проверки сессии экспортирована для N-015 (аудит #12)",
+   "pnpm lint, typecheck, i18n:sweep проходят с вендоренным набором и apps/agent/src в обходе (аудит #6, #33)"
+  ],
+  "dod": "vitest apps/agent/src/service зелёный; сервер слушает только 127.0.0.1 (тест читает address())"
+ },
+ {
+  "n": "N-006",
+  "title": "K3: журнал до ответа",
+  "deps": [
+   "N-005"
+  ],
+  "req": [
+   "REQ-60"
+  ],
+  "files": [
+   "Create: apps/agent/src/journal/journal.ts",
+   "Test: apps/agent/src/journal/journal.test.ts"
+  ],
+  "consumes": "serviceDirs().data",
+  "produces": "`class Journal { static open(dir, {retentionDays}): Journal; record(e: JournalEntry): Promise<void> /* append + fsync, бросает при сбое */; recent(limit): JournalEntry[]; sweep(now) }`; `JournalEntry {at, agent, task?, verb, origin?, outcome: 'answered'|'refused'|'rejected', code?: BridgeRefusal | DoorRejection, bytes?, verdict?}`; `DoorRejection = 'bad_host'|'bad_origin'|'bad_content_type'|'bad_request'`; JournalEntry — объединение по outcome: у 'rejected' нет agent и verb (аудит #38); verb: AnyBridgeVerb, канонический (аудит #19); `answerAfterRecord(journal, entry, send)` — единственная обёртка «запись до ответа», при сбое записи отправляет конверт отказа internal без содержимого страницы (аудит #18); RETENTION_DAYS_JOURNAL = 90, тест сверяет с RETENTION_DAYS.journal из @okolos/storage (аудит #30) (проверка seam N-001 круг 2) — без текста страницы и значений полей",
+  "tests": [
+   "record дописывает строку и делает fsync до возврата (шпион на fd.sync)",
+   "каталог только для чтения → record бросает, и обёртка answerAfterRecord отдаёт internal, а не ответ",
+   "запись с полем text или value отвергается типом и рантайм-проверкой",
+   "sweep удаляет записи старше срока; срок берётся из RETENTION_DAYS журнала расширения"
+  ],
+  "dod": "vitest apps/agent/src/journal зелёный; плант «ответ до записи» наблюдён красным"
+ },
+ {
+  "n": "N-007",
+  "title": "K3: привязка",
+  "deps": [
+   "N-005"
+  ],
+  "req": [
+   "REQ-58"
+  ],
+  "files": [
+   "Create: apps/agent/src/pairing/pairing.ts, apps/agent/src/pairing/name.ts",
+   "Test: apps/agent/src/pairing/pairing.test.ts, apps/agent/src/pairing/name.test.ts"
+  ],
+  "consumes": "serviceDirs().data",
+  "produces": "`class Pairing { static open(file): Pairing; request(agentName, now): {requestId, code, expiresAt} | {refused: reason}; confirm(requestId, now); decline(requestId); claim(requestId, now): {key} | {pending: true} | null; verify(key): AgentRecord | null; revoke(agentId); list(now): {requests: PublicRequest[] /* без requestId, с handle для страницы */, agents}; confirmByHandle(handle, now); declineByHandle(handle) }`; `checkAgentName(name): string | null` (причина отказа)",
+  "tests": [
+   "requestId 128 бит (32 hex), не появляется в list() для страницы, в журнале и событиях",
+   "claim до confirm → {pending: true}, нового запроса не создаёт; claim после confirm → ключ 256 бит; второй claim → null; claim позже 5 минут после confirm → null",
+   "запрос истекает через 5 минут с создания; больше 3 ожидающих → новый отвергается; больше 6 новых в минуту → отвергается",
+   "два ожидающих запроса с одним именем помечены duplicateName оба",
+   "имя агента: > 40 знаков, три цифры подряд, символы управления или bidi → отвергается с причиной (ревью F12)",
+   "verify через timingSafeEqual по SHA-256; отозванный ключ → null; хранилище 0600, атомарная запись; чужое содержимое файла не открывает хранилище, а даёт ошибку хранилища",
+   "confirmByHandle и declineByHandle работают по handle из list(); requestId в роли handle отвергается (аудит #9)"
+  ],
+  "dod": "vitest apps/agent/src/pairing зелёный"
+ },
+ {
+  "n": "N-008",
+  "title": "K3: дверь /mcp и stdio-шим",
+  "deps": [
+   "N-023",
+   "N-006",
+   "N-007",
+   "N-003"
+  ],
+  "req": [
+   "REQ-57"
+  ],
+  "files": [
+   "Create: apps/agent/src/door/door.ts, apps/agent/src/door/guard.ts, apps/agent/src/door/stdio-shim.ts, apps/agent/src/cli/pair.ts",
+   "Modify: apps/agent/package.json (зависимости @modelcontextprotocol/server, @modelcontextprotocol/node, zod), pnpm-lock.yaml",
+   "Test: apps/agent/src/door/door.test.ts, apps/agent/src/door/guard.test.ts, apps/agent/src/door/stdio-shim.test.ts, apps/agent/src/cli/pair.test.ts"
+  ],
+  "consumes": "Pairing.verify/request/claim; Journal.record; Route из N-005",
+  "produces": "`doorGuard(req): {status, code} | null` (Host, Origin, Sec-Fetch-*, Content-Type); `doorRoute({pairing, journal, tools, onRevoke}): Route`; ключ агента в `X-Okolos-Agent-Key` (аудит #31); каждый ответ через answerAfterRecord из N-006 (аудит #18); onRevoke(agentId) зовётся при отзыве, подключает N-011 (аудит #13); шим и CLI говорят с дверью через node:http, не fetch (аудит #32); подкоманды pair и mcp-stdio экспортируются функциями, main.ts их подключает в N-011 для POST /mcp, POST /pair, POST /pair/claim; обёртка journaled(res) пишет запись до тела; `type ToolSet = (agent: AgentRecord) => McpServer`; `okolos-agent pair --name <имя>`; `okolos-agent mcp-stdio --as <имя>`",
+  "tests": [
+   "без ключа: 403, тело {error: not_paired}, нет WWW-Authenticate, запроса привязки не создаётся",
+   "POST /pair {name} создаёт запрос и возвращает {requestId, code}; POST /pair/claim с X-Okolos-Pairing-Request до подтверждения → pending",
+   "токен хоста в Authorization: 403 not_paired, не 200",
+   "Host rebinding (attacker.example:47871) → 403 до разбора, запись в журнале, запроса привязки нет",
+   "любой Origin (в том числе http://localhost:3000) или Sec-Fetch-Site → 403, запроса привязки нет (ревью F7)",
+   "Content-Type не application/json → 415",
+   "журнал недоступен (ответ — конверт internal из answerAfterRecord, без содержимого; аудит #18): каждый маршрут и вид ответа (отказ двери, ошибка разбора, ошибка протокола, ответ инструмента) уходит без тела (ревью F14)",
+   "ключ отозван → 403 not_paired и вызван onRevoke(agentId); закрытие задач и окон проверяет N-011",
+   "stdio-шим: читает ключ из файла 0600 клиента, проксирует stdin/stdout ↔ /mcp; без файла ключа печатает в stderr, как пройти привязку, и выходит 2",
+   "CLI pair: печатает код, ждёт подтверждения, пишет ключ в clients/<имя>.key 0600; отказ человека → выход 1 без файла",
+   "тестовый MCP-клиент (@modelcontextprotocol/client) получает tools/list после привязки",
+   "правила двери (Host, Origin, Sec-Fetch-*, JSON) проверены на /pair и /pair/claim так же, как на /mcp (ревью R5)",
+   "имя ../x и a/b: файл ключа называется по SHA-256 имени в hex внутри clients/, 0600 (ревью R6)",
+   "ключ пишется во временный файл и переименовывается только после успешного забора; существующий файл заменяется только с --replace; привязка того же имени после отзыва проходит с --replace (ревью S5)"
+  ],
+  "dod": "vitest apps/agent/src/door зелёный"
+ },
+ {
+  "n": "N-009",
+  "title": "K3: задачи",
+  "deps": [
+   "N-023",
+   "N-005"
+  ],
+  "req": [
+   "REQ-59"
+  ],
+  "files": [
+   "Create: apps/agent/src/tasks/tasks.ts",
+   "Test: apps/agent/src/tasks/tasks.test.ts"
+  ],
+  "consumes": "validateScope, inScope, refuse, verbAllowed (close разрешён всегда) (bridge.ts)",
+  "produces": "`class Tasks { open(agentId, scopeInput, now): BridgeResult<Task>; get(agentId, taskId, now): BridgeResult<Task>; charge(task, verb, url?): BridgeResult<void>; closeAllOf(agentId); list(now) }`; `Task {id, agentId, scope, openedAt, stepsUsed, windowId?}`; `checkLanded(task, actualUrl): BridgeResult<void>` (аудит #39); SessionOpenResult.sessionId = Task.id",
+  "tests": [
+   "каждый отказ BRIDGE_REFUSALS, который выдают задачи (invalid_scope, no_such_task, origin_not_in_task, verb_not_in_task, budget_exhausted, task_expired), — свой тест",
+   "чужая задача (другой agentId) → no_such_task (ревью F8)",
+   "sessionId — 128 случайных бит (32 hex), два открытия дают разные id",
+   "checkLanded(task, actualUrl): фактический origin вне origins.read → origin_not_in_task (ревью F9)",
+   "отказ тоже списывает шаг (спека §2.3)",
+   "фрагмент URL не влияет на проверку origin"
+  ],
+  "dod": "vitest apps/agent/src/tasks зелёный"
+ },
+ {
+  "n": "N-010",
+  "title": "K4: окно агента",
+  "deps": [
+   "N-022",
+   "N-005"
+  ],
+  "req": [
+   "REQ-61"
+  ],
+  "files": [
+   "Create: apps/agent/src/window/chrome.ts, src/window/window.ts",
+   "Test: apps/agent/src/window/window.test.ts, src/window/window.chrome.test.ts (настоящий Chrome, пропуск с причиной, если его нет)"
+  ],
+  "consumes": "CdpTransport, CdpPipe.launch (N-022); launch сам добавляет --remote-debugging-pipe и --user-data-dir, AgentWindows их не передаёт (проверка seam N-002)",
+  "produces": "`findChrome(): string | null`; `class AgentWindows { constructor({binary, profileDir, launch: (o) => Promise<CdpTransport> = CdpPipe.launch, extraArgs?: readonly string[] /* для тестов: --host-resolver-rules; --enable-automation и --remote-debugging-port отвергаются (аудит #21) */}); openWindow(): Promise<{targetId, cdpSessionId}> /* targetId и есть windowId в SessionOpenResult; cdpSessionId агенту не уходит (аудит #28) */; closeWindow(targetId); shutdown() }` — свои аргументы `--no-startup-window --no-first-run --no-default-browser-check` и никогда `--enable-automation`",
+  "tests": [
+   "аргументы запуска: нет --enable-automation, есть --no-startup-window (фальшивый launch)",
+   "openWindow зовёт Target.createTarget {newWindow: true, background: true}",
+   "shutdown закрывает группу (фальшивый браузер)",
+   "Chrome: окно открывается, document.visibilityState = visible, фронтальное приложение не меняется (osascript), outerHeight − innerHeight < 120",
+   "Chrome: kill -9 демона-обёртки → процессов с профилем не остаётся после перезапуска (зачистка сирот своего профиля по SingletonLock)",
+   "extraArgs с --enable-automation или --remote-debugging-port → ошибка конструктора; --host-resolver-rules проходит (аудит #21)"
+  ],
+  "dod": "vitest apps/agent/src/window зелёный на этой машине с Chrome stable"
+ },
+ {
+  "n": "N-011",
+  "title": "K3: глаголы и walking skeleton",
+  "deps": [
+   "N-004",
+   "N-006",
+   "N-008",
+   "N-009",
+   "N-010",
+   "N-012"
+  ],
+  "req": [
+   "REQ-55"
+  ],
+  "files": [
+   "Create: apps/agent/src/agent.ts (createAgent), apps/agent/src/main.ts (команды serve, pair, mcp-stdio), apps/agent/src/verbs/verbs.ts, apps/agent/src/verbs/probe.ts, tools/build-agent.mjs (бандл демона и пробника, вместе с apps/agent/src/fabric)",
+   "Modify: apps/agent/package.json (bin okolos-agent → ./src/main.ts), tools/imports.mjs (бандл агента как точка входа)",
+   "Test: apps/agent/src/agent.test.ts, apps/agent/src/verbs/verbs.test.ts, apps/agent/src/verbs/skeleton.chrome.test.ts"
+  ],
+  "consumes": "Tasks и checkLanded (N-009), AgentWindows (N-010), Journal и answerAfterRecord (N-006), doorRoute, pair, mcp-stdio (N-008), buildSnapshot, snapshotVerdict, paginate (N-003, N-004), census и readCensus (N-012), VerbIO, toolName, canonicalVerb, isLocalAddress, toSnapshotFinding (N-023), service из N-005 (capStdoutLog, buildIdentity с корнем релиза), runProbe (бандл apps/extension/src/agent-probe.ts)",
+  "produces": "`createAgent({dataDir, port, allowLoopbackForTests?, extraChromeArgs?, routes?}): Promise<Agent>` в src/agent.ts: служба, дверь, задачи, окна, журнал, перепись; onRevoke(agentId) закрывает задачи агента и их окна (аудит #13); таймер Journal.sweep раз в сутки (аудит #30); main.ts: serve → createAgent, pair, mcp-stdio; инструменты MCP под toolName: session_open, open, snapshot, read, get, waitFor, close, hygiene_census; схемы zod типа z.ZodType<VerbIO[V]['input']> (аудит #26); журнал хранит canonicalVerb (аудит #19); SessionOpenResult.sessionId = Task.id, cdpSessionId не уходит агенту (аудит #28); находки только через toSnapshotFinding",
+  "tests": [
+   "skeleton на Chrome: session.open → open локальной фикстуры со скрытой инструкцией из корпуса → snapshot не содержит текста инструкции, verdict.level = finding → close: окна нет",
+   "корпус в Chrome: HTML-фикстура из каждого позитива positives.json (по носителю и сокрытию), ответы snapshot, read, get text, waitFor {text} не содержат текста позитива (ревью F1, F3)",
+   "read, get text|title, waitFor {text} строятся только из очищенных строк снимка",
+   "open {ref} на ссылку вне origins.read → origin_not_in_task до перехода; редирект за область → snapshot и read отвечают origin_not_in_task",
+   "каждый глагол, возвращающий URL, срезает фрагмент",
+   "ответ главного фрейма пришёл с адреса loopback, частной сети или 100.64.0.0/10 (Tailscale, CGNAT; решение: это локальная сеть) (Network.responseReceived remoteIPAddress; правило — isLocalHost из N-023, своей копии нет), например по имени 127.0.0.1.nip.io: snapshot и read отвечают origin_not_in_task (проверка unit N-001, риск 2)",
+   "ни один ответ агенту и ни одна запись журнала не содержат текста вырезанной инструкции: находки идут через toSnapshotFinding (проверка seam N-001, break 1)",
+   "фикстуры тестов открываются по имени fixture.test через --host-resolver-rules; разрешение на loopback даёт только параметр конструктора allowLoopbackForTests, который main.ts не передаёт, и тест читает main.ts на его отсутствие (проверка product N-001, риск 2)",
+   "tools/list не содержит screenshot (ревью R2)",
+   "фикстура, раздутая до исчерпания бюджета пробника, с позитивом после раздутия: вызов отказан cleaning_incomplete, текста позитива нет ни в одном ответе (ревью R1)",
+   "фикстура подменяет скрытый узел по таймеру каждые 5 мс: скрипты на паузе на время снимка, текст позитива не выдан; счётчик мутаций различается → демон один раз повторяет снимок, затем cleaning_incomplete; скрипты включаются обратно в finally, и страница снова выполняет таймер после снимка (ревью R3, S3)",
+   "open вне origins.read → origin_not_in_task, запись в журнале есть",
+   "snapshot большой фикстуры приходит частями ≤ 32 КБ с курсором",
+   "read возвращает boundary с nonce и origin; get title/url без фрагмента",
+   "поля password, cc-number, one-time-code, <label> вокруг поля, aria-labelledby на поле кода, contenteditable без роли, с введёнными значениями (fuzz, фиксированное зерно): значений нет ни в одном ответе ни одного глагола (ревью R4)",
+   "remoteIPAddress пуст или отсутствует: snapshot и read отказывают cleaning_incomplete (аудит #27)",
+   "отзыв доступа закрывает задачи агента и их окна: окна с targetId задачи больше нет (аудит #13)",
+   "журнал несёт глагол в каноническом виде (session.open), инструмент зовётся session_open (аудит #19)",
+   "бандл несёт apps/agent/src/fabric (.mjs набор не копирует tsc)"
+  ],
+  "dod": "vitest apps/agent/src/verbs зелёный на Chrome stable"
+ },
+ {
+  "n": "N-012",
+  "title": "K5: перепись процессов",
+  "deps": [
+   "N-023",
+   "N-005"
+  ],
+  "req": [
+   "REQ-62"
+  ],
+  "files": [
+   "Create: apps/agent/src/hygiene/census.ts",
+   "Test: apps/agent/src/hygiene/census.test.ts, fixtures ps/launchctl"
+  ],
+  "consumes": "CensusEntry (bridge.ts)",
+  "produces": "`census(ps: string, launchctl: string, opts: {selfPid, home, now}): CensusEntry[]` — тип из N-023: `{pid, ppid, executable, owner: string|null, ageSeconds, flags: string[], keep: boolean, reason}`, без полной командной строки; `readCensus()` вызывает `ps -axo pid=,ppid=,lstart=,command=` и `launchctl list` с таймаутом",
+  "tests": [
+   "процесс --remote-debugging-port с живым родителем-сессией: keep, owner = сессия",
+   "потомок задачи launchd с ppid 1: keep, причина «служба ОС»",
+   "Chrome человека без флагов автоматизации: keep, «браузер человека»",
+   "chrome-headless-shell с мёртвым родителем на $TMPDIR-профиле: keep=false, причина «сирота», но ничего не завершается",
+   "процесс с --token=SECRET в argv: в ответе нет SECRET, есть путь, pid, владелец, возраст, причина и флаги автоматизации (ревью F11)"
+  ],
+  "dod": "vitest apps/agent/src/hygiene зелёный"
+ },
+ {
+  "n": "N-013",
+  "title": "UX: экраны SCR-23/24, потоки, сценарии",
+  "deps": [],
+  "req": [
+   "REQ-64"
+  ],
+  "files": [
+   "Modify: docs/ux/screens.md, docs/ux/flows.md, docs/ux/scenarios.md"
+  ],
+  "consumes": "—",
+  "produces": "SCR-23, SCR-24 со состояниями; FLW-21/22 ведут к ним",
+  "tests": [
+   "python3 docs/ux/lint.py → 0"
+  ],
+  "dod": "сделано на стадии 3 (коммит de4cf56); узел закрывается проверкой линтера"
+ },
+ {
+  "n": "N-014",
+  "title": "Термины и строки (каталог apps/agent/_locales, ревью F22)",
+  "deps": [
+   "N-013"
+  ],
+  "req": [
+   "REQ-66"
+  ],
+  "files": [
+   "Modify: docs/brand/terminology.md",
+   "Create: apps/agent/_locales/ru/messages.json, apps/agent/_locales/en/messages.json",
+   "Modify: tools/locales.test.ts (каталог демона: одинаковые ключи в двух языках, плейсхолдеры объявлены)"
+  ],
+  "consumes": "—",
+  "produces": "строки страницы; число ключей меряется командой по каталогу ru (аудит #34); термины раздела «Мост для агентов»",
+  "tests": [
+   "оба каталога с одинаковыми ключами; каждый $X$ объявлен в placeholders",
+   "python3 docs/brand/lint.py → 0",
+   "ключ строки rejection_door в обоих каталогах для отказов двери до разбора; copylot_check (seam N-001 круг 3, break 3)",
+   "refusal_invalid_scope говорит «этого устройства»/«this device», как остальной продукт, и читается внутри строки refusalLine без двух двоеточий подряд; copylot_check на собранной строке (проверка product N-001 круг 2)",
+   "ключи taskProfileAgent и taskProfileDisposable в обоих каталогах, copylot_check (аудит #20)",
+   "решить, идут ли через каталог тексты службы N-005 (занятый замок, события, 503): человек читает события в Fabric Dashboards"
+  ],
+  "dod": "строки и термины сделаны на стадии 3; узел добавляет проверку каталога демона в tools/locales.test.ts"
+ },
+ {
+  "n": "N-015",
+  "title": "Страница демона: SCR-23, SCR-24",
+  "deps": [
+   "N-006",
+   "N-007",
+   "N-009",
+   "N-011",
+   "N-013",
+   "N-014"
+  ],
+  "req": [
+   "REQ-64",
+   "REQ-65"
+  ],
+  "files": [
+   "Create: apps/agent/src/dashboard/page.ts, apps/agent/src/dashboard/api.ts, apps/agent/src/dashboard/actions.ts, apps/agent/static/ (набор дашборда Fabric)",
+   "Modify: apps/agent/src/agent.ts (монтирует маршруты страницы и инструменты pairing.confirm, pairing.decline, agent.revoke; аудит #10, #11), docs/ux/screens.md, docs/ux/scenarios.md, docs/ux/flows.md (SCR-24 показывает профиль, SCN-045 и FLW-22 называют цель; аудит #20)",
+   "Test: apps/agent/src/dashboard/page.test.ts, apps/agent/src/dashboard/api.test.ts, apps/agent/src/dashboard/actions.test.ts"
+  ],
+  "consumes": "Pairing.list/confirmByHandle/declineByHandle/revoke (N-007), Tasks.list (N-009), Journal.recent (N-006), проверка сессии из N-005, createAgent (N-011), refusalKey (N-023), каталоги строк",
+  "produces": "GET /dashboard (сессия-кука от кода входа), GET /api/state, POST /api/pairing/:id/confirm|decline, POST /api/agents/:id/revoke — запись требует куку и заголовок X-Okolos-Request: 1; CSP без inline-скрипта; действия fabric-actions: pairing.confirm (human, consent), pairing.decline (human, consent), agent.revoke (relayed)",
+  "tests": [
+   "без куки → 401; запись без X-Okolos-Request → 403; запись без Origin или с чужим Origin → 403; чужой Host на любом маршруте → 403 (ревью F4)",
+   "requestId не попадает в HTML и /api/state; подтверждение идёт по handle, который страница получила в своей сессии",
+   "имя агента выводится текстом (textContent), код в отдельном элементе [data-role=pairing-code]",
+   "состояния SCR-23: loading, empty, error, success, expired; SCR-24: loading, empty, error, success — каждое по data-role",
+   "инструмент pairing.confirm через MCP отвечает human-step-required со ссылкой /dashboard",
+   "строки берутся из каталога; ключ без строки виден как [key]",
+   "отказ двери (DoorRejection) в списке отказов показывается одной строкой rejection_door, refusalKey для него не вызывается и не бросает (проверка seam N-001 круг 2)",
+   "страница принимает только сессию, выданную N-005; атрибуты куки проверяет N-005 (аудит #12)",
+   "строка задачи SCR-24 показывает профиль: с логинами человека или без них; SCN-045 шаг 1 и FLW-22 называют цель задачи (проверка product N-001 круг 2)",
+   "GET /api/journal выгружает журнал агентов (JSONL, без содержимого страниц) для [data-role=agent-journal-link] (аудит #40)"
+  ],
+  "dod": "vitest apps/agent/src/dashboard зелёный; SCN-044, SCN-045 переведены в built в том же изменении, python3 docs/ux/lint.py 0"
+ },
+ {
+  "n": "N-016",
+  "title": "K6: установка",
+  "deps": [
+   "N-011",
+   "N-012",
+   "N-015"
+  ],
+  "req": [
+   "REQ-63"
+  ],
+  "files": [
+   "Create: tools/install-agent.mjs, tools/install-agent.test.ts",
+   "Modify: apps/agent/src/main.ts (команда doctor --json), package.json (agent:build, agent:install, agent:doctor), docs/runbooks/development.md, docs/runbooks/agent.md"
+  ],
+  "consumes": "бандл из tools/build-agent.mjs; набор Fabric: writeDescriptor, launchdPlist, launchdInstall, launchdUninstall, pruneReleases",
+  "produces": "`pnpm agent:install` → релиз в ~/.local/share/okolos-agent/releases/<версия>-<sha12>/, дескриптор, plist, загрузка, ожидание well-known; `--uninstall`, `--status`, `--dry-run`; `okolos-agent doctor --json`",
+  "tests": [
+   "dry-run печатает plist: RunAtLoad, KeepAlive, ThrottleInterval 10, ProcessType Standard, FABRIC_SERVICE_SUPERVISOR=launchd, абсолютный node, путь в релизе, ни одного секрета",
+   "tools/runbook.test.ts видит новые скрипты в раннбуке",
+   "фальшивый launchctl первым в PATH: install зовёт bootout, ждёт, bootstrap",
+   "релиз содержит бандл, apps/agent/src/fabric и apps/agent/static (аудит #37)",
+   "install пишет plist через launchdPlist набора и зовёт capStdoutLog при старте"
+  ],
+  "dod": "vitest tools/install-agent.test.ts tools/runbook.test.ts зелёные"
+ },
+ {
+  "n": "N-017",
+  "title": "e2e моста",
+  "deps": [
+   "N-015",
+   "N-016"
+  ],
+  "req": [
+   "REQ-58",
+   "REQ-61"
+  ],
+  "files": [
+   "Create: e2e/bridge/skeleton.spec.ts, e2e/bridge/scn-044.spec.ts, e2e/bridge/scn-045.spec.ts, playwright.bridge.config.ts",
+   "Modify: package.json (test:e2e:bridge, аудит #14), playwright.config.ts (testIgnore bridge/**, аудит #15), docs/runbooks/development.md"
+  ],
+  "consumes": "демон в процессе теста через createAgent({dataDir, port, allowLoopbackForTests: true, extraChromeArgs}) импортом из apps/agent/src/agent.ts (типы есть, аудит #35), не через CLI и не через переменную окружения; ключ в X-Okolos-Agent-Key (аудит #31); страницы фикстур по имени fixture.test через --host-resolver-rules; Chrome stable",
+  "produces": "`pnpm test:e2e:bridge`",
+  "tests": [
+   "skeleton: MCP-клиент вызывает инструменты по toolName (session_open …), журнал хранит каноническое написание (session.open) → привязка через страницу → session.open → open → snapshot без скрытой инструкции → close",
+   "SCN-044: неверный код → отклонить; отзыв → следующий вызов not_paired, задача закрыта",
+   "SCN-045: страница показывает задачу агента и отказ origin_not_in_task",
+   "playwright test --list основного конфига не показывает e2e/bridge (аудит #15)"
+  ],
+  "dod": "pnpm test:e2e:bridge зелёный; все процессы Chrome и демона закрыты после прогона"
+ },
+ {
+  "n": "N-018",
+  "title": "ADR моста и снимка частями",
+  "deps": [
+   "N-011"
+  ],
+  "req": [
+   "REQ-67"
+  ],
+  "files": [
+   "Create: docs/adr/0020-bridge-is-part-of-okolos-agent.md, docs/adr/0021-agent-snapshot-in-pages-of-32-kb.md",
+   "Modify: docs/adr/README.md, docs/adr/0019-page-content-never-reaches-our-infrastructure.md, docs/adr/0018-agents-get-their-own-extension.md"
+  ],
+  "consumes": "имена тестов N-006, N-008, N-011",
+  "produces": "два ADR",
+  "tests": [
+   "tools/adr.test.ts: каждый названный файл существует",
+   "таблица «Чем держится» ADR-0019 называет тест журнала apps/agent/src/journal/journal.test.ts и тест снимка в Chrome apps/agent/src/verbs/skeleton.chrome.test.ts (ревью F25)",
+   "ADR моста записывает границу угроз Б1, что клиент с оболочкой под инъекцией страницы и есть код от имени человека, что в Б1 от этого пути защищает только очистка снимка, и что расширение Okolos в Б1 не имеет канала к демону (ревью F4, F21, R9)"
+  ],
+  "dod": "vitest tools/adr.test.ts зелёный"
+ },
+ {
+  "n": "N-019",
+  "title": "Снять исключения reachable",
+  "deps": [
+   "N-011"
+  ],
+  "req": [
+   "REQ-68"
+  ],
+  "files": [
+   "Modify: tools/reachable.test.ts"
+  ],
+  "consumes": "apps/agent как вызывающий core-snapshot и agent-probe",
+  "produces": "—",
+  "tests": [
+   "tools/reachable.test.ts без строк исключений моста (их добавили N-002, N-005 и другие)"
+  ],
+  "dod": "vitest tools/reachable.test.ts зелёный"
+ },
+ {
+  "n": "N-020",
+  "title": "Документы",
+  "deps": [
+   "N-016",
+   "N-017"
+  ],
+  "req": [
+   "REQ-69"
+  ],
+  "files": [
+   "Modify: AGENTS.md (Commands: MCP; Lifecycle: app.okolos.agent), docs/README.md (Статус, карта кода), docs/privacy.md (демон не выходит в сеть), docs/brand/facts.md, docs/backlog.md (Touch ID для подтверждения: строка на Б2), docs/superpowers/backlog.md, SECURITY.md (граница угроз Б1)"
+  ],
+  "consumes": "команды N-016, N-017",
+  "produces": "доки в синхроне",
+  "tests": [
+   "tools/docs.test.ts, tools/runbook.test.ts зелёные"
+  ],
+  "dod": "vitest зелёный; README «Статус» не утверждает ложного"
+ },
+ {
+  "n": "N-021",
+  "title": "Регресс",
+  "deps": [
+   "N-019",
+   "N-020"
+  ],
+  "req": [
+   "REQ-70"
+  ],
+  "files": [],
+  "consumes": "всё",
+  "produces": "—",
+  "tests": [
+   "pnpm gates → 0",
+   "pnpm test:e2e → 0",
+   "tools/manifest.test.ts «the line between Okolos and Okolos Bridge» зелёный"
+  ],
+  "dod": "три команды зелёные"
+ }
+]

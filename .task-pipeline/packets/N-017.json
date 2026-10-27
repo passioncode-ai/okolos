@@ -3,9 +3,9 @@
  "node": "N-017",
  "intent": "e2e моста",
  "inputs": [
-  "собранный демон, запущенный в процессе теста через экспорт createAgent({dataDir, port, allowLoopbackForTests: true}) из бандла, а не через CLI и не через переменную окружения; страницы фикстур по имени fixture.test через --host-resolver-rules; Chrome stable",
-  "N-011: рабочий демон",
-  "N-015: страница для подтверждения"
+  "демон в процессе теста через createAgent({dataDir, port, allowLoopbackForTests: true, extraChromeArgs}) импортом из apps/agent/src/agent.ts (типы есть, аудит #35), не через CLI и не через переменную окружения; ключ в X-Okolos-Agent-Key (аудит #31); страницы фикстур по имени fixture.test через --host-resolver-rules; Chrome stable",
+  "N-015: страница для подтверждения",
+  "N-016: скрипт agent:build и релиз"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -17,7 +17,10 @@
    "e2e/bridge/skeleton.spec.ts",
    "e2e/bridge/scn-044.spec.ts",
    "e2e/bridge/scn-045.spec.ts",
-   "playwright.bridge.config.ts"
+   "playwright.bridge.config.ts",
+   "package.json",
+   "playwright.config.ts",
+   "docs/runbooks/development.md"
   ]
  },
  "outputs": [
@@ -27,6 +30,7 @@
   "skeleton: MCP-клиент вызывает инструменты по toolName (session_open …), журнал хранит каноническое написание (session.open) → привязка через страницу → session.open → open → snapshot без скрытой инструкции → close",
   "SCN-044: неверный код → отклонить; отзыв → следующий вызов not_paired, задача закрыта",
   "SCN-045: страница показывает задачу агента и отказ origin_not_in_task",
+  "playwright test --list основного конфига не показывает e2e/bridge (аудит #15)",
   "проверка узла: pnpm -s run test:e2e:bridge"
  ],
  "guards": [

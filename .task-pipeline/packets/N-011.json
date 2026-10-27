@@ -3,11 +3,13 @@
  "node": "N-011",
  "intent": "K3: глаголы и walking skeleton",
  "inputs": [
-  "Tasks, AgentWindows, Journal, buildSnapshot, snapshotVerdict, paginate, runProbe (бандл apps/extension/src/agent-probe.ts)",
+  "Tasks и checkLanded (N-009), AgentWindows (N-010), Journal и answerAfterRecord (N-006), doorRoute, pair, mcp-stdio (N-008), buildSnapshot, snapshotVerdict, paginate (N-003, N-004), census и readCensus (N-012), VerbIO, toolName, canonicalVerb, isLocalAddress, toSnapshotFinding (N-023), service из N-005 (capStdoutLog, buildIdentity с корнем релиза), runProbe (бандл apps/extension/src/agent-probe.ts)",
   "N-004: pageOf с курсором",
+  "N-006: Journal, answerAfterRecord",
   "N-008: регистрация инструментов на запрос",
   "N-009: Task.charge и проверки области",
-  "N-010: AgentWindow.open/close"
+  "N-010: AgentWindow.open/close",
+  "N-012: census, readCensus, CensusEntry[]"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -16,16 +18,20 @@
  ],
  "source_scope": {
   "edit_targets": [
+   "apps/agent/src/agent.ts",
+   "apps/agent/src/main.ts",
    "apps/agent/src/verbs/verbs.ts",
-   "src/verbs/probe.ts",
-   "src/main.ts",
+   "apps/agent/src/verbs/probe.ts",
    "tools/build-agent.mjs",
+   "apps/agent/package.json",
+   "tools/imports.mjs",
+   "apps/agent/src/agent.test.ts",
    "apps/agent/src/verbs/verbs.test.ts",
-   "src/verbs/skeleton.chrome.test.ts"
+   "apps/agent/src/verbs/skeleton.chrome.test.ts"
   ]
  },
  "outputs": [
-  "инструменты MCP под именами toolName(verb) из N-001 (точка заменяется на _): session_open, open, snapshot, read, get, waitFor, close, hygiene_census (без screenshot); находки в ответе строятся только через toSnapshotFinding из N-001, без текста страницы; каждый ответ проходит journal.record до отправки; `main.ts` собирает службу"
+  "`createAgent({dataDir, port, allowLoopbackForTests?, extraChromeArgs?, routes?}): Promise<Agent>` в src/agent.ts: служба, дверь, задачи, окна, журнал, перепись; onRevoke(agentId) закрывает задачи агента и их окна (аудит #13); таймер Journal.sweep раз в сутки (аудит #30); main.ts: serve → createAgent, pair, mcp-stdio; инструменты MCP под toolName: session_open, open, snapshot, read, get, waitFor, close, hygiene_census; схемы zod типа z.ZodType<VerbIO[V]['input']> (аудит #26); журнал хранит canonicalVerb (аудит #19); SessionOpenResult.sessionId = Task.id, cdpSessionId не уходит агенту (аудит #28); находки только через toSnapshotFinding"
  ],
  "acceptance": [
   "skeleton на Chrome: session.open → open локальной фикстуры со скрытой инструкцией из корпуса → snapshot не содержит текста инструкции, verdict.level = finding → close: окна нет",
@@ -43,7 +49,11 @@
   "snapshot большой фикстуры приходит частями ≤ 32 КБ с курсором",
   "read возвращает boundary с nonce и origin; get title/url без фрагмента",
   "поля password, cc-number, one-time-code, <label> вокруг поля, aria-labelledby на поле кода, contenteditable без роли, с введёнными значениями (fuzz, фиксированное зерно): значений нет ни в одном ответе ни одного глагола (ревью R4)",
-  "проверка узла: pnpm -s exec vitest run apps/agent/src/verbs"
+  "remoteIPAddress пуст или отсутствует: snapshot и read отказывают cleaning_incomplete (аудит #27)",
+  "отзыв доступа закрывает задачи агента и их окна: окна с targetId задачи больше нет (аудит #13)",
+  "журнал несёт глагол в каноническом виде (session.open), инструмент зовётся session_open (аудит #19)",
+  "бандл несёт apps/agent/src/fabric (.mjs набор не копирует tsc)",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/agent.test.ts apps/agent/src/verbs && pnpm -s run typecheck"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",
@@ -53,5 +63,5 @@
   "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
   "без длинного тире в текстах для людей"
  ],
- "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/verbs/verbs.ts src/verbs/probe.ts src/main.ts; затем первый непройденный тест в списке acceptance"
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/agent.ts apps/agent/src/main.ts apps/agent/src/verbs/verbs.ts; затем первый непройденный тест в списке acceptance"
 }

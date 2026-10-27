@@ -20,7 +20,7 @@
   ]
  },
  "outputs": [
-  "`class Pairing { static open(file): Pairing; request(agentName, now): {requestId, code, expiresAt} | {refused: reason}; confirm(requestId, now); decline(requestId); claim(requestId, now): {key} | {pending: true} | null; verify(key): AgentRecord | null; revoke(agentId); list(now): {requests: PublicRequest[] /* без requestId, с handle для страницы */, agents} }`; `checkAgentName(name): string | null` (причина отказа)"
+  "`class Pairing { static open(file): Pairing; request(agentName, now): {requestId, code, expiresAt} | {refused: reason}; confirm(requestId, now); decline(requestId); claim(requestId, now): {key} | {pending: true} | null; verify(key): AgentRecord | null; revoke(agentId); list(now): {requests: PublicRequest[] /* без requestId, с handle для страницы */, agents}; confirmByHandle(handle, now); declineByHandle(handle) }`; `checkAgentName(name): string | null` (причина отказа)"
  ],
  "acceptance": [
   "requestId 128 бит (32 hex), не появляется в list() для страницы, в журнале и событиях",
@@ -29,7 +29,8 @@
   "два ожидающих запроса с одним именем помечены duplicateName оба",
   "имя агента: > 40 знаков, три цифры подряд, символы управления или bidi → отвергается с причиной (ревью F12)",
   "verify через timingSafeEqual по SHA-256; отозванный ключ → null; хранилище 0600, атомарная запись; чужое содержимое файла не открывает хранилище, а даёт ошибку хранилища",
-  "проверка узла: pnpm -s exec vitest run apps/agent/src/pairing"
+  "confirmByHandle и declineByHandle работают по handle из list(); requestId в роли handle отвергается (аудит #9)",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/pairing && pnpm -s run typecheck"
  ],
  "guards": [
   "TDD: тест пишется первым и наблюдается красным",

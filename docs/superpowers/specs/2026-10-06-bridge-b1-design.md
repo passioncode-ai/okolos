@@ -68,6 +68,13 @@ interface TaskScope {
 | `close` | нет | окно и процессы задачи закрыты; разрешён всегда, даже если не назван в `verbs` |
 | `hygiene.census` | нет | перепись (K5) без командных строк чужих процессов |
 
+**Формы входа и выхода, принятые в N-023** (тип `VerbIO` в `packages/contracts/src/bridge.ts`, их
+единственный дом): каждый глагол внутри задачи принимает `sessionId` задачи (`TaskCall`);
+`WaitForResult` равен `{met: boolean}`; `GetResult` помечен по `what` (`count` даёт число, остальные
+строку); `CloseResult` равен `{closed: true}`; `CensusResult` равен `readonly CensusEntry[]`. Глагол
+пишется с точкой (`session.open`) в контрактах и журнале; имя инструмента MCP даёт `toolName(verb)`
+(`session_open`), обратно `canonicalVerb`.
+
 `screenshot` перенесён в Б2 (ревью 2026-10-27, F3): пиксели обходят движок и показывают введённые
 номера карт и коды. Вернётся вместе с маскированием полей.
 

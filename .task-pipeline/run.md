@@ -31,3 +31,4 @@ event: memory — N-002 verdict re-stamped at 09bfbaa after merge; node code ide
 iter: 1 — item N-002 — closed at gate 5
 event: memory — lesson: N-002 implementer and all three certification tiers ran only the node check; i18n:sweep failed at pre-push after merge (5 unexempted strings in cdp-pipe). From N-005 on, every implementer runs `pnpm gates` before DONE — 2026-10-27T07:55:00+01:00
 holds: 5 — blocker N-001 parked at the certification ceiling (3 failing rounds, seam each time); replaced by N-023 with explicit edge change (revisions); plan-wide seam audit dispatched — 2026-10-27T08:10:00+01:00
+event: memory — plan-wide seam audit: 40 findings (22 breaks) applied through plan_tasks.json + apply_audit.py; touches now generated from packets; plan_audit then found 2 real collisions (lockfile N-003/N-008, pipe.ts N-005/N-022), ordered — 2026-10-27T09:10:00+01:00
