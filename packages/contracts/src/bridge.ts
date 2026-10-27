@@ -54,21 +54,19 @@ export function toolName(verb: AnyBridgeVerb): string {
   return verb.replaceAll('.', '_')
 }
 
-/*
- * Built from the lists, not written out, so a new verb has its way back the
- * moment it has a tool name.
- */
-const VERB_BY_TOOL_NAME: ReadonlyMap<string, AnyBridgeVerb> = new Map(
-  [...BRIDGE_VERBS, ...BRIDGE_SESSION_VERBS].map((verb) => [toolName(verb), verb]),
-)
-
 /**
  * The verb a tool call names, in its canonical spelling, or `null` for a name
  * that is no verb's tool. The door calls this on every tool call and journals
  * what it returns, so each caller does not undo the underscore its own way.
+ *
+ * Searched from the lists, so a new verb has its way back the moment it has a
+ * tool name. Inside the function and not a module-level table: the extension
+ * imports this package, and a table built at load is a side effect the bundler
+ * keeps, which put `"open"` into `content.js`, where the bundle gate reads it as
+ * the open shadow root of the test build.
  */
 export function canonicalVerb(name: string): AnyBridgeVerb | null {
-  return VERB_BY_TOOL_NAME.get(name) ?? null
+  return [...BRIDGE_VERBS, ...BRIDGE_SESSION_VERBS].find((verb) => toolName(verb) === name) ?? null
 }
 
 /** Every way the bridge says no. Closed: an unlisted refusal is a bug. */
