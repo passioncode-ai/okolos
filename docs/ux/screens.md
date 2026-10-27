@@ -202,7 +202,7 @@ generator, and the sheet declares no colour of its own.
 - **Status note:** built for the injection variant only
 - **Used by:** FLW-02, FLW-05, FLW-06, FLW-07, FLW-08, FLW-09, FLW-10
 - **Purpose:** speak at the moment of the decision, inside the page, without stealing the page
-- **Elements:** severity icon + label; one-sentence plain-language reason; **one primary action per variant**; secondary "Показать" → SCR-04 where applicable; "Это неверно"; dismiss. Variants: `injection`, `lookalike`, `clickfix` (blocking), `techsupport`, `download`, `credential`, `password`
+- **Elements:** severity icon + label; one-sentence plain-language reason; **one primary action per variant**; secondary "Показать" → SCR-04 where applicable; "Это неверно"; dismiss. Variants: `injection`, `lookalike`, `clickfix` (blocking), `techsupport`, `download`, `credential`, `password`. The `clickfix` variant also carries the link that would open a program or a shared folder outside the browser (SCN-049, 2026-10-27): the same trap by another road, with its own headline and sentence and no new element
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
@@ -216,7 +216,7 @@ generator, and the sheet declares no colour of its own.
 - **Behavior notes — severity in a word and a colour, in that order.** The word is the message; the strip on the panel's leading edge is the third signal, from the same three token levels the extension's own screens use. Until 2026-08-21 there was no strip and no colour at all here, so `Критично` and `Незначительно` were indistinguishable at a glance (B-116)
 - **Wireframe:** wireframes/SCR-03.md
 - **Coverage:** packages/ui/src/banner/banner.ts:mountBanner, e2e/scn-003.spec.ts, e2e/a11y-overlays.spec.ts, e2e/scn-034.spec.ts (the credential variant drawn from a frame's report, asserted through the open shadow root of the hooked build)
-- **Scenarios:** SCN-003, SCN-006, SCN-008, SCN-009, SCN-011, SCN-012, SCN-013, SCN-031, SCN-034, SCN-035, SCN-036
+- **Scenarios:** SCN-003, SCN-006, SCN-008, SCN-009, SCN-011, SCN-012, SCN-013, SCN-031, SCN-034, SCN-035, SCN-036, SCN-049
 - **Resources:** shared banner component, variant copy table, i18n strings
 - **Status:** built
 

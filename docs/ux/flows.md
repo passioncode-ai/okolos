@@ -160,8 +160,8 @@ flowchart TD
 ### FLW-06: ClickFix — page copies a command
 - **Traces:** ST-007 (JTBD-02, JRN-03/#3)
 - **Goal:** interrupt between the clipboard write and the user pasting into a system dialog — the last moment we can reach
-- **Entry points:** script-initiated clipboard write containing a shell-like payload, with no genuine user copy action
-- **Success exit:** user does not run the command; clipboard content is flagged
+- **Entry points:** script-initiated clipboard write containing a shell-like payload, with no genuine user copy action; a click on a link whose address opens a Windows program or a shared folder on another computer (SCN-049, added 2026-10-27)
+- **Success exit:** user does not run the command; clipboard content is flagged; a link that would start a program is stopped before the browser passes it on
 - **Task analysis:**
   1. Stop before switching windows
   2. Understand in one sentence why this is fake
@@ -176,6 +176,9 @@ flowchart TD
   C -->|I already ran it| E[Screen: Recovery checklist]
   B -->|dismiss - deliberate action required| F[Warning collapses to a persistent marker]
   F --> A
+  G[Screen: Page with a link to a program or a shared folder] -->|click, the click is stopped| H[Screen: In-page banner, clickfix variant, blocking: what would open and where]
+  H -->|leave page| D
+  H -->|this is wrong| I[Warning closes; that link goes through on the next click]
 ```
 
 - **Screens traversed:**

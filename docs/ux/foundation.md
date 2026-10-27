@@ -225,6 +225,7 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 - **Acceptance criteria:**
   - Given a page writes a shell-like command to the clipboard without a genuine user copy action, when that happens, then a blocking warning appears stating that a real verification never asks you to leave the browser.
   - Given the warning is shown, when I dismiss it, then dismissal requires a deliberate action, not a stray click.
+  - Given a link whose address opens a Windows program or a shared folder on another computer, when I click it, then the click is stopped and a blocking warning says what would have opened (added 2026-10-27, SCN-049).
 - **Priority:** must
 - **Status:** proposed
 
