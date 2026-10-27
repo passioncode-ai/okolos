@@ -1,21 +1,36 @@
 #!/usr/bin/env node
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { BOOTSTRAP_FILES } from './feed/bootstrap.mjs'
 import { runBounded } from './feed/bounded.mjs'
+import { isEntry } from './feed/entry.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { readStatus } from './feed/status.mjs'
 import { discover, quote, runnerArgv, xml } from './feed-agent-credential.mjs'
+import { directoriesIn, filesIn } from './tree.mjs'
 
 /**
  * Installs the feed-refresh agent on this machine, or prints what it would do.
  *
  *   node tools/install-feed-agent.mjs                      # checkout, bootstrap, plist, load
  *   node tools/install-feed-agent.mjs --dry-run            # print the plist, touch nothing
- *   node tools/install-feed-agent.mjs --status             # plist, bootstrap, launchd's view, last run
+ *   node tools/install-feed-agent.mjs --allow-branch       # install from a branch other than main (recorded)
+ *   node tools/install-feed-agent.mjs --status             # plist, bootstrap (and drift), launchd's view, last run
  *   node tools/install-feed-agent.mjs --uninstall          # bootout, delete the plist and bootstrap, verify
  *   node tools/install-feed-agent.mjs --uninstall --purge  # and the checkout, state and logs
  *
@@ -39,7 +54,17 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 export const LABEL = 'app.okolos.feed'
 const source = path.join(root, 'tools/launchd', `${LABEL}.plist`)
 
-const PLACEHOLDERS = ['{{CHECKOUT}}', '{{RUNNER}}', '{{LOG_DIR}}', '{{BOOTSTRAP}}', '{{NODE}}', '{{SOURCE_REPO}}', '{{ORIGIN}}']
+const PLACEHOLDERS = [
+  '{{CHECKOUT}}',
+  '{{RUNNER}}',
+  '{{LOG_DIR}}',
+  '{{LOGS}}',
+  '{{STATE}}',
+  '{{BOOTSTRAP}}',
+  '{{NODE}}',
+  '{{SOURCE_REPO}}',
+  '{{ORIGIN}}',
+]
 const LAUNCHCTL_TIMEOUT_MS = 15_000
 
 /** launchctl, bounded. Returns `{ code, stdout, stderr }`. */
@@ -58,8 +83,9 @@ export function rendered({
   checkout,
   runner,
   logDir,
+  stateDir = feedPaths().state,
   bootstrap,
-  node = process.execPath,
+  node = stableNode(),
   sourceRepo = root,
   origin = '',
 }) {
@@ -69,6 +95,8 @@ export function rendered({
   // Words in the shell command are shell-quoted; values of environment variables are not.
   const out = template
     .replaceAll('{{BOOTSTRAP}}', xml(quote(bootstrap)))
+    .replaceAll('{{STATE}}', xml(quote(stateDir)))
+    .replaceAll('{{LOGS}}', xml(quote(logDir)))
     .replaceAll('{{NODE}}', xml(quote(node)))
     .replaceAll('{{CHECKOUT}}', xml(checkout))
     .replaceAll('{{SOURCE_REPO}}', xml(sourceRepo))
@@ -134,6 +162,74 @@ export function installBootstrap({ dir, from = path.join(root, 'tools/feed'), fi
   log(`bootstrap: ${path.join(dir, 'bootstrap.mjs')} (${files.length} files, outside the checkout)`)
 }
 
+/**
+ * The node the plist falls back to when the login shell finds none: the PATH entry
+ * that leads to the running node (`/opt/homebrew/bin/node`), not the running
+ * binary's own path. `process.execPath` is the realpath, a versioned folder such
+ * as `Cellar/node/26.10.0_2`, which the next `brew upgrade` deletes.
+ */
+export function stableNode({ execPath = process.execPath, pathEnv = process.env.PATH ?? '' } = {}) {
+  const real = (file) => {
+    try {
+      return realpathSync(file)
+    } catch {
+      return null
+    }
+  }
+  const running = real(execPath) ?? execPath
+  for (const dir of pathEnv.split(path.delimiter)) {
+    if (!dir || !path.isAbsolute(dir)) continue
+    const candidate = path.join(dir, 'node')
+    if (existsSync(candidate) && real(candidate) === running) return candidate
+  }
+  return execPath
+}
+
+/**
+ * Whether this clone may install the agent: on `main`, or detached at origin/main.
+ * ADR-0017: production publishes run only from origin/main, and the clone the
+ * installer runs in is what the bootstrap recreates the checkout from.
+ */
+export async function checkBranch({ repo = root, tool = runBounded }) {
+  const git = (args) => tool('git', ['-C', repo, ...args], { timeoutMs: 15_000 })
+  const branch = await git(['rev-parse', '--abbrev-ref', 'HEAD'])
+  if (branch.code !== 0) return { ok: false, branch: null, reason: `git cannot read ${repo}: ${(branch.stderr || '').trim()}` }
+  const name = branch.stdout.trim()
+  if (name === 'main') return { ok: true, branch: name }
+  if (name === 'HEAD') {
+    const head = (await git(['rev-parse', 'HEAD'])).stdout.trim()
+    const target = (await git(['rev-parse', 'origin/main'])).stdout.trim()
+    if (/^[0-9a-f]{40}$/.test(head) && head === target) return { ok: true, branch: 'HEAD at origin/main' }
+  }
+  return {
+    ok: false,
+    branch: name,
+    reason:
+      `${repo} is on ${name}, not main: the agent publishes production only from origin/main (ADR-0017), and ` +
+      `recreates its checkout from this clone. Install from the main clone, or pass --allow-branch to override.`,
+  }
+}
+
+function digest(file) {
+  try {
+    return createHash('sha256').update(readFileSync(file)).digest('hex')
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Whether the bootstrap copy in `bin` is the one in `from` (the agent checkout's
+ * tools/feed): `{ matches, differs }`, `matches` null when there is no checkout to
+ * compare with. The copy changes only at install, the checkout at every run.
+ */
+export function bootstrapDrift({ bin, from, files = BOOTSTRAP_FILES }) {
+  if (!existsSync(path.join(from, 'bootstrap.mjs'))) return { matches: null, differs: [] }
+  const names = new Set([...files, ...(existsSync(bin) ? filesIn(bin, '.mjs') : [])])
+  const differs = [...names].filter((name) => digest(path.join(bin, name)) !== digest(path.join(from, name))).sort()
+  return { matches: differs.length === 0, differs }
+}
+
 /** The clone's origin URL, which the bootstrap clones from when the clone itself is gone; '' when none. */
 export async function originUrl({ repo = root, tool = runBounded }) {
   const result = await tool('git', ['-C', repo, 'remote', 'get-url', 'origin'], { timeoutMs: 15_000 })
@@ -173,7 +269,23 @@ export async function uninstallAgent({ label = LABEL, domain, target, bin, launc
   // Not loaded is the outcome asked for, not a failure.
   await launchctl(['bootout', `${domain}/${label}`])
   rmSync(target, { force: true })
-  if (bin) rmSync(bin, { recursive: true, force: true })
+  if (bin) {
+    rmSync(bin, { recursive: true, force: true })
+    // A staging folder an interrupted install left, and ~/.okolos/bin when the
+    // agent was all it held. rmdir removes only an empty folder.
+    const parent = path.dirname(bin)
+    const staging = `${path.basename(bin)}.staging-`
+    if (existsSync(parent)) {
+      for (const name of directoriesIn(parent)) {
+        if (name.startsWith(staging)) rmSync(path.join(parent, name), { recursive: true, force: true })
+      }
+      try {
+        rmdirSync(parent)
+      } catch {
+        // Not empty: something else lives there.
+      }
+    }
+  }
 
   if (purge) {
     const { repo, paths, tool = runBounded } = purge
@@ -207,9 +319,22 @@ export async function agentStatus({ label = LABEL, domain, target, launchctl = r
   const loaded = printed.code === 0
   const runs = Number(field(printed.stdout, 'runs'))
   const lastExit = Number(field(printed.stdout, 'last exit code'))
+  const plistText = existsSync(target) ? readFileSync(target, 'utf8') : ''
+  const program = /<key>ProgramArguments<\/key>\s*<array>([\s\S]*?)<\/array>/.exec(plistText)?.[1] ?? ''
+  const plistStartsBootstrap = program.includes('bootstrap.mjs')
+  const drift = bootstrapDrift({ bin: paths.agentBin, from: path.join(paths.agentCheckout, 'tools', 'feed') })
+  const notes = []
+  if (plistText && !plistStartsBootstrap) notes.push('the old plist (cd into the checkout) is installed; run pnpm feed:agent from the main clone')
+  if (drift.matches === false) {
+    notes.push(`the installed bootstrap differs from the checkout's (${drift.differs.join(', ')}); run pnpm feed:agent from the main clone`)
+  }
   return {
     plist: existsSync(target),
+    plistStartsBootstrap,
     bootstrap: existsSync(paths.bootstrap),
+    bootstrapMatchesCheckout: drift.matches,
+    bootstrapDiffers: drift.differs,
+    ...(notes.length ? { note: notes.join('; ') } : {}),
     loaded,
     launchd: loaded
       ? {
@@ -231,9 +356,9 @@ async function main() {
 
   if (process.platform !== 'darwin') {
     console.error(
-      'launchd is a macOS thing. On Linux the same schedule is a systemd timer or a\n' +
-        'crontab line running `node tools/feed-job.mjs --agent` every twelve hours, from a\n' +
-        'checkout at origin/main on a machine that holds the signing key.',
+      'The feed agent is macOS-only (ADR-0017): launchd starts its bootstrap, which keeps\n' +
+        'the checkout and the status record. Elsewhere, publish by hand from a clean clone at\n' +
+        'origin/main on a machine that holds the signing key: pnpm feed:refresh.',
     )
     process.exit(argv.includes('--uninstall') ? 0 : 1)
   }
@@ -257,10 +382,18 @@ async function main() {
     return
   }
 
+  const branch = await checkBranch({ repo: root })
+  if (!branch.ok) {
+    if (argv.includes('--dry-run')) console.log(`— would refuse: ${branch.reason}`)
+    else if (!argv.includes('--allow-branch')) throw new Error(branch.reason)
+    else console.log(`installing from ${branch.branch ?? 'an unreadable HEAD'} because --allow-branch was given (ADR-0017 expects main)`)
+  }
+
   const plist = rendered({
     checkout: paths.agentCheckout,
     runner: runnerArgv(discover()),
     logDir: paths.logs,
+    stateDir: paths.state,
     bootstrap: paths.bootstrap,
     sourceRepo: root,
     origin: await originUrl({ repo: root }),
@@ -287,7 +420,7 @@ async function main() {
   }
 }
 
-if (import.meta.filename === process.argv[1]) {
+if (isEntry(process.argv[1], import.meta.filename)) {
   main().catch((cause) => {
     console.error(`install-feed-agent: ${cause instanceof Error ? cause.message : String(cause)}`)
     process.exit(1)

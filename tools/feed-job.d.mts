@@ -11,6 +11,8 @@ export const EXIT: { ok: number; failed: number; lockHeld: number; watchdog: num
 
 type Runner = (command: string, args: string[], options: BoundedOptions) => Promise<BoundedResult>
 
+export function watchdogFrom(env: Record<string, string | undefined>): number
+
 export function sweepLeftovers(tmp?: string, now?: number): string[]
 
 export function runJob(options?: {

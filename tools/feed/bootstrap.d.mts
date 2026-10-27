@@ -8,7 +8,12 @@ type Tool = (command: string, args: string[], options: BoundedOptions) => Promis
 export const BOOTSTRAP_FILES: readonly string[]
 export const EXIT: { ok: number; failed: number; lockHeld: number; watchdog: number; signal: number }
 export const RECOVERY_DEADLINES: { git: number; worktree: number; clone: number; install: number }
-export const JOB_DEADLINE_MS: number
+export const RUN_DEADLINE_MS: number
+export const JOB_GRACE_MS: number
+export const JOB_TAIL_LINES: number
+
+/** The first line that reads as an error, else the last non-empty one. */
+export function reasonFrom(lines: readonly string[]): string
 
 export type CheckoutHealth =
   | { readonly state: 'ok' }
@@ -28,6 +33,22 @@ export function recoverCheckout(options: {
   env?: Record<string, string | undefined>
 }): Promise<{ how: string; commit: string }>
 
+export function signalRecord(
+  current: { stage: string; runId: string; startedAt: string; recovered: string | null },
+  signal: string,
+  at: string,
+): {
+  startedAt: string
+  at: string
+  outcome: 'failed'
+  stage: string
+  exit: number
+  reason: string
+  runId: string
+  recoveredCheckout: boolean
+  recovery?: string
+}
+
 export function runAgent(options?: {
   paths?: FeedPaths
   env?: Record<string, string | undefined>
@@ -37,7 +58,9 @@ export function runAgent(options?: {
   now?: () => number
   log?: (line: string) => void
   runId?: string
-  jobDeadlineMs?: number
+  runDeadlineMs?: number
   onStage?: (stage: string) => void
+  onRecovered?: (what: string) => void
+  relay?: (line: string) => void
   [key: string]: unknown
 }): Promise<{ exit: number; record: StatusRecord | null }>

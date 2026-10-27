@@ -30,13 +30,27 @@
     feed while the failure count read 0 (B-149). The installer copies
     tools/feed/bootstrap.mjs and the modules it imports to ~/.okolos/bin/feed-agent;
     it recreates a missing or broken checkout at origin/main, runs the job from it,
-    and writes the status record on every path, that one included.
+    and writes the status record for every failure that reaches it: stage
+    checkout (no checkout, or its repair outlived the run's 45-minute deadline),
+    stage job (the job died without its own record), the job's own stages.
+
+    The shell line around it covers what fails before any of that: node not found,
+    the installed copy gone, or node exiting non-zero (not 75, a run refused by the
+    lock) without a record carrying this launch's id (OKOLOS_LAUNCH_ID). It writes
+    feed-status.json itself with /bin/sh and coreutils only (outcome failed, stage
+    launch, exit, reason, time; consecutiveFailures counted on, lastPublished kept;
+    a temp file, then mv), and one line to feed.log and to this file's log below.
+    Not recorded anywhere: launchd not starting this at all, or /bin/sh failing;
+    the installer's status flag and `launchctl print` show those. No alarm reads the record yet
+    (B-135, blocked on OBS-32).
 
     Production publishes still run only from origin/main: the job fast-forwards the
     checkout itself (tools/feed-job.mjs, F2). Through a login shell because `node`
     and `pnpm` arrive from a version manager on most machines and launchd's own
     environment has almost nothing in it; measured 2026-10-03 at 0.02 s. When that
-    shell finds no `node`, the one that ran the installer is used.
+    shell finds no `node`, the one that ran the installer is used, by the PATH entry
+    it was found under (/opt/homebrew/bin/node), not its versioned realpath that the
+    next upgrade deletes.
 
     Agent mode is if-stale plus follow: a run whose served feed is younger than
     its interval records "skipped" and ends, so a login is not a publish.
@@ -45,7 +59,24 @@
   <array>
     <string>/bin/sh</string>
     <string>-lc</string>
-    <string>command -v node &gt;/dev/null 2&gt;&amp;1 &amp;&amp; exec node {{BOOTSTRAP}}; exec {{NODE}} {{BOOTSTRAP}}</string>
+    <string>st={{STATE}}; lg={{LOGS}}; b={{BOOTSTRAP}}; s="$st/feed-status.json"
+id="launch-$$-$(date +%s)"
+if command -v node &gt;/dev/null 2&gt;&amp;1; then n=node; else n={{NODE}}; fi
+if [ ! -f "$b" ]; then c=1; why="the installed bootstrap $b is missing; reinstall with pnpm feed:agent"
+elif [ "$n" != node ] &amp;&amp; [ ! -x "$n" ]; then c=127; why="no node: none on the login PATH, and $n is gone"
+else OKOLOS_LAUNCH_ID="$id" "$n" "$b"; c=$?; why="node exited $c before the bootstrap wrote a record"; fi
+if [ "$c" -ne 0 ] &amp;&amp; [ "$c" -ne 75 ] &amp;&amp; ! grep -q "\"runId\": \"$id\"" "$s" 2&gt;/dev/null; then
+  at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  p=$(sed -n 's/^  "consecutiveFailures": \([0-9][0-9]*\),$/\1/p' "$s" 2&gt;/dev/null | head -n 1)
+  l=$(sed -n '/^  "lastPublished"/,$p' "$s" 2&gt;/dev/null | sed '$d')
+  [ -n "$l" ] || l='  "lastPublished": null'
+  r=$(printf '%s' "$why" | sed 's/\\/\\\\/g; s/"/\\"/g')
+  mkdir -p "$st" "$lg"; t="$s.$$.tmp"
+  printf '{\n  "startedAt": "%s",\n  "at": "%s",\n  "outcome": "failed",\n  "stage": "launch",\n  "exit": %s,\n  "reason": "%s",\n  "runId": "%s",\n  "recoveredCheckout": false,\n  "consecutiveFailures": %s,\n%s\n}\n' "$at" "$at" "$c" "$r" "$id" "$((${p:-0} + 1))" "$l" &gt; "$t" &amp;&amp; chmod 600 "$t" &amp;&amp; mv -f "$t" "$s"
+  printf '%s failed in launch: %s\n' "$at" "$why" &gt;&gt; "$lg/feed.log"; chmod 600 "$lg/feed.log"
+  echo "feed-agent: failed in launch: $why" &gt;&amp;2
+fi
+exit "$c"</string>
   </array>
 
   <!--
@@ -77,8 +108,9 @@
     ADR-0010. launchd runs a missed StartInterval as soon as it can after a wake,
     which is the behaviour this wants: a laptop that was closed overnight
     refreshes on opening rather than waiting for the next slot. A run is bounded
-    by the job's own watchdog (thirty minutes), so launchd never skips a slot
-    behind a hung one.
+    by one deadline, 45 minutes from the bootstrap's start with the checkout repair
+    included (the job's own thirty-minute watchdog sits inside it), so launchd
+    never skips a slot behind a hung one.
   -->
   <key>StartInterval</key>
   <integer>43200</integer>
@@ -94,8 +126,11 @@
   <!--
     Not `KeepAlive`: this is a task that finishes, and keeping it alive would
     restart it in a loop. The job writes its own rotated, owner-only log and a
-    status record next to its state; launchd's streams catch only what happens
-    before the job's log is open, and the job caps that file too.
+    status record next to its state. launchd's streams catch the launch line's
+    one line when node or the bootstrap cannot start, one summary line per failed
+    run, and the job's own stderr, which the bootstrap passes through as it
+    arrives (a crash's error and stack; feed.log gets them too). The bootstrap and
+    the job cap that file at start.
   -->
   <key>StandardOutPath</key>
   <string>{{LOG_DIR}}/feed.launchd.log</string>

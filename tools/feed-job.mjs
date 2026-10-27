@@ -41,6 +41,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 import { killAllGroups, runBounded } from './feed/bounded.mjs'
+import { isEntry } from './feed/entry.mjs'
 import { acquireLock, LockHeldError } from './feed/lock.mjs'
 import { capFile, cleanLine, openLog } from './feed/log.mjs'
 import { feedPaths } from './feed/paths.mjs'
@@ -56,6 +57,16 @@ export const INTERVAL_MS = 12 * 60 * 60 * 1000
 export const STALE_AFTER_MS = INTERVAL_MS - 60 * 60 * 1000
 /** The whole run, every retry included. Far under the interval, so launchd never skips a slot. */
 export const WATCHDOG_MS = 30 * 60 * 1000
+
+/**
+ * The watchdog for this run: WATCHDOG_MS, or less when the bootstrap says less is
+ * left of the run's one deadline (OKOLOS_WATCHDOG_MS; it repaired the checkout
+ * first). Never more, and an unreadable value is ignored.
+ */
+export function watchdogFrom(env) {
+  const asked = Number(env.OKOLOS_WATCHDOG_MS)
+  return Number.isFinite(asked) && asked > 0 ? Math.min(WATCHDOG_MS, asked) : WATCHDOG_MS
+}
 
 export const DEADLINES = {
   git: 90_000,
@@ -412,6 +423,7 @@ async function main() {
   process.on('SIGTERM', () => onSignal('SIGTERM', current))
   process.on('SIGINT', () => onSignal('SIGINT', current))
   const record = await runJob({
+    watchdogMs: watchdogFrom(process.env),
     flags: {
       ifStale: agent || argv.includes('--if-stale'),
       follow: agent || argv.includes('--follow'),
@@ -424,7 +436,7 @@ async function main() {
   process.exit(record.exit)
 }
 
-if (import.meta.filename === process.argv[1]) {
+if (isEntry(process.argv[1], import.meta.filename)) {
   main().catch((cause) => {
     console.error(`feed-job: ${cause instanceof Error ? cause.stack : String(cause)}`)
     process.exit(EXIT.failed)

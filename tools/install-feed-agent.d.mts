@@ -13,12 +13,19 @@ export function rendered(options: {
   checkout: string
   runner: string[] | null
   logDir: string
+  stateDir?: string
   bootstrap: string
   node?: string
   sourceRepo?: string
   origin?: string
 }): string
 export function installBootstrap(options: { dir: string; from?: string; files?: readonly string[]; log?: (line: string) => void }): void
+export function stableNode(options?: { execPath?: string; pathEnv?: string }): string
+export function checkBranch(options: { repo?: string; tool?: Tool }): Promise<{ ok: boolean; branch: string | null; reason?: string }>
+export function bootstrapDrift(options: { bin: string; from: string; files?: readonly string[] }): {
+  matches: boolean | null
+  differs: string[]
+}
 export function originUrl(options: { repo?: string; tool?: Tool }): Promise<string>
 export function isDisabled(printDisabled: string, label?: string): boolean
 export function ensureCheckout(options: { repo?: string; checkout: string; tool?: Tool; log?: (line: string) => void }): Promise<void>
@@ -47,7 +54,11 @@ export function agentStatus(options: {
   paths?: FeedPaths
 }): Promise<{
   plist: boolean
+  plistStartsBootstrap: boolean
   bootstrap: boolean
+  bootstrapMatchesCheckout: boolean | null
+  bootstrapDiffers: string[]
+  note?: string
   loaded: boolean
   launchd: { state: string | null; runs: number | null; lastExit: number | null } | null
   lastRun: StatusRecord | null

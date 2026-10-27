@@ -27,22 +27,27 @@
  *      writing its own. Each counts towards `consecutiveFailures`.
  *
  * It holds the run lock only while it repairs the checkout and releases it before
- * the job starts, because the job takes the same lock. The job keeps its own
- * deadlines, watchdog and "skipped when the served feed is under 11 h old" rule;
- * this file adds a backstop deadline over the whole job and nothing else.
+ * the job starts, because the job takes the same lock. One deadline covers the
+ * whole run, repair included (RUN_DEADLINE_MS, 45 minutes from the start): a
+ * repair still going at the deadline is stopped and recorded; the job gets what
+ * is left, as its watchdog (at most its own thirty minutes, JOB_GRACE_MS before
+ * the deadline) and as a backstop at the deadline itself. The job keeps its own
+ * per-stage deadlines and the "skipped when the served feed is under 11 h old"
+ * rule.
  */
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, realpathSync, renameSync, rmSync } from 'node:fs'
 import path from 'node:path'
 
 import { killAllGroups, runBounded } from './bounded.mjs'
+import { isEntry } from './entry.mjs'
 import { acquireLock, LockHeldError } from './lock.mjs'
 import { capFile, cleanLine, openLog } from './log.mjs'
 import { feedPaths } from './paths.mjs'
 import { readStatus, writeStatus } from './status.mjs'
 
 /** What the installer copies beside launchd: this file and every module it imports. */
-export const BOOTSTRAP_FILES = ['bootstrap.mjs', 'bounded.mjs', 'lock.mjs', 'log.mjs', 'paths.mjs', 'status.mjs']
+export const BOOTSTRAP_FILES = ['bootstrap.mjs', 'bounded.mjs', 'entry.mjs', 'lock.mjs', 'log.mjs', 'paths.mjs', 'status.mjs']
 
 /** The same codes as tools/feed-job.mjs (a test holds them equal), so a host reads one table. */
 export const EXIT = { ok: 0, failed: 1, lockHeld: 75, watchdog: 124, signal: 143 }
@@ -50,8 +55,37 @@ export const EXIT = { ok: 0, failed: 1, lockHeld: 75, watchdog: 124, signal: 143
 /** Per child, as the job and the installer bound the same commands. */
 export const RECOVERY_DEADLINES = { git: 90_000, worktree: 120_000, clone: 5 * 60_000, install: 10 * 60_000 }
 
-/** The job's own watchdog is thirty minutes; this only catches a job that ignores it. */
-export const JOB_DEADLINE_MS = 35 * 60_000
+/**
+ * The whole run, checkout repair and job together. The repair's own per-step
+ * deadlines add up to at most 21 minutes (the clone path: 90 s + 5 min + 90 s +
+ * 10 min + 90 s, after a 90 s health check); in the ordinary run there is no
+ * repair and the job keeps its full thirty-minute watchdog.
+ */
+export const RUN_DEADLINE_MS = 45 * 60_000
+
+/** Room between the job's watchdog and the run's deadline, for the job to record its own failure. */
+export const JOB_GRACE_MS = 2 * 60_000
+
+/** The job's own watchdog (tools/feed-job.mjs WATCHDOG_MS; a test holds them equal). */
+const JOB_WATCHDOG_MS = 30 * 60_000
+
+/** How many of the job's last output lines are kept to name a failure. */
+export const JOB_TAIL_LINES = 50
+
+// A line that starts with an error's name ("TypeError: …", "Error [ERR_…]: …") or
+// says "error:". Not any line containing "Error": Node prints the throwing source
+// line above the error, and that line usually names the error class too.
+const ERROR_LINE = /^(?:Uncaught\s+)?[\w.]*(?:Error|Exception)\b|\berror:/
+
+/**
+ * The line that says why: the first one in `lines` that reads as an error, else
+ * the last non-empty one. A Node crash ends with "Node.js v<version>", which
+ * names nothing; the TypeError above it does.
+ */
+export function reasonFrom(lines) {
+  const kept = lines.map((line) => cleanLine(line).trim()).filter((line) => line !== '')
+  return kept.find((line) => ERROR_LINE.test(line)) ?? kept.at(-1) ?? ''
+}
 
 const SECRET_VARIABLES = ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY']
 
@@ -68,9 +102,16 @@ function describe(result) {
   return `exited ${result.code ?? result.signal}${said ? ` — ${said}` : ''}`
 }
 
+/**
+ * The canonical spelling. On Windows `.native` expands 8.3 short names
+ * (RUNNER~1), which git never prints; elsewhere the ordinary realpath, as node
+ * itself resolves paths.
+ */
+const realpath = process.platform === 'win32' ? realpathSync.native : realpathSync
+
 function real(file) {
   try {
-    return realpathSync(file)
+    return realpath(file)
   } catch {
     return path.resolve(file)
   }
@@ -165,12 +206,18 @@ export async function runAgent({
   node = process.execPath,
   now = Date.now,
   log,
-  runId = randomUUID(),
-  jobDeadlineMs = JOB_DEADLINE_MS,
+  // The launch line in the plist passes its own id, so it can tell whether this
+  // run wrote a record (B-159, fix round 2).
+  runId = env.OKOLOS_LAUNCH_ID || randomUUID(),
+  runDeadlineMs = RUN_DEADLINE_MS,
   onStage = () => {},
+  onRecovered = () => {},
+  // The bootstrap's stderr is launchd's StandardErrorPath (feed.launchd.log).
+  relay = (line) => process.stderr.write(`${line}\n`),
 } = {}) {
   const iso = () => new Date(now()).toISOString()
   const startedAt = iso()
+  const deadlineAt = now() + runDeadlineMs
   const checkout = paths.agentCheckout
 
   let write = log
@@ -209,9 +256,18 @@ export async function runAgent({
     return { exit: EXIT.failed, record: fail('checkout', EXIT.failed, `could not take the run lock: ${cause.message}`) }
   }
 
-  try {
-    const health = await checkoutHealth({ checkout, tool, env })
-    if (health.state !== 'ok') {
+  // Past the deadline the repair starts no further child: its current one is killed.
+  let aborted = false
+  const guarded = (command, args, options) =>
+    aborted
+      ? Promise.resolve({ code: null, signal: null, stdout: '', stderr: '', timedOut: true })
+      : tool(command, args, options)
+
+  /** The repair; resolves `{ ok: true }` or `{ error }`, never rejects. */
+  async function repair() {
+    try {
+      const health = await checkoutHealth({ checkout, tool: guarded, env })
+      if (health.state === 'ok') return { ok: true }
       const what = health.state === 'missing' ? 'is missing' : `is broken (${health.reason})`
       write(`checkout: ${checkout} ${what}; recreating it at origin/main`)
       if (health.state === 'broken') {
@@ -222,30 +278,71 @@ export async function runAgent({
       }
       let done
       try {
-        done = await recoverCheckout({ checkout, sourceRepo: env.OKOLOS_SOURCE_REPO, origin: env.OKOLOS_ORIGIN_URL, tool, env })
+        done = await recoverCheckout({ checkout, sourceRepo: env.OKOLOS_SOURCE_REPO, origin: env.OKOLOS_ORIGIN_URL, tool: guarded, env })
       } catch (cause) {
-        throw new Error(`the checkout ${what} and could not be recreated: ${cause.message}`)
+        return { error: `the checkout ${what} and could not be recreated: ${cause.message}` }
       }
+      if (aborted) return { error: 'the run deadline passed' }
       recovered = health.state === 'missing' ? 'missing' : `broken: ${health.reason}`
+      onRecovered(recovered)
       write(`checkout: recreated ${checkout} as ${done.how} at ${done.commit.slice(0, 7)} (recoveredCheckout: true)`)
+      return { ok: true }
+    } catch (cause) {
+      return { error: cause instanceof Error ? cause.message : String(cause) }
     }
-  } catch (cause) {
-    recovered = null
-    return { exit: EXIT.failed, record: fail('checkout', EXIT.failed, cause instanceof Error ? cause.message : String(cause)) }
+  }
+
+  let timer
+  try {
+    const outcome = await Promise.race([
+      repair(),
+      new Promise((resolve) => {
+        timer = setTimeout(() => resolve({ deadline: true }), Math.max(0, deadlineAt - now()))
+      }),
+    ])
+    if (outcome.deadline) {
+      aborted = true
+      await killAllGroups(5000)
+      recovered = null
+      const seconds = Math.round(runDeadlineMs / 1000)
+      return {
+        exit: EXIT.watchdog,
+        record: fail('checkout', EXIT.watchdog, `the run's deadline (${seconds} s) passed while repairing the checkout; its children were killed`),
+      }
+    }
+    if (outcome.error) {
+      recovered = null
+      return { exit: EXIT.failed, record: fail('checkout', EXIT.failed, outcome.error) }
+    }
   } finally {
+    clearTimeout(timer)
     lock.release()
   }
 
   write('── job')
   onStage('job')
   const spawnedAt = iso()
-  const jobEnv = { ...env, OKOLOS_RUN_ID: runId }
+  // What is left of the run: the job's watchdog fires JOB_GRACE_MS before the
+  // deadline, so the job records its own failure; the backstop is the deadline.
+  const left = Math.max(1, deadlineAt - now())
+  const watchdog = Math.max(1, Math.min(JOB_WATCHDOG_MS, left - JOB_GRACE_MS))
+  const jobEnv = { ...env, OKOLOS_RUN_ID: runId, OKOLOS_WATCHDOG_MS: String(watchdog) }
   if (recovered) jobEnv.OKOLOS_RECOVERED_CHECKOUT = recovered
   else delete jobEnv.OKOLOS_RECOVERED_CHECKOUT
+  // What the job prints (a crash's error and stack, mostly: its own lines go to
+  // feed.log directly) is passed on to launchd's log and feed.log as it arrives,
+  // and the last JOB_TAIL_LINES are kept to name the failure.
+  const tail = []
   const result = await run(node, [path.join(checkout, 'tools', 'feed-job.mjs'), '--agent'], {
     cwd: checkout,
     env: jobEnv,
-    timeoutMs: jobDeadlineMs,
+    timeoutMs: left,
+    onLine: (_stream, line) => {
+      relay(line)
+      write(`   ${line}`)
+      tail.push(line)
+      if (tail.length > JOB_TAIL_LINES) tail.shift()
+    },
   })
 
   const after = readStatus(paths.status)
@@ -260,11 +357,28 @@ export async function runAgent({
   if (result.timedOut) {
     return {
       exit: EXIT.watchdog,
-      record: fail('job', EXIT.watchdog, `the job passed ${Math.round(jobDeadlineMs / 1000)} s and its process group was killed`),
+      record: fail('job', EXIT.watchdog, `the run's deadline (${Math.round(runDeadlineMs / 1000)} s) passed during the job; its process group was killed`),
     }
   }
   const exit = result.code && result.code !== 0 ? result.code : EXIT.failed
-  return { exit, record: fail('job', exit, `the job ${describe(result)} without writing its record`) }
+  const said = reasonFrom(tail)
+  const how = said ? `exited ${result.code ?? result.signal} — ${said}` : describe(result)
+  return { exit, record: fail('job', exit, `the job ${how} without writing its record`) }
+}
+
+/** The record of a run stopped by `signal`; a checkout recovered before the stop stays recorded. */
+export function signalRecord(current, signal, at) {
+  return {
+    startedAt: current.startedAt,
+    at,
+    outcome: 'failed',
+    stage: current.stage,
+    exit: EXIT.signal,
+    reason: `stopped by ${signal}`,
+    runId: current.runId,
+    recoveredCheckout: Boolean(current.recovered),
+    ...(current.recovered ? { recovery: current.recovered } : {}),
+  }
 }
 
 /** On SIGTERM/SIGINT: stop the job's group, and record the stop unless the job already did. */
@@ -274,16 +388,7 @@ function onSignal(signal, current) {
     try {
       const paths = feedPaths()
       if (readStatus(paths.status)?.runId !== current.runId) {
-        writeStatus(paths.status, {
-          startedAt: current.startedAt,
-          at: new Date().toISOString(),
-          outcome: 'failed',
-          stage: current.stage,
-          exit: EXIT.signal,
-          reason: `stopped by ${signal}`,
-          runId: current.runId,
-          recoveredCheckout: false,
-        })
+        writeStatus(paths.status, signalRecord(current, signal, new Date().toISOString()))
       }
     } finally {
       process.exit(EXIT.signal)
@@ -292,13 +397,21 @@ function onSignal(signal, current) {
 }
 
 async function main() {
-  const current = { stage: 'start', runId: randomUUID(), startedAt: new Date().toISOString() }
+  const current = {
+    stage: 'start',
+    runId: process.env.OKOLOS_LAUNCH_ID || randomUUID(),
+    startedAt: new Date().toISOString(),
+    recovered: null,
+  }
   process.on('SIGTERM', () => onSignal('SIGTERM', current))
   process.on('SIGINT', () => onSignal('SIGINT', current))
   const { exit, record } = await runAgent({
     runId: current.runId,
     onStage: (stage) => {
       current.stage = stage
+    },
+    onRecovered: (what) => {
+      current.recovered = what
     },
   })
   // One line in launchd's own log too, where the silent failure used to be.
@@ -308,15 +421,7 @@ async function main() {
   process.exit(exit)
 }
 
-function isMain() {
-  try {
-    return Boolean(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(import.meta.filename)
-  } catch {
-    return false
-  }
-}
-
-if (isMain()) {
+if (isEntry(process.argv[1], import.meta.filename)) {
   main().catch((cause) => {
     console.error(`feed-agent: ${cause instanceof Error ? cause.stack : String(cause)}`)
     // Best effort: a crash here (an unwritable log folder, say) still counts.
@@ -328,6 +433,7 @@ if (isMain()) {
         stage: 'bootstrap',
         exit: EXIT.failed,
         reason: cleanLine(cause instanceof Error ? cause.message : String(cause)),
+        ...(process.env.OKOLOS_LAUNCH_ID ? { runId: process.env.OKOLOS_LAUNCH_ID } : {}),
         recoveredCheckout: false,
       })
     } catch {
