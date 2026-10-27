@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import process from 'node:process'
 
 import { fromCatalogue, t, useResolver, type Catalogue } from '@okolos/i18n'
 
+import { isEntry } from './entry.js'
 import { EXIT, scan } from './scan.js'
 
 /**
@@ -73,7 +74,7 @@ export interface ScriptResult {
 }
 
 /* c8 ignore start -- the entry point; `main` is what the tests drive. */
-if (process.argv[1] !== undefined && import.meta.url.endsWith(process.argv[1].split('/').pop() ?? '')) {
+if (isEntry(import.meta.url, process.argv[1], { platform: process.platform, realpath: realpathSync, cwd: process.cwd })) {
   const result = main(process.argv.slice(2), process.env)
   process.stdout.write(`${result.text}\n`)
   process.exitCode = result.code
