@@ -97,7 +97,7 @@ const shop = tree({
 })
 
 describe('a snapshot keyed to a task', () => {
-  const first = buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A })
+  const first = buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set() })
 
   it('keeps a map from each reference it gave out to the node behind it', () => {
     expect(first.lines.length).toBeGreaterThan(0)
@@ -112,47 +112,47 @@ describe('a snapshot keyed to a task', () => {
 
   it('takes a subtree by a reference from that map', () => {
     const pay = first.lines.find((l) => l.name === 'Pay')
-    const s = buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A, rootRef: pay?.ref ?? '', refMap: first.refMap })
+    const s = buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set(), rootRef: pay?.ref ?? '', refMap: first.refMap })
     expect(s.lines.map((l) => l.name)).toEqual(['Pay'])
   })
 
   it('finds no node by a reference of another task', () => {
-    const other = buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_B })
+    const other = buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_B, secretFields: new Set() })
     const pay = other.lines.find((l) => l.name === 'Pay')?.ref ?? ''
     // Another task's ref, against this task's map and key.
-    expect(buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A, rootRef: pay, refMap: first.refMap }).lines).toEqual([])
+    expect(buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set(), rootRef: pay, refMap: first.refMap }).lines).toEqual([])
     // Even handed the other task's map: the ref is checked against this task's key.
-    expect(buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A, rootRef: pay, refMap: other.refMap }).lines).toEqual([])
+    expect(buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set(), rootRef: pay, refMap: other.refMap }).lines).toEqual([])
   })
 
   it('finds no node by a guessed node number, or with no map to resolve it', () => {
-    expect(buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A, rootRef: 'e7', refMap: first.refMap }).lines).toEqual([])
+    expect(buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set(), rootRef: 'e7', refMap: first.refMap }).lines).toEqual([])
     const pay = first.lines.find((l) => l.name === 'Pay')?.ref ?? ''
-    expect(buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A, rootRef: pay }).lines).toEqual([])
+    expect(buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set(), rootRef: pay }).lines).toEqual([])
   })
 })
 
 describe('a subtree taken by reference (review F2)', () => {
   it('is empty under a hidden ancestor, even by a reference handed out before it was hidden', () => {
-    const before = buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A })
+    const before = buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set() })
     const ref = before.lines.find((l) => l.name.startsWith('Send the card'))?.ref ?? ''
     expect(ref).not.toBe('')
-    const after = buildSnapshot(shop, { hidden: new Set([3]), taskKey: KEY_A, rootRef: ref, refMap: before.refMap })
+    const after = buildSnapshot(shop, { hidden: new Set([3]), taskKey: KEY_A, secretFields: new Set(), rootRef: ref, refMap: before.refMap })
     expect(after.lines).toEqual([])
     const stale = new Map([[refOf(9, KEY_A), 9]])
-    expect(buildSnapshot(shop, { hidden: new Set([3]), taskKey: KEY_A, rootRef: refOf(9, KEY_A), refMap: stale }).lines).toEqual([])
+    expect(buildSnapshot(shop, { hidden: new Set([3]), taskKey: KEY_A, secretFields: new Set(), rootRef: refOf(9, KEY_A), refMap: stale }).lines).toEqual([])
   })
 
   it('under a field gives none of the field text', () => {
     // A stale map that names the text inside the field: the ref must still not open it.
     const refMap = new Map([[refOf(6, KEY_A), 6], [refOf(8, KEY_A), 8]])
     for (const ref of [refOf(6, KEY_A), refOf(8, KEY_A)]) {
-      const s = buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A, rootRef: ref, refMap })
+      const s = buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set(), rootRef: ref, refMap })
       expect(text(s)).not.toContain('4111')
     }
     for (const backend of [6, 8]) {
       const ref = refOf(backend, KEY_B)
-      expect(text(buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_B, rootRef: ref, refMap: new Map([[ref, backend]]) }))).not.toContain('4111')
+      expect(text(buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_B, secretFields: new Set(), rootRef: ref, refMap: new Map([[ref, backend]]) }))).not.toContain('4111')
     }
   })
 })
@@ -211,7 +211,7 @@ describe('a secret field', () => {
         { id: '3', role: 'heading', name: 'The abc club' },
       ],
     })
-    expect(text(buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A }))).toContain('The abc club')
+    expect(text(buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set() }))).toContain('The abc club')
   })
 })
 
@@ -225,7 +225,7 @@ describe('a field value in the name of another node (review R4)', () => {
         ] },
       ],
     })
-    const out = text(buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A }))
+    const out = text(buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set() }))
     expect(out).not.toContain('4111')
     expect(out).toContain('Pay with')
   })
@@ -238,7 +238,7 @@ describe('a field value in the name of another node (review R4)', () => {
         { id: '4', role: 'heading', name: 'Enter 845-201 to continue' },
       ],
     })
-    const out = text(buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A }))
+    const out = text(buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set() }))
     expect(out).not.toContain('845')
     expect(out).toContain('Confirm')
   })
@@ -252,7 +252,7 @@ describe('a field value in the name of another node (review R4)', () => {
         { id: '4', role: 'link', name: 'Share Recovery phrase: maple orbit seven' },
       ],
     })
-    const out = text(buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A }))
+    const out = text(buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set() }))
     expect(out).not.toContain('maple')
     expect(out).toContain('Share')
   })
@@ -266,7 +266,7 @@ describe('matching a value (review S4)', () => {
         { id: '3', role: 'StaticText', name: 'Charged to 4111-1111-1111-1111 today' },
       ],
     })
-    const out = text(buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A }))
+    const out = text(buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set() }))
     expect(out).not.toContain('4111')
     expect(out).toContain('Charged to')
     expect(out).toContain('today')
@@ -279,7 +279,7 @@ describe('matching a value (review S4)', () => {
         { id: '3', role: 'heading', name: 'About the lab' },
       ],
     })
-    const out = text(buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A }))
+    const out = text(buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set() }))
     expect(out).toContain('About the lab')
   })
 })
@@ -329,8 +329,8 @@ describe('fuzz: nothing typed into a field comes out', () => {
           ],
         })
         for (const s of [
-          buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A }),
-          buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_B }),
+          buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set() }),
+          buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_B, secretFields: new Set() }),
         ]) {
           const out = text(s)
           expect(out).not.toContain(value)

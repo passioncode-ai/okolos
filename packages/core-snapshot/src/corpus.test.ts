@@ -22,6 +22,8 @@ const positiveCases = positives.cases as Case[]
 const negativeCases = negatives.cases as Case[]
 
 const KEY = new Uint8Array(32).fill(7)
+/** A snapshot whose cleaning finished: the verdict reads the snapshot as well as the probe. */
+const COMPLETE = { incomplete: false } as const
 const ctx = { now: '2026-10-27T00:00:00.000Z', newId: () => 'v' }
 /** The backend id the probe's locator resolves to, and the node carrying the text under it. */
 const ELEMENT = 10
@@ -72,12 +74,12 @@ describe('every positive of the corpus, hidden in the tree, is absent from what 
       const hidden = hiddenBy(verdicts, c.candidate)
       expect(hidden.has(ELEMENT), 'the detector named the element').toBe(true)
 
-      const snapshot = buildSnapshot(articleWith(c.candidate), { hidden, taskKey: KEY })
+      const snapshot = buildSnapshot(articleWith(c.candidate), { hidden, taskKey: KEY, secretFields: new Set() })
       const out = snapshot.lines.map(renderLine).join('\n')
       expect(out).not.toContain(collapsed(c.candidate.text).slice(0, 24))
       expect(snapshot.lines.map((l) => l.name)).toEqual(['Visible article'])
       expect(snapshot.hiddenRemoved).toBe(2)
-      expect(snapshotVerdict({ verdicts, truncated: false, unresolved: 0 })).toMatchObject({ level: 'finding' })
+      expect(snapshotVerdict({ verdicts, truncated: false, unresolved: 0 }, COMPLETE)).toMatchObject({ level: 'finding' })
     })
   }
 })
@@ -86,13 +88,13 @@ describe('no negative of the corpus is cut', () => {
   for (const c of negativeCases) {
     it(c.name, () => {
       const verdicts = detectHidden(pageOf(c.candidate), ctx)
-      const snapshot = buildSnapshot(articleWith(c.candidate), { hidden: hiddenBy(verdicts, c.candidate), taskKey: KEY })
+      const snapshot = buildSnapshot(articleWith(c.candidate), { hidden: hiddenBy(verdicts, c.candidate), taskKey: KEY, secretFields: new Set() })
       expect(snapshot.hiddenRemoved).toBe(0)
       // A one-character text (a decorative glyph) is dropped as text without words, not cut.
       const shown = collapsed(c.candidate.text)
       const present = snapshot.lines.map((l) => l.name).some((n) => n.startsWith(shown.slice(0, 60)))
       expect(present || shown.length < 2).toBe(true)
-      expect(snapshotVerdict({ verdicts, truncated: false, unresolved: 0 })).toEqual({ level: 'clean', findings: [] })
+      expect(snapshotVerdict({ verdicts, truncated: false, unresolved: 0 }, COMPLETE)).toEqual({ level: 'clean', findings: [] })
     })
   }
 })
@@ -128,7 +130,7 @@ describe('a finding built from the detectors’ real output', () => {
   })
 
   function expectFilled(verdicts: readonly Verdict[], c: Case, stage: string): void {
-    const result = snapshotVerdict({ verdicts, truncated: false, unresolved: 0 })
+    const result = snapshotVerdict({ verdicts, truncated: false, unresolved: 0 }, COMPLETE)
     if (!('level' in result)) throw new Error('refused')
     expect(result.findings.length).toBe(verdicts.length)
     const concealment = c.candidate.concealment.filter((t) => Object.hasOwn(CONCEALMENT, t))

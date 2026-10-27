@@ -1,6 +1,8 @@
 import { toSnapshotFinding } from '@okolos/contracts'
 import type { SnapshotVerdict, Verdict } from '@okolos/contracts'
 
+import type { Snapshot } from './snapshot.js'
+
 /**
  * What the probe (`apps/extension/src/agent-probe.ts`) reports about one page,
  * reduced to the parts the verdict reads.
@@ -29,11 +31,16 @@ export interface CleaningIncomplete {
  * plain zero (`NaN`, a negative, a fraction) is treated as incomplete too: the
  * only number that proves nothing was lost is 0.
  *
+ * The snapshot is read too, and is required: a snapshot whose cleaner stopped at
+ * its budget (`incomplete`) is refused the same way, and a call without one is
+ * refused rather than trusted (certification round 1, seam).
+ *
  * Each finding is built by `toSnapshotFinding` alone, so the snippet, the
  * locator and the free-form detail of a verdict never leave the daemon.
  */
-export function snapshotVerdict(probe: SnapshotProbe): SnapshotVerdict | CleaningIncomplete {
+export function snapshotVerdict(probe: SnapshotProbe, snapshot: Pick<Snapshot, 'incomplete'>): SnapshotVerdict | CleaningIncomplete {
   if (probe.truncated !== false || probe.unresolved !== 0) return { refused: 'cleaning_incomplete' }
+  if ((snapshot as Partial<Snapshot> | undefined)?.incomplete !== false) return { refused: 'cleaning_incomplete' }
   const findings = probe.verdicts.map(toSnapshotFinding)
   return { level: findings.length === 0 ? 'clean' : 'finding', findings }
 }

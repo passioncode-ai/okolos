@@ -5,6 +5,9 @@ import type { Verdict } from '@okolos/contracts'
 // is only reachable through a relative path is not part of the package's API.
 import { snapshotVerdict } from '@okolos/core-snapshot'
 
+/** A snapshot whose cleaning finished: the verdict reads the snapshot as well as the probe. */
+const COMPLETE = { incomplete: false } as const
+
 function verdict(id: string, detail: Verdict['evidence'][number]['detail']): Verdict {
   return {
     id,
@@ -36,11 +39,11 @@ const finding = verdict('v1', {
 
 describe('the verdict sent with a snapshot', () => {
   it('is clean when the probe finished and found nothing', () => {
-    expect(snapshotVerdict({ verdicts: [], truncated: false, unresolved: 0 })).toEqual({ level: 'clean', findings: [] })
+    expect(snapshotVerdict({ verdicts: [], truncated: false, unresolved: 0 }, COMPLETE)).toEqual({ level: 'clean', findings: [] })
   })
 
   it('names each finding by how it was hidden, never by what it said or where it was', () => {
-    const result = snapshotVerdict({ verdicts: [finding], truncated: false, unresolved: 0 })
+    const result = snapshotVerdict({ verdicts: [finding], truncated: false, unresolved: 0 }, COMPLETE)
     expect(result).toEqual({
       level: 'finding',
       findings: [
@@ -63,19 +66,19 @@ describe('the verdict sent with a snapshot', () => {
    * is the failure this answer exists to prevent.
    */
   it('refuses, with no text and no level, when the probe hit its budget', () => {
-    const result = snapshotVerdict({ verdicts: [], truncated: true, unresolved: 0 })
+    const result = snapshotVerdict({ verdicts: [], truncated: true, unresolved: 0 }, COMPLETE)
     expect(result).toEqual({ refused: 'cleaning_incomplete' })
     expect(result).not.toHaveProperty('level')
     expect(result).not.toHaveProperty('text')
   })
 
   it('refuses when an element the probe meant to cut could not be found', () => {
-    expect(snapshotVerdict({ verdicts: [finding], truncated: false, unresolved: 1 })).toEqual({ refused: 'cleaning_incomplete' })
+    expect(snapshotVerdict({ verdicts: [finding], truncated: false, unresolved: 1 }, COMPLETE)).toEqual({ refused: 'cleaning_incomplete' })
   })
 
   it('refuses when the count of unresolved elements is not a count at all', () => {
     for (const unresolved of [Number.NaN, -1, 0.5, Number.POSITIVE_INFINITY]) {
-      expect(snapshotVerdict({ verdicts: [], truncated: false, unresolved })).toEqual({ refused: 'cleaning_incomplete' })
+      expect(snapshotVerdict({ verdicts: [], truncated: false, unresolved }, COMPLETE)).toEqual({ refused: 'cleaning_incomplete' })
     }
   })
 })

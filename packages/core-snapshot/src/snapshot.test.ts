@@ -34,20 +34,20 @@ const page = tree(['1', 'RootWebArea', 'Shop', 1, [
 
 describe('a snapshot', () => {
   it('keeps what an agent acts on, with references it can name back', () => {
-    const { lines } = buildSnapshot(page, { hidden: NONE, taskKey: KEY })
+    const { lines } = buildSnapshot(page, { hidden: NONE, taskKey: KEY, secretFields: NONE })
     expect(lines.map((l) => `${l.ref} ${l.role}`)).toEqual([
       `${refOf(2, KEY)} heading`, `${refOf(4, KEY)} text`, `${refOf(5, KEY)} textbox`, `${refOf(7, KEY)} button`,
     ])
   })
 
   it('cuts a node the detector judged hidden, with everything under it', () => {
-    const s = buildSnapshot(page, { hidden: new Set([3]), taskKey: KEY })
+    const s = buildSnapshot(page, { hidden: new Set([3]), taskKey: KEY, secretFields: NONE })
     expect(s.lines.some((l) => l.name.includes('Ignore previous'))).toBe(false)
     expect(s.hiddenRemoved).toBe(2)
   })
 
   it('never gives up what was typed into a field, whatever the field is called', () => {
-    const s = buildSnapshot(page, { hidden: NONE, taskKey: KEY })
+    const s = buildSnapshot(page, { hidden: NONE, taskKey: KEY, secretFields: NONE })
     expect(s.lines.map(renderLine).join('\n')).not.toContain('4111')
     expect(s.fieldTextDropped).toBe(1)
     expect(s.lines.find((l) => l.ref === refOf(5, KEY))).toMatchObject({ role: 'textbox', name: 'Card number' })
@@ -59,19 +59,19 @@ describe('a snapshot', () => {
       { nodeId: 'a', parentId: 'r', ignored: true, role: { value: 'button' }, name: { value: 'Ghost' }, backendDOMNodeId: 2 },
       { nodeId: 'b', parentId: 'r', role: { value: 'StaticText' }, name: { value: ' ' }, backendDOMNodeId: 3 },
     ]
-    expect(buildSnapshot(nodes, { hidden: NONE, taskKey: KEY }).lines).toEqual([])
+    expect(buildSnapshot(nodes, { hidden: NONE, taskKey: KEY, secretFields: NONE }).lines).toEqual([])
   })
 
   it('can be taken of one subtree by its reference', () => {
-    const { refMap } = buildSnapshot(page, { hidden: NONE, taskKey: KEY })
-    const s = buildSnapshot(page, { hidden: NONE, taskKey: KEY, rootRef: refOf(5, KEY), refMap })
+    const { refMap } = buildSnapshot(page, { hidden: NONE, taskKey: KEY, secretFields: NONE })
+    const s = buildSnapshot(page, { hidden: NONE, taskKey: KEY, secretFields: NONE, rootRef: refOf(5, KEY), refMap })
     expect(s.lines.map((l) => l.ref)).toEqual([refOf(5, KEY)])
-    expect(buildSnapshot(page, { hidden: NONE, taskKey: KEY, rootRef: refOf(999, KEY), refMap }).lines).toEqual([])
+    expect(buildSnapshot(page, { hidden: NONE, taskKey: KEY, secretFields: NONE, rootRef: refOf(999, KEY), refMap }).lines).toEqual([])
   })
 
   it('finds nothing by a guessed `e<node>` reference', () => {
-    const { refMap } = buildSnapshot(page, { hidden: NONE, taskKey: KEY })
-    expect(buildSnapshot(page, { hidden: NONE, taskKey: KEY, rootRef: 'e5', refMap }).lines).toEqual([])
+    const { refMap } = buildSnapshot(page, { hidden: NONE, taskKey: KEY, secretFields: NONE })
+    expect(buildSnapshot(page, { hidden: NONE, taskKey: KEY, secretFields: NONE, rootRef: 'e5', refMap }).lines).toEqual([])
   })
 })
 
@@ -88,16 +88,16 @@ describe('the task key', () => {
   })
 
   it('is at least 16 bytes, like refOf', () => {
-    expect(() => buildSnapshot(page, { hidden: NONE, taskKey: new Uint8Array(15) })).toThrow(RangeError)
-    expect(() => buildSnapshot(page, { hidden: NONE, taskKey: new Uint8Array(0) })).toThrow(RangeError)
-    const call = buildSnapshot as (nodes: readonly AxNode[], options: { hidden: ReadonlySet<number>; taskKey: unknown }) => unknown
-    expect(() => call(page, { hidden: NONE, taskKey: 'a sixteen+ byte string' })).toThrow(RangeError)
-    expect(buildSnapshot(page, { hidden: NONE, taskKey: new Uint8Array(16) }).lines.length).toBeGreaterThan(0)
+    expect(() => buildSnapshot(page, { hidden: NONE, taskKey: new Uint8Array(15), secretFields: NONE })).toThrow(RangeError)
+    expect(() => buildSnapshot(page, { hidden: NONE, taskKey: new Uint8Array(0), secretFields: NONE })).toThrow(RangeError)
+    const call = buildSnapshot as (nodes: readonly AxNode[], options: { hidden: ReadonlySet<number>; taskKey: unknown; secretFields: ReadonlySet<number> }) => unknown
+    expect(() => call(page, { hidden: NONE, taskKey: 'a sixteen+ byte string', secretFields: NONE })).toThrow(RangeError)
+    expect(buildSnapshot(page, { hidden: NONE, taskKey: new Uint8Array(16), secretFields: NONE }).lines.length).toBeGreaterThan(0)
   })
 
   it('leaves no ref of the `e<node>` form in any output', () => {
-    const whole = buildSnapshot(page, { hidden: NONE, taskKey: KEY })
-    const sub = buildSnapshot(page, { hidden: NONE, taskKey: KEY, rootRef: refOf(5, KEY), refMap: whole.refMap })
+    const whole = buildSnapshot(page, { hidden: NONE, taskKey: KEY, secretFields: NONE })
+    const sub = buildSnapshot(page, { hidden: NONE, taskKey: KEY, secretFields: NONE, rootRef: refOf(5, KEY), refMap: whole.refMap })
     for (const s of [whole, sub]) {
       expect(s.lines.length).toBeGreaterThan(0)
       for (const line of s.lines) expect(line.ref).not.toMatch(/^e\d+$/)
@@ -110,7 +110,7 @@ describe('the task key', () => {
       { nodeId: 'a', role: { value: 'button' }, name: { value: 'A' }, backendDOMNodeId: 1, childIds: ['b'] },
       { nodeId: 'b', parentId: 'a', role: { value: 'button' }, name: { value: 'B' }, backendDOMNodeId: 2, childIds: ['a'] },
     ]
-    expect(buildSnapshot(nodes, { hidden: NONE, taskKey: KEY }).lines.map((l) => l.name)).toEqual(['A', 'B'])
+    expect(buildSnapshot(nodes, { hidden: NONE, taskKey: KEY, secretFields: NONE }).lines.map((l) => l.name)).toEqual(['A', 'B'])
   })
 
   it('survives a tree deeper than any recursion limit', () => {
@@ -125,7 +125,7 @@ describe('the task key', () => {
       })
     }
     nodes.push({ nodeId: '20000', parentId: '19999', role: { value: 'button' }, name: { value: 'Deep' }, backendDOMNodeId: 20000 })
-    expect(buildSnapshot(nodes, { hidden: NONE, taskKey: KEY }).lines.map((l) => l.name)).toEqual(['Deep'])
+    expect(buildSnapshot(nodes, { hidden: NONE, taskKey: KEY, secretFields: NONE }).lines.map((l) => l.name)).toEqual(['Deep'])
   })
 })
 
