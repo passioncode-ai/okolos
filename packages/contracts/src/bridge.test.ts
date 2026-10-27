@@ -7,15 +7,32 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { CarrierKind, ConcealmentTechnique } from './snapshot.js'
 import type { Confidence, EvidenceKind, Stage, Verdict, VerdictCategory } from './verdict.js'
 import type {
+  AnyBridgeVerb,
   BridgeSessionVerb,
+  BridgeVerb,
   CensusEntry,
+  CensusInput,
+  CensusResult,
+  CloseInput,
+  CloseResult,
+  GetInput,
+  GetResult,
+  OpenInput,
   OpenResult,
+  ReadInput,
   ReadResult,
+  SessionOpenInput,
   SessionOpenResult,
   SnapshotEvidence,
   SnapshotFinding,
+  SnapshotInput,
   SnapshotResult,
   SnapshotVerdict,
+  TaskCall,
+  TaskScope,
+  VerbIO,
+  WaitForInput,
+  WaitForResult,
 } from './index.js'
 import * as contracts from './index.js'
 
@@ -456,6 +473,68 @@ describe('the answers', () => {
       readonly keep: boolean
       readonly reason: string
     }>()
+  })
+
+  it('carry the inputs of spec §2.2, each naming its task by the id session.open returned', () => {
+    expectTypeOf<SessionOpenInput>().toEqualTypeOf<TaskScope>()
+    expectTypeOf<TaskCall>().toEqualTypeOf<{ readonly sessionId: string }>()
+    // open goes to a URL or follows a ref on the page, never both at once.
+    expectTypeOf<{ sessionId: string; url: string }>().toMatchTypeOf<OpenInput>()
+    expectTypeOf<{ sessionId: string; ref: string }>().toMatchTypeOf<OpenInput>()
+    expectTypeOf<{ sessionId: string; url: string; ref: string }>().not.toMatchTypeOf<OpenInput>()
+    expectTypeOf<{ sessionId: string }>().not.toMatchTypeOf<OpenInput>()
+    expectTypeOf<SnapshotInput>().toEqualTypeOf<{
+      readonly sessionId: string
+      readonly ref?: string
+      readonly cursor?: string
+      readonly maxBytes?: number
+    }>()
+    expectTypeOf<ReadInput>().toEqualTypeOf<{
+      readonly sessionId: string
+      readonly ref?: string
+      readonly maxBytes?: number
+    }>()
+    expectTypeOf<GetInput>().toEqualTypeOf<{
+      readonly sessionId: string
+      readonly what: 'url' | 'title' | 'text' | 'count'
+      readonly ref?: string
+    }>()
+    // One condition per wait: a wait for text and a URL at once has no single meaning.
+    expectTypeOf<{ sessionId: string; ms: number }>().toMatchTypeOf<WaitForInput>()
+    expectTypeOf<{ sessionId: string; text: string }>().toMatchTypeOf<WaitForInput>()
+    expectTypeOf<{ sessionId: string; url: string }>().toMatchTypeOf<WaitForInput>()
+    expectTypeOf<{ sessionId: string; text: string; url: string }>().not.toMatchTypeOf<WaitForInput>()
+    expectTypeOf<CloseInput>().toEqualTypeOf<TaskCall>()
+    // The census lives outside any task and takes nothing.
+    expectTypeOf<CensusInput>().toEqualTypeOf<Record<string, never>>()
+  })
+
+  it('carry the answers of get, waitFor, close and the census', () => {
+    // count is the one answer that is a number; the rest are cleaned strings.
+    expectTypeOf<GetResult>().toEqualTypeOf<
+      | { readonly what: 'url' | 'title' | 'text'; readonly value: string }
+      | { readonly what: 'count'; readonly value: number }
+    >()
+    // A wait that ran out is an answer, not a refusal: the page simply did not change.
+    expectTypeOf<WaitForResult>().toEqualTypeOf<{ readonly met: boolean }>()
+    expectTypeOf<CloseResult>().toEqualTypeOf<{ readonly closed: true }>()
+    expectTypeOf<CensusResult>().toEqualTypeOf<readonly CensusEntry[]>()
+  })
+
+  it('pair each verb with its input and its answer, one entry per verb and no more', () => {
+    // VerbIO is a mapped type over the verb lists: a verb added to either list
+    // without its entry fails to compile, so the daemon's schemas and the e2e
+    // client cannot describe a verb the contract does not (seam N-001, r3).
+    expectTypeOf<AnyBridgeVerb>().toEqualTypeOf<BridgeVerb | BridgeSessionVerb>()
+    expectTypeOf<keyof VerbIO>().toEqualTypeOf<AnyBridgeVerb>()
+    expectTypeOf<VerbIO['session.open']>().toEqualTypeOf<{ readonly input: SessionOpenInput; readonly output: SessionOpenResult }>()
+    expectTypeOf<VerbIO['open']>().toEqualTypeOf<{ readonly input: OpenInput; readonly output: OpenResult }>()
+    expectTypeOf<VerbIO['snapshot']>().toEqualTypeOf<{ readonly input: SnapshotInput; readonly output: SnapshotResult }>()
+    expectTypeOf<VerbIO['read']>().toEqualTypeOf<{ readonly input: ReadInput; readonly output: ReadResult }>()
+    expectTypeOf<VerbIO['get']>().toEqualTypeOf<{ readonly input: GetInput; readonly output: GetResult }>()
+    expectTypeOf<VerbIO['waitFor']>().toEqualTypeOf<{ readonly input: WaitForInput; readonly output: WaitForResult }>()
+    expectTypeOf<VerbIO['close']>().toEqualTypeOf<{ readonly input: CloseInput; readonly output: CloseResult }>()
+    expectTypeOf<VerbIO['hygiene.census']>().toEqualTypeOf<{ readonly input: CensusInput; readonly output: CensusResult }>()
   })
 })
 

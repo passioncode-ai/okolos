@@ -36,6 +36,13 @@ export const BRIDGE_SESSION_VERBS = ['session.open', 'hygiene.census'] as const
 export type BridgeSessionVerb = (typeof BRIDGE_SESSION_VERBS)[number]
 
 /**
+ * Every call the bridge answers, in its canonical spelling (`session.open`, with
+ * the dot). This is what the journal stores and the page shows; the MCP tool
+ * name is derived from it, never the other way round.
+ */
+export type AnyBridgeVerb = BridgeVerb | BridgeSessionVerb
+
+/**
  * The MCP tool name of a verb. Dots become underscores: the Anthropic API takes
  * only `[a-zA-Z0-9_-]` in a tool name, and a client that refuses `session.open`
  * refuses it before the agent ever reaches the bridge. The test holds that no
@@ -315,6 +322,100 @@ export interface TaskScope {
   readonly stepBudget: number
   readonly profile: TaskProfile
 }
+
+/*
+ * What each verb takes (spec §2.2). The daemon's tool schemas and the e2e client
+ * both describe these shapes; typing them here is what makes the two agree.
+ */
+
+/** A task is born from its scope; `validateScope` turns what the agent sent into this. */
+export type SessionOpenInput = TaskScope
+
+/**
+ * Every verb inside a task names it by the `sessionId` that `session.open`
+ * returned. The spec's table lists only what each verb adds to that: the door
+ * builds a fresh transport per request, so nothing else carries the task.
+ */
+export interface TaskCall {
+  readonly sessionId: string
+}
+
+/** A URL from `origins.read`, or a ref on the current page; never both, so the daemon has one target to check. */
+export type OpenInput =
+  | { readonly sessionId: string; readonly url: string; readonly ref?: never }
+  | { readonly sessionId: string; readonly ref: string; readonly url?: never }
+
+/** `maxBytes` is clamped by the daemon to 1024…32768, not refused. */
+export interface SnapshotInput extends TaskCall {
+  readonly ref?: string
+  readonly cursor?: string
+  readonly maxBytes?: number
+}
+
+export interface ReadInput extends TaskCall {
+  readonly ref?: string
+  readonly maxBytes?: number
+}
+
+export interface GetInput extends TaskCall {
+  readonly what: 'url' | 'title' | 'text' | 'count'
+  readonly ref?: string
+}
+
+/**
+ * The value `get` asked for. `text` and `title` come from the cleaned snapshot,
+ * `url` is without its fragment; `count` is the one answer that is a number.
+ */
+export type GetResult =
+  | { readonly what: 'url' | 'title' | 'text'; readonly value: string }
+  | { readonly what: 'count'; readonly value: number }
+
+/** One condition per wait: text and a URL at once would have no single meaning. `text` is sought only in the cleaned snapshot. */
+export type WaitForInput =
+  | { readonly sessionId: string; readonly ms: number; readonly text?: never; readonly url?: never }
+  | { readonly sessionId: string; readonly text: string; readonly ms?: never; readonly url?: never }
+  | { readonly sessionId: string; readonly url: string; readonly ms?: never; readonly text?: never }
+
+/**
+ * Whether the condition held before the daemon's bound ran out. A wait that ran
+ * out is an answer, not a refusal: the page simply did not change, and asking
+ * again may see it change.
+ */
+export interface WaitForResult {
+  readonly met: boolean
+}
+
+export type CloseInput = TaskCall
+
+/** The task's window and processes are gone when this arrives. */
+export interface CloseResult {
+  readonly closed: true
+}
+
+/** The census reads the machine, not a task, and takes nothing. */
+export type CensusInput = Record<string, never>
+
+export type CensusResult = readonly CensusEntry[]
+
+interface VerbIOEntries {
+  readonly 'session.open': { readonly input: SessionOpenInput; readonly output: SessionOpenResult }
+  readonly open: { readonly input: OpenInput; readonly output: OpenResult }
+  readonly snapshot: { readonly input: SnapshotInput; readonly output: SnapshotResult }
+  readonly read: { readonly input: ReadInput; readonly output: ReadResult }
+  readonly get: { readonly input: GetInput; readonly output: GetResult }
+  readonly waitFor: { readonly input: WaitForInput; readonly output: WaitForResult }
+  readonly close: { readonly input: CloseInput; readonly output: CloseResult }
+  readonly 'hygiene.census': { readonly input: CensusInput; readonly output: CensusResult }
+}
+
+/**
+ * Each verb with what it takes and what it answers. Mapped over the verb lists
+ * rather than declared by hand: a verb added to `BRIDGE_VERBS` or
+ * `BRIDGE_SESSION_VERBS` without its line in `VerbIOEntries` cannot index it,
+ * and the build fails before a schema or a client describes a verb the contract
+ * does not.
+ */
+export type VerbIO = { readonly [V in AnyBridgeVerb]: VerbIOEntries[V] }
 
 export const SCOPE_LIMITS = {
   maxTtlSeconds: 3600,
