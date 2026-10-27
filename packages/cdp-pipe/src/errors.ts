@@ -9,13 +9,14 @@
  *   cdp     -> the browser answered with an error; `cdpCode` is its code
  *   exited  -> the browser process ended; no answer can come any more
  *   closed  -> the pipe ended or broke, or its owner closed it; no answer can come
+ *   launch  -> the browser could not be started (launch() only; method is 'launch')
  */
-export type CdpErrorKind = 'timeout' | 'cdp' | 'exited' | 'closed'
+export type CdpErrorKind = 'timeout' | 'cdp' | 'exited' | 'closed' | 'launch'
 
 export class CdpError extends Error {
   override readonly name = 'CdpError'
   readonly kind: CdpErrorKind
-  /** The CDP method of the request that failed. */
+  /** The CDP method of the request that failed; 'launch' for kind launch. */
   readonly method: string
   /** The code of the browser's error answer; set only when kind is cdp. */
   readonly cdpCode?: number

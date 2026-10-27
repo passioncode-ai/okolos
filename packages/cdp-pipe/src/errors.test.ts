@@ -13,6 +13,12 @@ describe('CdpError', () => {
     expect(error.message).toBe('Page.navigate: no answer within 300 ms')
   })
 
+  it('has a kind for a browser that could not be started', () => {
+    const error = new CdpError('launch', 'launch', 'cannot start /no/such/browser: spawn ENOENT')
+    expect(error.kind).toBe('launch')
+    expect(error.message).toBe('launch: cannot start /no/such/browser: spawn ENOENT')
+  })
+
   it('carries the CDP error code when the browser answered with an error', () => {
     const error = new CdpError('cdp', 'Target.attachToTarget', 'No target with given id found', -32000)
     expect(error.kind).toBe('cdp')

@@ -157,10 +157,14 @@ describe('launching a browser on a pipe', () => {
     expect(await pipe.send('Fake.echo', { still: 'reading' })).toEqual({ still: 'reading' })
   })
 
-  it('refuses a binary that does not exist', async () => {
-    await expect(
+  it('refuses a binary that does not exist with a CdpError of kind launch', async () => {
+    const error = await rejectionOf(
       CdpPipe.launch({ binary: path.join(tmpdir(), 'okolos-no-such-browser'), args: [], userDataDir: PROFILE }),
-    ).rejects.toThrow(/okolos-no-such-browser/)
+    )
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('launch')
+    expect(error.method).toBe('launch')
+    expect(error.message).toMatch(/okolos-no-such-browser/)
   })
 })
 

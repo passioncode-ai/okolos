@@ -210,7 +210,9 @@ export class CdpPipe implements CdpTransport {
       { stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'], detached: true },
     )
     return new Promise((resolve, reject) => {
-      child.once('error', (cause) => reject(new Error(`cannot start ${options.binary}: ${cause.message}`)))
+      child.once('error', (cause) =>
+        reject(new CdpError('launch', 'launch', `cannot start ${options.binary}: ${cause.message}`)),
+      )
       child.once('spawn', () => resolve(new CdpPipe(child, options)))
     })
   }
