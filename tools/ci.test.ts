@@ -337,6 +337,16 @@ describe('the pre-push hook exists and runs the gates', () => {
     }
     expect(pkg.scripts.prepare ?? '').toContain('core.hooksPath')
   })
+
+  it('wires it on Windows too, where pnpm runs scripts with cmd.exe', () => {
+    // `|| true` has no `true` to run in cmd.exe, so a checkout outside Git made
+    // `pnpm install` fail there; `|| exit 0` means the same in sh and in cmd (B-162).
+    const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>
+    }
+    expect(pkg.scripts.prepare ?? '').not.toMatch(/\|\|\s*true\b/)
+    expect(pkg.scripts.prepare ?? '').toMatch(/\|\| exit 0$/)
+  })
 })
 
 describe('the release archive is built by CI, not by hand', () => {

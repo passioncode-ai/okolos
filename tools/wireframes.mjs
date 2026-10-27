@@ -257,6 +257,8 @@ export function writeAll() {
   return Object.keys(SCREENS).length
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// The path, not a `file://` string built from it: on Windows argv[1] is `C:\…`, and
+// the string never equalled the URL, so `pnpm wireframes` wrote nothing (B-162).
+if (import.meta.filename === process.argv[1]) {
   console.log(`wrote ${writeAll()} wireframes`)
 }

@@ -30,7 +30,7 @@
     "public:style": "node tools/public-style.mjs",
     "graph:check": "node tools/graph-check.mjs",
     "suffix:gap": "node tools/suffix-gap.mjs",
-    "prepare": "git config core.hooksPath .githooks || true",
+    "prepare": "git config core.hooksPath .githooks || exit 0",
     "package": "node tools/package.mjs",
     "package:check": "node tools/package.mjs --check",
     "screenshots": "pnpm build && node tools/screenshots.mjs",
