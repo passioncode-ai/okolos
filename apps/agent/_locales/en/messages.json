@@ -403,7 +403,7 @@
     "message": "Okolos Agent is stopping. Open the page again once it has started."
   },
   "taskProfileAgent": {
-    "message": "Agent profile, which keeps sign-ins"
+    "message": "Agent profile: persistent and shared by agents with access; what sites keep between runs stays"
   },
   "taskProfileDisposable": {
     "message": "Temporary profile, which keeps no sign-ins"
@@ -486,6 +486,12 @@
     }
   },
   "pairingGrants": {
-    "message": "Access lets the agent open and read, in the agent window, the sites it names in its own tasks, and read this computer's process census, without command lines."
+    "message": "Access lets the agent open and read, in the agent window, the sites it names in its own tasks, in the agent profile shared by every agent with access, and read this computer's process census, without command lines."
+  },
+  "verb_unknown": {
+    "message": "an unknown call"
+  },
+  "refusal_bad_call": {
+    "message": "the call was malformed: an unknown tool, wrong arguments or a protocol error"
   }
 }

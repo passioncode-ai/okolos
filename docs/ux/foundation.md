@@ -415,7 +415,7 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 - **Status:** proposed
 
 ### ST-028: An agent reads my logged-in pages, cleaned, without disturbing me
-- **Story:** As P-01, I want an agent to read pages behind my logins in its own background window, with hidden instructions removed and the page's verdict attached, so that I can delegate reading without the page steering the agent or the agent stealing my focus. In Б1 the agent profile starts with no sign-ins and Б1 has no sign-in step, so the read is meant for pages that need none, though a sign-in I make by hand in an agent window is kept; pages behind my logins come with the sign-in step of SCN-047 in Б2.
+- **Story:** As P-01, I want an agent to read pages behind my logins in its own background window, with hidden instructions removed and the page's verdict attached, so that I can delegate reading without the page steering the agent or the agent stealing my focus. In Б1 the agent profile starts with no sign-ins and Б1 has no sign-in step, so the read is meant for pages that need none, though a sign-in I make by hand in an agent window stays as long as the site itself keeps it between browser runs; pages behind my logins come with the sign-in step of SCN-047 in Б2.
 - **Traces:** JTBD-10, JTBD-01, JRN-05/#2, JRN-05/#3, JRN-05/#4
 - **Acceptance criteria:**
   - Given a task with its sites named, when the agent asks for a site outside them, then it is refused with a reason it can act on.

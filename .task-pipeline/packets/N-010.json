@@ -37,6 +37,7 @@
   "AgentWindows зовёт close() только с константой graceMs (close(NaN) в cdp-pipe может зависнуть: риск вердикта N-022); хелперы Chrome (crashpad) после kill -9 не остаются сиротами",
   "тексты, которые читает человек, идут ключами каталога, которые заранее добавил N-014; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
   "временный профиль (profile disposable) создаётся в своём временном каталоге на задачу и удаляется при её закрытии; это обещает строка taskProfileDisposable (проверки N-013 круг 12)",
+  "профиль агента переживает перезапуск Chrome и демона: cookie с Expires остаются (тест с фикстурой, ставящей постоянную и сеансовую cookie), сеансовая уходит; так держится строка taskProfileAgent (проверка product N-013 круг 15)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/window && pnpm -s run typecheck && pnpm -s run i18n:sweep"
  ],
  "guards": [
