@@ -1,0 +1,521 @@
+{
+ "goal": "Агент, привязанный человеком, через локальную дверь Okolos Agent читает страницу в своём фоновом окне очищенной и частями, и каждый ответ есть в журнале",
+ "requirements": [
+  "REQ-53",
+  "REQ-54",
+  "REQ-55",
+  "REQ-56",
+  "REQ-57",
+  "REQ-58",
+  "REQ-59",
+  "REQ-60",
+  "REQ-61",
+  "REQ-62",
+  "REQ-63",
+  "REQ-64",
+  "REQ-65",
+  "REQ-66",
+  "REQ-67",
+  "REQ-68",
+  "REQ-69",
+  "REQ-70"
+ ],
+ "nodes": [
+  {
+   "id": "N-001",
+   "title": "K0 контракты: исчерпывающий switch по отказам, hygiene.census, ответы глаголов",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [],
+   "serves": "REQ-53",
+   "check": "pnpm -s exec vitest run packages/contracts && pnpm -s typecheck",
+   "touches": [
+    "packages/contracts/src/bridge.ts",
+    "packages/contracts/src/bridge.test.ts"
+   ],
+   "risk": "R2"
+  },
+  {
+   "id": "N-002",
+   "title": "K1 packages/cdp-pipe: кадры, запросы, плоские сессии, таймауты, группа процессов",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [],
+   "serves": "REQ-54",
+   "check": "pnpm -s exec vitest run packages/cdp-pipe tools/agent-window-spike.test.ts",
+   "touches": [
+    "packages/cdp-pipe/**",
+    "tools/agent-window-spike.mjs",
+    "tools/agent-window-spike.test.ts"
+   ],
+   "risk": "R2"
+  },
+  {
+   "id": "N-003",
+   "title": "K2 снимок: вердикт движка, корпус инъекций, fuzz секретов",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [
+    "N-001"
+   ],
+   "serves": "REQ-55",
+   "check": "pnpm -s exec vitest run packages/core-snapshot",
+   "touches": [
+    "packages/core-snapshot/src/verdict.ts",
+    "packages/core-snapshot/src/verdict.test.ts",
+    "packages/core-snapshot/src/corpus.test.ts"
+   ],
+   "risk": "R3"
+  },
+  {
+   "id": "N-004",
+   "title": "K2 выдача частями: 32 КБ, курсор, поддерево по ref",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [
+    "N-003"
+   ],
+   "serves": "REQ-56",
+   "check": "pnpm -s exec vitest run packages/core-snapshot",
+   "touches": [
+    "packages/core-snapshot/src/pages.ts",
+    "packages/core-snapshot/src/pages.test.ts"
+   ],
+   "risk": "R2"
+  },
+  {
+   "id": "N-005",
+   "title": "K3 оболочка службы fabric-service/0.1",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [],
+   "serves": "REQ-63",
+   "check": "pnpm -s exec vitest run apps/agent/src/service",
+   "touches": [
+    "apps/agent/package.json",
+    "apps/agent/src/fabric/**",
+    "apps/agent/src/service/**"
+   ],
+   "risk": "R2"
+  },
+  {
+   "id": "N-006",
+   "title": "K3 журнал до ответа",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [
+    "N-005"
+   ],
+   "serves": "REQ-60",
+   "check": "pnpm -s exec vitest run apps/agent/src/journal",
+   "touches": [
+    "apps/agent/src/journal/**"
+   ],
+   "risk": "R3"
+  },
+  {
+   "id": "N-007",
+   "title": "K3 привязка: коды, ключи, связка ключей, отзыв",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [
+    "N-005"
+   ],
+   "serves": "REQ-58",
+   "check": "pnpm -s exec vitest run apps/agent/src/pairing",
+   "touches": [
+    "apps/agent/src/pairing/**"
+   ],
+   "risk": "R3"
+  },
+  {
+   "id": "N-008",
+   "title": "K3 дверь /mcp: ключ, Host/Origin, not_paired, stdio-шим",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [
+    "N-001",
+    "N-006",
+    "N-007"
+   ],
+   "serves": "REQ-57",
+   "check": "pnpm -s exec vitest run apps/agent/src/door",
+   "touches": [
+    "apps/agent/src/door/**"
+   ],
+   "risk": "R3"
+  },
+  {
+   "id": "N-009",
+   "title": "K3 задачи: область, бюджет, TTL, отказы",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [
+    "N-001"
+   ],
+   "serves": "REQ-59",
+   "check": "pnpm -s exec vitest run apps/agent/src/tasks",
+   "touches": [
+    "apps/agent/src/tasks/**"
+   ],
+   "risk": "R2"
+  },
+  {
+   "id": "N-010",
+   "title": "K4 окно агента на Chrome stable",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [
+    "N-002"
+   ],
+   "serves": "REQ-61",
+   "check": "pnpm -s exec vitest run apps/agent/src/window",
+   "touches": [
+    "apps/agent/src/window/**"
+   ],
+   "risk": "R3"
+  },
+  {
+   "id": "N-011",
+   "title": "K3 глаголы и walking skeleton на настоящем Chrome",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [
+    "N-004",
+    "N-008",
+    "N-009",
+    "N-010"
+   ],
+   "serves": "REQ-55",
+   "check": "pnpm -s exec vitest run apps/agent/src/verbs",
+   "touches": [
+    "apps/agent/src/verbs/**",
+    "apps/agent/src/main.ts"
+   ],
+   "risk": "R3"
+  },
+  {
+   "id": "N-012",
+   "title": "K5 перепись процессов",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [
+    "N-001"
+   ],
+   "serves": "REQ-62",
+   "check": "pnpm -s exec vitest run apps/agent/src/hygiene",
+   "touches": [
+    "apps/agent/src/hygiene/**"
+   ],
+   "risk": "R2"
+  },
+  {
+   "id": "N-013",
+   "title": "UX: FLW-21/22 к экранам, SCR привязки и активности, вайрфреймы, сценарии",
+   "owner": "ux",
+   "status": "pending",
+   "blocked_by": [],
+   "serves": "REQ-64",
+   "check": "python3 docs/ux/lint.py",
+   "touches": [
+    "docs/ux/flows.md",
+    "docs/ux/screens.md",
+    "docs/ux/scenarios.md",
+    "docs/ux/wireframes/**"
+   ],
+   "risk": "R2",
+   "surface_class": "product"
+  },
+  {
+   "id": "N-014",
+   "title": "Термины моста и строки страницы",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [
+    "N-013"
+   ],
+   "serves": "REQ-66",
+   "check": "python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts",
+   "touches": [
+    "docs/brand/terminology.md",
+    "packages/i18n/**"
+   ],
+   "risk": "R1"
+  },
+  {
+   "id": "N-015",
+   "title": "Страница демона: привязки, задачи, отзыв",
+   "owner": "ui",
+   "status": "pending",
+   "blocked_by": [
+    "N-007",
+    "N-009",
+    "N-013",
+    "N-014"
+   ],
+   "serves": "REQ-65",
+   "check": "pnpm -s exec vitest run apps/agent/src/dashboard",
+   "touches": [
+    "apps/agent/src/dashboard/**",
+    "apps/agent/static/**"
+   ],
+   "risk": "R3",
+   "surface_class": "product"
+  },
+  {
+   "id": "N-016",
+   "title": "K6 установка: релиз, дескриптор, plist, doctor, раннбук",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [
+    "N-011",
+    "N-012",
+    "N-015"
+   ],
+   "serves": "REQ-63",
+   "check": "pnpm -s exec vitest run tools/install-agent.test.ts tools/runbook.test.ts",
+   "touches": [
+    "tools/install-agent.mjs",
+    "tools/install-agent.test.ts",
+    "package.json",
+    "docs/runbooks/**"
+   ],
+   "risk": "R2"
+  },
+  {
+   "id": "N-017",
+   "title": "e2e моста: skeleton, SCN-044, SCN-045 на Chrome stable",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [
+    "N-011",
+    "N-015"
+   ],
+   "serves": "REQ-58",
+   "check": "pnpm -s run test:e2e:bridge",
+   "touches": [
+    "e2e/bridge/**",
+    "playwright.bridge.config.ts"
+   ],
+   "risk": "R3"
+  },
+  {
+   "id": "N-018",
+   "title": "ADR моста и снимка частями, механизмы в ADR-0019",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [
+    "N-011"
+   ],
+   "serves": "REQ-67",
+   "check": "pnpm -s exec vitest run tools/adr.test.ts",
+   "touches": [
+    "docs/adr/**"
+   ],
+   "risk": "R1"
+  },
+  {
+   "id": "N-019",
+   "title": "Снять исключения моста в reachable",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [
+    "N-011"
+   ],
+   "serves": "REQ-68",
+   "check": "pnpm -s exec vitest run tools/reachable.test.ts",
+   "touches": [
+    "tools/reachable.test.ts"
+   ],
+   "risk": "R1"
+  },
+  {
+   "id": "N-020",
+   "title": "Документы: AGENTS.md, README, privacy, факты, бэклог",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [
+    "N-016",
+    "N-017"
+   ],
+   "serves": "REQ-69",
+   "check": "pnpm -s exec vitest run tools/docs.test.ts tools/runbook.test.ts",
+   "touches": [
+    "AGENTS.md",
+    "docs/README.md",
+    "docs/privacy.md",
+    "docs/brand/facts.md",
+    "docs/backlog.md",
+    "docs/superpowers/backlog.md"
+   ],
+   "risk": "R1"
+  },
+  {
+   "id": "N-021",
+   "title": "Регресс: всё, что работало, работает",
+   "owner": "verifier",
+   "status": "pending",
+   "blocked_by": [
+    "N-019",
+    "N-020"
+   ],
+   "serves": "REQ-70",
+   "check": "pnpm gates && pnpm test:e2e",
+   "touches": [],
+   "risk": "R2"
+  }
+ ],
+ "edges": [
+  {
+   "from": "N-001",
+   "to": "N-003",
+   "payload": "TaskScope и BridgeRefusal"
+  },
+  {
+   "from": "N-003",
+   "to": "N-004",
+   "payload": "Snapshot с вердиктом"
+  },
+  {
+   "from": "N-005",
+   "to": "N-006",
+   "payload": "каталоги данных службы"
+  },
+  {
+   "from": "N-005",
+   "to": "N-007",
+   "payload": "каталоги данных и токен хоста"
+  },
+  {
+   "from": "N-001",
+   "to": "N-008",
+   "payload": "глаголы и конверт"
+  },
+  {
+   "from": "N-006",
+   "to": "N-008",
+   "payload": "Journal.record до ответа"
+  },
+  {
+   "from": "N-007",
+   "to": "N-008",
+   "payload": "Pairing.verify и запрос привязки"
+  },
+  {
+   "from": "N-001",
+   "to": "N-009",
+   "payload": "validateScope и отказы"
+  },
+  {
+   "from": "N-002",
+   "to": "N-010",
+   "payload": "CdpPipe"
+  },
+  {
+   "from": "N-004",
+   "to": "N-011",
+   "payload": "pageOf с курсором"
+  },
+  {
+   "from": "N-008",
+   "to": "N-011",
+   "payload": "регистрация инструментов на запрос"
+  },
+  {
+   "from": "N-009",
+   "to": "N-011",
+   "payload": "Task.charge и проверки области"
+  },
+  {
+   "from": "N-010",
+   "to": "N-011",
+   "payload": "AgentWindow.open/close"
+  },
+  {
+   "from": "N-001",
+   "to": "N-012",
+   "payload": "тип ответа hygiene.census"
+  },
+  {
+   "from": "N-013",
+   "to": "N-014",
+   "payload": "список строк экранов"
+  },
+  {
+   "from": "N-007",
+   "to": "N-015",
+   "payload": "список привязок и отзыв"
+  },
+  {
+   "from": "N-009",
+   "to": "N-015",
+   "payload": "список активных задач"
+  },
+  {
+   "from": "N-013",
+   "to": "N-015",
+   "payload": "состояния экранов SCR"
+  },
+  {
+   "from": "N-014",
+   "to": "N-015",
+   "payload": "ключи строк i18n"
+  },
+  {
+   "from": "N-011",
+   "to": "N-016",
+   "payload": "точка входа main"
+  },
+  {
+   "from": "N-012",
+   "to": "N-016",
+   "payload": "инструмент переписи"
+  },
+  {
+   "from": "N-015",
+   "to": "N-016",
+   "payload": "статика страницы"
+  },
+  {
+   "from": "N-011",
+   "to": "N-017",
+   "payload": "рабочий демон"
+  },
+  {
+   "from": "N-015",
+   "to": "N-017",
+   "payload": "страница для подтверждения"
+  },
+  {
+   "from": "N-011",
+   "to": "N-018",
+   "payload": "механизмы для таблиц ADR"
+  },
+  {
+   "from": "N-011",
+   "to": "N-019",
+   "payload": "вызывающий код для core-snapshot и agent-probe"
+  },
+  {
+   "from": "N-016",
+   "to": "N-020",
+   "payload": "команды установки"
+  },
+  {
+   "from": "N-017",
+   "to": "N-020",
+   "payload": "команда e2e моста"
+  },
+  {
+   "from": "N-019",
+   "to": "N-021",
+   "payload": "чистый reachable"
+  },
+  {
+   "from": "N-020",
+   "to": "N-021",
+   "payload": "доки в синхроне"
+  }
+ ],
+ "revisions": []
+}
