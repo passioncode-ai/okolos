@@ -9,17 +9,28 @@
  * which kind of "no" it is and whether trying again could change it.
  */
 
-/** Verbs of the read-only bridge (Б1). Actions arrive in Б2 with their taxonomy. */
+/**
+ * Verbs of the read-only bridge (Б1), the ones a task names. Actions arrive in
+ * Б2 with their taxonomy, and so does `screenshot`: pixels bypass the cleaner and
+ * show the card numbers and codes a person typed, so it waits for field masking.
+ */
 export const BRIDGE_VERBS = [
   'open',
   'snapshot',
   'read',
   'get',
   'waitFor',
-  'screenshot',
   'close',
 ] as const
 export type BridgeVerb = (typeof BRIDGE_VERBS)[number]
+
+/**
+ * Calls that live outside any task: `session.open` is how a task comes to exist,
+ * and the census reads the machine, not a page. A scope cannot name them, so
+ * they are a separate list rather than members of `BRIDGE_VERBS`.
+ */
+export const BRIDGE_SESSION_VERBS = ['session.open', 'hygiene.census'] as const
+export type BridgeSessionVerb = (typeof BRIDGE_SESSION_VERBS)[number]
 
 /** Every way the bridge says no. Closed: an unlisted refusal is a bug. */
 export const BRIDGE_REFUSALS = [
@@ -231,6 +242,15 @@ function normaliseOrigins(value: unknown): { ok: true; list: string[] } | { ok: 
     if (!list.includes(origin)) list.push(origin)
   }
   return { ok: true, list }
+}
+
+/**
+ * Whether a task may call a verb. `close` always may: it only gives back the
+ * window and the processes the task holds, and refusing it would leave them
+ * running until the TTL to punish an agent that forgot to list it.
+ */
+export function verbAllowed(scope: TaskScope, verb: BridgeVerb): boolean {
+  return verb === 'close' || scope.verbs.includes(verb)
 }
 
 /** Whether a URL the task wants to open is inside what it named for reading. */

@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   BRIDGE_REFUSALS,
+  BRIDGE_SESSION_VERBS,
+  BRIDGE_VERBS,
   REFUSAL_RETRYABLE,
   SCOPE_LIMITS,
   inScope,
@@ -13,6 +15,7 @@ import {
   refusalKey,
   refuse,
   validateScope,
+  verbAllowed,
 } from './bridge.js'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -87,6 +90,34 @@ describe('what a task may open', () => {
   it('reads an origin the way the browser does', () => {
     expect(originOf('HTTPS://Example.COM:443/a')).toBe('https://example.com')
     expect(originOf('https://xn--pple-43d.com/')).toBe('https://xn--pple-43d.com')
+  })
+})
+
+describe('the verbs', () => {
+  const scope = (() => {
+    const r = validateScope(base)
+    if (!r.ok) throw new Error(r.reason)
+    return r.scope
+  })()
+
+  it('leave screenshot to Б2, so pixels cannot carry what the cleaner removed', () => {
+    expect(BRIDGE_VERBS).not.toContain('screenshot')
+    expect(validateScope({ ...base, verbs: ['open', 'screenshot'] })).toEqual({
+      ok: false,
+      reason: 'unknown verbs: screenshot',
+    })
+  })
+
+  it('name the two calls that live outside a task', () => {
+    expect(BRIDGE_SESSION_VERBS).toEqual(['session.open', 'hygiene.census'])
+  })
+
+  it('are the ones the task named, and close, which is never refused', () => {
+    expect(scope.verbs).not.toContain('close')
+    expect(verbAllowed(scope, 'open')).toBe(true)
+    expect(verbAllowed(scope, 'snapshot')).toBe(true)
+    expect(verbAllowed(scope, 'read')).toBe(false)
+    expect(verbAllowed(scope, 'close')).toBe(true)
   })
 })
 
