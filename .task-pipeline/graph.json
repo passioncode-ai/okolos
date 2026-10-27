@@ -16,7 +16,7 @@
       "id": "N-101",
       "title": "mail-cli: запуск на Windows (закрывает B-161)",
       "owner": "implementer",
-      "status": "pending",
+      "status": "done",
       "blocked_by": [],
       "serves": "B-161",
       "check": "pnpm -s exec vitest run apps/mail-cli && pnpm gates",
@@ -27,25 +27,48 @@
         "apps/mail-cli/**"
       ],
       "certification": {
-        "round": 2,
+        "round": 3,
         "tiers": {
-          "unit": "fail"
+          "unit": "pass"
         },
-        "at": "3bd3feec6a4f019bcf53ae83bf96db23131db8d4",
+        "at": "bfb73de1bbfd97ce2d5e14c7fcb2ef96aba1dd4f",
         "history": [
           {
             "unit": "fail"
           },
           {
             "unit": "fail"
+          },
+          {
+            "unit": "pass"
           }
         ],
         "kinds": [
           "blind",
+          "blind",
           "blind"
         ],
-        "tree": "524b154b66b74c4b37fbda028a71a18c261d439a"
-      }
+        "tree": "f7dc90b7a79b181362192966de28fe2a439b1ab7"
+      },
+      "proof": {
+        "head": "bfb73de1bbfd97ce2d5e14c7fcb2ef96aba1dd4f",
+        "tree": "f7dc90b7a79b181362192966de28fe2a439b1ab7",
+        "graph_revision": "0"
+      },
+      "evidence": [
+        "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-sw-01 -s exec vitest run apps/mail-cli (node v26.10.0, HEAD bfb73de) → 6 files, 43 tests passed, exit 0",
+        "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-sw-01 -s run typecheck → exit 0, no output",
+        "unit: matrix, OKOLOS_LOCALE=en, entries bin/okolos-mail.mjs, dist/index.js, src/index.ts × clean.eml/empty.eml: v22.23.1, v22.23.3, v24.19.0, v26.10.0 → 0/2 on every entry, stderr empty; v20.20.2 → bin and dist exit 2 with 'okolos-mail: Node.js ^22.18.0 || >=23.6.0 is needed ... this is Node.js 20.20.2', src/index.ts exit 1 (ERR_UNKNOWN_FILE_EXTENSION)",
+        "unit: node 26 --no-experimental-strip-types: dist/index.js → exit 2 'okolos-mail: this Node.js 26.10.0 has type stripping switched off'; src/index.ts → exit 1",
+        "unit: bash, reader gone (`| true`): clean → 0, empty → 2 on 22.23.1, 24.19.0, 26.10.0, stderr empty",
+        "unit: stdout opened read-only (1<file): exit 2 'okolos-mail: the command failed: EBADF: bad file descriptor, write' on 22.23.1, 24.19.0, 26.10.0; stdout and stderr both read-only → exit 2 on 20, 22, 24, 26",
+        "unit: stdout fd closed (>&-) → exit 0 (scanned; node reopens the fd); stderr fd closed with stripping off → exit 2",
+        "unit: planted via --import registerHooks load: scan throws Object.create(null) → exit 1 (bin and src/index.ts); command.ts throws Object.create(null) at load → exit 1; Error with throwing stack getter → okolos-mail: line then exit 1; throw undefined → exit 2 with okolos-mail: line",
+        "unit: planted unreachable cases for the record: setTimeout throw after scan returns → exit 1; process.exit() inside scan → exit 0",
+        "unit: grep -rnE 'process\\.exit|setTimeout|setImmediate|queueMicrotask|process\\.nextTick|throw ' over apps/mail-cli/src/{scan,render}.ts and packages/{core-mail,i18n,core-lookalike}/src (non-test) → no matches",
+        "unit: side effect to disclose: running `--version` on /Applications/Goose.app/Contents/Resources/bin/node (a wrapper script, not a node binary) made it download hermit and a Node into ~/.config/goose/mcp-hermit; not used for any result",
+        "proven at bfb73de1bbfd97ce2d5e14c7fcb2ef96aba1dd4f (tree f7dc90b7a79b181362192966de28fe2a439b1ab7)"
+      ]
     },
     {
       "id": "N-102",
@@ -103,14 +126,19 @@
         "AGENTS.md"
       ],
       "certification": {
-        "round": 1,
+        "round": 2,
         "tiers": {
           "unit": "pass",
           "seam": "fail",
           "product": "fail"
         },
-        "at": "75faabf706d3e28301ae82ef3ce87d6ddc7f2cb4",
+        "at": "821f948f175a5a7659099f9c6a63977c0c83a02f",
         "history": [
+          {
+            "unit": "pass",
+            "seam": "fail",
+            "product": "fail"
+          },
           {
             "unit": "pass",
             "seam": "fail",
@@ -118,9 +146,10 @@
           }
         ],
         "kinds": [
+          "blind",
           "blind"
         ],
-        "tree": "9305d2ed76c1138bed27a83f23a5f81aae0f6ed0"
+        "tree": "afc1bc94aaeda438b19a9a927cc44a91121ff4da"
       }
     },
     {
@@ -240,5 +269,12 @@
       "payload": "переносимые инструменты и CLI, которые CI на Windows запускает"
     }
   ],
-  "revisions": []
+  "revisions": [
+    {
+      "verb": "close",
+      "node": "N-101",
+      "why": "certified at all 1 tiers in round 3",
+      "precondition": "bfb73de1bbfd97ce2d5e14c7fcb2ef96aba1dd4f"
+    }
+  ]
 }
