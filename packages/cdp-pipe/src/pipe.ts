@@ -46,6 +46,7 @@ function reportCloseIncomplete(pid: number): void {
 
 function reportListenerError(error: unknown, event: string): void {
   const kind = error instanceof Error ? error.name : typeof error
+  // i18n-exempt: a diagnostic line on the daemon's stderr for whoever reads its log, never shown to a person in the product
   process.stderr.write(`cdp-pipe: a listener of ${event} threw (${kind})\n`)
 }
 
@@ -101,14 +102,17 @@ export class CdpPipe {
     const fromBrowser = child.stdio[4] as Readable
     fromBrowser.setEncoding('utf8')
     fromBrowser.on('data', (chunk: string) => this.read(chunk))
+    // i18n-exempt: why a request failed, for the owner's code; the daemon answers its agents with a refusal code of its own
     fromBrowser.on('end', () => this.fail('the pipe from the browser closed'))
     // A write after the browser is gone fails with EPIPE; unhandled, it would
     // take the owner's process down with it.
+    // i18n-exempt: why a request failed, for the owner's code; the daemon answers its agents with a refusal code of its own
     this.toBrowser.on('error', (cause) => this.fail(`the pipe to the browser broke (${cause.message})`))
     // Unread stderr would fill the pipe and stall the browser.
     ;(child.stdio[2] as Readable).resume()
     child.once('exit', () => {
       this.exited = true
+      // i18n-exempt: why a request failed, for the owner's code; the daemon answers its agents with a refusal code of its own
       this.fail('the browser exited')
     })
   }
@@ -137,6 +141,7 @@ export class CdpPipe {
       }
       const timer = setTimeout(() => {
         this.waiting.delete(id)
+        // i18n-exempt: why a request failed, for the owner's code; the daemon answers its agents with a refusal code of its own
         reject(new Error(`${method}: no answer within ${this.requestTimeoutMs} ms`))
       }, this.requestTimeoutMs)
       this.waiting.set(id, {
