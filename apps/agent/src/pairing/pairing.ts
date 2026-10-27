@@ -59,6 +59,12 @@ export class PairingStoreError extends Error {
 
 export type StoreRefusal = 'unreadable' | 'not_json' | 'not_a_store' | 'bad_record' | 'unwritable' | 'changed_on_disk'
 
+/**
+ * A store file larger than this is not opened (`not_a_store`, fix round 4): a pairing is about 200
+ * bytes, so this holds thousands, and a larger file is not one the daemon wrote.
+ */
+export const MAX_STORE_BYTES = 1024 * 1024
+
 /** A request lives this long from its creation, unless it is confirmed. */
 export const REQUEST_LIFETIME_MS = 5 * 60_000
 /** After the confirm, the key can be claimed for this long. */
@@ -539,9 +545,28 @@ function fingerprintOnDisk(file: string, expectedSize?: number): Fingerprint | n
   return bytes === null ? null : fingerprint(bytes)
 }
 
+/**
+ * Reads and checks the store. Refused, with the file left as it is: a file that cannot be read
+ * (`unreadable`); one over MAX_STORE_BYTES, told by its size before it is read (`not_a_store`); one
+ * that is not JSON (`not_json`) or not a pairing store (`not_a_store`); and (`bad_record`) a record of
+ * the wrong shape, one agent id twice (a revoke would be ambiguous), one key hash twice (one key
+ * would open two agents), or a name `checkAgentName` refuses. That last one also covers names stored
+ * under the rules of an earlier round of N-007 that the allowlist of round 4 refuses: this is
+ * pre-release code, no store has been installed anywhere, so there is no migration (fix round 4).
+ */
 function readStore(file: string): { agents: StoredAgent[]; onDisk: Fingerprint | null } {
+  let size: number
+  try {
+    size = statSync(file).size
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { agents: [], onDisk: null }
+    throw new PairingStoreError(file, 'unreadable', { cause: error })
+  }
+  if (size > MAX_STORE_BYTES) throw new PairingStoreError(file, 'not_a_store')
   const bytes = readBytes(file)
   if (bytes === null) return { agents: [], onDisk: null }
+  // The file may have grown between the size check and the read.
+  if (bytes.length > MAX_STORE_BYTES) throw new PairingStoreError(file, 'not_a_store')
   const text = bytes.toString('utf8')
   let value: unknown
   try {
@@ -556,6 +581,8 @@ function readStore(file: string): { agents: StoredAgent[]; onDisk: Fingerprint |
   if (!agents.every(isStoredAgent)) throw new PairingStoreError(file, 'bad_record')
   // One agent id twice would make a revoke and a last call ambiguous (fix round 3).
   if (new Set(agents.map((agent) => agent.agentId)).size !== agents.length) throw new PairingStoreError(file, 'bad_record')
+  if (new Set(agents.map((agent) => agent.keyHash)).size !== agents.length) throw new PairingStoreError(file, 'bad_record')
+  if (agents.some((agent) => checkAgentName(agent.name) !== null)) throw new PairingStoreError(file, 'bad_record')
   return { agents, onDisk: fingerprint(bytes) }
 }
 
