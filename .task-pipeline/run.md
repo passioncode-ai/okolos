@@ -40,3 +40,4 @@ holds: 5 — blocker N-005 parked at the certification ceiling (r1 all, r2 produ
 iter: 3 — item N-024 — closed at gate 5
 event: memory — INCIDENT: a N-024 test committed "dotfiles" (8a7a78a, 1 file) into bridge/b1-run2 under the pre-push hook (inherited GIT_DIR); push refused, nothing reached origin (dfba2ab); branch restored with git reset --mixed 33a0e75 (767 files, clean); fix N-025 (28f2434) — 2026-10-27T11:30:00+01:00
 iter: 4 — item N-025 — closed at gate 5
+event: memory — N-013 certification count: the first certify call was refused (visual tier owed while surface_class was set), so the graph records the r2 reports as round 1; files cert-N-013-r3-* are graph round 2 — 2026-10-27T13:20:00+01:00
