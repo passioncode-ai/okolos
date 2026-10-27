@@ -267,7 +267,27 @@
     "apps/agent/src/journal/journal.test.ts",
     "tools/reachable.test.ts"
    ],
-   "risk": "R3"
+   "risk": "R3",
+   "certification": {
+    "round": 1,
+    "tiers": {
+     "unit": "fail",
+     "seam": "fail",
+     "product": "fail"
+    },
+    "at": "e53b46477b9506b999a3e1fb3414f4f0fa984099",
+    "history": [
+     {
+      "unit": "fail",
+      "seam": "fail",
+      "product": "fail"
+     }
+    ],
+    "kinds": [
+     "blind"
+    ],
+    "tree": "e0629fc52a2bd72234fd594c9b23232aa276d2a2"
+   }
   },
   {
    "id": "N-007",
