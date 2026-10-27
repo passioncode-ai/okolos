@@ -25,6 +25,8 @@
  "acceptance": [
   "оба каталога с одинаковыми ключами; каждый $X$ объявлен в placeholders",
   "python3 docs/brand/lint.py → 0",
+  "ключ строки rejection_door в обоих каталогах для отказов двери до разбора; copylot_check (seam N-001 круг 3, break 3)",
+  "refusal_invalid_scope говорит «этого устройства»/«this device», как остальной продукт, и читается внутри строки refusalLine без двух двоеточий подряд; copylot_check на собранной строке (проверка product N-001 круг 2)",
   "проверка узла: python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts"
  ],
  "guards": [

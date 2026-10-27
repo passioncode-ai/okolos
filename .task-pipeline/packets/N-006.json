@@ -18,7 +18,7 @@
   ]
  },
  "outputs": [
-  "`class Journal { static open(dir, {retentionDays}): Journal; record(e: JournalEntry): Promise<void> /* append + fsync, бросает при сбое */; recent(limit): JournalEntry[]; sweep(now) }`; `JournalEntry {at, agent, task?, verb, origin?, outcome: 'answered'|'refused', code?, bytes?, verdict?}` — без текста страницы и значений полей"
+  "`class Journal { static open(dir, {retentionDays}): Journal; record(e: JournalEntry): Promise<void> /* append + fsync, бросает при сбое */; recent(limit): JournalEntry[]; sweep(now) }`; `JournalEntry {at, agent, task?, verb, origin?, outcome: 'answered'|'refused'|'rejected', code?: BridgeRefusal | DoorRejection, bytes?, verdict?}`; `DoorRejection = 'bad_host'|'bad_origin'|'bad_content_type'|'bad_request'` для отказов двери до разбора (проверка seam N-001 круг 2) — без текста страницы и значений полей"
  ],
  "acceptance": [
   "record дописывает строку и делает fsync до возврата (шпион на fd.sync)",

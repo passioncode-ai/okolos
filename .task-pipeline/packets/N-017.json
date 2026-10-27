@@ -3,7 +3,7 @@
  "node": "N-017",
  "intent": "e2e моста",
  "inputs": [
-  "собранный демон на временном каталоге данных и временном порту; Chrome stable",
+  "собранный демон, запущенный в процессе теста через экспорт createAgent({dataDir, port, allowLoopbackForTests: true}) из бандла, а не через CLI и не через переменную окружения; страницы фикстур по имени fixture.test через --host-resolver-rules; Chrome stable",
   "N-011: рабочий демон",
   "N-015: страница для подтверждения"
  ],
@@ -24,7 +24,7 @@
   "`pnpm test:e2e:bridge`"
  ],
  "acceptance": [
-  "skeleton: MCP-клиент → привязка через страницу → session.open → open → snapshot без скрытой инструкции → close",
+  "skeleton: MCP-клиент вызывает инструменты по toolName (session_open …), журнал хранит каноническое написание (session.open) → привязка через страницу → session.open → open → snapshot без скрытой инструкции → close",
   "SCN-044: неверный код → отклонить; отзыв → следующий вызов not_paired, задача закрыта",
   "SCN-045: страница показывает задачу агента и отказ origin_not_in_task",
   "проверка узла: pnpm -s run test:e2e:bridge"

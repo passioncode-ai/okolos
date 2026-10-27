@@ -3,7 +3,7 @@
  "node": "N-015",
  "intent": "Страница демона: SCR-23, SCR-24",
  "inputs": [
-  "Pairing.list/confirm/decline/revoke, Tasks.list, Journal.recent, каталоги строк",
+  "Pairing.list/confirm/decline/revoke, Tasks.list, Journal.recent, каталоги строк, refusalKey (N-001) для строк отказов",
   "N-007: список привязок и отзыв",
   "N-009: список активных задач",
   "N-013: состояния экранов SCR",
@@ -32,7 +32,9 @@
   "состояния SCR-23: loading, empty, error, success, expired; SCR-24: loading, empty, error, success — каждое по data-role",
   "инструмент pairing.confirm через MCP отвечает human-step-required со ссылкой /dashboard",
   "строки берутся из каталога; ключ без строки виден как [key]",
+  "отказ двери (DoorRejection) в списке отказов показывается одной строкой rejection_door, refusalKey для него не вызывается и не бросает (проверка seam N-001 круг 2)",
   "Set-Cookie от /fabric/v1/login несёт HttpOnly и SameSite=Strict (ревью R8)",
+  "строка задачи SCR-24 показывает профиль: с логинами человека или без них; SCN-045 шаг 1 и FLW-22 называют цель задачи (проверка product N-001 круг 2)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/dashboard"
  ],
  "guards": [

@@ -4,7 +4,8 @@
  "intent": "K5: перепись процессов",
  "inputs": [
   "CensusEntry (bridge.ts)",
-  "N-001: тип ответа hygiene.census"
+  "N-023: тип ответа hygiene.census",
+  "N-005: apps/agent: package.json с зависимостью @okolos/contracts, tsconfig, каталоги службы"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
@@ -18,7 +19,7 @@
   ]
  },
  "outputs": [
-  "`census(ps: string, launchctl: string, opts: {selfPid, home}): CensusEntry[]` — `{pid, ppid, kind, owner, keep: boolean, reason}`; `readCensus()` вызывает `ps -axo pid=,ppid=,lstart=,command=` и `launchctl list` с таймаутом"
+  "`census(ps: string, launchctl: string, opts: {selfPid, home, now}): CensusEntry[]` — тип из N-001: `{pid, ppid, executable, owner: string|null, ageSeconds, flags: string[], keep: boolean, reason}`, без полной командной строки; `readCensus()` вызывает `ps -axo pid=,ppid=,lstart=,command=` и `launchctl list` с таймаутом"
  ],
  "acceptance": [
   "процесс --remote-debugging-port с живым родителем-сессией: keep, owner = сессия",
