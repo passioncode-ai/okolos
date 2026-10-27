@@ -102,6 +102,7 @@
   "snapshotVerdict(probe, snapshot) получает unresolved = промахи пробника + сбои DOM.describeNode; snapshot.incomplete означает отказ cleaning_incomplete (N-003 круг 1)",
   "open {ref} и другие глаголы со ссылкой идут через resolveRef из @okolos/core-snapshot; found:false и inField:true для open дают отказ; refMap объединяется по документу, потому что снимок поддерева несёт только свои ссылки (N-003 круг 1)",
   "Chrome-фикстура: трёхзначный cc-csc внутри своего label не доходит до агента; настоящий <select> отдаёт варианты как option или MenuListOption, и секретный select не отдаёт ни одного; текст под display:none не получает узла в дереве (иначе snapshotVerdict отказывает по hiddenUnmatched) (N-003 круг 1)",
+  "Journal.open с JournalError(locked, open) пишет событие и выходит; отклонённый close() пишется событием (замок снят всё равно); все записи журнала штампуются одними часами демона; после close() записей нет (N-006 круг 3)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/agent.test.ts apps/agent/src/verbs && pnpm -s run typecheck"
  ],
  "guards": [
