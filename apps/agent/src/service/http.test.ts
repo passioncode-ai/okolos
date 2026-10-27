@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
 import http from 'node:http'
+import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,7 +9,14 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { LoginCodes } from '../fabric/fabric-service.mjs'
 import { serviceDirs, type ServiceDirs } from './dirs.js'
-import { operatorSession, startService, type Route, type RunningService } from './http.js'
+import {
+  operatorSession,
+  startService,
+  type RefusalReason,
+  type Route,
+  type RunningService,
+  type StartOptions,
+} from './http.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
@@ -36,12 +44,24 @@ function tempHome(): string {
 }
 
 async function start(
-  options: { dirs?: ServiceDirs; routes?: Route[] } = {},
+  options: Partial<StartOptions> = {},
 ): Promise<{ service: RunningService; dirs: ServiceDirs }> {
   const dirs = options.dirs ?? serviceDirs(tempHome())
-  const service = await startService({ port: 0, dirs, routes: options.routes ?? [] })
+  const service = await startService({ port: 0, routes: [], ...options, dirs })
   services.push(service)
   return { service, dirs }
+}
+
+/** Bytes on a raw socket, for request lines no HTTP client would send. Resolves with what came back. */
+function raw(port: number, text: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let back = ''
+    const socket = net.connect(port, '127.0.0.1', () => socket.write(text))
+    socket.setEncoding('utf8')
+    socket.on('data', (chunk: string) => (back += chunk))
+    socket.on('close', () => resolve(back))
+    socket.on('error', reject)
+  })
 }
 
 interface Reply {
@@ -243,6 +263,101 @@ describe('the guard runs on every path, the well-known one included', () => {
     expect(ran).toBe(0)
     await call(service.port, '/counted')
     expect(ran).toBe(1)
+  })
+})
+
+describe('every request ends in an answer', () => {
+  it('a target that is not a URL is a 400, and the service keeps answering', async () => {
+    const { service } = await start()
+    const back = await raw(
+      service.port,
+      `GET http://[bad/x HTTP/1.1\r\nHost: 127.0.0.1:${service.port}\r\nConnection: close\r\n\r\n`,
+    )
+    expect(back.split('\r\n')[0]).toBe('HTTP/1.1 400 Bad Request')
+    expect((await call(service.port, '/.well-known/fabric-service')).status).toBe(200)
+  })
+
+  it('the guard still answers first: the same target from a foreign Host is a 403', async () => {
+    const { service } = await start()
+    const back = await raw(service.port, 'GET http://[bad/x HTTP/1.1\r\nHost: evil.example\r\nConnection: close\r\n\r\n')
+    expect(back.split('\r\n')[0]).toBe('HTTP/1.1 403 Forbidden')
+    expect((await call(service.port, '/.well-known/fabric-service')).status).toBe(200)
+  })
+})
+
+describe('a refusal is told to the caller before it is answered (onRefused)', () => {
+  const cases: ReadonlyArray<{ headers: Record<string, string>; reason: RefusalReason }> = [
+    { headers: { Host: 'evil.example' }, reason: 'bad_host' },
+    { headers: { Origin: 'https://evil.example' }, reason: 'bad_origin' },
+    { headers: { 'Sec-Fetch-Site': 'cross-site' }, reason: 'cross_site' },
+  ]
+
+  for (const { headers, reason } of cases) {
+    it(`${reason}: called with the request, its URL and the reason, before a byte is written`, async () => {
+      const seen: Array<{ path: string | undefined; reason: RefusalReason; method: string | undefined }> = []
+      let release: () => void = () => {}
+      const gate = new Promise<void>((resolve) => (release = resolve))
+      let called: () => void = () => {}
+      const inside = new Promise<void>((resolve) => (called = resolve))
+      const { service } = await start({
+        onRefused: async (req, url, why) => {
+          seen.push({ path: url?.pathname, reason: why, method: req.method })
+          called()
+          await gate
+        },
+      })
+
+      let answered = false
+      const reply = call(service.port, '/mcp', { method: 'POST', headers }).then((r) => {
+        answered = true
+        return r
+      })
+      await inside
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(answered).toBe(false)
+      release()
+      expect((await reply).status).toBe(403)
+      expect(seen).toEqual([{ path: '/mcp', reason, method: 'POST' }])
+    })
+  }
+
+  it('bad_request: a target that is not a URL reaches onRefused with no URL, then 400', async () => {
+    const seen: Array<{ url: URL | null; reason: RefusalReason }> = []
+    const { service } = await start({
+      onRefused: async (_req, url, reason) => {
+        seen.push({ url, reason })
+      },
+    })
+    const back = await raw(
+      service.port,
+      `GET http://[bad/x HTTP/1.1\r\nHost: 127.0.0.1:${service.port}\r\nConnection: close\r\n\r\n`,
+    )
+    expect(back.split('\r\n')[0]).toBe('HTTP/1.1 400 Bad Request')
+    expect(seen).toEqual([{ url: null, reason: 'bad_request' }])
+  })
+
+  it('an onRefused that throws makes the answer a 500 with no body', async () => {
+    const { service } = await start({
+      onRefused: async () => {
+        throw new Error('the journal is not writable')
+      },
+    })
+    const answer = await call(service.port, '/mcp', { headers: { Host: 'evil.example' } })
+    expect(answer.status).toBe(500)
+    expect(answer.body).toBe('')
+    expect((await call(service.port, '/.well-known/fabric-service')).status).toBe(200)
+  })
+
+  it('is not called for a request the guard lets through', async () => {
+    let calls = 0
+    const { service } = await start({
+      onRefused: async () => {
+        calls += 1
+      },
+    })
+    await call(service.port, '/.well-known/fabric-service')
+    await call(service.port, '/fabric/v1/events')
+    expect(calls).toBe(0)
   })
 })
 

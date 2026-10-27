@@ -76,6 +76,12 @@ export interface StartOptions {
   readonly exit?: (code: number) => void
   /** Install the SIGTERM/SIGINT drain (the daemon does; in-process tests do not). */
   readonly handleSignals?: boolean
+  /**
+   * Told of every request the shell refuses before a route sees it (a foreign Host or Origin, a
+   * cross-site fetch, a target that is not a URL), and awaited before the 403 or 400 is written,
+   * so the daemon can journal the refusal first. A hook that throws makes the answer a 500 with no body.
+   */
+  readonly onRefused?: (req: IncomingMessage, url: URL | null, reason: RefusalReason) => Promise<void>
 }
 
 const HOST = '127.0.0.1'
@@ -151,15 +157,44 @@ export async function startService(options: StartOptions): Promise<RunningServic
 
   const routes: readonly Route[] = [builtIn, ...(options.routes ?? [])]
 
+  /** Tells the caller's hook first; a hook that throws turns the answer into a 500 with no body. */
+  const refuse = async (
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL | null,
+    reason: RefusalReason,
+    answer: () => void,
+  ): Promise<void> => {
+    try {
+      await options.onRefused?.(req, url, reason)
+    } catch (error) {
+      log.write('error', 'onRefused failed', { reason, error: errorName(error) })
+      res.writeHead(500)
+      res.end()
+      return
+    }
+    answer()
+  }
+
   const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     for (const [name, value] of Object.entries(COMMON_HEADERS)) res.setHeader(name, value)
-    const refusal = checkRequest(port, req.headers.host, req.headers.origin, firstHeader(req.headers['sec-fetch-site']))
-    const url = new URL(req.url ?? '/', `http://${HOST}:${port}`)
+    const url = parseTarget(req.url, port)
     res.on('finish', () =>
-      log.write('info', 'request', { method: req.method, path: url.pathname, status: res.statusCode }),
+      log.write('info', 'request', { method: req.method, path: url?.pathname ?? null, status: res.statusCode }),
     )
+    // The guard answers first, whatever the target looks like.
+    const refusal = guard(port, req)
     if (refusal !== null) {
-      json(res, 403, { error: 'forbidden', message: refusal })
+      await refuse(req, res, url, refusal.reason, () =>
+        json(res, 403, { error: 'forbidden', message: refusal.sentence }),
+      )
+      return
+    }
+    if (url === null) {
+      await refuse(req, res, null, 'bad_request', () =>
+        // i18n-exempt: a protocol answer to a client that sent a request target no URL parser reads
+        json(res, 400, { error: 'bad_request', message: 'The request target is not a URL.' }),
+      )
       return
     }
     // The well-known document is read from memory and answers while the service drains,
@@ -183,14 +218,27 @@ export async function startService(options: StartOptions): Promise<RunningServic
         json(res, 503, { error: 'stopping', message: 'Okolos Agent is stopping and takes no new work.' })
         return
       }
-      log.write('error', 'route failed', { path: url.pathname, error: String((error as Error)?.name ?? 'Error') })
+      log.write('error', 'route failed', { path: url.pathname, error: errorName(error) })
       if (!res.headersSent) json(res, 500, { error: 'internal' })
       else res.end()
     }
   }
 
+  // No throw inside handle, the log's included, may become an unhandled rejection: that ends the daemon.
   const server = createServer((req, res) => {
-    void handle(req, res)
+    handle(req, res).catch((error: unknown) => {
+      try {
+        log.write('error', 'request failed', { error: errorName(error) })
+      } catch {
+        // The log itself failed; the answer below still goes out.
+      }
+      if (!res.headersSent) {
+        res.writeHead(500)
+        res.end()
+      } else {
+        res.destroy()
+      }
+    })
   })
 
   // 3. The bind: loopback only.
@@ -258,6 +306,37 @@ export async function startService(options: StartOptions): Promise<RunningServic
  */
 export function operatorSession(codes: LoginCodes, req: { readonly headers: { readonly cookie?: string | undefined } }): boolean {
   return codes.sessionValid(cookieValue(req.headers.cookie))
+}
+
+/** Why the shell refused a request before any route saw it. */
+export type RefusalReason = 'bad_host' | 'bad_origin' | 'cross_site' | 'bad_request'
+
+/**
+ * The kit's checkRequest, asked one header at a time so the refusal carries its reason. The
+ * sentence is the kit's own; the decision is the kit's alone.
+ */
+function guard(port: number, req: IncomingMessage): { reason: RefusalReason; sentence: string } | null {
+  const own = `${HOST}:${port}`
+  const host = checkRequest(port, req.headers.host, undefined, undefined)
+  if (host !== null) return { reason: 'bad_host', sentence: host }
+  const origin = checkRequest(port, own, req.headers.origin, undefined)
+  if (origin !== null) return { reason: 'bad_origin', sentence: origin }
+  const site = checkRequest(port, own, undefined, firstHeader(req.headers['sec-fetch-site']))
+  if (site !== null) return { reason: 'cross_site', sentence: site }
+  return null
+}
+
+/** The request target as a URL on this origin, or null when it does not parse. */
+function parseTarget(target: string | undefined, port: number): URL | null {
+  try {
+    return new URL(target ?? '/', `http://${HOST}:${port}`)
+  } catch {
+    return null
+  }
+}
+
+function errorName(error: unknown): string {
+  return error instanceof Error ? error.name : typeof error
 }
 
 function firstHeader(value: string | string[] | undefined): string | undefined {
