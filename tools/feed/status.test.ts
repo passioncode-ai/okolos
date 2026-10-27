@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { readStatus, writeStatus } from './status.mjs'
+import { readStatus, stampRunId, writeStatus } from './status.mjs'
 
 /**
  * A structured status record per run (LC-03), for the host to surface.
@@ -65,6 +65,20 @@ describe('the feed status record', () => {
 
   it('answers null for a record that is missing or unreadable, not an exception', () => {
     expect(readStatus(path.join(os.tmpdir(), 'okolos-no-such-status.json'))).toBeNull()
+  })
+
+  it('stamps a run id into a record without changing anything else, the count included', () => {
+    const f = file()
+    const failed = { startedAt: '', at: 'x', outcome: 'failed', stage: 'publish', exit: 1 } as const
+    writeStatus(f, failed)
+    writeStatus(f, failed)
+    const stamped = stampRunId(f, 'launch-1-2')
+    expect(stamped).toMatchObject({ runId: 'launch-1-2', consecutiveFailures: 2, stage: 'publish', at: 'x' })
+    expect(readStatus(f)).toEqual(stamped)
+  })
+
+  it('stamps nothing when there is no record', () => {
+    expect(stampRunId(path.join(os.tmpdir(), 'okolos-no-such-status.json'), 'r')).toBeNull()
   })
 
   it('is written whole or not at all', () => {

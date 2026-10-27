@@ -26,3 +26,5 @@ export interface StatusRecord extends RunRecord {
 
 export function readStatus(file: string): StatusRecord | null
 export function writeStatus(file: string, record: RunRecord): StatusRecord
+/** Marks the record as run `runId`'s, changing nothing else; null when there is none. */
+export function stampRunId(file: string, runId: string): StatusRecord | null

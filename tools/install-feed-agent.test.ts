@@ -461,6 +461,37 @@ process.exit(${exit})
     }
   })
 
+  /** A job as origin/main had it before B-159: its own record, no runId, then exit 1. */
+  const OLD_JOB = `
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+const file = path.join(process.env.OKOLOS_STATE_DIR ?? path.join(os.homedir(), '.okolos', 'state'), 'feed-status.json')
+let previous = null
+try { previous = JSON.parse(readFileSync(file, 'utf8')) } catch {}
+const at = new Date().toISOString()
+mkdirSync(path.dirname(file), { recursive: true })
+writeFileSync(file, JSON.stringify({ startedAt: at, at, outcome: 'failed', stage: 'publish', exit: 1, reason: 'Unauthorized 401',
+  consecutiveFailures: (previous?.consecutiveFailures ?? 0) + 1, lastPublished: previous?.lastPublished ?? null }, null, 2) + '\\n')
+process.exit(1)
+`
+
+  it('counts one failed job run once, through the real bootstrap, even from a job that writes no runId', () => {
+    const h = home()
+    installBootstrap({ dir: h.paths.agentBin })
+    mkdirSync(path.join(h.paths.agentCheckout, 'tools'), { recursive: true })
+    writeFileSync(path.join(h.paths.agentCheckout, 'tools/feed-job.mjs'), OLD_JOB)
+    expect(spawnSync('git', ['init', '--quiet', h.paths.agentCheckout]).status).toBe(0)
+
+    const result = launch(h)
+    expect(result.status, result.stderr).toBe(1)
+    const status = readStatus(h.paths.status)
+    expect(status).toMatchObject({ outcome: 'failed', stage: 'publish', consecutiveFailures: 1 })
+    // The bootstrap stamped the launch id into the record it adopted, so the launch line left it alone.
+    expect(status?.runId).toMatch(/^launch-\d+-\d+$/)
+    expect(readFileSync(h.paths.log, 'utf8')).not.toMatch(/failed in launch/)
+  }, 30_000)
+
   it('counts on from the previous record and keeps the last publish, as JSON the host can read', () => {
     const h = home()
     writeStatus(h.paths.status, { startedAt: 'a', at: 'a', outcome: 'published', stage: 'done', exit: 0, version: 65, entries: 220 })

@@ -44,7 +44,7 @@ import { isEntry } from './entry.mjs'
 import { acquireLock, LockHeldError } from './lock.mjs'
 import { capFile, cleanLine, openLog } from './log.mjs'
 import { feedPaths } from './paths.mjs'
-import { readStatus, writeStatus } from './status.mjs'
+import { readStatus, stampRunId, writeStatus } from './status.mjs'
 
 /** What the installer copies beside launchd: this file and every module it imports. */
 export const BOOTSTRAP_FILES = ['bootstrap.mjs', 'bounded.mjs', 'entry.mjs', 'lock.mjs', 'log.mjs', 'paths.mjs', 'status.mjs']
@@ -349,7 +349,10 @@ export async function runAgent({
   // A job from before this change writes no runId; its record is still its own
   // when it was written after the job started.
   const own = after && (after.runId === runId || (!after.runId && typeof after.at === 'string' && after.at >= spawnedAt))
-  if (own) return { exit: result.code ?? EXIT.failed, record: after }
+  // One rule for "this run wrote a record": it carries this run's id. A record
+  // adopted from such a job is stamped with it, or the launch line would find no
+  // record of its id, write its own and count the one failure twice.
+  if (own) return { exit: result.code ?? EXIT.failed, record: after.runId === runId ? after : stampRunId(paths.status, runId) }
   if (result.code === EXIT.lockHeld) {
     write('refused: the job found another feed run holding the lock')
     return { exit: EXIT.lockHeld, record: null }

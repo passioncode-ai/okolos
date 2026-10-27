@@ -19,6 +19,27 @@ export function readStatus(file) {
   }
 }
 
+function writeWhole(file, full) {
+  mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 })
+  const temporary = `${file}.${process.pid}.tmp`
+  writeFileSync(temporary, `${JSON.stringify(full, null, 2)}\n`, { mode: 0o600 })
+  renameSync(temporary, file)
+  return full
+}
+
+/**
+ * Marks the record in `file` as run `runId`'s, changing nothing else: the count
+ * stays what the writer made it. The bootstrap stamps a record it adopts from a job
+ * that writes no run id (one from before B-159), so the plist's launch line, which
+ * writes only when no record of its run id exists, does not count the run twice.
+ * Returns the stamped record, or null when there is none.
+ */
+export function stampRunId(file, runId) {
+  const record = readStatus(file)
+  if (!record) return null
+  return writeWhole(file, { ...record, runId })
+}
+
 export function writeStatus(file, record) {
   const previous = readStatus(file)
   const failed = record.outcome === 'failed'
@@ -30,9 +51,5 @@ export function writeStatus(file, record) {
         ? { version: record.version ?? null, entries: record.entries ?? null, at: record.at }
         : (previous?.lastPublished ?? null),
   }
-  mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 })
-  const temporary = `${file}.${process.pid}.tmp`
-  writeFileSync(temporary, `${JSON.stringify(full, null, 2)}\n`, { mode: 0o600 })
-  renameSync(temporary, file)
-  return full
+  return writeWhole(file, full)
 }
