@@ -330,8 +330,11 @@ describe('the host’s routes take the host token', () => {
     expect(attributes).toContain('HttpOnly')
     expect(attributes).toContain('SameSite=Strict')
     expect(attributes).toContain('Path=/')
-    const maxAge = attributes.find((part) => part.startsWith('Max-Age='))
-    if (maxAge !== undefined) expect(Number(maxAge.slice('Max-Age='.length))).toBeLessThanOrEqual(7 * 24 * 60 * 60)
+    // A cookie without Max-Age would last the browser session; the kit always bounds it.
+    const maxAge = attributes.find((part) => part.startsWith('Max-Age=')) ?? 'Max-Age=missing'
+    const seconds = Number(maxAge.slice('Max-Age='.length))
+    expect(seconds).toBeGreaterThan(0)
+    expect(seconds).toBeLessThanOrEqual(7 * 24 * 60 * 60)
     expect(attributes.some((part) => part.startsWith('Expires='))).toBe(false)
   })
 
