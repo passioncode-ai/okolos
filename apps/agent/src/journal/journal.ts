@@ -177,6 +177,10 @@ export class Journal {
 
   /** Opens the journal in `dir` (`<data>/journal`), creating the folder 0700 when it is missing. */
   static open(dir: string, options: { retentionDays: number }): Journal {
+    // A window of NaN or zero days would make the sweep drop every entry.
+    if (!Number.isInteger(options.retentionDays) || options.retentionDays < 1) {
+      throw new RangeError(`retentionDays: ${String(options.retentionDays)}`)
+    }
     mkdirSync(dir, { recursive: true, mode: 0o700 })
     return new Journal(dir, options.retentionDays)
   }
@@ -241,9 +245,14 @@ export class Journal {
   async record(entry: JournalEntry): Promise<void> {
     const written = checkEntry(entry)
     const day = new Date(written.at).toISOString().slice(0, 10)
-    const handle = await open(path.join(this.dir, `${day}.jsonl`), 'a', 0o600)
+    const handle = await open(path.join(this.dir, `${day}.jsonl`), 'a+', 0o600)
     try {
-      await handle.write(`${JSON.stringify(written)}\n`)
+      // A last line cut short by a crash gets its newline first, so this entry is a line of its own.
+      const { size } = await handle.stat()
+      const last = Buffer.alloc(1)
+      if (size > 0) await handle.read(last, 0, 1, size - 1)
+      const torn = size > 0 && last[0] !== 0x0a
+      await handle.write(`${torn ? '\n' : ''}${JSON.stringify(written)}\n`)
       await handle.sync()
     } finally {
       await handle.close()

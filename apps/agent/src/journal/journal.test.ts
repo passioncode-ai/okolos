@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { appendFileSync, chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { open } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -228,5 +228,33 @@ describe('retention: the journal keeps what the extension’s journal keeps', ()
     expect(journal.recent(2)).toEqual(entries.slice(-2))
     expect(journal.recent(10)).toEqual(entries)
     expect(journal.recent(0)).toEqual([])
+  })
+
+  it('refuses a window that is not a whole number of days, so a bad setting cannot empty the journal', () => {
+    for (const retentionDays of [Number.NaN, 0, -1, 1.5]) {
+      expect(() => Journal.open(temp(), { retentionDays })).toThrow(RangeError)
+    }
+  })
+})
+
+describe('the journal on disk', () => {
+  it('is a 0700 folder of 0600 files', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: RETENTION_DAYS_JOURNAL })
+    await journal.record(answered)
+    expect(statSync(dir).mode & 0o777).toBe(0o700)
+    expect(statSync(path.join(dir, '2026-10-27.jsonl')).mode & 0o777).toBe(0o600)
+  })
+
+  it('a line cut short by a crash is skipped, and the next entry still lands on a line of its own', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: RETENTION_DAYS_JOURNAL })
+    await journal.record(answered)
+    appendFileSync(path.join(dir, '2026-10-27.jsonl'), JSON.stringify(answered).slice(0, 30))
+    const next: JournalEntry = { ...answered, at: '2026-10-27T11:00:00.000Z', verb: 'read' }
+
+    await journal.record(next)
+
+    expect(journal.recent(10)).toEqual([answered, next])
   })
 })
