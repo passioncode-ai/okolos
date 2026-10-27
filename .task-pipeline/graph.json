@@ -88,24 +88,30 @@
         "docs/runbooks/development.md"
       ],
       "certification": {
-        "round": 1,
+        "round": 2,
         "tiers": {
           "unit": "fail",
-          "seam": "pass",
+          "seam": "fail",
           "product": "fail"
         },
-        "at": "0bbe63f5187e85393b09e6550a6665e549b5a439",
+        "at": "4b94d069be98f93e479164b07a53c429e8a95876",
         "history": [
           {
             "unit": "fail",
             "seam": "pass",
             "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
           }
         ],
         "kinds": [
+          "blind",
           "blind"
         ],
-        "tree": "5be9d0bf88bb5c39aef850c7a376af25ae4734f5"
+        "tree": "8dd085d63b7c97d014dd0c94db187693338c3fc1"
       }
     },
     {
@@ -126,13 +132,13 @@
         "AGENTS.md"
       ],
       "certification": {
-        "round": 2,
+        "round": 4,
         "tiers": {
-          "unit": "pass",
+          "unit": "fail",
           "seam": "fail",
           "product": "fail"
         },
-        "at": "821f948f175a5a7659099f9c6a63977c0c83a02f",
+        "at": "4b94d069be98f93e479164b07a53c429e8a95876",
         "history": [
           {
             "unit": "pass",
@@ -143,13 +149,25 @@
             "unit": "pass",
             "seam": "fail",
             "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
           }
         ],
         "kinds": [
           "blind",
+          "blind",
+          "blind",
           "blind"
         ],
-        "tree": "afc1bc94aaeda438b19a9a927cc44a91121ff4da"
+        "tree": "8dd085d63b7c97d014dd0c94db187693338c3fc1"
       }
     },
     {
