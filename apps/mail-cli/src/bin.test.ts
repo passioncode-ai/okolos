@@ -51,9 +51,29 @@ function okolosMail(
 const count = (text: string, needle: string): number => text.split(needle).length - 1
 
 describe('okolos-mail, started the way a person starts it', () => {
-  it('is declared as a file that exists', () => {
-    expect(manifest.bin['okolos-mail']).toBeDefined()
-    expect(readFileSync(bin, 'utf8')).toMatch(/^#!\/usr\/bin\/env node\n/)
+  /**
+   * Plain JavaScript, so any node the root `engines` allows can start it and
+   * reach its refusal. A `.ts` command on node 22.0 to 22.17 is rejected by node
+   * before a line of it runs, with node's own exit 1, which this command uses
+   * for "signals found".
+   */
+  it('is declared as a plain JavaScript file that exists', () => {
+    expect(manifest.bin['okolos-mail']).toMatch(/\.mjs$/)
+    expect(readFileSync(bin, 'utf8')).toMatch(/^#!\/usr\/bin\/env node\r?\n/)
+  })
+
+  /**
+   * The nearest a test gets to an old node without installing one: this node
+   * with type stripping switched off reads the launcher and cannot read the
+   * sources, which is exactly the position of node 22.0 to 22.17.
+   */
+  it('exits 2 and names what it needs when node cannot strip types', () => {
+    const out = okolosMail(['scan', clean], { before: ['--no-experimental-strip-types'] })
+    expect(out.stdout).toBe('')
+    // This node is new enough, so the line names the switch, not a version;
+    // the version line is the injected case below.
+    expect(out.stderr).toMatch(/^okolos-mail: .*type stripping switched off/)
+    expect(out.code).toBe(EXIT.unreadable)
   })
 
   it('prints its verdict once for a readable message and exits 0', () => {
@@ -134,9 +154,9 @@ describe('okolos-mail, started the way a person starts it', () => {
 
   /**
    * `index.ts` still runs when it is itself the file node was started with, as
-   * a built or bundled copy would be. The resolve hook is the one `bin.ts`
-   * installs, written out here because the test cannot import `bin.ts` without
-   * running it.
+   * a built or bundled copy would be. The resolve hook is the one
+   * `src/launch.mjs` installs, written out here so the run goes through no
+   * launcher at all.
    */
   it('runs main exactly once when index.ts is started directly', () => {
     const hook = path.join(dir, 'resolve-ts.mjs')

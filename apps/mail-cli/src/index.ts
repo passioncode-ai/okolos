@@ -88,7 +88,7 @@ const processIo: RunIo = {
 }
 
 /**
- * The command, as `bin.ts` and a direct start both call it.
+ * The command, as `bin/okolos-mail.mjs` and a direct start both call it.
  *
  * A `main` that throws ends with `EXIT.unreadable` and the error on stderr. A
  * throw left to node exits 1, which is `EXIT.signalsFound`: a crash would read
@@ -112,7 +112,7 @@ export function run(
   io.exit(result.code)
 }
 
-/* c8 ignore start -- a direct `node index.js`; `bin.ts` is the command and `bin.test.ts` spawns both. */
+/* c8 ignore start -- a direct `node index.js`; `bin/okolos-mail.mjs` is the command and `bin.test.ts` spawns both. */
 if (isEntry(import.meta.url, process.argv[1], { platform: process.platform, realpath: realpathSync, cwd: process.cwd })) {
   run(process.argv.slice(2), process.env)
 }
