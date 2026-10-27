@@ -90,12 +90,25 @@ Files the feed agent writes — all outside the working tree, all bounded (LC-12
 `~/.okolos/bin/feed-agent/` (six files from `tools/feed/`, replaced whole at each install); its own
 checkout `~/.okolos/agent-checkout` (a worktree at origin/main, recreated by the bootstrap when it is
 missing; a broken one is moved to `~/.okolos/agent-checkout.broken`, one kept, removed by `--purge`);
+in the clone `pnpm feed:agent` ran from, the installer's and the bootstrap's `git worktree prune`,
+`git fetch origin main` and `git worktree add` (its `.git/worktrees/` entry and remote refs, nothing
+in its working tree);
 private `$TMPDIR/okolos-feed-*` directories removed in `finally`, older ones swept at the next
 start. The run's record — `outcome`, `stage`, `exit`, `version`, `entries`, `consecutiveFailures`,
 `lastPublished`, `recoveredCheckout` — is what a host reads: alert at two failures in a row or when
-`lastPublished.at` is older than 26 h. Every failure counts, including `stage: checkout` (the
-checkout could not be recreated) and `stage: job` (the job died before writing its own record);
-`recoveredCheckout: true` marks a run whose checkout had vanished (B-150's evidence). Decision: [ADR-0017](docs/adr/0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md).
+`lastPublished.at` is older than 26 h. A failure that reaches the bootstrap writes a status and
+counts in `consecutiveFailures`, including `stage: checkout` (the checkout could not be recreated)
+and `stage: job` (the job died before writing its own record; its stderr goes to `feed.log` and
+`feed.launchd.log`); `recoveredCheckout: true` marks a run whose checkout had vanished (B-150's
+evidence). A failure before the bootstrap runs (launchd cannot start `node`, or the installed copy in
+`~/.okolos/bin/feed-agent/` is gone) writes no status: only `feed.launchd.log` and the
+`lastPublished` older than 26 h alarm (B-135) show it.
+
+**After this lands (B-159), once, by a person:** the Mac keeps running the old plist (`cd` into the
+checkout) until the agent is reinstalled. From the main clone, at origin/main: `pnpm feed:agent`,
+then `node tools/install-feed-agent.mjs --status` must show `"bootstrap": true` and `"loaded": true`,
+and `plutil -extract ProgramArguments.2 raw -o - ~/Library/LaunchAgents/app.okolos.feed.plist` must
+name `~/.okolos/bin/feed-agent/bootstrap.mjs`. B-159 closes only after that check. Decision: [ADR-0017](docs/adr/0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md).
 
 **Build retention (LC-15).** Release archives go to `apps/extension/dist/release/`, and
 `pnpm package` keeps the current and the previous one per browser itself

@@ -115,8 +115,21 @@ node tools/install-feed-agent.mjs --uninstall --purge  # и чекаут, сос
   `git worktree prune`; если клона нет, `git clone` его origin), сломанный сначала переносит в
   `~/.okolos/agent-checkout.broken`. Затем запускает `tools/feed-job.mjs --agent` из чекаута.
   Не удалось пересоздать: статус `outcome: failed`, `stage: checkout`; задача умерла, не записав
-  статус: `stage: job`. Оба считаются в `consecutiveFailures`, и строка об этом есть и в
-  `feed.log`, и в `feed.launchd.log`.
+  статус: `stage: job`, а её stderr (ошибка и стек) уходит в `feed.log` и `feed.launchd.log`. Оба
+  случая считаются в `consecutiveFailures`. Сбой до загрузчика (launchd не нашёл `node`, или копии
+  в `~/.okolos/bin/feed-agent/` нет) статуса не пишет: его видно только в `feed.launchd.log` и по
+  тревоге «`lastPublished` старше 26 часов» (B-135).
+- **После слияния B-159, один раз, руками.** Пока агента не переустановили, Mac запускает старый
+  plist с `cd` в чекаут. Из основного клона на `origin/main`:
+
+  ```bash
+  pnpm feed:agent
+  node tools/install-feed-agent.mjs --status   # должно быть "bootstrap": true и "loaded": true
+  plutil -extract ProgramArguments.2 raw -o - ~/Library/LaunchAgents/app.okolos.feed.plist
+  # строка должна называть ~/.okolos/bin/feed-agent/bootstrap.mjs
+  ```
+
+  B-159 закрывается только после этой проверки.
 - **Где работает:** собственный чекаут `~/.okolos/agent-checkout` (detached worktree на
   `origin/main`); перед каждым прогоном агент перематывает его на `origin/main` и, если
   сдвинулся lockfile, ставит только инструменты публикации. Загрузчик обновляется только

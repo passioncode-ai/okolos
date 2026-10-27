@@ -30,13 +30,19 @@
     feed while the failure count read 0 (B-149). The installer copies
     tools/feed/bootstrap.mjs and the modules it imports to ~/.okolos/bin/feed-agent;
     it recreates a missing or broken checkout at origin/main, runs the job from it,
-    and writes the status record on every path, that one included.
+    and writes the status record for every failure that reaches it, a checkout it
+    cannot recreate and a job that dies without a record included. What fails
+    before it runs (no node at all, the installed copy gone) writes no status:
+    only this file's log below and the "lastPublished older than 26 h" alarm
+    (B-135) show that.
 
     Production publishes still run only from origin/main: the job fast-forwards the
     checkout itself (tools/feed-job.mjs, F2). Through a login shell because `node`
     and `pnpm` arrive from a version manager on most machines and launchd's own
     environment has almost nothing in it; measured 2026-10-03 at 0.02 s. When that
-    shell finds no `node`, the one that ran the installer is used.
+    shell finds no `node`, the one that ran the installer is used, by the PATH entry
+    it was found under (/opt/homebrew/bin/node), not its versioned realpath that the
+    next upgrade deletes.
 
     Agent mode is if-stale plus follow: a run whose served feed is younger than
     its interval records "skipped" and ends, so a login is not a publish.
