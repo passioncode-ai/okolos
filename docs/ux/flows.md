@@ -714,7 +714,7 @@ flowchart TD
   P -->|person confirms, codes match| C[Confirmed: the CLI collects the key within five minutes]
   C -->|collected| R[Key issued to the agent once; the daemon keeps only its SHA-256]
   C -->|not collected in time| NE
-  P -->|person refuses or no answer| NE[Refused and recorded in the service's events]
+  P -->|person declines or no answer| NE[Declined or expired, recorded in the service's events]
   R --> OK
   K -->|any Origin or Sec-Fetch header| N
 ```

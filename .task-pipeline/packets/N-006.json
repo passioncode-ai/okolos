@@ -35,6 +35,7 @@
   "запись журнала несёт рядом с agentId дату выдачи доступа (pairedAt), чтобы SCR-24 показал отозванного агента строкой agentLabelRevoked с датой (проверки N-013 круг 8)",
   "recent при сбое чтения бросает ошибку с кодом причины (no_space не бывает, no_permission, unreadable, other): из неё N-015 берёт $WHAT$ строки journalUnreadable (проверки N-013 круг 9)",
   "ответы протокола MCP привязанному агенту (initialize, tools/list, ошибка разбора) пишутся записью с outcome answered и глаголом протокола (mcp.initialize, mcp.tools_list, mcp.parse_error) или явно не пишутся с причиной в спеке §3; решение одно для N-006 и N-008 (проверки N-013 круг 9)",
+  "ответы агенту «неизвестный инструмент», «неверные аргументы» и ошибки протокола пишутся в журнал с outcome refused и кодом invalid_scope или internal и показываются на странице существующими строками (проверки N-013 круг 12)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/journal && pnpm -s run typecheck"
  ],
  "guards": [

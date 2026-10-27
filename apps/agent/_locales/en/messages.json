@@ -97,7 +97,7 @@
     "message": "No agent has access."
   },
   "pairingHow": {
-    "message": "An agent asks for access with okolos-agent pair --name \"<name>\" in a terminal. Its code then appears here. The door's address: $URL$.",
+    "message": "An agent asks for access with okolos-agent pair --name \"<name>\" in a terminal. Its code then appears here. The door's address: $URL$",
     "placeholders": {
       "url": {
         "content": "$1"
@@ -105,7 +105,7 @@
     }
   },
   "pairingStoreError": {
-    "message": "The access list cannot be read: $WHAT$. Until it is fixed, the door refuses every call. Run okolos-agent doctor to see what is wrong with the file.",
+    "message": "The access list cannot be read: $WHAT$. Until it is fixed, every call to the door ends in an Okolos Agent failure: no key can be checked. Run okolos-agent doctor to see what is wrong with the file.",
     "placeholders": {
       "what": {
         "content": "$1"
@@ -210,7 +210,7 @@
     "message": "Okolos Agent was busy with another task"
   },
   "refusal_in_use_by_person": {
-    "message": "you were using this window"
+    "message": "you were using the agent window"
   },
   "refusal_browser_offline": {
     "message": "the agents' Chrome did not start or did not answer"
@@ -318,7 +318,7 @@
     "message": "the call had no valid access key"
   },
   "journalError": {
-    "message": "The agents' journal cannot be written: $WHAT$. Until it is fixed, every agent call ends in an Okolos Agent failure and no page content is given to agents. Run okolos-agent doctor to see what is wrong with the journal.",
+    "message": "The agents' journal could not be written: $WHAT$. Until a write succeeds, every agent call ends in an Okolos Agent failure and no page content is given to agents. Run okolos-agent doctor to see what is wrong with the journal.",
     "placeholders": {
       "what": {
         "content": "$1"
@@ -394,7 +394,7 @@
     }
   },
   "refusalsIncomplete": {
-    "message": "This list is incomplete: while the agents' journal cannot be written, refusals and failures are not recorded."
+    "message": "This list is incomplete: while writes to the agents' journal fail, refusals and failures are not recorded."
   },
   "pageSessionExpired": {
     "message": "The page session expired. Open Okolos Agent again in Fabric Dashboards."

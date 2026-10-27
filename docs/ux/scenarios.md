@@ -554,7 +554,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Traces:** ST-019, FLW-14 (JTBD-05)
 - **Entry point:** settings screen
 - **Preconditions:** local data exists
-- **Scope:** the Okolos extension's local data. Okolos Agent, the separate daemon of the agents' bridge, keeps its own data: the access list, the agents' journal, its service events and logs, and the agent Chrome profile (history and cache of the pages agents opened); an agent keeps its access key in its own `clients/` file. The journal is exported from Okolos Agent's page (SCR-24); Okolos Agent's data is removed by its uninstaller with `--purge`, an agent's key file by that agent's owner
+- **Scope:** the Okolos extension's local data. Okolos Agent, the separate daemon of the agents' bridge, keeps its own data: the access list, the agents' journal, its service events and logs, and the agent Chrome profile (history and cache of the pages agents opened); the access key the CLI collects for an agent lives in Okolos Agent's `clients/` folder. The journal is exported from Okolos Agent's page (SCR-24); all of this, the `clients/` key files included, is removed by its uninstaller with `--purge`
 - **Steps:**
   1. User clicks "Wipe all data" -> system asks for confirmation and lists exactly what will be deleted — **one kind per store, nine of them.** The word "exactly" was here before the list was: the confirmation named five while `wipeAll` cleared nine, so `models`, `feeds`, `snapshots` and the password-reuse index went unmentioned and the user agreed to five while nine went. Safe in direction, and still a confirmation that had not asked. Completeness now lives in `DATA_KIND_KEY: Record<StoreName, string>`, so a new store fails the build until the dialog has words for it
   2. User confirms -> system deletes all local data
@@ -574,7 +574,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Traces:** ST-019, FLW-14 (JTBD-05)
 - **Entry point:** settings screen
 - **Preconditions:** local data exists
-- **Scope:** the Okolos extension's local data. Okolos Agent, the separate daemon of the agents' bridge, keeps its own data: the access list, the agents' journal, its service events and logs, and the agent Chrome profile (history and cache of the pages agents opened); an agent keeps its access key in its own `clients/` file. The journal is exported from Okolos Agent's page (SCR-24); Okolos Agent's data is removed by its uninstaller with `--purge`, an agent's key file by that agent's owner
+- **Scope:** the Okolos extension's local data. Okolos Agent, the separate daemon of the agents' bridge, keeps its own data: the access list, the agents' journal, its service events and logs, and the agent Chrome profile (history and cache of the pages agents opened); the access key the CLI collects for an agent lives in Okolos Agent's `clients/` folder. The journal is exported from Okolos Agent's page (SCR-24); all of this, the `clients/` key files included, is removed by its uninstaller with `--purge`
 - **Steps:**
   1. User clicks "Export all data" -> system produces a JSON file containing findings, journal, settings, and the outbound log
   2. User saves the file -> system confirms and states what the file contains
