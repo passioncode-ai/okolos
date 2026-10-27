@@ -83,9 +83,10 @@ export const COALESCE_WINDOW_MS = 60_000
  * The most `rejected` lines one UTC day holds (first lines and count lines alike). The next
  * rejection that day writes one `cap_reached` line instead, and every later one is dropped and
  * counted in memory. With origins bounded to MAX_ORIGIN_LENGTH a rejected line is under 400 bytes,
- * so a day of rejections stays under 4 MB however many requests a page sends.
+ * so a day of rejections stays under 0.8 MB however many requests a page sends, and the 90 days
+ * the journal keeps stay under 72 MB (LC-12: every file bounded; decision 2026-10-27, N-006 round 2).
  */
-export const REJECTED_LINES_PER_DAY = 10_000
+export const REJECTED_LINES_PER_DAY = 2_000
 
 /**
  * The longest origin an entry stores: `https://`, a 253-character host (the most DNS allows) and

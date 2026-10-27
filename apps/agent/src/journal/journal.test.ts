@@ -1112,7 +1112,7 @@ describe('door rejections are capped per day; agent entries never are', () => {
   const late = (s: number, origin: string): JournalEntry => ({ at: journalTime(t0 + s * 1_000), outcome: 'rejected', code: 'bad_origin', origin })
 
   it('names its cap and its stored codes', () => {
-    expect(REJECTED_LINES_PER_DAY).toBe(10_000)
+    expect(REJECTED_LINES_PER_DAY).toBe(2_000)
     expect(STORED_REJECTION_CODES).toEqual([...REJECTION_CODES, CAP_REACHED])
     expect(REJECTION_CODES).not.toContain(CAP_REACHED)
   })
