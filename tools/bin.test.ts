@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import { binInvocation, endTree, runToCompletion, shCandidates } from './bin.mjs'
@@ -40,7 +41,7 @@ describe('starting pnpm or npx', () => {
     // Run on this host with the Windows shape: a shell is a shell for the warning.
     const probe = `
 import { spawnSync } from 'node:child_process'
-import { binInvocation } from ${JSON.stringify(path.join(import.meta.dirname, 'bin.mjs'))}
+import { binInvocation } from ${JSON.stringify(pathToFileURL(path.join(import.meta.dirname, 'bin.mjs')).href)}
 const run = binInvocation('node', ['--version'], 'win32')
 const result = spawnSync(run.command, run.args, { shell: run.shell, encoding: 'utf8' })
 process.stdout.write(result.stdout)

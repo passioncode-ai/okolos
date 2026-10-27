@@ -513,7 +513,9 @@ describe('an install made off origin/main is in every record the bootstrap write
     expect(readStatus(w.paths.status)).toMatchObject({ stage: 'bootstrap', runId: 'launch-9-9', installedOffMain: OFF, consecutiveFailures: 1 })
   })
 
-  it('in the record of a stop by SIGTERM, through the installed copy', async () => {
+  // A stop by signal is launchd's (macOS): Windows has no SIGTERM to deliver, and Node's kill('SIGTERM') there
+  // ends the process outright, so no handler runs. The feed agent runs only under launchd.
+  it.skipIf(process.platform === 'win32')('in the record of a stop by SIGTERM, through the installed copy', async () => {
     const marker = (w: ReturnType<typeof world>) => path.join(w.base, 'job-started')
     const { w, env } = installed((at) => `import { writeFileSync } from 'node:fs'\nwriteFileSync(${JSON.stringify(marker(at))}, '')\nsetInterval(() => {}, 1000)\n`)
     const child = spawn(process.execPath, [path.join(w.paths.agentBin, 'bootstrap.mjs')], { env, stdio: 'ignore' })
