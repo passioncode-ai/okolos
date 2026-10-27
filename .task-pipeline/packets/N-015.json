@@ -71,6 +71,8 @@
   "при переводе SCN-045 в implemented из alt path убрано «записи задачи идут к человеку» (в Б1 записей нет) или помечено как Б2 (проверки N-013 круг 12)",
   "refusalsEmpty показывается только когда журнал прочитан целиком за срок хранения и в нём нет отказов и сбоев; дата агента в agentLabel до минуты; цель задачи выводится текстом с подписью «словами агента»; Confirm в состоянии store-unwritable показывает pairingStoreUnwritable, а не pairingConfirmed (проверки N-013 круг 13)",
   "элементы pairing-grants (строка pairingGrants рядом с кнопками) и строка окна задачи (taskWindowOpen или taskWindowClosed) проверены по data-role; журнальные коды bad_call и local_answer показываются строками refusal_bad_call и refusal_local_answer, глагол unknown строкой verb_unknown; сборка строки отказа без двух двоеточий подряд для каждого кода (проверки N-013 круг 16)",
+  "цель показана через goalShown из apps/agent/src/tasks/tasks.ts, своей копии правила 200 символов на странице нет (риск N-009 r1 seam #5)",
+  "задача, чей срок вышел, остаётся в списке SCR-24 с пометкой, пока её окно не закрыто таймером (риск N-009 r1 product #3)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/dashboard && pnpm -s run typecheck"
  ],
  "guards": [
