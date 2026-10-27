@@ -2,7 +2,7 @@
 import json, os
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEC=["docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения","docs/superpowers/specs/2026-10-06-bridge-b1-design.md","docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"]
-GUARDS_ALL=["TDD: тест пишется первым и наблюдается красным","никакого секрета в argv, логах, журнале и URL","ничего не уходит в сеть, кроме уже разрешённого @okolos/net","core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)","лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial","без длинного тире в текстах для людей"]
+GUARDS_ALL=["TDD: тест пишется первым и наблюдается красным","никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)","ничего не уходит в сеть, кроме уже разрешённого @okolos/net","core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)","лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial","без длинного тире в текстах для людей"]
 T=json.load(open(os.path.join(ROOT,'.task-pipeline/plan_tasks.json')))
 
 import re
@@ -32,7 +32,7 @@ def render():
 "- Пакеты `core-*` не трогают браузерные API, сеть, часы и случайность (ESLint и `tools/gates/bundle-scan.test.ts`).",
 "- Единственный выход в сеть: `@okolos/net`; демон в сеть не ходит (спека §3).",
 "- Демон слушает только `127.0.0.1:47871`; `Host`, `Origin`, `Sec-Fetch-Site` проверяются на каждом пути (`fabric-service/0.1`).",
-"- Ни один секрет (ключ агента, токен хоста, код входа) не попадает в argv, логи, журнал, URL.",
+"- Ни один секрет (ключ агента, токен хоста, код входа) не попадает в argv, логи, журнал, URL. Исключение одно: одноразовый код входа в `/fabric/v1/login?code=`, которого требует протокол `fabric-service/0.1` (120 с, сгорает при первом использовании, не логируется).",
 "- Каждый ответ агенту записан в журнал до отправки; сбой записи означает отказ `internal` (ADR-0019).",
 "- Значения полей `password`, `cc-*`, OTP и фрагменты URL агенту не выдаются (спека §3).",
 "- Тексты для людей: термины из `docs/brand/terminology.md`, без длинного тире, каждая новая строка через `copylot_check`.",
