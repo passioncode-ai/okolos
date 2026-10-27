@@ -93,7 +93,7 @@ const SHOWS_SOMETHING = /[\p{L}\p{N}]/u
  * caller's bug, not the agent's text.
  */
 export function checkFreeText(text: string, maxLength: number): FreeTextRefusal | null {
-  if (!Number.isInteger(maxLength) || maxLength <= 0) throw new TypeError(`checkFreeText: maxLength must be a positive integer, got ${String(maxLength)}`)
+  if (!Number.isInteger(maxLength) || maxLength <= 0) throw new TypeError(`checkFreeText: maxLength must be a positive integer, got ${String(maxLength)}`) // i18n-exempt: a programming error in the daemon, thrown to its caller, never shown to a person
   const fault = textFault(text, {
     maxLength,
     length: (value) => value.length,
