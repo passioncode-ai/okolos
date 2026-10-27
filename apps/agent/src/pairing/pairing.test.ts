@@ -1,23 +1,36 @@
-import { createHash } from 'node:crypto'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { createHash, timingSafeEqual } from 'node:crypto'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { serviceDirs } from '../service/dirs.js'
 import {
   CLAIM_WINDOW_MS,
   EXPIRED_SHOWN_MS,
   MAX_NEW_PER_MINUTE,
   MAX_PENDING,
   Pairing,
+  PairingStoreError,
   REQUEST_LIFETIME_MS,
+  pairingStoreFile,
   type PairingNotice,
   type RandomSource,
 } from './pairing.js'
 
+// The real comparison, watched: verify must go through it.
+vi.mock('node:crypto', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:crypto')>()
+  return { ...actual, timingSafeEqual: vi.fn(actual.timingSafeEqual) }
+})
+
 const temps: string[] = []
 afterEach(() => {
-  for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true })
+  for (const dir of temps.splice(0)) {
+    chmodSync(dir, 0o700)
+    rmSync(dir, { recursive: true, force: true })
+  }
+  vi.mocked(timingSafeEqual).mockClear()
 })
 
 function storeFile(): string {
@@ -210,6 +223,143 @@ describe('how long a request lives and how many there may be (spec §11 F5)', ()
     expect(pairing.request('agent 123', T0)).toEqual({ refused: 'name_digits' })
     expect(pairing.request('a'.repeat(41), T0)).toEqual({ refused: 'name_too_long' })
     expect(pairing.list(T0).requests).toEqual([])
+  })
+})
+
+/** Pairs `name` from request to claim and gives back the key. */
+function pair(pairing: Pairing, name: string, now: number): string {
+  const { requestId } = asked(pairing.request(name, now))
+  expect(pairing.confirm(requestId, now + 1)).toBe(true)
+  const claimed = pairing.claim(requestId, now + 2)
+  if (claimed === null || !('key' in claimed)) throw new Error('no key')
+  return claimed.key
+}
+
+describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
+  it('lives in the service data folder', () => {
+    const home = mkdtempSync(path.join(os.tmpdir(), 'okolos-agent-home-'))
+    temps.push(home)
+    expect(pairingStoreFile(serviceDirs(home))).toBe(path.join(serviceDirs(home).data, 'pairings.json'))
+  })
+
+  it('finds the agent a key belongs to by its SHA-256, compared with timingSafeEqual', () => {
+    const pairing = open()
+    const key = pair(pairing, 'Claude Code', T0)
+    pair(pairing, 'Codex', T0 + 10)
+    vi.mocked(timingSafeEqual).mockClear()
+
+    expect(pairing.verify(key)).toEqual({ agentId: expect.any(String), name: 'Claude Code', pairedAt: T0 + 2 })
+    const digest = createHash('sha256').update(key, 'utf8').digest()
+    const calls = vi.mocked(timingSafeEqual).mock.calls
+    expect(calls.length).toBeGreaterThan(0)
+    for (const [a, b] of calls) {
+      expect(Buffer.byteLength(a as Buffer)).toBe(32)
+      expect(Buffer.byteLength(b as Buffer)).toBe(32)
+    }
+    expect(calls.some(([a, b]) => digest.equals(a as Buffer) || digest.equals(b as Buffer))).toBe(true)
+
+    expect(pairing.verify('f'.repeat(64))).toBeNull()
+    expect(pairing.verify('')).toBeNull()
+  })
+
+  it('keeps only the hash of the key, in a 0600 file that a reopened store reads back', () => {
+    const file = storeFile()
+    const key = pair(open(file), 'Claude Code', T0)
+    const stored = readFileSync(file, 'utf8')
+    expect(stored).not.toContain(key)
+    expect(stored).toContain(createHash('sha256').update(key, 'utf8').digest('hex'))
+    expect(statSync(file).mode & 0o777).toBe(0o600)
+
+    expect(open(file).verify(key)).toMatchObject({ name: 'Claude Code' })
+  })
+
+  it('refuses a revoked key, now and after a reopen', () => {
+    const file = storeFile()
+    const pairing = open(file)
+    const key = pair(pairing, 'Claude Code', T0)
+    const kept = pair(pairing, 'Codex', T0 + 10)
+    const agent = pairing.verify(key)!
+    expect(pairing.revoke(agent.agentId)).toBe(true)
+    expect(pairing.verify(key)).toBeNull()
+    expect(pairing.revoke(agent.agentId)).toBe(false)
+    expect(pairing.list(T0 + 20).agents.map((a) => a.name)).toEqual(['Codex'])
+    expect(open(file).verify(key)).toBeNull()
+    expect(open(file).verify(kept)).toMatchObject({ name: 'Codex' })
+  })
+
+  it('pairs the same name again after a revoke, with a new key', () => {
+    const pairing = open()
+    const old = pair(pairing, 'Claude Code', T0)
+    pairing.revoke(pairing.verify(old)!.agentId)
+    const fresh = pair(pairing, 'Claude Code', T0 + 10)
+    expect(fresh).not.toBe(old)
+    expect(pairing.verify(fresh)).toMatchObject({ name: 'Claude Code' })
+    expect(pairing.verify(old)).toBeNull()
+  })
+
+  it('writes by replacing the file whole, leaving no temporary file beside it', () => {
+    const file = storeFile()
+    const pairing = open(file)
+    pair(pairing, 'Claude Code', T0)
+    const before = statSync(file).ino
+    pair(pairing, 'Codex', T0 + 10)
+    expect(statSync(file).ino).not.toBe(before)
+    expect(statSync(file).mode & 0o777).toBe(0o600)
+    expect(readdirSync(path.dirname(file))).toEqual(['pairings.json'])
+  })
+
+  it('gives no key when the store cannot be written, and the claim can be tried again', () => {
+    const file = storeFile()
+    const pairing = open(file)
+    const { requestId } = asked(pairing.request('Claude Code', T0))
+    pairing.confirm(requestId, T0 + 1)
+    chmodSync(path.dirname(file), 0o500)
+    expect(() => pairing.claim(requestId, T0 + 2)).toThrow()
+    chmodSync(path.dirname(file), 0o700)
+    expect(pairing.list(T0 + 3).agents).toEqual([])
+    expect(pairing.claim(requestId, T0 + 4)).toHaveProperty('key')
+    expect(pairing.list(T0 + 5).agents).toHaveLength(1)
+  })
+
+  it('does not open a file of foreign content: a store error, and the file is left as it was', () => {
+    const foreign = [
+      'not json',
+      '',
+      '[]',
+      '{}',
+      JSON.stringify({ schema: 'something-else/1', agents: [] }),
+      JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: {} }),
+      JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: [{ agentId: 1, name: 'x', pairedAt: 0, keyHash: 'a'.repeat(64) }] }),
+      JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: [{ agentId: 'a1', name: 'x', pairedAt: 0, keyHash: 'not a hash' }] }),
+      JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: [null] }),
+    ]
+    for (const content of foreign) {
+      const file = storeFile()
+      writeFileSync(file, content, { mode: 0o600 })
+      let thrown: unknown = null
+      try {
+        open(file)
+      } catch (error) {
+        thrown = error
+      }
+      expect(thrown, content).toBeInstanceOf(PairingStoreError)
+      expect((thrown as PairingStoreError).file).toBe(file)
+      expect(readFileSync(file, 'utf8')).toBe(content)
+    }
+  })
+
+  it('does not open a store it cannot read: a store error', () => {
+    const file = storeFile()
+    mkdirSync(file)
+    expect(() => open(file)).toThrow(PairingStoreError)
+  })
+
+  it('opens a missing file as an empty store and writes nothing until a pairing', () => {
+    const file = storeFile()
+    const pairing = open(file)
+    expect(pairing.list(T0).agents).toEqual([])
+    asked(pairing.request('Claude Code', T0))
+    expect(readdirSync(path.dirname(file))).toEqual([])
   })
 })
 

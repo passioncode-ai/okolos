@@ -14,11 +14,31 @@
  *
  * Requests live in memory only: they last five minutes, and a restart ends them.
  */
-import { createHash, randomBytes } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 
 import { atomicWrite } from '../fabric/fabric-service.mjs'
+import type { ServiceDirs } from '../service/dirs.js'
 import { checkAgentName, type NameRefusal } from './name.js'
+
+/** The pairing store: the one place a key's SHA-256 lives, in the service data folder. */
+export function pairingStoreFile(dirs: ServiceDirs): string {
+  return path.join(dirs.data, 'pairings.json')
+}
+
+/**
+ * The pairing store cannot be read, or holds something that is not a pairing store. Nothing is
+ * paired or checked until it is fixed (SCR-23, error state); the file is never overwritten.
+ */
+export class PairingStoreError extends Error {
+  readonly file: string
+  constructor(file: string, reason: string, options?: { cause?: unknown }) {
+    super(`pairing store ${file}: ${reason}`, options)
+    this.name = 'PairingStoreError'
+    this.file = file
+  }
+}
 
 /** A request lives this long from its creation, unless it is confirmed. */
 export const REQUEST_LIFETIME_MS = 5 * 60_000
@@ -127,10 +147,22 @@ export class Pairing {
     this.notify = options.onNotice ?? (() => {})
   }
 
-  /** Opens the pairing store at `file`; a missing file is an empty store, written on first change. */
+  /**
+   * Opens the pairing store at `file`; a missing file is an empty store, written on first change.
+   * A file that cannot be read or is not a pairing store throws PairingStoreError.
+   */
   static open(file: string, options: PairingOptions = {}): Pairing {
-    const agents = existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as StoreFile).agents : []
-    return new Pairing(file, [...agents], options)
+    return new Pairing(file, readStore(file), options)
+  }
+
+  /** The agent a key belongs to, or null. Every stored hash is compared, in constant time. */
+  verify(key: string): AgentRecord | null {
+    const presented = createHash('sha256').update(key, 'utf8').digest()
+    let found: StoredAgent | null = null
+    for (const agent of this.agents) {
+      if (timingSafeEqual(presented, Buffer.from(agent.keyHash, 'hex')) && found === null) found = agent
+    }
+    return found === null ? null : { agentId: found.agentId, name: found.name, pairedAt: found.pairedAt }
   }
 
   request(agentName: string, now: number): { requestId: string; code: string; expiresAt: number } | { refused: RequestRefusal } {
@@ -285,6 +317,43 @@ export class Pairing {
 
 function deadline(entry: Entry): number {
   return entry.confirmedAt === null ? entry.createdAt + REQUEST_LIFETIME_MS : entry.confirmedAt + CLAIM_WINDOW_MS
+}
+
+function readStore(file: string): StoredAgent[] {
+  let text: string
+  try {
+    text = readFileSync(file, 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+    throw new PairingStoreError(file, 'cannot be read', { cause: error })
+  }
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  } catch (error) {
+    throw new PairingStoreError(file, 'is not JSON', { cause: error })
+  }
+  if (!isRecord(value) || value['schema'] !== SCHEMA || !Array.isArray(value['agents'])) {
+    throw new PairingStoreError(file, `is not a ${SCHEMA} document`)
+  }
+  const agents = value['agents'] as unknown[]
+  if (!agents.every(isStoredAgent)) throw new PairingStoreError(file, 'holds an agent record of the wrong shape')
+  return agents
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isStoredAgent(value: unknown): value is StoredAgent {
+  return (
+    isRecord(value) &&
+    typeof value['agentId'] === 'string' &&
+    typeof value['name'] === 'string' &&
+    typeof value['pairedAt'] === 'number' &&
+    typeof value['keyHash'] === 'string' &&
+    /^[0-9a-f]{64}$/.test(value['keyHash'])
+  )
 }
 
 /** Two names a person would read as one: compatibility-normalised and case-folded. */
