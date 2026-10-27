@@ -1090,3 +1090,80 @@ describe('closing the pairing (fix round 4)', () => {
     expect(pairing.request('Aider', T0 + 41)).toEqual({ refused: 'closed' })
   })
 })
+
+// Fix round 4: the pairing remembers the bytes it last read or wrote, and writes nothing over a
+// store someone else changed in between (another daemon, a hand edit, a restore).
+describe('a store changed on disk (fix round 4)', () => {
+  function changedOnDisk(file: string): ReturnType<typeof expect.objectContaining> {
+    return expect.objectContaining({ name: 'PairingStoreError', reason: 'changed_on_disk', file })
+  }
+
+  it('gives no key when the file changed since it was last written, and leaves the file as it is', () => {
+    const file = storeFile()
+    const pairing = open(file)
+    pair(pairing, 'Claude Code', T0)
+    const request = asked(pairing.request('Codex', T0 + 10))
+    expect(confirmAt(pairing, request, T0 + 11)).toBe(true)
+    const edited = readFileSync(file, 'utf8').replace('"Claude Code"', '"Claude"')
+    writeFileSync(file, edited, { mode: 0o600 })
+
+    expect(() => pairing.claim(request.requestId, T0 + 12)).toThrow(changedOnDisk(file))
+    expect(readFileSync(file, 'utf8')).toBe(edited)
+    expect(pairing.list(T0 + 13).agents.map((a) => a.name)).toEqual(['Claude Code'])
+    // The request stays confirmed and the claim keeps failing until the daemon reopens the store.
+    expect(pairing.list(T0 + 13).requests[0]).toMatchObject({ name: 'Codex', state: 'confirmed' })
+    expect(() => pairing.claim(request.requestId, T0 + 14)).toThrow(changedOnDisk(file))
+  })
+
+  it('refuses a revoke, a last-call write and a flush over a changed file', () => {
+    const file = storeFile()
+    const pairing = open(file)
+    const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    const edited = `${readFileSync(file, 'utf8')} `
+    writeFileSync(file, edited, { mode: 0o600 })
+
+    expect(() => pairing.revoke(agent.agentId, T0 + 10)).toThrow(changedOnDisk(file))
+    expect(() => pairing.touch(agent.agentId, T0 + 20)).toThrow(changedOnDisk(file))
+    expect(() => pairing.flush()).toThrow(changedOnDisk(file))
+    expect(readFileSync(file, 'utf8')).toBe(edited)
+    expect(pairing.list(T0 + 30).agents).toEqual([{ ...agent, lastCallAt: T0 + 20 }])
+  })
+
+  it('sees an edit that keeps the size of the file: the bytes are compared, not only the size', () => {
+    const file = storeFile()
+    const pairing = open(file)
+    const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    const before = readFileSync(file, 'utf8')
+    const edited = before.replace('"Claude Code"', '"Claude Coda"')
+    expect(edited.length).toBe(before.length)
+    writeFileSync(file, edited, { mode: 0o600 })
+    expect(() => pairing.revoke(agent.agentId, T0 + 10)).toThrow(changedOnDisk(file))
+    expect(readFileSync(file, 'utf8')).toBe(edited)
+  })
+
+  it('refuses to write over a file removed, or created, since it was last read', () => {
+    const removed = storeFile()
+    const first = open(removed)
+    pair(first, 'Claude Code', T0)
+    rmSync(removed)
+    expect(() => pair(first, 'Codex', T0 + 10)).toThrow(changedOnDisk(removed))
+    expect(readdirSync(path.dirname(removed))).toEqual([])
+
+    const created = storeFile()
+    const second = open(created) // missing: an empty store
+    writeFileSync(created, JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: [] }), { mode: 0o600 })
+    expect(() => pair(second, 'Codex', T0)).toThrow(changedOnDisk(created))
+  })
+
+  it('lets one of two pairings on the same file write, and refuses the other', () => {
+    const file = storeFile()
+    const a = open(file)
+    const b = open(file)
+    pair(a, 'Claude Code', T0)
+    expect(() => pair(b, 'Codex', T0 + 10)).toThrow(changedOnDisk(file))
+    expect(open(file).list(T0 + 20).agents.map((agent) => agent.name)).toEqual(['Claude Code'])
+    // A pairing that writes again after its own write is not refused.
+    pair(a, 'Cursor', T0 + 30)
+    expect(open(file).list(T0 + 40).agents.map((agent) => agent.name)).toEqual(['Claude Code', 'Cursor'])
+  })
+})

@@ -24,7 +24,7 @@
  * call (see `touch`), or exactly that call when the daemon ran `close` or `flush` before it stopped.
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 import { atomicWrite } from '../fabric/fabric-service.mjs'
@@ -39,8 +39,11 @@ export function pairingStoreFile(dirs: ServiceDirs): string {
 /**
  * The pairing store cannot be read, holds something that is not a pairing store, or cannot be
  * written. A store that cannot be opened pairs and checks nothing until it is fixed (SCR-23, error
- * state), and the file is never overwritten. A write that fails (`unwritable`) changes nothing:
- * the file and the agents in memory stay as they were.
+ * state), and the file is never overwritten. A write that fails (`unwritable`, `changed_on_disk`)
+ * changes nothing: the file and the agents in memory stay as they were. `changed_on_disk` (fix round
+ * 4): the file is not what this pairing last read or wrote (another daemon, a hand edit, a restore),
+ * so writing would lose that change; every later write is refused the same way until the daemon
+ * opens the store again.
  */
 export class PairingStoreError extends Error {
   readonly file: string
@@ -54,7 +57,7 @@ export class PairingStoreError extends Error {
   }
 }
 
-export type StoreRefusal = 'unreadable' | 'not_json' | 'not_a_store' | 'bad_record' | 'unwritable'
+export type StoreRefusal = 'unreadable' | 'not_json' | 'not_a_store' | 'bad_record' | 'unwritable' | 'changed_on_disk'
 
 /** A request lives this long from its creation, unless it is confirmed. */
 export const REQUEST_LIFETIME_MS = 5 * 60_000
@@ -196,6 +199,8 @@ export class Pairing {
   private readonly random: RandomSource
   private readonly notify: (notice: PairingNotice) => void
   private agents: StoredAgent[]
+  /** What the file held when this pairing last read or wrote it; null for no file (fix round 4). */
+  private onDisk: Fingerprint | null
   private readonly byRequestId = new Map<string, Entry>()
   private readonly byHandle = new Map<string, Entry>()
   private readonly ended = new Map<string, Ended>()
@@ -210,9 +215,10 @@ export class Pairing {
   /** `close` ran: no request, confirm, decline or claim any more. */
   private closed = false
 
-  private constructor(file: string, agents: StoredAgent[], options: PairingOptions) {
+  private constructor(file: string, store: { agents: StoredAgent[]; onDisk: Fingerprint | null }, options: PairingOptions) {
     this.file = file
-    this.agents = agents
+    this.agents = store.agents
+    this.onDisk = store.onDisk
     this.random = options.random ?? randomBytes
     const onNotice = options.onNotice ?? (() => {})
     const onNoticeError = options.onNoticeError ?? warn
@@ -453,14 +459,23 @@ export class Pairing {
     this.refusals.set(sha256(entry.requestId), { refused, endedAt })
   }
 
-  /** Writes `agents` and only then takes them as the agents in memory; throws PairingStoreError. */
+  /**
+   * Writes `agents` and only then takes them as the agents in memory; throws PairingStoreError.
+   * First the file is checked against what this pairing last read or wrote: a file that changed
+   * since is not written over (`changed_on_disk`). The check and the write are two steps, so a
+   * change in between them is not seen; the daemon is the store's only writer, and this catches a
+   * second daemon or a hand edit made between two operations.
+   */
   private save(agents: StoredAgent[]): void {
+    if (!sameFingerprint(fingerprintOnDisk(this.file, this.onDisk?.size), this.onDisk)) throw new PairingStoreError(this.file, 'changed_on_disk')
     const content: StoreFile = { schema: SCHEMA, agents }
+    const text = `${JSON.stringify(content, null, 2)}\n`
     try {
-      atomicWrite(this.file, `${JSON.stringify(content, null, 2)}\n`, 0o600)
+      atomicWrite(this.file, text, 0o600)
     } catch (error) {
       throw new PairingStoreError(this.file, 'unwritable', { cause: error })
     }
+    this.onDisk = fingerprint(Buffer.from(text, 'utf8'))
     this.agents = agents
     // The file now holds every agent as it is in memory, last calls included.
     this.callsUnsaved = false
@@ -484,14 +499,50 @@ function deadline(entry: Entry): number {
   return entry.confirmedAt === null ? entry.createdAt + REQUEST_LIFETIME_MS : entry.confirmedAt + CLAIM_WINDOW_MS
 }
 
-function readStore(file: string): StoredAgent[] {
-  let text: string
+/** The size and SHA-256 of the store's bytes. */
+interface Fingerprint {
+  readonly size: number
+  readonly sha256: string
+}
+
+function fingerprint(bytes: Buffer): Fingerprint {
+  return { size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') }
+}
+
+function sameFingerprint(a: Fingerprint | null, b: Fingerprint | null): boolean {
+  return a === null || b === null ? a === b : a.size === b.size && a.sha256 === b.sha256
+}
+
+/** The file's bytes, or null when there is no file; PairingStoreError when it cannot be read. */
+function readBytes(file: string): Buffer | null {
   try {
-    text = readFileSync(file, 'utf8')
+    return readFileSync(file)
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
     throw new PairingStoreError(file, 'unreadable', { cause: error })
   }
+}
+
+/**
+ * The fingerprint of what the file holds now, null for no file. A size other than the one last
+ * seen is told from the file's metadata alone, without reading what may be a large file.
+ */
+function fingerprintOnDisk(file: string, expectedSize?: number): Fingerprint | null {
+  try {
+    const { size } = statSync(file)
+    if (expectedSize !== undefined && size !== expectedSize) return { size, sha256: '' }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+    throw new PairingStoreError(file, 'unreadable', { cause: error })
+  }
+  const bytes = readBytes(file)
+  return bytes === null ? null : fingerprint(bytes)
+}
+
+function readStore(file: string): { agents: StoredAgent[]; onDisk: Fingerprint | null } {
+  const bytes = readBytes(file)
+  if (bytes === null) return { agents: [], onDisk: null }
+  const text = bytes.toString('utf8')
   let value: unknown
   try {
     value = JSON.parse(text)
@@ -505,7 +556,7 @@ function readStore(file: string): StoredAgent[] {
   if (!agents.every(isStoredAgent)) throw new PairingStoreError(file, 'bad_record')
   // One agent id twice would make a revoke and a last call ambiguous (fix round 3).
   if (new Set(agents.map((agent) => agent.agentId)).size !== agents.length) throw new PairingStoreError(file, 'bad_record')
-  return agents
+  return { agents, onDisk: fingerprint(bytes) }
 }
 
 /** The record the page and the door see; the key's hash stays in the store. */
