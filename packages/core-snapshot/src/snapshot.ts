@@ -370,7 +370,9 @@ function withoutValues(name: string, values: readonly string[]): string {
  * snapshot is built synchronously.
  */
 export function refOf(backendId: number, taskKey: Uint8Array): string {
+  // i18n-exempt: a programming error in the daemon's call, thrown to its caller; never shown to a person
   if (!Number.isSafeInteger(backendId) || backendId < 0) throw new RangeError('backendId must be a non-negative integer')
+  // i18n-exempt: a programming error in the daemon's call, thrown to its caller; never shown to a person
   if (taskKey.length < 16) throw new RangeError('taskKey must be at least 16 bytes')
   const message = Uint8Array.from(`ref:${backendId}`, (c) => c.charCodeAt(0))
   return `r${base64url(hmacSha256(taskKey, message).subarray(0, 12))}`
