@@ -4,7 +4,8 @@
  "intent": "K3: оболочка службы fabric-service/0.1",
  "inputs": [
   "Node-набор Fabric: holdSingleInstance, ensureToken, checkRequest, buildWellKnown, LoginCodes, makeEvent, eventsPage, Drain, RotatingLog; JsonlEventLog в Node-наборе нет, файл событий пишет service/events.ts (аудит #5)",
-  "N-002: resource: корневой tsconfig.json, ссылки на проекты; N-005 дописывает после N-002"
+  "N-002: resource: корневой tsconfig.json, ссылки на проекты; N-005 дописывает после N-002",
+  "N-022: resource: packages/cdp-pipe/src/pipe.ts; N-022 вливается первым, при слиянии N-005 файл берётся из N-022 (его пометки i18n-exempt покрывают весь файл)"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
