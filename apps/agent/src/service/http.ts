@@ -113,7 +113,7 @@ export async function startService(options: StartOptions): Promise<RunningServic
   let port = options.port
 
   const hostAuthorized = (req: IncomingMessage) => tokenMatches(req.headers.authorization, token)
-  const operatorSession = (req: IncomingMessage) => codes.sessionValid(cookieValue(req.headers.cookie))
+  const sessionOf = (req: IncomingMessage) => operatorSession(codes, req)
 
   const builtIn: Route = async (req, res, ctx) => {
     const { pathname } = ctx.url
@@ -172,7 +172,7 @@ export async function startService(options: StartOptions): Promise<RunningServic
       json(res, 200, wellKnown({ build, startedAt, pid: process.pid, status, degraded: [] }))
       return
     }
-    const ctx: RouteContext = { url, port, dirs, log, events, hostAuthorized, operatorSession }
+    const ctx: RouteContext = { url, port, dirs, log, events, hostAuthorized, operatorSession: sessionOf }
     try {
       await drain.work(async () => {
         for (const route of routes) if (await route(req, res, ctx)) return
@@ -248,6 +248,16 @@ export async function startService(options: StartOptions): Promise<RunningServic
       await finish(await drain.wait(DRAIN_SECONDS))
     },
   }
+}
+
+/**
+ * Whether a request carries a live operator session: the `fabric_session` cookie that
+ * `GET /fabric/v1/login` set, still inside the kit's bounds (12 h idle, 7 days in all, not logged
+ * out, signed under the current host token). The dashboard (N-015) asks this before every page and
+ * every write; a use inside the bounds refreshes the idle bound.
+ */
+export function operatorSession(codes: LoginCodes, req: { readonly headers: { readonly cookie?: string | undefined } }): boolean {
+  return codes.sessionValid(cookieValue(req.headers.cookie))
 }
 
 function firstHeader(value: string | string[] | undefined): string | undefined {

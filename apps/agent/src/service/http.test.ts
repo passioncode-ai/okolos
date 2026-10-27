@@ -6,8 +6,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { LoginCodes } from '../fabric/fabric-service.mjs'
 import { serviceDirs, type ServiceDirs } from './dirs.js'
-import { startService, type Route, type RunningService } from './http.js'
+import { operatorSession, startService, type Route, type RunningService } from './http.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
@@ -316,6 +317,36 @@ describe('the host’s routes take the host token', () => {
     const again = await call(service.port, url)
     expect(again.status).toBe(401)
     expect(again.headers['set-cookie']).toBeUndefined()
+  })
+
+  it('the session cookie is HttpOnly, SameSite=Strict, Path=/ and lives at most 7 days', async () => {
+    const { service, dirs } = await start()
+    const issued = await call(service.port, '/fabric/v1/login-code', { method: 'POST', headers: bearer(dirs) })
+    const { url } = JSON.parse(issued.body) as { url: string }
+    const signedIn = await call(service.port, url)
+    const cookies = signedIn.headers['set-cookie'] ?? []
+    expect(cookies).toHaveLength(1)
+    const attributes = (cookies[0] ?? '').split(';').map((part) => part.trim())
+    expect(attributes).toContain('HttpOnly')
+    expect(attributes).toContain('SameSite=Strict')
+    expect(attributes).toContain('Path=/')
+    const maxAge = attributes.find((part) => part.startsWith('Max-Age='))
+    if (maxAge !== undefined) expect(Number(maxAge.slice('Max-Age='.length))).toBeLessThanOrEqual(7 * 24 * 60 * 60)
+    expect(attributes.some((part) => part.startsWith('Expires='))).toBe(false)
+  })
+
+  it('operatorSession knows the cookie the login gave, and nothing else', async () => {
+    const { service, dirs } = await start()
+    const codes = new LoginCodes(path.join(dirs.data, 'auth'), 120, { token: token(dirs) })
+    const issued = await call(service.port, '/fabric/v1/login-code', { method: 'POST', headers: bearer(dirs) })
+    const { url } = JSON.parse(issued.body) as { url: string }
+    const signedIn = await call(service.port, url)
+    const pair = String(signedIn.headers['set-cookie']).split(';')[0] ?? ''
+
+    expect(operatorSession(codes, { headers: { cookie: `theme=dark; ${pair}` } })).toBe(true)
+    expect(operatorSession(codes, { headers: {} })).toBe(false)
+    expect(operatorSession(codes, { headers: { cookie: `${pair.slice(0, -1)}0` } })).toBe(false)
+    expect(operatorSession(codes, { headers: { cookie: 'fabric_session=v2.x.1.y.z' } })).toBe(false)
   })
 
   it('a made-up code signs nobody in', async () => {
