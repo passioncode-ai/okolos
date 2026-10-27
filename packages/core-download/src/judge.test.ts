@@ -198,6 +198,29 @@ describe('the shapes this list is a claim about', () => {
     }
   })
 
+  it('recognises the remaining initial-access types (B-165, round 1)', () => {
+    // A rogue Remote Desktop file, a ClickOnce shortcut, a troubleshooter package
+    // (the ms-msdt payload as a file), a OneNote package, Excel's web query and
+    // SYLK formats, a Visual Studio Tools for Office add-in, and the two script
+    // component formats `regsvr32` loads. Each runs or connects something on open.
+    for (const ext of ['rdp', 'appref-ms', 'diagcab', 'onepkg', 'iqy', 'slk', 'vsto', 'wsc', 'sct']) {
+      expect(named(`invoice.${ext}`).shape.map((entry) => entry.code), ext).toContain('is-a-program')
+    }
+  })
+
+  it('reads the type past a trailing dot or space, which Windows drops', () => {
+    // Windows strips trailing dots and spaces from a name and runs the file by the
+    // extension that is left; a list anchored at the very end missed all three.
+    for (const name of ['a.one.', 'a.one ', 'report.dll. . ']) {
+      expect(named(name).shape.map((entry) => entry.code), JSON.stringify(name)).toContain('is-a-program')
+    }
+    expect(named('invoice.pdf.dll.').shape.map((entry) => entry.code)).toContain('double-extension')
+  })
+
+  it('sees a decoy extension with a space before the real one', () => {
+    expect(named('invoice.pdf .dll').shape.map((entry) => entry.code)).toContain('double-extension')
+  })
+
   it('does not read a longer name as one of the new types', () => {
     // `.one` and `.application` are short words; only the last extension counts.
     for (const name of ['phone.txt', 'application.pdf', 'one.docx', 'notes.onetoc2.txt']) {

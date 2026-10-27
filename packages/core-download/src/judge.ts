@@ -92,6 +92,12 @@ export interface DownloadVerdict {
  * and ClickOnce manifests that install from a URL inside them, the shell's saved
  * searches and settings shortcuts that open a remote folder or run a command,
  * and Java Web Start. All of them join the program class: none is a container.
+ * The first certification of that change named nine more of the same kind: a
+ * Remote Desktop file that connects to the sender's machine (`.rdp`), the
+ * ClickOnce shortcut (`.appref-ms`), the troubleshooter package that carried the
+ * `ms-msdt` payload as a file (`.diagcab`), the OneNote package (`.onepkg`),
+ * Excel's web query and SYLK formats (`.iqy`, `.slk`), the Office add-in
+ * manifest (`.vsto`) and the script components `regsvr32` loads (`.wsc`, `.sct`).
  */
 const EXECUTABLE =
   new RegExp(
@@ -99,15 +105,15 @@ const EXECUTABLE =
       // Native programs, libraries and installers.
       'exe|dll|msi|msp|com|scr|pif|apk|dmg|pkg|deb|rpm|appx|appxbundle|msix|msixbundle|gadget|' +
       // Manifests that install or launch from an address written inside them.
-      'appinstaller|application|jnlp|' +
+      'appinstaller|application|appref-ms|jnlp|vsto|' +
       // Shell and scripting hosts.
-      'bat|cmd|ps1|ps2|psc1|vbs|vbe|js|jse|wsf|wsh|sh|jar|hta|mshxml|' +
+      'bat|cmd|ps1|ps2|psc1|vbs|vbe|js|jse|wsf|wsh|wsc|sct|sh|jar|hta|mshxml|' +
       // Formats Windows opens with a program attached to them.
-      'lnk|scf|url|reg|msc|cpl|chm|inf|ade|adp|' +
+      'lnk|scf|url|reg|msc|cpl|chm|inf|ade|adp|rdp|diagcab|iqy|slk|' +
       'library-ms|search-ms|searchconnector-ms|settingcontent-ms|' +
       // Office documents and add-ins that carry code. They look like documents,
       // which is the point of using them.
-      'docm|dotm|xlsm|xltm|xlsb|xlam|xll|pptm|potm|ppam|one' +
+      'docm|dotm|xlsm|xltm|xlsb|xlam|xll|pptm|potm|ppam|one|onepkg' +
       ')$',
     'i',
   )
@@ -115,15 +121,29 @@ const EXECUTABLE =
 /** Containers: what is inside was not checked, and a mounted one loses the mark of the web. */
 const ARCHIVE = /\.(zip|rar|7z|iso|img|cab|arj|lzh|ace|tar|gz|tgz|bz2|xz|zst|vhd|vhdx|wim)$/i
 
+/**
+ * The name Windows runs the file by.
+ *
+ * Windows drops trailing dots and spaces from a file name, so `a.one.` and
+ * `report.dll ` open as a notebook and a library. The lists above are anchored
+ * at the end of the name, and before this every such name matched nothing.
+ */
+function runsAs(filename: string): string {
+  return filename.replace(/[.\s]+$/u, '')
+}
+
 /** A name whose real extension is hidden behind a decoy one. */
 function hasDoubleExtension(filename: string): boolean {
-  const parts = filename.toLowerCase().split('.')
+  const name = runsAs(filename)
+  // Each part trimmed: `invoice.pdf .dll` shows "pdf" to a reader as surely as
+  // `invoice.pdf.dll` does.
+  const parts = name.toLowerCase().split('.').map((part) => part.trim())
   if (parts.length < 3) return false
   // A decoy is whatever looks harmless in a filename, so the set is wider than
   // "document": an image, a video and a saved message all read as safe.
   const decoy =
     /^(pdf|doc|docx|rtf|odt|xls|xlsx|ods|ppt|pptx|odp|txt|csv|xml|json|jpg|jpeg|png|gif|bmp|webp|svg|mp3|mp4|avi|mov|htm|html|eml|msg|log)$/
-  return decoy.test(parts[parts.length - 2] as string) && EXECUTABLE.test(filename)
+  return decoy.test(parts[parts.length - 2] as string) && EXECUTABLE.test(name)
 }
 
 /** Types that carry code, whatever the name in front of them says. */
@@ -151,14 +171,14 @@ export type MimeDisagreement = 'name-hides-a-program' | 'type-is-a-program' | nu
 function mimeDisagrees(filename: string, mimeType: string | null): MimeDisagreement {
   if (!mimeType) return null
   const claimsDocument = /^(text\/|image\/|application\/pdf)/i.test(mimeType)
-  if (EXECUTABLE.test(filename) && claimsDocument) return 'name-hides-a-program'
+  if (EXECUTABLE.test(runsAs(filename)) && claimsDocument) return 'name-hides-a-program'
   /**
    * `application/octet-stream` is in the executable list and is also what a great many
    * servers send for anything they cannot classify — so it counts only against a name
    * that reads as a document. A `.zip` served as `octet-stream` is ordinary; an
    * `invoice.pdf` served that way is a file whose two halves disagree.
    */
-  if (EXECUTABLE_MIME.test(mimeType) && DOCUMENT_NAME.test(filename)) return 'type-is-a-program'
+  if (EXECUTABLE_MIME.test(mimeType) && DOCUMENT_NAME.test(runsAs(filename))) return 'type-is-a-program'
   return null
 }
 
@@ -207,10 +227,10 @@ export function judgeDownload(evidence: DownloadEvidence): DownloadVerdict {
       mimeType: evidence.mimeType,
     })
   }
-  if (shape.length === 0 && EXECUTABLE.test(evidence.filename) && skipped.length > 0) {
+  if (shape.length === 0 && EXECUTABLE.test(runsAs(evidence.filename)) && skipped.length > 0) {
     shape.push({ code: 'is-a-program' })
   }
-  if (shape.length === 0 && ARCHIVE.test(evidence.filename) && skipped.length > 0) {
+  if (shape.length === 0 && ARCHIVE.test(runsAs(evidence.filename)) && skipped.length > 0) {
     shape.push({ code: 'is-an-archive' })
   }
 
