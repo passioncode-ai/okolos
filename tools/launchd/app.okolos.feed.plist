@@ -38,8 +38,10 @@
     the installed copy gone, or node exiting non-zero (not 75, a run refused by the
     lock) without a record carrying this launch's id (OKOLOS_LAUNCH_ID). It writes
     feed-status.json itself with /bin/sh and coreutils only (outcome failed, stage
-    launch, exit, reason, time; consecutiveFailures counted on, lastPublished kept;
-    a temp file, then mv), and one line to feed.log and to this file's log below.
+    launch, exit, reason, time; consecutiveFailures counted on; the lastPublished
+    value copied alone, never a field written after it, so the record holds one
+    runId, its own; a temp file, then mv), and one line to feed.log and to this
+    file's log below.
     Not recorded anywhere: launchd not starting this at all, or /bin/sh failing;
     the installer's status flag and `launchctl print` show those. No alarm reads the
     record yet: that is OBS-32 in project-observatory-dashboard, which does not read
@@ -71,7 +73,7 @@ else OKOLOS_LAUNCH_ID="$id" "$n" "$b"; c=$?; why="node exited $c before the boot
 if [ "$c" -ne 0 ] &amp;&amp; [ "$c" -ne 75 ] &amp;&amp; ! grep -q "\"runId\": \"$id\"" "$s" 2&gt;/dev/null; then
   at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   p=$(sed -n 's/^  "consecutiveFailures": \([0-9][0-9]*\),$/\1/p' "$s" 2&gt;/dev/null | head -n 1)
-  l=$(sed -n '/^  "lastPublished"/,$p' "$s" 2&gt;/dev/null | sed '$d')
+  l=$(sed -n '/^  "lastPublished": {$/,/^  }/p; /^  "lastPublished": [^{]/p' "$s" 2&gt;/dev/null | sed '$s/,$//')
   [ -n "$l" ] || l='  "lastPublished": null'
   r=$(printf '%s' "$why" | sed 's/\\/\\\\/g; s/"/\\"/g')
   mkdir -p "$st" "$lg"; t="$s.$$.tmp"

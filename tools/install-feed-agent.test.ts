@@ -5,7 +5,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { feedPaths } from './feed/paths.mjs'
-import { readStatus, writeStatus } from './feed/status.mjs'
+import { readStatus, stampRunId, writeStatus } from './feed/status.mjs'
 import { filesIn } from './tree.mjs'
 import { BOOTSTRAP_FILES, BOOTSTRAP_SOURCES } from './feed/bootstrap.mjs'
 import {
@@ -492,6 +492,40 @@ process.exit(1)
     expect(status?.runId).toMatch(/^launch-\d+-\d+$/)
     expect(readFileSync(h.paths.log, 'utf8')).not.toMatch(/failed in launch/)
   }, 30_000)
+
+  it('writes its own run id alone after a record the bootstrap stamped', () => {
+    const h = home()
+    writeStatus(h.paths.status, { startedAt: 'a', at: 'a', outcome: 'published', stage: 'done', exit: 0, version: 65, entries: 220 })
+    writeStatus(h.paths.status, { startedAt: 'b', at: 'b', outcome: 'failed', stage: 'publish', exit: 1 })
+    stampRunId(h.paths.status, 'launch-1-1')
+    expect(launch(h, { bootstrap: 'process.exit(1)\n' }).status).toBe(1)
+    const text = readFileSync(h.paths.status, 'utf8')
+    expect(text.match(/"runId"/g)).toHaveLength(1)
+    const status = readStatus(h.paths.status)
+    expect(status?.runId).toMatch(/^launch-\d+-\d+$/)
+    expect(status?.runId).not.toBe('launch-1-1')
+    expect(status).toMatchObject({ stage: 'launch', consecutiveFailures: 2, lastPublished: { version: 65, entries: 220, at: 'a' } })
+  })
+
+  it('copies the last publish alone, whatever a record holds after it', () => {
+    const cases = [
+      { lastPublished: null, after: 'null' },
+      { lastPublished: { version: 65, entries: 220, at: 'a' }, after: '{\n    "version": 65,\n    "entries": 220,\n    "at": "a"\n  }' },
+    ]
+    for (const { lastPublished, after } of cases) {
+      const h = home()
+      mkdirSync(h.paths.state, { recursive: true })
+      writeFileSync(
+        h.paths.status,
+        `{\n  "outcome": "failed",\n  "consecutiveFailures": 4,\n  "lastPublished": ${after},\n  "runId": "launch-old-1",\n  "installedOffMain": "x"\n}\n`,
+      )
+      launch(h, { bootstrap: 'process.exit(1)\n' })
+      const text = readFileSync(h.paths.status, 'utf8')
+      expect(text.match(/"runId"/g), text).toHaveLength(1)
+      expect(text).not.toMatch(/installedOffMain/)
+      expect(readStatus(h.paths.status)).toMatchObject({ stage: 'launch', consecutiveFailures: 5, lastPublished })
+    }
+  })
 
   it('counts on from the previous record and keeps the last publish, as JSON the host can read', () => {
     const h = home()

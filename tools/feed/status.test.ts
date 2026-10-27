@@ -77,6 +77,16 @@ describe('the feed status record', () => {
     expect(readStatus(f)).toEqual(stamped)
   })
 
+  it('stamps the id where writeStatus puts it, before the count and the last publish', () => {
+    // The plist's launch line copies the last publish from its key to the record's
+    // end; an id stamped after it would ride into the next launch record (B-159).
+    const f = file()
+    writeStatus(f, published)
+    writeStatus(f, { startedAt: '', at: 'x', outcome: 'failed', stage: 'publish', exit: 1 })
+    stampRunId(f, 'launch-1-2')
+    expect(Object.keys(readStatus(f) ?? {}).slice(-3)).toEqual(['runId', 'consecutiveFailures', 'lastPublished'])
+  })
+
   it('stamps nothing when there is no record', () => {
     expect(stampRunId(path.join(os.tmpdir(), 'okolos-no-such-status.json'), 'r')).toBeNull()
   })

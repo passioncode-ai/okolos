@@ -32,12 +32,15 @@ function writeWhole(file, full) {
  * stays what the writer made it. The bootstrap stamps a record it adopts from a job
  * that writes no run id (one from before B-159), so the plist's launch line, which
  * writes only when no record of its run id exists, does not count the run twice.
+ * The id goes where writeStatus puts its fields, before `consecutiveFailures` and
+ * `lastPublished`: the record keeps one shape, whoever wrote it last.
  * Returns the stamped record, or null when there is none.
  */
 export function stampRunId(file, runId) {
   const record = readStatus(file)
   if (!record) return null
-  return writeWhole(file, { ...record, runId })
+  const { consecutiveFailures, lastPublished, ...fields } = record
+  return writeWhole(file, { ...fields, runId, consecutiveFailures, lastPublished })
 }
 
 export function writeStatus(file, record) {
