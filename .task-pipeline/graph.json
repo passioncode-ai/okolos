@@ -633,13 +633,13 @@
    ],
    "risk": "R2",
    "certification": {
-    "round": 20,
+    "round": 21,
     "tiers": {
-     "unit": "pass",
-     "seam": "pass",
+     "unit": "fail",
+     "seam": "fail",
      "product": "fail"
     },
-    "at": "a719fe7ca1f5b7f1b9d519c0bd0bbac4e81f0c96",
+    "at": "6032b231328869fcffd4ee53bed635c2dbfecb03",
     "history": [
      {
       "unit": "fail",
@@ -740,6 +740,11 @@
       "unit": "pass",
       "seam": "pass",
       "product": "fail"
+     },
+     {
+      "unit": "fail",
+      "seam": "fail",
+      "product": "fail"
      }
     ],
     "kinds": [
@@ -762,11 +767,12 @@
      "blind",
      "blind",
      "blind",
+     "blind",
      "blind"
     ],
-    "tree": "8eed553e256485eb293ac3178107958c1ca3246d"
+    "tree": "e03d5a601cc99710d2fcbb744060b7d14fc0818f"
    },
-   "parked_reason": "certification ceiling: 20 failing round(s), ceiling 20; failing tier(s) product; stuck on product; first break apps/extension/_locales/ru/messages.json:1887 (storageResetNote, en twin), packages/ui/src/storage/storage-problem.ts:103, docs/ux/scenarios.md:747 SCN-032, docs/backlog.md B-156: A neighbouring extension string becomes false once Okolos Agent is installed, and nothing records it. The SCR-20 storage-problem screen says «Очистка удалит всё, что Okolos хранит на этом устройстве: находки, журнал, …» / 'Clearing removes everything Okolos kept on this device'. With Okolos Agent on the device, its access list, agents' journal, service events, logs, agent profile (with what sites keep from sign-ins) and clients/ keys all survive that clearing. N-013 handled the same collision for SCN-023 and SCN-024 (scope lines, B-156), and terminology.md cites SCR-20's «Очистить локальные данные», but SCN-032, storageResetNote, B-156 and every plan node leave this sentence out; check: grep -n 'storageResetNote\\|SCN-032' docs/backlog.md prints a row, and grep -n 'Okolos Agent' docs/ux/scenarios.md shows a hit inside SCN-032; then judgement: SCN-032 reads true for a device with Okolos Agent installed. Blocker row owed on the board"
+   "parked_reason": "certification ceiling: 21 failing round(s), ceiling 21; failing tier(s) unit, seam, product; stuck on product; first break docs/superpowers/specs/2026-10-06-bridge-b1-design.md:219 and :265: The spec's strings section contradicts itself and the tree on the catalogue size. §9 opens with «98 строк (... 95 и 97 в следующих; число берётся командой node -e ...)» and the same paragraph ends «Всего строк 99»; §10 still says «98 строк × 2 языка на 2026-10-27, число берётся командой». The named command prints 99 (taskTimeOver, added by N-009 round 2, commit 1d68ab2, was counted at the end but not at the head or in §10). A record that names its own counting command and states a number the command does not print is the drift the brand pack rule «число берётся командой в момент правки» forbids.; check: node -e \"console.log(Object.keys(require('/Users/sshlg/DATA/_worktrees/okolos-bridge-b1/apps/agent/_locales/ru/messages.json')).length)\" prints N, and grep -nE '[0-9]+ строк' /Users/sshlg/DATA/_worktrees/okolos-bridge-b1/docs/superpowers/specs/2026-10-06-bridge-b1-design.md shows only N for the catalogue count. Blocker row owed on the board"
   },
   {
    "id": "N-014",
@@ -1669,6 +1675,16 @@
    "node": "N-009",
    "why": "certified at all 3 tiers in round 4",
    "precondition": "7913bc3b93c3be402e776e25f73e42ff639742f5"
+  },
+  {
+   "verb": "resume",
+   "node": "N-013",
+   "why": "B-157 second option, chosen 2026-10-27 under the operator's «давай все доделаем» by the run's rule for an open question (safest reversible: the stricter of the two options; accepting with risks would close it unread): the product tier is narrowed to the node's own files (docs/ux SCR-23, SCR-24, FLW-21, FLW-22, SCN-044, SCN-045, JRN-05 rows, apps/agent/_locales, the spec sections the node edited) read against the code that exists and the spec; neighbouring extension screens and other runs' docs go to B-156 as before. One round (21), ceiling 21: a failing round parks the node again for the operator."
+  },
+  {
+   "verb": "park",
+   "node": "N-013",
+   "why": "certification ceiling: 21 failing round(s), ceiling 21; failing tier(s) unit, seam, product; stuck on product; first break docs/superpowers/specs/2026-10-06-bridge-b1-design.md:219 and :265: The spec's strings section contradicts itself and the tree on the catalogue size. §9 opens with «98 строк (... 95 и 97 в следующих; число берётся командой node -e ...)» and the same paragraph ends «Всего строк 99»; §10 still says «98 строк × 2 языка на 2026-10-27, число берётся командой». The named command prints 99 (taskTimeOver, added by N-009 round 2, commit 1d68ab2, was counted at the end but not at the head or in §10). A record that names its own counting command and states a number the command does not print is the drift the brand pack rule «число берётся командой в момент правки» forbids.; check: node -e \"console.log(Object.keys(require('/Users/sshlg/DATA/_worktrees/okolos-bridge-b1/apps/agent/_locales/ru/messages.json')).length)\" prints N, and grep -nE '[0-9]+ строк' /Users/sshlg/DATA/_worktrees/okolos-bridge-b1/docs/superpowers/specs/2026-10-06-bridge-b1-design.md shows only N for the catalogue count. Blocker row owed on the board"
   }
  ]
 }

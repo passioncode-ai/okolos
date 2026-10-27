@@ -158,7 +158,7 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 ### JRN-05: P-01 — an agent does a job in my browser (JTBD-10)
 | # | Stage | User action | Touchpoint | Emotion (1-5) | Pain | Opportunity |
 |---|-------|------------|------------|---------------|------|-------------|
-| 1 | Connect | Lets an agent use the browser for the first time | `okolos-agent pair` in the terminal, the Okolos Agent page in Fabric Dashboards | 2 | Every bridge today asks for "read and change all your data" once and never again, for any agent that asks | One pairing per agent, confirmed by the person with a matching code, revocable, scoped |
+| 1 | Connect | Lets an agent use the browser for the first time | `okolos-agent pair` in the terminal, the Okolos Agent page in Fabric Dashboards | 2 | Every bridge today asks for "read and change all your data" once and never again, for any agent that asks | One pairing per agent, confirmed by the person with a matching code, revocable; each task the agent opens is scoped |
 | 2 | Hand over | Gives the agent a job | the agent | 3 | The agent gets the whole browser: every tab, every login | The job carries its own reach: which sites to read, which to write, for how long |
 | 3 | Working | Keeps working in their own apps | own apps | 3 | Agent windows jump in front and type into whatever has focus | The agent works in its own window, in the background, and never takes the focus |
 | 4 | Reading | — (the agent reads pages) | the agent's window | 3 | Pages carry instructions written for the agent; the agent reads them as orders | What the agent reads is cleaned first, and the page's verdict travels with it |
@@ -420,7 +420,7 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 - **Acceptance criteria:**
   - Given a task with its sites named, when the agent asks for a site outside them, then it is refused with a reason it can act on.
   - Given a page with hidden instructions from the corpus, when the agent takes a snapshot, then none of them is in what it receives and the finding is attached.
-  - Given a page with a password, card or one-time-code field, when the agent reads it, then it sees the field and never its value.
+  - Given a page with a password, card or one-time-code field, when the agent reads it, then it sees the field and never its value; the value of any input field is also removed from other elements' names, from 4 characters and from 3 in password, card and one-time-code fields (spec §3 R4, §11 S4), so a 1- or 2-character value can still show in a label that repeats it.
   - Given the person working in another app, when the agent opens, navigates and reads, then the person's app stays in front.
   - Given a very large page, when the agent asks for a snapshot, then it receives it in parts it can page through, never a single answer too large to use.
 - **Priority:** must
