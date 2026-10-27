@@ -3,7 +3,7 @@
  "node": "N-015",
  "intent": "Страница демона: SCR-23, SCR-24",
  "inputs": [
-  "Pairing.list/confirmByHandle/declineByHandle/revoke (N-007), Tasks.list (N-009), Journal.recent (N-006), проверка сессии из N-024, createAgent (N-011), refusalKey (N-023), каталоги строк",
+  "Pairing.list/confirmByHandle/declineByHandle/revoke (N-007), Tasks.list (N-009), Journal.recent (N-006), проверка сессии из N-024, createAgent (N-011), refusalKey (N-023), каталоги строк; goalShown и TaskSnapshot (expired) из apps/agent/src/tasks/tasks.ts (N-009)",
   "N-006: Journal.recent, JournalEntry, DoorRejection",
   "N-007: список привязок и отзыв",
   "N-009: список активных задач",
@@ -74,6 +74,8 @@
   "цель показана через goalShown из apps/agent/src/tasks/tasks.ts, своей копии правила 200 символов на странице нет (риск N-009 r1 seam #5); цель сокращается в демоне (goalShown при сборке /api/state), а не в браузере: модуль задач тянет node:crypto и в страницу не попадает (риск N-009 r2 seam #2)",
   "задача, чей срок вышел, остаётся в списке SCR-24 со строкой taskTimeOver вместо оставшегося времени, пока её окно не закрыто таймером (Tasks.list отдаёт её с пометкой expired; N-009 круг 2)",
   "список отказов и сбоев (Journal.recent) не входит в двухсекундный опрос SCR-23: журнал читается при открытии страницы и не чаще раза в 30 секунд, иначе демон перечитывает 90 дней каждые 2 с (риск N-006 r2 seam #3)",
+  "задачи на SCR-24 идут новыми сверху: Tasks.list отдаёт старые первыми, страница переворачивает (риск N-009 r3 seam #4)",
+  "строка истёкшей задачи с уже закрытым окном не говорит «закрывает её окно»: taskTimeOver только пока windowOpen, иначе taskWindowClosed (наблюдение N-009 r3)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/dashboard && pnpm -s run typecheck"
  ],
  "guards": [

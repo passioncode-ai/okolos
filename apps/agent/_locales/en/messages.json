@@ -453,7 +453,7 @@
     }
   },
   "pairingGone": {
-    "message": "This request is gone: it expired or was declined."
+    "message": "This request is gone: it expired, was declined, or the agent has already collected its key."
   },
   "agentGone": {
     "message": "This agent no longer has access."

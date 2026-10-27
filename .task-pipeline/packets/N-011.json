@@ -89,6 +89,10 @@
   "N-011 вызывает Tasks.charge(task, verb, now, url?) с часами демона и ставит окно задачи через Tasks.setWindow(task, {windowId, windowOpen}) на живой задаче из open/get; снимки из list/sweep для этого не годятся (N-009 круг 1)",
   "Journal.sweep при старте и по суточному таймеру: TypeError или JournalError не роняют демон, а пишутся событием и показываются как сбой журнала на SCR-24 (риск N-006 r2 seam #2)",
   "время записей журнала берётся только из journalTime(ms) из apps/agent/src/journal/journal.ts (риск N-006 r2 seam, break)",
+  "окно задачи не открылось: задача закрывается Tasks.close, агент получает отказ без sessionId, на SCR-24 строки не остаётся (риск N-009 r3 seam #2)",
+  "окно задачи, чей срок вышел, но которую таймер ещё не убрал, закрылось само: setWindow через ручку, сохранённую при open, ставит windowOpen false (риск N-009 r3 seam #3)",
+  "задача с profile 'disposable' получает своё временное окружение профиля у N-010; openWindow без профиля для неё не годится (наблюдение N-009 r3 seam)",
+  "ключ HMAC для ref и хранилище снимка задачи принадлежат N-011; Task.id (это sessionId агента) ключом ref не служит (риск N-009 r3 seam #1)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/agent.test.ts apps/agent/src/verbs && pnpm -s run typecheck"
  ],
  "guards": [
