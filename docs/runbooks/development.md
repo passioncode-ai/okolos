@@ -9,6 +9,24 @@
 `package.json` не остался здесь неназванным. Возможность, о которой никто не
 знает, отличается от отсутствующей только тем, что за неё уже заплатили.
 
+## На каких ОС
+
+Решение оператора от 2026-10-27 (B-166). Что из этого можно обещать
+пользователю, записано в [facts.md](../brand/facts.md#где-работает); здесь то же
+для того, кто собирает и проверяет. Столбец «Обещано» и есть решение, столбец
+справа говорит, что его доказывает, и где доказательства пока нет.
+
+| Что | Обещано | Чем подтверждено |
+|---|---|---|
+| Расширение | Chrome, Edge и Firefox на Windows, macOS и Linux | пути кода, зависящего от ОС, в сборке нет (`tools/docs.test.ts`); Edge получает сборку Chrome; браузерный прогон есть только на Linux, в CI |
+| `okolos-mail scan` | Windows, macOS и Linux, когда закрыт B-161 | исправление в PR #20; до него команда не запускалась ни на одной ОС ([facts.md](../brand/facts.md#где-работает)) |
+| Наблюдение за почтой (SCN-042) | только Apple Mail на macOS | не построено, `docs/ux/scenarios.md` |
+| `pnpm gates` и хук pre-push | macOS, Linux и Windows | Linux: задача `gates` на `ubuntu-latest` в `.github/workflows/ci.yml`, прогон 40402594155 на `5d664c5` зелёный. macOS: `pnpm build` и `pnpm gates` 2026-10-27 на ветке этой правки (B-166), код 0. Windows: на `5d664c5` гейты зовут `python3` (`package.json`, `tools/brand-gate.mjs:22`), которого в Windows нет (B-162); PR #20 это исправляет и добавляет задачу `gates (windows)` на `windows-latest` (B-164), её прогон 40517607494 зелёный |
+| `pnpm package` | macOS, Linux и Windows | на `5d664c5` архив пишет системный `zip` (`tools/package.mjs:192`), в Windows его нет (B-163, исправление в PR #20). CI на Linux гоняет `pnpm package:check`, те же проверки без записи архива; сам `pnpm package` в CI не идёт ни на одной ОС |
+| `pnpm test:e2e`, `pnpm test:e2e:firefox` | macOS, Linux и Windows | задачи `e2e (chromium)` и `e2e (firefox)` на `ubuntu-latest`. На macOS в CI их нет. На Windows e2e не запускался нигде, и после PR #20 тоже: задача Windows гоняет только гейты |
+| Агент фида (`pnpm feed:agent`) | только macOS | launchd, [ADR-0017](../adr/0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md) |
+| Okolos Agent (мост, фаза Б1) | только macOS; Windows отдельной фазой | B-167 |
+
 ## Что нужно на машине
 
 | Что | Версия | Зачем |

@@ -60,8 +60,8 @@ Full vector coverage: [docs/coverage-matrix.md](docs/coverage-matrix.md).
 
 ## Quick start for a new teammate
 
-**Install.** Nothing is published yet: no Chrome Web Store or Firefox Add-ons listing, no
-GitHub release. Build it and load the unpacked extension:
+**Install.** Nothing is published yet: no Chrome Web Store, Firefox Add-ons or Edge Add-ons
+listing, no GitHub release. Build it and load the unpacked extension:
 
 ```bash
 corepack enable && pnpm install     # Node and pnpm; also installs the pre-push hook
@@ -70,8 +70,20 @@ pnpm package                        # the store zips, checked, in apps/extension
 ```
 
 Chrome: `chrome://extensions` → Developer mode → **Load unpacked** →
-`apps/extension/dist/chrome`. Firefox: `about:debugging` → This Firefox → **Load Temporary
-Add-on** → `apps/extension/dist/firefox/manifest.json`.
+`apps/extension/dist/chrome`. Edge takes the same Chrome build: `edge://extensions` →
+Developer mode → **Load unpacked** → `apps/extension/dist/chrome`. Firefox: `about:debugging` →
+This Firefox → **Load Temporary Add-on** → `apps/extension/dist/firefox/manifest.json`.
+
+**Where it runs.** The extension supports Chrome, Edge and Firefox on Windows, macOS and Linux:
+the built extension asks no OS anything (`tools/docs.test.ts` reads the bundles), and the one
+path it sees, a download's file name, is split on both `/` and `\`
+(`packages/platform/src/adapter.ts:289`). Browser tests run on Linux in CI only; nobody has run
+it in Edge or on Windows yet. `okolos-mail scan` targets Windows, macOS and Linux once B-161
+lands; mail watching is Apple Mail on macOS only, and not built. Contributor tooling
+(`pnpm gates`, the pre-push hook, `pnpm package`, e2e) is meant for macOS, Linux and Windows:
+CI proves it on Linux, `pnpm gates` passes on macOS, and Windows needs B-162, B-163 and B-164. Each row with its proof: the
+[development runbook](docs/runbooks/development.md#на-каких-ос); what may be promised to a
+user: [docs/brand/facts.md](docs/brand/facts.md#где-работает).
 
 **Configure.** The extension needs no account and no key. The email leak check asks Have I
 Been Pwned only with an HIBP API key (from haveibeenpwned.com, paid); without one that source

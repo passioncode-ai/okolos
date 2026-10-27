@@ -36,6 +36,24 @@ Contract: brand-contract v1
 | Не удерживает действие, у которого нет формы и навигации | Записанный предел SCN-010 |
 | Не может опознать агента, ведущего браузер снаружи, если тот снял флаг автоматизации | Записанный предел SCN-010, измерение `isTrusted` |
 
+## Где работает
+
+Решение оператора от 2026-10-27 (прогон стабильности и Windows, B-166). Обещание и
+прогон здесь записаны раздельно: где обещание шире того, что кто-то запускал,
+строка это называет. Наблюдения с датой сделаны на `5d664c5`.
+
+| Утверждение | Чем подтверждено |
+|---|---|
+| Расширение работает в Chrome, Edge и Firefox на Windows, macOS и Linux | Сборки две, по манифесту на каждую: `apps/extension/manifest.chrome.json` для Chrome и Edge (оба на Chromium), `apps/extension/manifest.firefox.json` для Firefox; `tools/build.mjs` собирает цели `chrome` и `firefox`. Пути кода, зависящего от ОС, в собранном расширении нет: `tools/docs.test.ts` («promises every OS only while the built extension asks no OS») читает `dist/chrome` и `dist/firefox` и отказывает на любом опросе платформы. Путь с машины пользователя расширение видит в одном месте, в имени загрузки, и режет его по обоим разделителям, `/` и `\` (`packages/platform/src/adapter.ts:289`, тест «reports a bare filename, whatever path the browser hands over» с путями macOS и Windows) |
+| Браузерный прогон есть в Chromium и Firefox на Linux | e2e в CI на `ubuntu-latest`, задачи `e2e (chromium)` и `e2e (firefox)` в `.github/workflows/ci.yml`; прогон 40402594155 на `5d664c5` зелёный. На Windows и в Edge браузерного прогона нет |
+| В Edge ставится сборка Chrome; карточки в Edge Add-ons нет | Отдельной цели Edge в `tools/build.mjs` нет. Публикация в Edge Add-ons ждёт решения оператора (B-137) |
+| `okolos-mail scan` работает на Windows, macOS и Linux, когда закрыт B-161 | Команда читает один файл и зовёт только Node (`apps/mail-cli/src/index.ts`). До исправления B-161 она не запускалась: 2026-10-27 на macOS, Node 26.10.0, `node apps/mail-cli/src/index.ts scan <файл>` падал с `ERR_MODULE_NOT_FOUND` на `./scan.js`, а на Windows проверка запуска `process.argv[1].split('/')` (`index.ts:76`) не узнаёт путь с `\`. Исправление и тест с путём Windows в PR #20 |
+| Наблюдение за почтой только для Apple Mail на macOS, и оно не построено | SCN-042 в `docs/ux/scenarios.md`: хранилище `~/Library/Mail`, доступ Full Disk Access, статус draft; переезжает в Okolos Agent (`docs/strategy/2026-09-29-ecosystem.md:114`) |
+| Okolos Agent (мост, фаза Б1) только на macOS; Windows отдельной фазой | Папки сервиса в разметке macOS, `~/Library` (ветка `bridge/b1-run2`, `apps/agent/src/service/dirs.ts:55-57`); решение записывается в бриф и ADR моста (B-167) |
+
+Для тех, кто собирает Okolos из исходников, ОС записаны в
+[раннбуке разработки](../runbooks/development.md#на-каких-ос).
+
 ## Что уходит с устройства
 
 Полный список назначений. Других нет, и это держит тест: запись в журнал

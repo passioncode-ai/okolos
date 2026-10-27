@@ -574,6 +574,40 @@ describe('the brand pack states facts, and a fact is checkable', () => {
       )
     }
   })
+
+  it('promises every OS only while the built extension asks no OS', () => {
+    /**
+     * "Windows, macOS and Linux" rests on an absence: nothing the browser runs
+     * asks which system it is on, so nothing can behave differently there
+     * (B-166). An absence is read from what ships, the built bundle, and not
+     * from the sources, because a bundled dependency is invisible to a sweep of
+     * `src/`. The targets come from the manifests, so a third build cannot ship
+     * without the pack naming it.
+     */
+    const extension = path.join(root, 'apps/extension')
+    const manifests = filesIn(extension, '.json').filter((name) => name.startsWith('manifest.'))
+    expect(manifests.length, 'no manifest found to read the targets from').toBeGreaterThanOrEqual(2)
+
+    const probe = /process\.platform|getPlatformInfo|navigator\.(?:platform|userAgent|oscpu)|userAgentData/
+    for (const manifest of manifests) {
+      expect(facts, `${manifest} ships and the pack does not name it`).toContain(
+        `apps/extension/${manifest}`,
+      )
+      const dist = path.join(extension, 'dist', manifest.split('.')[1] as string)
+      expect(existsSync(dist), `${path.relative(root, dist)} is missing: run pnpm build first`).toBe(true)
+      const bundles = filesUnder(dist, '.js', { skip: [] })
+      expect(bundles.length, `${path.relative(root, dist)} holds no script`).toBeGreaterThan(0)
+      for (const file of bundles) {
+        expect(readFileSync(file, 'utf8'), `${path.relative(root, file)} asks which OS it runs on`).not.toMatch(
+          probe,
+        )
+      }
+    }
+
+    const row = /^\| Расширение работает в ([^|]+?) на ([^|]+?) \|/m.exec(facts)
+    expect(row, 'facts.md has no row promising the extension an OS list').not.toBeNull()
+    expect(row?.[2]).toBe('Windows, macOS и Linux')
+  })
 })
 
 describe('the privacy policy describes the code, not an intention', () => {

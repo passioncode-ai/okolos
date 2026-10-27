@@ -295,7 +295,11 @@ describe('downloads', () => {
     const seen: string[] = []
     platform.downloads.onCreated((item) => seen.push(item.filename))
     held.fire?.({ id: 1, url: 'https://x.test/a', filename: '/Users/example/Downloads/setup.exe' })
-    expect(seen).toEqual(['setup.exe'])
+    // Windows hands over a backslash path. This split is the only place the
+    // extension sees a path of the user's machine, so it is what the promise
+    // "Windows, macOS and Linux" in docs/brand/facts.md rests on.
+    held.fire?.({ id: 2, url: 'https://x.test/b', filename: 'C:\\Users\\example\\Downloads\\invoice.pdf.exe' })
+    expect(seen).toEqual(['setup.exe', 'invoice.pdf.exe'])
   })
 
   it('says when the browser has no downloads API rather than pretending', () => {
