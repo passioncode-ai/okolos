@@ -16,6 +16,7 @@
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
+import { isMain } from './is-main.mjs'
 
 const root = process.cwd()
 
@@ -261,6 +262,7 @@ export function writeAll() {
 
 // The path, not a `file://` string built from it: on Windows argv[1] is `C:\…`, and
 // the string never equalled the URL, so `pnpm wireframes` wrote nothing (B-162).
-if (import.meta.filename === process.argv[1]) {
+// Real paths, so a run through a symlink or a junction still runs (tools/is-main.mjs).
+if (isMain(import.meta.filename)) {
   console.log(`wrote ${writeAll()} wireframes`)
 }

@@ -11,6 +11,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { isMain } from './is-main.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
 const SOURCE = path.join(root, 'docs/privacy.md')
@@ -95,7 +96,8 @@ export function toHtml(markdown) {
   return out.join('\n')
 }
 
-if (import.meta.filename === process.argv[1]) {
+// Real paths, so a run through a symlink or a junction still runs (tools/is-main.mjs).
+if (isMain(import.meta.filename)) {
   const html = toHtml(readFileSync(SOURCE, 'utf8'))
   writeFileSync(
     OUT,

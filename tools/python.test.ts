@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -86,6 +86,20 @@ describe('running a script through it', () => {
     const script = path.join(dir, 'ok.py')
     writeFileSync(script, 'pass\n')
     expect(() => execFileSync(process.execPath, [tool, script])).not.toThrow()
+  })
+
+  it('runs the linter when started through a linked directory, not exit 0 without it', () => {
+    // The old guard compared import.meta.filename (the real path) with argv[1] (the
+    // path as typed): through a symlink or a junction it skipped main and exited 0, a
+    // gate passing without running. A junction needs no privilege on Windows; elsewhere
+    // the type is ignored and this is a directory symlink.
+    const linked = path.join(mkdtempSync(path.join(os.tmpdir(), 'okolos-python-link-')), 'tools')
+    symlinkSync(import.meta.dirname, linked, 'junction')
+    const script = path.join(dir, 'exit3-linked.py')
+    writeFileSync(script, 'import sys\nprint("through the link")\nsys.exit(3)\n')
+    const run = spawnSync(process.execPath, [path.join(linked, 'python.mjs'), script], { encoding: 'utf8' })
+    expect(run.stdout.trim()).toBe('through the link')
+    expect(run.status).toBe(3)
   })
 
   it('refuses a call that names no script', () => {

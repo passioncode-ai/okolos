@@ -16,6 +16,7 @@
  * first, so the interpreter the gates used before this file is still the one they use.
  */
 import { spawnSync } from 'node:child_process'
+import { isMain } from './is-main.mjs'
 
 /** Exits 0 only under Python 3; what each candidate is asked to run. */
 export const PYTHON3_CHECK = 'import sys; sys.exit(0 if sys.version_info[0] == 3 else 1)'
@@ -83,7 +84,8 @@ export function noPythonMessage(platform = process.platform) {
   return `no Python 3 found (tried ${tried}). Install Python 3 so one of those names runs it.`
 }
 
-if (import.meta.filename === process.argv[1]) {
+// Real paths, so a run through a symlink or a junction still runs (tools/is-main.mjs).
+if (isMain(import.meta.filename)) {
   const [script, ...rest] = process.argv.slice(2)
   if (script === undefined) {
     console.error('usage: node tools/python.mjs <script.py> [args…]')
