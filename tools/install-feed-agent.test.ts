@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -17,6 +17,7 @@ import {
   isDisabled,
   originUrl,
   rendered,
+  stableNode,
   uninstallAgent,
 } from './install-feed-agent.mjs'
 
@@ -96,6 +97,27 @@ describe('uninstall is symmetric (F5, LC-14)', () => {
     expect(result.ok).toBe(true)
     expect(existsSync(h.paths.agentBin), 'a bootstrap left behind is a half-installed agent').toBe(false)
     for (const dir of [h.paths.agentCheckout, h.paths.state, h.paths.logs]) expect(existsSync(dir), dir).toBe(true)
+  })
+
+  it('removes an emptied ~/.okolos/bin and a staging folder an interrupted install left', async () => {
+    const h = home()
+    installBootstrap({ dir: h.paths.agentBin })
+    mkdirSync(`${h.paths.agentBin}.staging-4242`)
+    const launchd = fakeLaunchd({ loaded: false })
+    const result = await uninstallAgent({ ...base, target: h.target, bin: h.paths.agentBin, launchctl: launchd.launchctl })
+    expect(result.ok).toBe(true)
+    expect(existsSync(`${h.paths.agentBin}.staging-4242`)).toBe(false)
+    expect(existsSync(path.dirname(h.paths.agentBin)), '~/.okolos/bin held only the agent').toBe(false)
+    expect(existsSync(path.join(h.dir, '.okolos')), 'the rest of ~/.okolos is not the agent’s to remove').toBe(true)
+  })
+
+  it('keeps ~/.okolos/bin when something else lives there', async () => {
+    const h = home()
+    installBootstrap({ dir: h.paths.agentBin })
+    writeFileSync(path.join(path.dirname(h.paths.agentBin), 'someone-elses-tool'), '')
+    const launchd = fakeLaunchd({ loaded: false })
+    await uninstallAgent({ ...base, target: h.target, bin: h.paths.agentBin, launchctl: launchd.launchctl })
+    expect(existsSync(path.join(path.dirname(h.paths.agentBin), 'someone-elses-tool'))).toBe(true)
   })
 
   it('succeeds when the agent was never loaded — absence is the outcome asked for', async () => {
@@ -327,6 +349,39 @@ describe('the bootstrap launchd starts lives outside the checkout (B-159)', () =
     expect(result.stderr).toMatch(/feed-agent: failed in checkout: .*missing/)
     expect(readStatus(h.paths.status)).toMatchObject({ outcome: 'failed', stage: 'checkout', consecutiveFailures: 1, recoveredCheckout: false })
     expect(readFileSync(h.paths.log, 'utf8')).toMatch(/is missing; recreating it/)
+  })
+})
+
+describe('the node the plist falls back to', () => {
+  /** A Homebrew-like layout: a versioned binary and a stable link to it on PATH. */
+  function brew() {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-node-'))
+    const versioned = path.join(dir, 'Cellar/node/26.10.0_2/bin/node')
+    mkdirSync(path.dirname(versioned), { recursive: true })
+    writeFileSync(versioned, '#!/bin/sh\n')
+    chmodSync(versioned, 0o755)
+    mkdirSync(path.join(dir, 'bin'))
+    symlinkSync(versioned, path.join(dir, 'bin/node'))
+    const other = path.join(dir, 'other/node')
+    mkdirSync(path.dirname(other))
+    writeFileSync(other, '#!/bin/sh\n')
+    chmodSync(other, 0o755)
+    return { dir, versioned, link: path.join(dir, 'bin/node'), other }
+  }
+
+  it('is the PATH entry that leads to the running node, not its versioned realpath (a brew upgrade removes that)', () => {
+    const b = brew()
+    const pathEnv = [path.dirname(b.other), path.join(b.dir, 'bin')].join(path.delimiter)
+    expect(stableNode({ execPath: b.versioned, pathEnv })).toBe(b.link)
+  })
+
+  it('skips a different node earlier on PATH', () => {
+    const b = brew()
+    expect(stableNode({ execPath: b.versioned, pathEnv: path.dirname(b.other) })).toBe(b.versioned)
+  })
+
+  it('is the running node itself when PATH has no way to it', () => {
+    expect(stableNode({ execPath: '/opt/node/bin/node', pathEnv: '' })).toBe('/opt/node/bin/node')
   })
 })
 

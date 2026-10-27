@@ -19,6 +19,7 @@ export function rendered(options: {
   origin?: string
 }): string
 export function installBootstrap(options: { dir: string; from?: string; files?: readonly string[]; log?: (line: string) => void }): void
+export function stableNode(options?: { execPath?: string; pathEnv?: string }): string
 export function originUrl(options: { repo?: string; tool?: Tool }): Promise<string>
 export function isDisabled(printDisabled: string, label?: string): boolean
 export function ensureCheckout(options: { repo?: string; checkout: string; tool?: Tool; log?: (line: string) => void }): Promise<void>

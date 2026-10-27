@@ -1,5 +1,16 @@
 #!/usr/bin/env node
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,6 +20,7 @@ import { runBounded } from './feed/bounded.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { readStatus } from './feed/status.mjs'
 import { discover, quote, runnerArgv, xml } from './feed-agent-credential.mjs'
+import { directoriesIn } from './tree.mjs'
 
 /**
  * Installs the feed-refresh agent on this machine, or prints what it would do.
@@ -59,7 +71,7 @@ export function rendered({
   runner,
   logDir,
   bootstrap,
-  node = process.execPath,
+  node = stableNode(),
   sourceRepo = root,
   origin = '',
 }) {
@@ -134,6 +146,29 @@ export function installBootstrap({ dir, from = path.join(root, 'tools/feed'), fi
   log(`bootstrap: ${path.join(dir, 'bootstrap.mjs')} (${files.length} files, outside the checkout)`)
 }
 
+/**
+ * The node the plist falls back to when the login shell finds none: the PATH entry
+ * that leads to the running node (`/opt/homebrew/bin/node`), not the running
+ * binary's own path. `process.execPath` is the realpath, a versioned folder such
+ * as `Cellar/node/26.10.0_2`, which the next `brew upgrade` deletes.
+ */
+export function stableNode({ execPath = process.execPath, pathEnv = process.env.PATH ?? '' } = {}) {
+  const real = (file) => {
+    try {
+      return realpathSync(file)
+    } catch {
+      return null
+    }
+  }
+  const running = real(execPath) ?? execPath
+  for (const dir of pathEnv.split(path.delimiter)) {
+    if (!dir || !path.isAbsolute(dir)) continue
+    const candidate = path.join(dir, 'node')
+    if (existsSync(candidate) && real(candidate) === running) return candidate
+  }
+  return execPath
+}
+
 /** The clone's origin URL, which the bootstrap clones from when the clone itself is gone; '' when none. */
 export async function originUrl({ repo = root, tool = runBounded }) {
   const result = await tool('git', ['-C', repo, 'remote', 'get-url', 'origin'], { timeoutMs: 15_000 })
@@ -173,7 +208,23 @@ export async function uninstallAgent({ label = LABEL, domain, target, bin, launc
   // Not loaded is the outcome asked for, not a failure.
   await launchctl(['bootout', `${domain}/${label}`])
   rmSync(target, { force: true })
-  if (bin) rmSync(bin, { recursive: true, force: true })
+  if (bin) {
+    rmSync(bin, { recursive: true, force: true })
+    // A staging folder an interrupted install left, and ~/.okolos/bin when the
+    // agent was all it held. rmdir removes only an empty folder.
+    const parent = path.dirname(bin)
+    const staging = `${path.basename(bin)}.staging-`
+    if (existsSync(parent)) {
+      for (const name of directoriesIn(parent)) {
+        if (name.startsWith(staging)) rmSync(path.join(parent, name), { recursive: true, force: true })
+      }
+      try {
+        rmdirSync(parent)
+      } catch {
+        // Not empty: something else lives there.
+      }
+    }
+  }
 
   if (purge) {
     const { repo, paths, tool = runBounded } = purge
@@ -231,9 +282,9 @@ async function main() {
 
   if (process.platform !== 'darwin') {
     console.error(
-      'launchd is a macOS thing. On Linux the same schedule is a systemd timer or a\n' +
-        'crontab line running `node tools/feed-job.mjs --agent` every twelve hours, from a\n' +
-        'checkout at origin/main on a machine that holds the signing key.',
+      'The feed agent is macOS-only (ADR-0017): launchd starts its bootstrap, which keeps\n' +
+        'the checkout and the status record. Elsewhere, publish by hand from a clean clone at\n' +
+        'origin/main on a machine that holds the signing key: pnpm feed:refresh.',
     )
     process.exit(argv.includes('--uninstall') ? 0 : 1)
   }
