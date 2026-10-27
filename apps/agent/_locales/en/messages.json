@@ -160,10 +160,10 @@
     "message": "Agent window closed"
   },
   "refusalsHeading": {
-    "message": "Recent refusals"
+    "message": "Recent refusals and failures"
   },
   "refusalsEmpty": {
-    "message": "No refusals."
+    "message": "No refusals or failures."
   },
   "refusalLine": {
     "message": "$WHEN$. $AGENT$, call “$ASKED$”. Refused: $WHAT$",
@@ -213,7 +213,7 @@
     "message": "you were using this window"
   },
   "refusal_browser_offline": {
-    "message": "could not start or reach its Chrome"
+    "message": "the agents' Chrome did not start or does not answer"
   },
   "refusal_blocked_by_shield": {
     "message": "Okolos protection stopped the call"
@@ -264,7 +264,7 @@
     }
   },
   "pairingClaimExpired": {
-    "message": "The agent did not collect its key within five minutes. No access was given; it has to ask again."
+    "message": "The key was not collected within five minutes. No access was given; the agent has to ask again."
   },
   "pairingDuplicate": {
     "message": "The name looks like another request's name. Compare the code with special care."
@@ -318,7 +318,7 @@
     "message": "the call had no valid access key"
   },
   "journalError": {
-    "message": "The agents' journal cannot be written: $WHAT$. Until it is fixed, agents get a refusal and no page content is given to them. Run okolos-agent doctor to see what is wrong with the journal.",
+    "message": "The agents' journal cannot be written: $WHAT$. Until it is fixed, every agent call ends in an Okolos Agent failure and no page content is given to agents. Run okolos-agent doctor to see what is wrong with the journal.",
     "placeholders": {
       "what": {
         "content": "$1"
@@ -372,10 +372,13 @@
     }
   },
   "agentLabelRevoked": {
-    "message": "Agent $NAME$ (access revoked)",
+    "message": "Agent $NAME$ (access since $DATE$, revoked)",
     "placeholders": {
       "name": {
         "content": "$1"
+      },
+      "date": {
+        "content": "$2"
       }
     }
   },
@@ -391,7 +394,7 @@
     }
   },
   "refusalsIncomplete": {
-    "message": "This list is incomplete: while the agents' journal cannot be written, refusals are not recorded."
+    "message": "This list is incomplete: while the agents' journal cannot be written, refusals and failures are not recorded."
   },
   "pageSessionExpired": {
     "message": "The page session expired. Open Okolos Agent again in Fabric Dashboards."
@@ -437,5 +440,19 @@
         "content": "$4"
       }
     }
+  },
+  "pairingStoreUnwritable": {
+    "message": "The access list cannot be written: $WHAT$. Access cannot be given or revoked right now; agents with access work as before. Run okolos-agent doctor to see what is wrong with the file.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingGone": {
+    "message": "This request is gone: it expired or was declined."
+  },
+  "agentGone": {
+    "message": "This agent no longer has access."
   }
 }

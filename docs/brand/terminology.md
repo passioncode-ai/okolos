@@ -140,7 +140,8 @@ Contract: brand-contract v1
 | Забрать доступ | **Отозвать доступ** | Revoke access | `[data-role=agent-revoke]` |
 | Работа агента с областью, бюджетом и сроком | **задача** | task | `TaskScope` |
 | Шаг задачи, который считается в бюджет | **шаг** | step | `stepBudget` |
-| Ответ «нет» по правилам задачи | **отказ** | refusal | `BridgeRefusal` |
+| Ответ «нет» по правилам задачи или двери | **отказ** | refusal | `BridgeRefusal`, кроме трёх кодов сбоя; `DoorRejection` |
+| Okolos Agent не смог выполнить разрешённый вызов: `internal`, `browser_offline`, `cleaning_incomplete` | **сбой Okolos Agent** | Okolos Agent failure | `refusalFailureLine` |
 | Локальный адрес Okolos Agent, через который агенты обращаются к службе | **дверь** | door | `doorRoute`, `/mcp`, `/pair`, `/pair/claim` |
 | Любое обращение к службе: агента к двери, страницы или Fabric к службе | **вызов** | call | журнал агентов, `pairedSince`, `eventDrainCutOff` |
 | Программа, которая действует в браузере за человека: на его странице (гейт расширения, SCR-06) или через дверь Okolos Agent, где получает доступ и работает по задаче в своём окне | **агент** (на странице Okolos Agent имя, которое агент дал себе сам, всегда стоит после слова «агент») | agent | `AgentRecord`, `agentLabel` |
