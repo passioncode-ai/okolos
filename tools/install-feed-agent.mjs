@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
   chmodSync,
@@ -78,9 +79,32 @@ const PLACEHOLDERS = [
 ]
 const LAUNCHCTL_TIMEOUT_MS = 15_000
 
+/**
+ * The environment of every child the installer starts: git, pnpm, launchctl and the
+ * Observatory probe. Nothing the installer runs publishes, so none of them gets the
+ * Cloudflare credential (SECRET_VARIABLES, the list the job and the bootstrap drop),
+ * and git never prompts.
+ */
+export function installerEnv(from = process.env) {
+  return { ...withoutSecrets(from), GIT_TERMINAL_PROMPT: '0' }
+}
+
+/**
+ * `tool` (runBounded's shape) with installerEnv forced on every call. Every bounded
+ * child of the installer goes through here, so a new call cannot forget it.
+ */
+export function installerTool(tool = runBounded, from = process.env) {
+  return (command, args, options = {}) => tool(command, args, { ...options, env: installerEnv(options.env ?? from) })
+}
+
+/** execFileSync with installerEnv: the run discover() uses to find the Observatory. */
+export function installerRun(command, args, options = {}) {
+  return execFileSync(command, args, { ...options, env: installerEnv(options.env ?? process.env) })
+}
+
 /** launchctl, bounded. Returns `{ code, stdout, stderr }`. */
 async function realLaunchctl(args) {
-  const result = await runBounded('launchctl', args, { timeoutMs: LAUNCHCTL_TIMEOUT_MS })
+  const result = await installerTool()('launchctl', args, { timeoutMs: LAUNCHCTL_TIMEOUT_MS })
   return { code: result.code ?? 1, stdout: result.stdout, stderr: result.stderr || result.error || '' }
 }
 
@@ -136,18 +160,18 @@ export async function ensureCheckout({ repo = root, checkout, tool = runBounded,
     log(`agent checkout: ${checkout} (kept; the job fast-forwards it)`)
     return
   }
-  // No credential for git or pnpm: the same list the job and the bootstrap drop.
-  const env = { ...withoutSecrets(from), GIT_TERMINAL_PROMPT: '0' }
+  // No credential for git or pnpm (installerEnv).
+  const run = installerTool(tool, from)
   const steps = [
     // A folder deleted under git leaves its worktree entry, and `add` refuses that
     // path until the entry is pruned (B-150).
-    ['git', ['-C', repo, 'worktree', 'prune'], { env, timeoutMs: 90_000 }],
-    ['git', ['-C', repo, 'fetch', '--quiet', 'origin', 'main'], { env, timeoutMs: 90_000 }],
-    ['git', ['-C', repo, 'worktree', 'add', '--detach', checkout, 'origin/main'], { env, timeoutMs: 120_000 }],
-    ['pnpm', ['install', '--frozen-lockfile', '--filter', '@okolos/proxy'], { cwd: checkout, env, timeoutMs: 600_000 }],
+    ['git', ['-C', repo, 'worktree', 'prune'], { timeoutMs: 90_000 }],
+    ['git', ['-C', repo, 'fetch', '--quiet', 'origin', 'main'], { timeoutMs: 90_000 }],
+    ['git', ['-C', repo, 'worktree', 'add', '--detach', checkout, 'origin/main'], { timeoutMs: 120_000 }],
+    ['pnpm', ['install', '--frozen-lockfile', '--filter', '@okolos/proxy'], { cwd: checkout, timeoutMs: 600_000 }],
   ]
   for (const [command, args, options] of steps) {
-    const result = await tool(command, args, options)
+    const result = await run(command, args, options)
     if (result.code !== 0) {
       throw new Error(`${command} ${args.join(' ')} failed: ${(result.stderr || result.error || '').trim()}`)
     }
@@ -207,9 +231,9 @@ export function stableNode({ execPath = process.execPath, pathEnv = process.env.
  * production publishes run only from origin/main, and the clone the installer runs
  * in is what the bootstrap recreates the checkout from.
  */
-export async function checkBranch({ repo = root, tool = runBounded }) {
-  const git = (args, timeoutMs = 15_000) =>
-    tool('git', ['-C', repo, ...args], { timeoutMs, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } })
+export async function checkBranch({ repo = root, tool = runBounded, env = process.env }) {
+  const run = installerTool(tool, env)
+  const git = (args, timeoutMs = 15_000) => run('git', ['-C', repo, ...args], { timeoutMs })
   const branch = await git(['rev-parse', '--abbrev-ref', 'HEAD'])
   if (branch.code !== 0) return { ok: false, branch: null, reason: `git cannot read ${repo}: ${(branch.stderr || '').trim()}` }
   const name = branch.stdout.trim()
@@ -295,8 +319,8 @@ export function bootstrapDrift({ bin, from, files = BOOTSTRAP_FILES }) {
 }
 
 /** The clone's origin URL, which the bootstrap clones from when the clone itself is gone; '' when none. */
-export async function originUrl({ repo = root, tool = runBounded }) {
-  const result = await tool('git', ['-C', repo, 'remote', 'get-url', 'origin'], { timeoutMs: 15_000 })
+export async function originUrl({ repo = root, tool = runBounded, env = process.env }) {
+  const result = await installerTool(tool, env)('git', ['-C', repo, 'remote', 'get-url', 'origin'], { timeoutMs: 15_000 })
   return result.code === 0 ? result.stdout.trim() : ''
 }
 
@@ -352,7 +376,8 @@ export async function uninstallAgent({ label = LABEL, domain, target, bin, launc
   }
 
   if (purge) {
-    const { repo, paths, tool = runBounded } = purge
+    const { repo, paths, tool: purgeTool = runBounded } = purge
+    const tool = installerTool(purgeTool)
     if (existsSync(paths.agentCheckout)) {
       const removed = await tool('git', ['-C', repo, 'worktree', 'remove', '--force', paths.agentCheckout], { timeoutMs: 60_000 })
       if (removed.code !== 0) log(`git worktree remove failed (${(removed.stderr || '').trim()}); removing the directory`)
@@ -462,7 +487,7 @@ async function main() {
 
   const plist = rendered({
     checkout: paths.agentCheckout,
-    runner: runnerArgv(discover()),
+    runner: runnerArgv(discover({ run: installerRun })),
     logDir: paths.logs,
     stateDir: paths.state,
     bootstrap: paths.bootstrap,

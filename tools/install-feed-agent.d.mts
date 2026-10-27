@@ -33,13 +33,19 @@ export interface BranchCheck {
   changed?: string[]
   reason?: string
 }
-export function checkBranch(options: { repo?: string; tool?: Tool }): Promise<BranchCheck>
+export function checkBranch(options: { repo?: string; tool?: Tool; env?: Record<string, string | undefined> }): Promise<BranchCheck>
 export function offMainNote(branch: BranchCheck, at?: string): string
 export function bootstrapDrift(options: { bin: string; from: string; files?: readonly string[] }): {
   matches: boolean | null
   differs: string[]
 }
-export function originUrl(options: { repo?: string; tool?: Tool }): Promise<string>
+export function originUrl(options: { repo?: string; tool?: Tool; env?: Record<string, string | undefined> }): Promise<string>
+/** The environment of every installer child: no Cloudflare credential, git never prompts. */
+export function installerEnv(from?: Record<string, string | undefined>): Record<string, string | undefined>
+/** `tool` with installerEnv forced on every call. */
+export function installerTool(tool?: Tool, from?: Record<string, string | undefined>): Tool
+/** execFileSync with installerEnv. */
+export function installerRun(command: string, args: readonly string[], options?: { encoding?: BufferEncoding; env?: Record<string, string | undefined> }): string
 export function isDisabled(printDisabled: string, label?: string): boolean
 export function ensureCheckout(options: {
   repo?: string

@@ -25,7 +25,8 @@ import { spawn } from 'node:child_process'
  * Variables that carry the Cloudflare credential. Only the publish step, behind
  * the secret runner, may see one; every other child (git, pnpm install, the
  * ingest) gets `withoutSecrets(env)`. One list for the job, the bootstrap and the
- * installer.
+ * installer (every installer child goes through its `installerEnv`). The bootstrap
+ * hands the job itself the whole environment: publish inherits it through the job.
  */
 export const SECRET_VARIABLES = ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY']
 

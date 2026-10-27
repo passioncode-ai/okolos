@@ -2,11 +2,13 @@ import { spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { feedPaths } from './feed/paths.mjs'
 import { readStatus, stampRunId, writeStatus } from './feed/status.mjs'
 import { filesIn } from './tree.mjs'
+// @ts-expect-error: a plain .mjs tool, typed by its use here (as in feed-agent-credential.test.ts)
+import { discover } from './feed-agent-credential.mjs'
 import { BOOTSTRAP_FILES, BOOTSTRAP_SOURCES } from './feed/bootstrap.mjs'
 import {
   LABEL,
@@ -18,6 +20,7 @@ import {
   ensureCheckout,
   installAgent,
   installBootstrap,
+  installerRun,
   isDisabled,
   originUrl,
   rendered,
@@ -809,5 +812,74 @@ describe('where the agent recreates its checkout from', () => {
 
   it('answers empty when there is no origin, and the bootstrap then uses the clone alone', async () => {
     expect(await originUrl({ repo: '/repo', tool: async () => ({ ...ok(), code: 2, stderr: 'No such remote' }) })).toBe('')
+  })
+})
+
+/**
+ * Nothing the installer starts publishes, so none of its children may hold the
+ * Cloudflare credential (B-159, fix round 5): the same list the job and the bootstrap
+ * drop. These run the real spawn paths (runBounded, execFileSync, the default
+ * launchctl) against stand-ins on a PATH that holds nothing else, so the operator's
+ * launchctl and git cannot be reached; each stand-in writes the environment it got.
+ */
+describe.skipIf(process.platform === 'win32')('no installer child gets the Cloudflare credential', () => {
+  function standIns() {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-installer-env-'))
+    const bin = path.join(dir, 'bin')
+    const dumps = path.join(dir, 'dumps')
+    mkdirSync(bin)
+    mkdirSync(dumps)
+    const dump = '/usr/bin/env > "$OKOLOS_TEST_DUMPS/$(/usr/bin/basename "$0")-$$.env"\n'
+    const script = (name: string, body = '') => {
+      writeFileSync(path.join(bin, name), `#!/bin/sh\n${dump}${body}`)
+      chmodSync(path.join(bin, name), 0o755)
+    }
+    // The Observatory probe: which finds the launcher, the launcher names a root, and
+    // the launcher's interpreter (here /bin/sh) runs the root's use_secret.py.
+    const root = path.join(dir, 'observatory')
+    mkdirSync(path.join(root, 'tools'), { recursive: true })
+    writeFileSync(path.join(root, 'tools/use_secret.py'), `${dump}`)
+    // `worktree add` makes the folder, as git would: pnpm install runs in it.
+    script('git', '[ "$3 $4" = "worktree add" ] && /bin/mkdir -p "$6"\nexit 0\n')
+    script('pnpm')
+    script('launchctl')
+    script('which', `echo ${path.join(bin, 'project-observatory')}\n`)
+    script('project-observatory', `echo ${root}\n`)
+    return { dir, bin, dumps }
+  }
+
+  it('strips CLOUDFLARE_API_TOKEN and CLOUDFLARE_API_KEY from git, launchctl and the Observatory probe', async () => {
+    const s = standIns()
+    const h = home()
+    vi.stubEnv('PATH', s.bin)
+    vi.stubEnv('OKOLOS_TEST_DUMPS', s.dumps)
+    vi.stubEnv('CLOUDFLARE_API_TOKEN', 'token-from-the-shell')
+    vi.stubEnv('CLOUDFLARE_API_KEY', 'key-from-the-shell')
+    try {
+      await checkBranch({ repo: '/repo' })
+      await originUrl({ repo: '/repo' })
+      await ensureCheckout({ repo: '/repo', checkout: path.join(h.dir, 'checkout'), log: quiet })
+      await installAgent({ ...base, target: h.target, plist: '<plist/>' })
+      await agentStatus({ ...base, target: h.target, paths: h.paths })
+      mkdirSync(h.paths.agentCheckout, { recursive: true })
+      await uninstallAgent({ ...base, target: h.target, bin: h.paths.agentBin, purge: { repo: '/repo', paths: h.paths } })
+      discover({ run: installerRun, log: quiet })
+    } finally {
+      vi.unstubAllEnvs()
+    }
+    const seen = filesIn(s.dumps, '.env')
+    const by = (name: string) => seen.filter((file) => file.startsWith(`${name}-`)).length
+    // Every path ran: checkBranch 5, originUrl 1, ensureCheckout 3, the purge 2.
+    expect(by('git')).toBe(11)
+    expect(by('pnpm')).toBe(1)
+    // install 3, status 1, uninstall 2.
+    expect(by('launchctl')).toBe(6)
+    expect([by('which'), by('project-observatory'), by('use_secret.py')]).toEqual([1, 1, 1])
+    for (const file of seen) {
+      const text = readFileSync(path.join(s.dumps, file), 'utf8')
+      // Booleans, so a failure names the file and never prints an environment.
+      expect(/^CLOUDFLARE_API_(TOKEN|KEY)=/m.test(text), `${file} holds the credential`).toBe(false)
+      expect(/^OKOLOS_TEST_DUMPS=/m.test(text), `${file} lost the rest of the environment`).toBe(true)
+    }
   })
 })

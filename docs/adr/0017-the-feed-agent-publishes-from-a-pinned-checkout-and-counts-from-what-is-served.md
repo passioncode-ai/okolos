@@ -53,7 +53,8 @@ That one line carried four defects the audit measured:
    entry point, retries with backoff, and a status record per run that counts failures in a row.
    The Cloudflare token reaches only the publish step: one list of credential variables
    (`tools/feed/bounded.mjs`) is dropped from every other child of the job, the bootstrap and the
-   installer. Since B-159 one deadline covers the whole
+   installer; the job itself gets the bootstrap's whole environment, because publish inherits it
+   through the job. Since B-159 one deadline covers the whole
    run, the checkout repair included (45 minutes; the job's watchdog is what is left minus two
    minutes, at most thirty).
 5. **A login is not a publish**: the agent's run skips when the served feed is younger than its

@@ -187,7 +187,10 @@ node tools/install-feed-agent.mjs --uninstall --purge  # и чекаут, сос
 - **Токен** получает только стадия публикации: раннер секрета (`OKOLOS_SECRET_RUNNER` в plist,
   argv без значения) оборачивает её одну. `CLOUDFLARE_API_TOKEN` и `CLOUDFLARE_API_KEY`
   убираются из окружения всех остальных дочерних процессов задачи, загрузчика и установщика
-  (один список, `SECRET_VARIABLES` в `tools/feed/bounded.mjs`).
+  (один список, `SECRET_VARIABLES` в `tools/feed/bounded.mjs`; каждый дочерний процесс
+  установщика, git, pnpm, launchctl и поиск Observatory, идёт через `installerTool` или
+  `installerRun` в `tools/install-feed-agent.mjs`). Исключение одно: загрузчик отдаёт самой
+  задаче окружение целиком, потому что публикация наследует его через неё.
 
 Входной файл — обновление без подписи:
 
