@@ -23,7 +23,7 @@ covers: REQ-53, REQ-54, REQ-55, REQ-56, REQ-57, REQ-58, REQ-59, REQ-60, REQ-61, 
 | # | Модуль | Где | Владеет REQ | Зависит от |
 |---|---|---|---|---|
 | **K0** | Контракты моста | `packages/contracts/src/bridge.ts` | REQ-53 | — |
-| **K1** | CDP-клиент по pipe | `packages/cdp-pipe` | REQ-54 | K0 |
+| **K1** | CDP-клиент по pipe | `packages/cdp-pipe` | REQ-54 | ни от чего: `packages/cdp-pipe/package.json` без зависимостей; отказ отдаёт своим `CdpError`, код отказа моста из K0 по нему выбирает K3 |
 | **K2** | Снимок для агента | `packages/core-snapshot` | REQ-55, REQ-56 | K0, `core-injection`, `core-sanitizer` |
 | **K3** | Демон Okolos Agent | `apps/agent` | REQ-57, REQ-58, REQ-59, REQ-60 | K0, K1, K2, `net` |
 | **K4** | Окно агента | `apps/agent/src/window` | REQ-61 | K1, K3 |
