@@ -112,10 +112,34 @@ describe('the name an agent gives itself', () => {
     expect(checkAgentName('okolos-agent')).toBe('name_reserved')
   })
 
+  // Fix round 3: the reserved name is compared on a stricter key: the folded name with every
+  // character that is not a letter removed and Cyrillic written in Latin letters, so spacing,
+  // punctuation, a capital I and the Russian spelling do not get around it.
+  it('refuses "okolos" spelled apart, in Cyrillic, or with a capital I for the l (fix round 3)', () => {
+    for (const name of [
+      'OkoIos', // capital i for the l
+      'Околос', // Cyrillic
+      'ОКОЛОС',
+      'O k o l o s',
+      'Oko-los',
+      'O.k.o.l.o.s',
+      'oko_los',
+      'oko los',
+      '0kolos',
+      'ｏkolos',
+      'Okoлos', // one Cyrillic letter
+      'my Ok0l0s agent',
+      'Ökolos', // a diacritic is not a letter of its own
+    ]) {
+      expect(checkAgentName(name), name).toBe('name_reserved')
+    }
+    expect(checkAgentName('Okol\u034fos')).toBe('name_control') // refused already, as invisible
+  })
+
   it('accepts a name that only shares letters with "okolos"', () => {
-    expect(checkAgentName('Kolos')).toBeNull()
-    expect(checkAgentName('Claude Code')).toBeNull()
-    expect(checkAgentName('oko los')).toBeNull()
+    for (const name of ['Kolos', 'Claude Code', 'oko', 'Cursor', 'Колос', 'Око', 'Okolo agent']) {
+      expect(checkAgentName(name), name).toBeNull()
+    }
   })
 
   it('folds a name the way the duplicate check does: NFKC, lower case, look-alikes, spaces', () => {

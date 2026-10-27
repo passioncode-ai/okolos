@@ -5,8 +5,8 @@
  * six-digit code the person compares. So the name may not crowd the page, may not carry
  * numerals that could pass for the code, and may not carry a character that moves, hides or breaks
  * text. Nor may it pass the agent off as Okolos itself: the page is Okolos speaking, so a name that
- * looks like it contains "okolos" is reserved. A refusal is a machine code; the page and the CLI map
- * it through the catalogue.
+ * reads as "okolos", however spelled or spaced, is reserved. A refusal is a machine code; the page
+ * and the CLI map it through the catalogue.
  */
 import { skeleton } from '@okolos/core-lookalike'
 
@@ -85,8 +85,32 @@ export function nameSkeleton(name: string): string {
   return foldReadsAs(folded).replace(/\s+/gu, ' ').trim()
 }
 
-/** The product's own name, as it looks: a name that contains it is refused (`name_reserved`). */
-const RESERVED = nameSkeleton('okolos')
+/**
+ * Cyrillic in Latin letters, for the reserved-name key only: a fixed table over the basic Russian
+ * alphabet (and the Ukrainian and Belarusian letters beside it). Where a letter looks like a Latin
+ * one, the look wins (р is p, у is y, х is x); otherwise the sound does (л is l, с is s).
+ */
+const CYRILLIC_TO_LATIN: Readonly<Record<string, string>> = {
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k',
+  л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'p', с: 's', т: 't', у: 'y', ф: 'f', х: 'x', ц: 'ts',
+  ч: 'ch', ш: 'sh', щ: 'shch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
+  і: 'i', ї: 'i', є: 'e', ґ: 'g', ў: 'u',
+}
+
+/**
+ * The stricter key the reserved name is compared on (fix round 3): Cyrillic written in Latin
+ * letters (before the look-alike table, which would make с a c), then `nameSkeleton`, then every
+ * character that is not a letter removed: spaces, hyphens, dots, underscores, diacritics, and the
+ * numerals the folding left (0 and 1 are already o and l). So `O k o l o s`, `Oko-los`, `Околос`
+ * and `OkoIos` all give `okolos`.
+ */
+function reservedKey(name: string): string {
+  const latin = [...name.normalize('NFKC')].map((char) => CYRILLIC_TO_LATIN[char.toLowerCase()] ?? char).join('')
+  return nameSkeleton(latin).normalize('NFD').replace(/\P{L}/gu, '')
+}
+
+/** The product's own name: a name whose key contains it is refused (`name_reserved`). */
+const RESERVED = 'okolos'
 
 /** The reason the name is refused, or null when it may be shown. */
 export function checkAgentName(name: string): NameRefusal | null {
@@ -98,6 +122,6 @@ export function checkAgentName(name: string): NameRefusal | null {
   if (CONTROL.test(name) || STACKED_MARKS.test(name)) return 'name_control'
   if (!VISIBLE.test(name)) return 'name_empty'
   if (numerals(name) > MAX_NUMERIC) return 'name_digits'
-  if (nameSkeleton(name).includes(RESERVED)) return 'name_reserved'
+  if (reservedKey(name).includes(RESERVED)) return 'name_reserved'
   return null
 }
