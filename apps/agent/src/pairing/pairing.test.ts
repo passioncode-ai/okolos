@@ -213,6 +213,55 @@ describe('how long a request lives and how many there may be (spec §11 F5)', ()
   })
 })
 
+describe('two waiting requests under one name (spec §11 F5)', () => {
+  function flags(pairing: Pairing, now: number): Record<string, boolean> {
+    return Object.fromEntries(pairing.list(now).requests.map((row) => [`${row.name}#${row.handle}`, row.duplicateName]))
+  }
+
+  it('are both marked, and a request with a name of its own is not', () => {
+    const pairing = open()
+    asked(pairing.request('Claude Code', T0))
+    asked(pairing.request('Claude Code', T0 + 1))
+    asked(pairing.request('Codex', T0 + 2))
+    const rows = pairing.list(T0 + 3).requests
+    expect(rows.filter((row) => row.name === 'Claude Code').map((row) => row.duplicateName)).toEqual([true, true])
+    expect(rows.find((row) => row.name === 'Codex')?.duplicateName).toBe(false)
+  })
+
+  it('are marked when the names differ only in case or in Unicode form', () => {
+    const pairing = open()
+    asked(pairing.request('Claude Code', T0))
+    asked(pairing.request('claude code', T0 + 1))
+    expect(Object.values(flags(pairing, T0 + 2))).toEqual([true, true])
+
+    const other = open()
+    asked(other.request('Café', T0))
+    asked(other.request('Café', T0 + 1))
+    expect(Object.values(flags(other, T0 + 2))).toEqual([true, true])
+  })
+
+  it('stay marked when one is already confirmed, and the mark goes when the other leaves', () => {
+    const pairing = open()
+    const first = asked(pairing.request('Claude Code', T0))
+    const second = asked(pairing.request('Claude Code', T0 + 1))
+    expect(pairing.confirm(first.requestId, T0 + 2)).toBe(true)
+    expect(Object.values(flags(pairing, T0 + 3))).toEqual([true, true])
+    expect(pairing.decline(second.requestId)).toBe(true)
+    expect(Object.values(flags(pairing, T0 + 4))).toEqual([false])
+  })
+
+  it('are not marked against an expired row, which waits for nothing', () => {
+    const pairing = open()
+    asked(pairing.request('Claude Code', T0))
+    asked(pairing.request('Claude Code', T0 + REQUEST_LIFETIME_MS))
+    const rows = pairing.list(T0 + REQUEST_LIFETIME_MS + 1).requests
+    expect(rows.map((row) => [row.state, row.duplicateName])).toEqual([
+      ['pending', false],
+      ['expired', false],
+    ])
+  })
+})
+
 describe('the page acts by handle, never by request id (audit #9)', () => {
   it('confirms by the handle list() gives, and the agent can then claim', () => {
     const pairing = open()

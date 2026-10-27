@@ -58,6 +58,11 @@ export interface PublicRequest {
   readonly expiresAt: number
   /** An expired row is shown for EXPIRED_SHOWN_MS with nothing to press; its handle does nothing. */
   readonly state: 'pending' | 'confirmed' | 'expired'
+  /**
+   * Another waiting request (pending or confirmed) carries the same name, compared without case
+   * and after Unicode normalisation; every such request is marked. Never set on an expired row.
+   */
+  readonly duplicateName: boolean
 }
 
 /**
@@ -192,16 +197,28 @@ export class Pairing {
 
   list(now: number): { requests: PublicRequest[]; agents: AgentRecord[] } {
     this.sweep(now)
-    const live = [...this.byHandle.values()].map((entry): PublicRequest => ({
+    const waiting = [...this.byHandle.values()]
+    const perName = new Map<string, number>()
+    for (const entry of waiting) perName.set(sameName(entry.name), (perName.get(sameName(entry.name)) ?? 0) + 1)
+    const live = waiting.map((entry): PublicRequest => ({
       handle: entry.handle,
       name: entry.name,
       code: entry.code,
       createdAt: entry.createdAt,
       expiresAt: deadline(entry),
       state: entry.confirmedAt === null ? 'pending' : 'confirmed',
+      duplicateName: (perName.get(sameName(entry.name)) ?? 0) > 1,
     }))
     const gone = [...this.ended.values()].map(
-      ({ handle, name, code, createdAt, endedAt }): PublicRequest => ({ handle, name, code, createdAt, expiresAt: endedAt, state: 'expired' }),
+      ({ handle, name, code, createdAt, endedAt }): PublicRequest => ({
+        handle,
+        name,
+        code,
+        createdAt,
+        expiresAt: endedAt,
+        state: 'expired',
+        duplicateName: false,
+      }),
     )
     const requests = [...live, ...gone]
     const agents = this.agents.map(({ agentId, name, pairedAt }) => ({ agentId, name, pairedAt }))
@@ -268,6 +285,11 @@ export class Pairing {
 
 function deadline(entry: Entry): number {
   return entry.confirmedAt === null ? entry.createdAt + REQUEST_LIFETIME_MS : entry.confirmedAt + CLAIM_WINDOW_MS
+}
+
+/** Two names a person would read as one: compatibility-normalised and case-folded. */
+function sameName(name: string): string {
+  return name.normalize('NFKC').toLowerCase()
 }
 
 function sha256(key: string): string {
