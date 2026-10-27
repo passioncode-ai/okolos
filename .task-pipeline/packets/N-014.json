@@ -33,6 +33,7 @@
   "ключи taskProfileAgent и taskProfileDisposable в обоих каталогах, copylot_check (аудит #20)",
   "тексты службы уже идут через каталог (N-024): служба не стартует без своих ключей; N-014 переносит в каталог английские тексты набора Fabric (403, занятый замок) или записывает, почему они остаются протокольными",
   "eventsUnreadable не утверждает, что сохранены все остальные события: обрезка по сроку при том же старте может удалить старые (проверка product N-024 круг 2)",
+  "слова для машинных причин привязки: name_not_text, name_empty, name_too_long, name_digits, name_bidi, name_control, too_many_pending, too_many_requests и причин хранилища unreadable, not_json, not_a_store, bad_record; copylot_check (проверка product N-007)",
   "проверка узла: python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts"
  ],
  "guards": [
