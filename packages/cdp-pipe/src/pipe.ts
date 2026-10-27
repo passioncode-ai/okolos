@@ -214,7 +214,7 @@ export class CdpPipe {
       }
       const timer = setTimeout(() => {
         this.waiting.delete(id)
-        reject(new Error(`${method}: no answer within ${this.requestTimeoutMs} ms`))
+        reject(new CdpError('timeout', method, `no answer within ${this.requestTimeoutMs} ms`))
       }, this.requestTimeoutMs)
       this.waiting.set(id, {
         method,
@@ -227,8 +227,12 @@ export class CdpPipe {
           reject(error)
         },
       })
-      this.toBrowser.write(`${JSON.stringify(message)}\0`)
+      this.write(message)
     })
+  }
+
+  private write(message: object): void {
+    this.toBrowser.write(`${JSON.stringify(message)}\0`)
   }
 
   /** Subscribes to one CDP event; returns the function that unsubscribes. */
@@ -249,7 +253,8 @@ export class CdpPipe {
    * graceMs. The group is swept even when the browser left on its own, because
    * a child of it may not have. Hard deadline: 3 x graceMs; a browser still
    * there then is reported through onCloseIncomplete and close() resolves
-   * anyway. Calling it again returns the same promise.
+   * anyway, with the group alive. Requests waiting are rejected as `closed` at
+   * once. Calling it again returns the same promise.
    */
   close(graceMs = 2000): Promise<void> {
     this.closing ??= this.shutdown(graceMs)
@@ -260,10 +265,13 @@ export class CdpPipe {
     // The whole close has a hard deadline: ask, SIGTERM, SIGKILL, one grace each.
     const deadline = Date.now() + 3 * graceMs
     const exited = (): boolean => this.exitInfo !== undefined
+    // No answer is waited for any more: the owner is ending the browser.
+    this.fail('closed', 'its owner closed the pipe')
     if (!exited()) {
-      // The answer does not matter: the process leaving is the answer, and
-      // the signals below are the guarantee.
-      this.send('Browser.close').catch(() => undefined)
+      // Written past the closed pipe's refusal, and nothing waits for the
+      // answer: the process leaving is the answer, and the signals below are
+      // the guarantee.
+      this.write({ id: this.nextId++, method: 'Browser.close', params: {} })
       await until(exited, graceMs)
     }
     for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
@@ -331,7 +339,10 @@ export class CdpPipe {
         if (waiting === undefined) continue
         this.waiting.delete(message.id)
         if (message.error === undefined) waiting.resolve(message.result)
-        else waiting.reject(new Error(`${waiting.method}: ${message.error.message} (CDP ${message.error.code})`))
+        else {
+          const { code, message: text } = message.error
+          waiting.reject(new CdpError('cdp', waiting.method, `${text} (CDP ${code})`, code))
+        }
       } else if (typeof message.method === 'string') {
         // A copy: a listener may unsubscribe while the event is being delivered.
         for (const listener of [...(this.listeners.get(message.method) ?? [])]) {

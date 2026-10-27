@@ -218,6 +218,51 @@ describe('the transport a consumer depends on', () => {
   })
 })
 
+describe('every failure of send is a CdpError of its kind', () => {
+  it('timeout: no answer within the deadline', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 300 })
+    const error = await rejectionOf(pipe.send('Fake.silence'))
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('timeout')
+    expect(error.method).toBe('Fake.silence')
+    expect(error.cdpCode).toBeUndefined()
+  })
+
+  it('cdp: the browser answered with an error, and its code comes along', async () => {
+    const pipe = await fake()
+    const failed = await rejectionOf(pipe.send('Fake.fail', { message: 'No target with given id found' }))
+    expect(failed).toBeInstanceOf(CdpError)
+    expect(failed.kind).toBe('cdp')
+    expect(failed.method).toBe('Fake.fail')
+    expect(failed.cdpCode).toBe(-32000)
+    expect(failed.message).toContain('No target with given id found')
+
+    const unknown = await rejectionOf(pipe.send('Page.noSuchThing'))
+    expect(unknown.kind).toBe('cdp')
+    expect(unknown.cdpCode).toBe(-32601)
+  })
+
+  it('exited: the browser process ended', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    const error = await rejectionOf(pipe.send('Fake.exit', { code: 1 }))
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('exited')
+  })
+
+  it('closed: its owner closed the pipe, for a request waiting then and for one sent after', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 60_000 })
+    const waiting = rejectionOf(pipe.send('Fake.silence'))
+
+    await pipe.close(300)
+
+    const error = await waiting
+    expect(error).toBeInstanceOf(CdpError)
+    expect(error.kind).toBe('closed')
+    expect(error.method).toBe('Fake.silence')
+    expect((await rejectionOf(pipe.send('Fake.echo'))).kind).toBe('closed')
+  })
+})
+
 describe('a browser that exits on its own', () => {
   it('is heard by onExit with its exit code, and requests waiting are rejected as exited', async () => {
     const pipe = await fake([], { requestTimeoutMs: 60_000 })
