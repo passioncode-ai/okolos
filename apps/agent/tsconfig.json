@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": ["node"]
+  },
+  // The Fabric kit under src/fabric/ is vendored JavaScript (.mjs) and is not compiled; the
+  // service reads its types from src/fabric/fabric-service.d.mts, which is ours.
+  "include": ["src/**/*.ts", "src/**/*.d.mts"],
+  // Tests are not part of a built package (same reason as core-gate).
+  "exclude": ["src/**/*.test.ts"],
+  "references": [
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/cdp-pipe" }
+  ]
+}
