@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 import { EXIT as JOB_EXIT } from '../feed-job.mjs'
 import { runBounded } from './bounded.mjs'
-import { BOOTSTRAP_FILES, checkoutHealth, EXIT, recoverCheckout, runAgent } from './bootstrap.mjs'
+import { BOOTSTRAP_FILES, checkoutHealth, EXIT, JOB_TAIL_LINES, reasonFrom, recoverCheckout, runAgent } from './bootstrap.mjs'
 import { acquireLock } from './lock.mjs'
 import { feedPaths } from './paths.mjs'
 import { readStatus } from './status.mjs'
@@ -328,6 +328,51 @@ describe('no failure path is silent (B-159)', () => {
 
   it('uses the job’s exit codes, so a host reads one table', () => {
     expect(EXIT).toEqual(JOB_EXIT)
+  })
+})
+
+describe('a job that crashes leaves its error where a person reads it', () => {
+  it('relays the crash to launchd’s log and feed.log, and records the error, not the Node version line', async () => {
+    const w = world()
+    mkdirSync(path.join(w.paths.agentCheckout, 'tools'), { recursive: true })
+    writeFileSync(
+      path.join(w.paths.agentCheckout, 'tools/feed-job.mjs'),
+      "function stageThatThrows() { throw new TypeError('boom from the job') }\nstageThatThrows()\n",
+    )
+    const relayed: string[] = []
+    const { promise, lines } = agent(w, { run: runBounded, node: process.execPath, relay: (line: string) => relayed.push(line) })
+    const result = await promise
+
+    expect(result.exit).toBe(1)
+    const status = readStatus(w.paths.status)
+    expect(status).toMatchObject({ outcome: 'failed', stage: 'job', consecutiveFailures: 1 })
+    expect(status?.reason).toMatch(/TypeError: boom from the job/)
+    expect(status?.reason).not.toMatch(/Node\.js v\d/)
+    // The stack goes where the plist sends stderr, and into the durable log.
+    expect(relayed.join('\n')).toMatch(/TypeError: boom from the job/)
+    expect(relayed.join('\n')).toMatch(/at stageThatThrows/)
+    expect(lines.join('\n')).toMatch(/at stageThatThrows/)
+  }, 20_000)
+
+  it('keeps a bounded tail: an error line older than the tail no longer names the reason', async () => {
+    const w = world()
+    plantCheckout(w.paths.agentCheckout)
+    const run = async (_command: string, _args: string[], options: { onLine?: (stream: 'stdout' | 'stderr', line: string) => void }) => {
+      options.onLine?.('stderr', 'Error: an early failure')
+      for (let index = 0; index < JOB_TAIL_LINES * 3; index += 1) options.onLine?.('stderr', `noise ${index}`)
+      return failed('', 1)
+    }
+    await agent(w, { run, relay: () => undefined }).promise
+    expect(readStatus(w.paths.status)?.reason).toMatch(new RegExp(`noise ${JOB_TAIL_LINES * 3 - 1}`))
+  })
+
+  it('chooses the first line that reads as an error, else the last line', () => {
+    expect(reasonFrom(['file:///x/feed-job.mjs:1', 'TypeError: boom', '    at f (x:1:1)', '', 'Node.js v26.10.0'])).toBe('TypeError: boom')
+    expect(reasonFrom(['fatal error: out of memory', 'Node.js v26.10.0'])).toBe('fatal error: out of memory')
+    expect(reasonFrom(['something odd', 'Node.js v26.10.0'])).toBe('Node.js v26.10.0')
+    expect(reasonFrom(["throw new TypeError('x')", '      ^', '', 'TypeError: x'])).toBe('TypeError: x')
+    expect(reasonFrom(["Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/x/y.mjs'"])).toMatch(/^Error \[ERR_MODULE_NOT_FOUND\]/)
+    expect(reasonFrom([])).toBe('')
   })
 })
 

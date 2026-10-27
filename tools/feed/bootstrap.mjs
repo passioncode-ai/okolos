@@ -53,6 +53,24 @@ export const RECOVERY_DEADLINES = { git: 90_000, worktree: 120_000, clone: 5 * 6
 /** The job's own watchdog is thirty minutes; this only catches a job that ignores it. */
 export const JOB_DEADLINE_MS = 35 * 60_000
 
+/** How many of the job's last output lines are kept to name a failure. */
+export const JOB_TAIL_LINES = 50
+
+// A line that starts with an error's name ("TypeError: …", "Error [ERR_…]: …") or
+// says "error:". Not any line containing "Error": Node prints the throwing source
+// line above the error, and that line usually names the error class too.
+const ERROR_LINE = /^(?:Uncaught\s+)?[\w.]*(?:Error|Exception)\b|\berror:/
+
+/**
+ * The line that says why: the first one in `lines` that reads as an error, else
+ * the last non-empty one. A Node crash ends with "Node.js v<version>", which
+ * names nothing; the TypeError above it does.
+ */
+export function reasonFrom(lines) {
+  const kept = lines.map((line) => cleanLine(line).trim()).filter((line) => line !== '')
+  return kept.find((line) => ERROR_LINE.test(line)) ?? kept.at(-1) ?? ''
+}
+
 const SECRET_VARIABLES = ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY']
 
 function quietEnv(env) {
@@ -168,6 +186,8 @@ export async function runAgent({
   runId = randomUUID(),
   jobDeadlineMs = JOB_DEADLINE_MS,
   onStage = () => {},
+  // The bootstrap's stderr is launchd's StandardErrorPath (feed.launchd.log).
+  relay = (line) => process.stderr.write(`${line}\n`),
 } = {}) {
   const iso = () => new Date(now()).toISOString()
   const startedAt = iso()
@@ -242,10 +262,20 @@ export async function runAgent({
   const jobEnv = { ...env, OKOLOS_RUN_ID: runId }
   if (recovered) jobEnv.OKOLOS_RECOVERED_CHECKOUT = recovered
   else delete jobEnv.OKOLOS_RECOVERED_CHECKOUT
+  // What the job prints (a crash's error and stack, mostly: its own lines go to
+  // feed.log directly) is passed on to launchd's log and feed.log as it arrives,
+  // and the last JOB_TAIL_LINES are kept to name the failure.
+  const tail = []
   const result = await run(node, [path.join(checkout, 'tools', 'feed-job.mjs'), '--agent'], {
     cwd: checkout,
     env: jobEnv,
     timeoutMs: jobDeadlineMs,
+    onLine: (_stream, line) => {
+      relay(line)
+      write(`   ${line}`)
+      tail.push(line)
+      if (tail.length > JOB_TAIL_LINES) tail.shift()
+    },
   })
 
   const after = readStatus(paths.status)
@@ -264,7 +294,9 @@ export async function runAgent({
     }
   }
   const exit = result.code && result.code !== 0 ? result.code : EXIT.failed
-  return { exit, record: fail('job', exit, `the job ${describe(result)} without writing its record`) }
+  const said = reasonFrom(tail)
+  const how = said ? `exited ${result.code ?? result.signal} — ${said}` : describe(result)
+  return { exit, record: fail('job', exit, `the job ${how} without writing its record`) }
 }
 
 /** On SIGTERM/SIGINT: stop the job's group, and record the stop unless the job already did. */

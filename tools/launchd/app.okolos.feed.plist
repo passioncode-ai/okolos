@@ -94,8 +94,11 @@
   <!--
     Not `KeepAlive`: this is a task that finishes, and keeping it alive would
     restart it in a loop. The job writes its own rotated, owner-only log and a
-    status record next to its state; launchd's streams catch only what happens
-    before the job's log is open, and the job caps that file too.
+    status record next to its state. launchd's streams catch what the shell says
+    (node not found, the bootstrap copy gone), one summary line per failed run,
+    and the job's own stderr, which the bootstrap passes through as it arrives (a
+    crash's error and stack; feed.log gets them too). The bootstrap and the job
+    cap that file at start.
   -->
   <key>StandardOutPath</key>
   <string>{{LOG_DIR}}/feed.launchd.log</string>
