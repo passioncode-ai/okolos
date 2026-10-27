@@ -73,7 +73,7 @@ jobs:
 
       # REQ-31 — the UX chain must not drift
       - name: ux lint
-        run: python3 docs/ux/lint.py
+        run: node tools/python.mjs docs/ux/lint.py
 
       # The brand pack is the source for every string a user reads, and it went
       # four errors deep while nothing ran it. Warnings print and pass; errors

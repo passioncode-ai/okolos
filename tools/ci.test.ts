@@ -143,6 +143,15 @@ describe('the workflow runs what the project has', () => {
     expect(stale, 'these exemptions no longer describe anything CI does').toEqual([])
   })
 
+  it('starts Python only through tools/python.mjs, as the hook and pnpm gates do (B-162)', () => {
+    // One wiring per gate: a step that calls python3 itself never runs the finder,
+    // so CI could stay green on the path a Windows contributor takes.
+    const direct = commandsIn(workflow)
+      .split('\n')
+      .filter((line) => /(?:^|[\s;&|])(?:python3?|py)(?:\s|$)/.test(line))
+    expect(direct, 'these steps start Python without the finder').toEqual([])
+  })
+
   it('does not pin a Playwright build number', () => {
     // A path carrying one turns an unrelated dependency bump into a red Firefox
     // job, which is the pressure that gets a browser dropped from CI.
