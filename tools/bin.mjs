@@ -10,7 +10,10 @@
  * A shell joins the arguments with spaces and reads its own metacharacters, so on
  * win32 an argument that a shell would reinterpret is refused rather than quoted:
  * every argument these tools pass is a fixed word, and one that is not is a change
- * that should have to say so.
+ * that should have to say so. The line is built here, one string with no args array:
+ * an args array beside `shell: true` is DEP0190 (a runtime deprecation since Node
+ * 24). It is the line Node itself joined before, word for word; no word needs quotes,
+ * because none can hold a space, a quote or a metacharacter.
  */
 
 import { spawn, spawnSync } from 'node:child_process'
@@ -33,7 +36,7 @@ export function binInvocation(name, args, platform = process.platform) {
   if (unsafe.length > 0) {
     throw new Error(`refusing to pass ${unsafe.map((a) => JSON.stringify(a)).join(', ')} through cmd.exe`)
   }
-  return { command: name, args: [...args], shell: true }
+  return { command: [name, ...args].join(' '), args: [], shell: true }
 }
 
 /**

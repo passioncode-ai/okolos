@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -21,13 +21,34 @@ describe('starting pnpm or npx', () => {
     })
   })
 
-  it('goes through cmd.exe on Windows, where pnpm and npx are .cmd files', () => {
+  it('goes through cmd.exe on Windows, where pnpm and npx are .cmd files, as one command line', () => {
+    // The line Node used to join from an args array under shell: true, built here
+    // instead: an args array with a shell is DEP0190.
     expect(binInvocation('npx', ['geckodriver', '--port', '4444'], 'win32')).toEqual({
-      command: 'npx',
-      args: ['geckodriver', '--port', '4444'],
+      command: 'npx geckodriver --port 4444',
+      args: [],
       shell: true,
     })
-    expect(binInvocation('npx', ['wrangler', 'd1', 'execute', '--file=schema.sql'], 'win32').shell).toBe(true)
+    expect(binInvocation('npx', ['wrangler', 'd1', 'execute', '--file=schema.sql'], 'win32')).toEqual({
+      command: 'npx wrangler d1 execute --file=schema.sql',
+      args: [],
+      shell: true,
+    })
+  })
+
+  it('gives spawn no args array beside a shell, so Node prints no DEP0190', () => {
+    // Run on this host with the Windows shape: a shell is a shell for the warning.
+    const probe = `
+import { spawnSync } from 'node:child_process'
+import { binInvocation } from ${JSON.stringify(path.join(import.meta.dirname, 'bin.mjs'))}
+const run = binInvocation('node', ['--version'], 'win32')
+const result = spawnSync(run.command, run.args, { shell: run.shell, encoding: 'utf8' })
+process.stdout.write(result.stdout)
+`
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', probe], { encoding: 'utf8' })
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout.trim()).toMatch(/^v\d+/)
+    expect(result.stderr).not.toMatch(/DEP0190/)
   })
 
   it('refuses on Windows an argument the shell would reinterpret, rather than quoting it', () => {
