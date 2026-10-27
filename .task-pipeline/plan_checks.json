@@ -10,5 +10,6 @@
  "N-011": "pnpm -s exec vitest run apps/agent/src/agent.test.ts apps/agent/src/verbs && pnpm -s run typecheck",
  "N-012": "pnpm -s exec vitest run apps/agent/src/hygiene && pnpm -s run typecheck && pnpm -s run i18n:sweep",
  "N-015": "pnpm -s exec vitest run apps/agent/src/dashboard && pnpm -s run typecheck",
- "N-024": "pnpm -s exec vitest run apps/agent/src/service && pnpm -s run typecheck && pnpm -s run lint && pnpm -s run i18n:sweep"
+ "N-024": "pnpm -s exec vitest run apps/agent/src/service && pnpm -s run typecheck && pnpm -s run lint && pnpm -s run i18n:sweep",
+ "N-025": "pnpm -s exec vitest run apps/agent/src/service/wellknown.test.ts tools/git-env.test.ts && pnpm -s run gates"
 }

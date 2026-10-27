@@ -212,6 +212,27 @@
   "dod": "vitest apps/agent/src/service зелёный; typecheck, lint, pnpm gates 0"
  },
  {
+  "n": "N-025",
+  "title": "Исправление: git в тестах и в buildIdentity не наследует GIT_DIR хука",
+  "deps": [
+   "N-024"
+  ],
+  "req": [
+   "REQ-70"
+  ],
+  "files": [
+   "Modify: apps/agent/src/service/wellknown.ts, apps/agent/src/service/wellknown.test.ts",
+   "Create: tools/git-env.test.ts"
+  ],
+  "consumes": "buildIdentity и тест «dotfiles» из N-024",
+  "produces": "gitEnv() без GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE и соседей; buildIdentity и тестовые вызовы git -C идут с ним; гейт tools/git-env.test.ts",
+  "tests": [
+   "тест на жертвенном репозитории под унаследованным GIT_DIR: в его логе только «the only commit» (наблюдался красным: «dotfiles» утекал)",
+   "гейт: тестовый файл с git -C без gitEnv() назван; подсаженный дефект гейт ловит"
+  ],
+  "dod": "pnpm gates 0; HEAD и индекс репозитория не меняются при прогоне тестов из хука"
+ },
+ {
   "n": "N-006",
   "title": "K3: журнал до ответа",
   "deps": [

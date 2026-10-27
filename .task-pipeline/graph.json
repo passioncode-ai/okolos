@@ -773,6 +773,23 @@
     "product: git -C /Users/sshlg/DATA/_worktrees/okolos-b1-n-024 status --short → empty before and after the runs; apps/agent/dist and tsconfig.tsbuildinfo are git-ignored (.gitignore:2, :6)",
     "proven at 87eea45fdddf5db508eef27599173e538c61512f (tree 173d507eeb1ac4520728efa93fd125f4ba43cc69)"
    ]
+  },
+  {
+   "id": "N-025",
+   "title": "Исправление: git в тестах и в buildIdentity не наследует GIT_DIR хука",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [
+    "N-024"
+   ],
+   "serves": "REQ-70",
+   "check": "pnpm -s exec vitest run apps/agent/src/service/wellknown.test.ts tools/git-env.test.ts && pnpm -s run gates",
+   "touches": [
+    "apps/agent/src/service/wellknown.ts",
+    "apps/agent/src/service/wellknown.test.ts",
+    "tools/git-env.test.ts"
+   ],
+   "risk": "R1"
   }
  ],
  "edges": [
@@ -805,6 +822,11 @@
    "from": "N-003",
    "to": "N-004",
    "payload": "Snapshot с вердиктом"
+  },
+  {
+   "from": "N-024",
+   "to": "N-025",
+   "payload": "buildIdentity и тест dotfiles"
   },
   {
    "from": "N-024",
@@ -1085,6 +1107,11 @@
    "node": "N-024",
    "why": "certified at all 3 tiers in round 2",
    "precondition": "87eea45fdddf5db508eef27599173e538c61512f"
+  },
+  {
+   "verb": "add",
+   "node": "N-025",
+   "why": "тест N-024 под хуком pre-push закоммитил «dotfiles» (1 файл вместо 767) в bridge/b1-run2 через унаследованный GIT_DIR; пуш не ушёл, ветка восстановлена на 33a0e75; исправление и гейт класса"
   }
  ]
 }
