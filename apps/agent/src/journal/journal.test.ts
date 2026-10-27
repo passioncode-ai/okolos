@@ -1467,6 +1467,14 @@ describe('one process writes the journal: Journal.open locks the folder', () => 
     expect(readFileSync(path.join(dir, JOURNAL_LOCK), 'utf8')).toBe(`${process.ppid}\n`)
   })
 
+  it.skipIf(process.getuid?.() === 0)('a lock held by a live process this user may not signal (EPERM, pid 1) makes open fail', () => {
+    const dir = temp()
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(path.join(dir, JOURNAL_LOCK), '1\n')
+    expect(() => Journal.open(dir, { retentionDays: 90 })).toThrow(expect.objectContaining({ code: 'locked' }) as Error)
+    expect(readFileSync(path.join(dir, JOURNAL_LOCK), 'utf8')).toBe('1\n')
+  })
+
   it('a stale lock, whose pid is no longer alive, is replaced', async () => {
     const dir = temp()
     mkdirSync(dir, { recursive: true })
