@@ -325,7 +325,8 @@
    "Chrome: kill -9 демона-обёртки → процессов с профилем не остаётся после перезапуска (зачистка сирот своего профиля по SingletonLock)",
    "extraArgs с --enable-automation или --remote-debugging-port → ошибка конструктора; --host-resolver-rules проходит (аудит #21)",
    "onExit: самостоятельный выход браузера отличается от выхода по close() (поле requested), окна задач помечаются закрытыми; send, отклонённый как closed, ведёт к close() группы (проверка seam N-022)",
-   "на настоящем Chrome: kill -9 браузера даёт CdpError kind exited у ожидающего запроса в пределах окна EXIT_AFTER_PIPE_MS (проверка seam N-022, риск 4)"
+   "на настоящем Chrome: kill -9 браузера даёт CdpError kind exited у ожидающего запроса в пределах окна EXIT_AFTER_PIPE_MS (проверка seam N-022, риск 4)",
+   "onCloseIncomplete при close() окна агента: демон пишет событие с pid, отмечает degraded источник window и не считает окно закрытым; спека §3 получает это исключение (проверка seam N-022)"
   ],
   "dod": "vitest apps/agent/src/window зелёный на этой машине с Chrome stable"
  },
