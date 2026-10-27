@@ -204,13 +204,13 @@
     "message": "время задачи вышло"
   },
   "refusal_tab_gone": {
-    "message": "вкладки задачи больше нет"
+    "message": "вкладки задачи уже не было"
   },
   "refusal_busy": {
-    "message": "Okolos Agent занят другой задачей"
+    "message": "Okolos Agent был занят другой задачей"
   },
   "refusal_in_use_by_person": {
-    "message": "человек сейчас пользуется этим окном"
+    "message": "этим окном пользовались вы"
   },
   "refusal_browser_offline": {
     "message": "Okolos Agent не смог запустить свой Chrome или связаться с ним"
@@ -297,13 +297,13 @@
     }
   },
   "rejection_bad_host": {
-    "message": "вызов назвал не адрес Okolos Agent"
+    "message": "вызов не был адресован Okolos Agent"
   },
   "rejection_bad_origin": {
     "message": "вызов нёс заголовок Origin, как у веб-страницы"
   },
   "rejection_cross_site": {
-    "message": "вызов нёс заголовок Sec-Fetch-Site, как у браузера"
+    "message": "вызов нёс заголовки Sec-Fetch-*, как у браузера"
   },
   "rejection_bad_content_type": {
     "message": "вызов в неверном формате"
@@ -326,12 +326,7 @@
     }
   },
   "pairingLooksLikeAgent": {
-    "message": "Имя похоже на имя агента с доступом: $AGENTS$. Сверьте код особенно внимательно.",
-    "placeholders": {
-      "agents": {
-        "content": "$1"
-      }
-    }
+    "message": "Похожее имя есть среди агентов с доступом, они перечислены ниже. Сверьте код особенно внимательно."
   },
   "agentRevokeFailed": {
     "message": "Доступ агента $NAME$ не отозван: список доступов не записался. Агент по-прежнему может работать. Попробуйте ещё раз. Если не выйдет, запустите okolos-agent doctor.",
@@ -357,7 +352,7 @@
     "message": "подождать на странице"
   },
   "verb_close": {
-    "message": "закрыть окно задачи"
+    "message": "закрыть окно агента"
   },
   "verb_session_open": {
     "message": "открыть задачу"
@@ -409,5 +404,21 @@
   },
   "taskProfileDisposable": {
     "message": "Временный профиль, входы на сайты не сохраняются"
+  },
+  "pairedAgentName": {
+    "message": "Агент $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "journalExportFailed": {
+    "message": "Журнал агентов не выгрузился: $WHAT$. Запустите okolos-agent doctor: он покажет, что с журналом.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
   }
 }

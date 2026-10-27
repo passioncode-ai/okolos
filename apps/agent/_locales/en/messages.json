@@ -204,13 +204,13 @@
     "message": "the task's time ran out"
   },
   "refusal_tab_gone": {
-    "message": "the task's tab is gone"
+    "message": "the task's tab was gone"
   },
   "refusal_busy": {
-    "message": "Okolos Agent is busy with another task"
+    "message": "Okolos Agent was busy with another task"
   },
   "refusal_in_use_by_person": {
-    "message": "a person is using this window now"
+    "message": "you were using this window"
   },
   "refusal_browser_offline": {
     "message": "Okolos Agent could not start or reach its Chrome"
@@ -297,13 +297,13 @@
     }
   },
   "rejection_bad_host": {
-    "message": "the call named an address other than Okolos Agent"
+    "message": "the call was not addressed to Okolos Agent"
   },
   "rejection_bad_origin": {
     "message": "the call carried an Origin header, as a web page does"
   },
   "rejection_cross_site": {
-    "message": "the call carried a Sec-Fetch-Site header, as a browser does"
+    "message": "the call carried Sec-Fetch-* headers, as a browser does"
   },
   "rejection_bad_content_type": {
     "message": "the call was in the wrong format"
@@ -326,12 +326,7 @@
     }
   },
   "pairingLooksLikeAgent": {
-    "message": "The name looks like that of an agent with access: $AGENTS$. Compare the code with special care.",
-    "placeholders": {
-      "agents": {
-        "content": "$1"
-      }
-    }
+    "message": "A similar name is among the agents with access, listed below. Compare the code with special care."
   },
   "agentRevokeFailed": {
     "message": "Access for agent $NAME$ was not revoked: the access list could not be written. The agent can still work. Try again. If it fails, run okolos-agent doctor.",
@@ -357,7 +352,7 @@
     "message": "wait on the page"
   },
   "verb_close": {
-    "message": "close the task's window"
+    "message": "close the agent window"
   },
   "verb_session_open": {
     "message": "open a task"
@@ -409,5 +404,21 @@
   },
   "taskProfileDisposable": {
     "message": "Temporary profile, which keeps no sign-ins"
+  },
+  "pairedAgentName": {
+    "message": "Agent $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "journalExportFailed": {
+    "message": "The agents' journal could not be exported: $WHAT$. Run okolos-agent doctor to see what is wrong with the journal.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
   }
 }

@@ -57,6 +57,8 @@
   "строка агента везде через agentLabel (имя и дата доступа) или agentLabelRevoked: два агента с одинаковым именем различимы в строке задачи и в строке отказа; pairingLooksLikeAgent перечисляет всех похожих агентов через запятую (проверки N-013 круг 4)",
   "журнал не пишется: список отказов помечен refusalsIncomplete и никогда не показывает refusalsEmpty; журнал не читается: состояние journal-unreadable со строкой journalUnreadable вместо пустого списка (проверки N-013 круг 4)",
   "строка задачи показывает профиль строкой taskProfileAgent или taskProfileDisposable; состояния session-expired и stopping берут строки pageSessionExpired и pageStopping (проверки N-013 круг 4)",
+  "значения строк проверены на опорных данных: время осталось (мс → минуты), шаги, сайты, число открытых задач, адрес двери; время привязки (мс) и журнала (ISO) выводятся в одном формате (проверки N-013 круг 5)",
+  "ссылка выгрузки журнала скрыта в состоянии journal-unreadable; сбой выгрузки показывает journalExportFailed (проверки N-013 круг 5)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/dashboard && pnpm -s run typecheck"
  ],
  "guards": [

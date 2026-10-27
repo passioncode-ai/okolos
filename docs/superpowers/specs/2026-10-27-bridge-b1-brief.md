@@ -79,7 +79,7 @@
 | REQ-61 | Окно агента: без стартового окна, окно на задачу, фокус не уходит, инфобара нет, процессы закрываются | e2e на настоящем Chrome по методике Б0 | open |
 | REQ-62 | Перепись процессов автоматизации с владельцем и причиной «не трогать» | тест на фикстуре `ps` и `launchctl` | open |
 | REQ-63 | Установка: launchd, дескриптор `fabric-service/0.1`, `doctor`, раннбук | `check_service.py` → 0 FAIL; перезапуск после `kill -9` | open |
-| REQ-64 | Панель привязки: экран в `docs/ux/screens.md` с состояниями, FLW-21 ведёт к нему, SCN-044 со статусом `built` | `python3 docs/ux/lint.py`; e2e SCN-044 | open |
+| REQ-64 | Панель привязки: экран в `docs/ux/screens.md` с состояниями, FLW-21 ведёт к нему, SCN-044 со статусом `implemented` | `python3 docs/ux/lint.py`; e2e SCN-044 | open |
 | REQ-65 | Вид активности: открытые задачи агентов и последние отказы (отзыв доступа живёт в SCR-23) | e2e SCN-045 читает страницу | open |
 | REQ-66 | Термины моста (Okolos Bridge, Okolos Agent, окно агента, привязка, задача агента) в `docs/brand/terminology.md` до первых строк для людей (B-147) | `python3 docs/brand/lint.py`; `tools/docs.test.ts` | open |
 | REQ-67 | ADR «мост — часть Okolos Agent; две двери; задача — своё окно» (B-146) и ADR «снимок частями, не больше 32 КБ»; строки механизмов моста в ADR-0019 | `tools/adr.test.ts` (каждый названный файл существует) | open |

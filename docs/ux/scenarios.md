@@ -54,7 +54,7 @@ are specified once in [screens.md](screens.md).
 | SCN-042 | A message arrives and is judged before it is read | mail-guard | P-01 | ST-022, FLW-20 | draft | — |
 | SCN-043 | Who reviewed, where it ran, and what left | mail-guard | P-01 | ST-026, FLW-19 | draft | — |
 | SCN-044 | An agent is paired once, by the person, and can be taken back | agent-bridge | P-01 | ST-027, FLW-21 | draft | — |
-| SCN-045 | An agent reads a logged-in page, cleaned, in its own background window | agent-bridge | P-01 | ST-028, FLW-22 | draft | — |
+| SCN-045 | An agent reads a page, cleaned, in its own background window | agent-bridge | P-01 | ST-028, FLW-22 | draft | — |
 | SCN-046 | An action that spends, sends, deletes or signs in waits for the person | agent-bridge | P-01 | ST-029, FLW-22 | draft | — |
 | SCN-047 | The person takes over a step, hands back, or stops every agent | agent-bridge | P-01 | ST-030, FLW-22 | draft | — |
 | SCN-048 | What agents left behind is cleaned, and nothing in use is touched | agent-bridge | P-01 | ST-031, FLW-23 | draft | — |
@@ -981,12 +981,12 @@ every rule below; where they differ, the scenario says so.
 - **Status:** draft
 - **Coverage:** none — designed 2026-10-06, not built
 
-### SCN-045: An agent reads a logged-in page, cleaned, in its own background window
+### SCN-045: An agent reads a page, cleaned, in its own background window
 - **Persona:** P-01
 - **Feature:** agent-bridge
 - **Traces:** ST-028, FLW-22 (JTBD-10, JTBD-01, JRN-05/#2–#4)
 - **Entry point:** a paired agent opens a task naming its sites
-- **Preconditions:** the agent is paired; the person is logged in to the site in the profile the task uses
+- **Preconditions:** the agent is paired. In Б1 the agent profile starts with no sign-ins and Б1 gives the person no way to add them, so the agent reads pages that need no sign-in; reading a logged-in page comes with the sign-in step of SCN-047 in Б2. The Okolos extension does not guard the agent profile: stable Chrome refuses `--load-extension`, and the snapshot cleaning is what stands between the page and the agent
 - **Steps:**
   1. The agent opens a task with its sites, verbs, time limit and step budget -> the task gets its own window, in the background, with an active tab
   2. The agent opens a page in the task -> the page loads in that window; the person's app stays in front

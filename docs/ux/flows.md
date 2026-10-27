@@ -750,7 +750,7 @@ flowchart TD
   STOP[Stop control] -.-> E
 ```
 
-- **Screens traversed:** SCR-24 (Agent activity) in Б1. The approval panel, the hand-off notice and the stop control are designed in Б2, with the actions they gate; in Б1 a task ends by its time limit, its step budget, the agent's `close` or the person revoking the agent's access.
+- **Screens traversed:** SCR-24 (Agent activity) in Б1. The approval panel, the hand-off notice and the stop control are designed in Б2, with the actions they gate; in Б1 a task whose time limit has passed is closed with its window within a minute by Okolos Agent's timer; a task out of steps refuses further calls and stays until its time runs out, the agent's `close` or the person revokes the agent's access.
 - **The task gets its own window, not a background tab.** Measured 2026-10-06 (`docs/superpowers/evidence/2026-10-06-b0-agent-window.md`): input sent to a background tab never reaches the page, even with focus emulation, while a tab in a separate background window is visible and receives trusted input — and the window does not take the person's focus once it is open.
 - **"Refused" is a policy answer, not an error.** An agent that reads a refusal as a failure retries it; the codes say which kind of no it was, and a retry after a refusal counts against the task's budget.
 
