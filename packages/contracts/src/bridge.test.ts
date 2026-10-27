@@ -27,6 +27,7 @@ import {
   originOf,
   refusalKey,
   refuse,
+  toolName,
   validateScope,
   verbAllowed,
 } from './bridge.js'
@@ -205,6 +206,18 @@ describe('the verbs', () => {
 
   it('name the two calls that live outside a task', () => {
     expect(BRIDGE_SESSION_VERBS).toEqual(['session.open', 'hygiene.census'])
+  })
+
+  it('become tool names every MCP client accepts, one name per verb', () => {
+    // The Anthropic API takes tool names matching [a-zA-Z0-9_-]{1,64}; a dotted
+    // name like session.open is refused by some clients before any call is made.
+    const verbs = [...BRIDGE_VERBS, ...BRIDGE_SESSION_VERBS]
+    const names = verbs.map(toolName)
+    for (const [i, name] of names.entries()) expect(name, verbs[i]).toMatch(/^[a-zA-Z0-9_-]{1,64}$/)
+    expect(new Set(names).size).toBe(verbs.length)
+    expect(toolName('session.open')).toBe('session_open')
+    expect(toolName('hygiene.census')).toBe('hygiene_census')
+    expect(toolName('snapshot')).toBe('snapshot')
   })
 
   it('are the ones the task named, and close, which is never refused', () => {

@@ -34,6 +34,16 @@ export type BridgeVerb = (typeof BRIDGE_VERBS)[number]
 export const BRIDGE_SESSION_VERBS = ['session.open', 'hygiene.census'] as const
 export type BridgeSessionVerb = (typeof BRIDGE_SESSION_VERBS)[number]
 
+/**
+ * The MCP tool name of a verb. Dots become underscores: the Anthropic API takes
+ * only `[a-zA-Z0-9_-]` in a tool name, and a client that refuses `session.open`
+ * refuses it before the agent ever reaches the bridge. The test holds that no
+ * two verbs collapse into one name.
+ */
+export function toolName(verb: string): string {
+  return verb.replaceAll('.', '_')
+}
+
 /** Every way the bridge says no. Closed: an unlisted refusal is a bug. */
 export const BRIDGE_REFUSALS = [
   'not_paired',

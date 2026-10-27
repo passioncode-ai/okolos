@@ -72,6 +72,7 @@ export {
   originOf,
   refusalKey,
   refuse,
+  toolName,
   validateScope,
   verbAllowed,
 } from './bridge.js'
