@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-import { filesIn } from './tree.mjs'
+import { filesIn, toPosix } from './tree.mjs'
 
 // @ts-expect-error — a plain .mjs tool, imported for the parsing it does.
 import { NEVER_BLOCK, RULE_LIMIT, SHORT_HOST_CHARS, SOURCES, buildSnapshot, defaultOut, guard, hostFrom, hostsFrom, ingest, shrankTooFar } from './ingest.mjs'
@@ -443,6 +443,6 @@ describe('the version comes from what is served, not from the worktree (F1)', ()
 
   it('writes outside the git working tree by default', () => {
     expect(defaultOut().startsWith(root), defaultOut()).toBe(false)
-    expect(defaultOut()).toMatch(/\.okolos\/state\/feeds\/phishing\.json$/)
+    expect(toPosix(defaultOut())).toMatch(/\.okolos\/state\/feeds\/phishing\.json$/)
   })
 })

@@ -39,9 +39,11 @@ describe('where the cache is', () => {
   })
 
   it('keeps the macOS and Linux caches it always read', () => {
+    // Joined with the host's separator, which is what the function does: on a Windows
+    // host a darwin answer is `\h\Library\…`, and the literal `/h/…` was never it (B-164).
     expect(playwrightCaches({ platform: 'darwin', env: {}, home: '/h' })).toEqual([
-      '/h/Library/Caches/ms-playwright',
-      '/h/.cache/ms-playwright',
+      path.join('/h', 'Library/Caches/ms-playwright'),
+      path.join('/h', '.cache/ms-playwright'),
       '/root/.cache/ms-playwright',
     ])
   })
