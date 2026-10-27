@@ -30,6 +30,18 @@ export interface LaunchOptions {
    * the error's class, never the params (they can carry page content).
    */
   readonly onListenerError?: (error: unknown, event: string) => void
+  /**
+   * Hears that close() gave up: the browser had not exited graceMs after
+   * SIGKILL to its group (a group it may not signal, EPERM). close() resolves
+   * anyway. Default: one stderr line naming the pid.
+   */
+  readonly onCloseIncomplete?: (pid: number) => void
+  /** The signal sender; tests inject a failing one. Default: process.kill. */
+  readonly kill?: typeof process.kill
+}
+
+function reportCloseIncomplete(pid: number): void {
+  process.stderr.write(`cdp-pipe: browser ${pid} had not exited after SIGKILL to its group; close() gave up\n`)
 }
 
 function reportListenerError(error: unknown, event: string): void {
@@ -67,6 +79,8 @@ export class CdpPipe {
   private readonly toBrowser: Writable
   private readonly requestTimeoutMs: number
   private readonly onListenerError: (error: unknown, event: string) => void
+  private readonly onCloseIncomplete: (pid: number) => void
+  private readonly kill: typeof process.kill
   private nextId = 1
   private pending = ''
   private readonly waiting = new Map<number, Waiting>()
@@ -74,7 +88,6 @@ export class CdpPipe {
   /** Why no further answer can arrive; set once the pipe or the process is gone. */
   private closedBecause: string | undefined
   private exited = false
-  private readonly exit: Promise<void>
   private closing: Promise<void> | undefined
 
   private constructor(child: ChildProcess, options: LaunchOptions) {
@@ -82,6 +95,8 @@ export class CdpPipe {
     this.pid = child.pid as number
     this.requestTimeoutMs = options.requestTimeoutMs ?? 10_000
     this.onListenerError = options.onListenerError ?? reportListenerError
+    this.onCloseIncomplete = options.onCloseIncomplete ?? reportCloseIncomplete
+    this.kill = options.kill ?? process.kill.bind(process)
     this.toBrowser = child.stdio[3] as Writable
     const fromBrowser = child.stdio[4] as Readable
     fromBrowser.setEncoding('utf8')
@@ -92,12 +107,9 @@ export class CdpPipe {
     this.toBrowser.on('error', (cause) => this.fail(`the pipe to the browser broke (${cause.message})`))
     // Unread stderr would fill the pipe and stall the browser.
     ;(child.stdio[2] as Readable).resume()
-    this.exit = new Promise((resolve) => {
-      child.once('exit', () => {
-        this.exited = true
-        this.fail('the browser exited')
-        resolve()
-      })
+    child.once('exit', () => {
+      this.exited = true
+      this.fail('the browser exited')
     })
   }
 
@@ -156,9 +168,11 @@ export class CdpPipe {
   /**
    * Ends the browser and every process in its group (LC-02), and resolves once
    * the browser has exited. Asks first (`Browser.close`), waits graceMs; then
-   * SIGTERM to the group, waits graceMs; then SIGKILL to the group. The group
-   * is swept even when the browser left on its own, because a child of it may
-   * not have. Calling it again returns the same promise.
+   * SIGTERM to the group, waits graceMs; then SIGKILL to the group, waits
+   * graceMs. The group is swept even when the browser left on its own, because
+   * a child of it may not have. Hard deadline: 3 x graceMs; a browser still
+   * there then is reported through onCloseIncomplete and close() resolves
+   * anyway. Calling it again returns the same promise.
    */
   close(graceMs = 2000): Promise<void> {
     this.closing ??= this.shutdown(graceMs)
@@ -166,6 +180,8 @@ export class CdpPipe {
   }
 
   private async shutdown(graceMs: number): Promise<void> {
+    // The whole close has a hard deadline: ask, SIGTERM, SIGKILL, one grace each.
+    const deadline = Date.now() + 3 * graceMs
     if (!this.exited) {
       // The answer does not matter: the process leaving is the answer, and
       // the signals below are the guarantee.
@@ -173,12 +189,36 @@ export class CdpPipe {
       await until(() => this.exited, graceMs)
     }
     for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
-      if (!groupAlive(this.pid)) break
-      signalGroup(this.pid, signal)
-      if (await until(() => !groupAlive(this.pid), graceMs)) break
+      if (!this.groupAlive()) break
+      this.signalGroup(signal)
+      if (await until(() => !this.groupAlive(), graceMs)) break
     }
-    await this.exit
+    // A group that is gone has an exit event on its way; a group that could
+    // not be signalled (EPERM) may never give one, and close() must not hang.
+    if (!(await until(() => this.exited, Math.max(deadline - Date.now(), POLL_MS)))) {
+      this.onCloseIncomplete(this.pid)
+    }
     for (const stream of this.child.stdio) stream?.destroy()
+  }
+
+  /** Whether any process of the browser's group still exists. */
+  private groupAlive(): boolean {
+    try {
+      this.kill(-this.pid, 0)
+      return true
+    } catch (cause) {
+      // EPERM: the group exists and is not ours to signal; count it as alive so
+      // close() does not report a group gone that is not.
+      return (cause as NodeJS.ErrnoException).code !== 'ESRCH'
+    }
+  }
+
+  private signalGroup(signal: NodeJS.Signals): void {
+    try {
+      this.kill(-this.pid, signal)
+    } catch {
+      // the group left between the check and the signal, or may not be signalled
+    }
   }
 
   private fail(reason: string): void {
@@ -231,32 +271,16 @@ function parse(text: string): Incoming | undefined {
   }
 }
 
-/** Whether any process of the group led by pid still exists. */
-function groupAlive(pid: number): boolean {
-  try {
-    process.kill(-pid, 0)
-    return true
-  } catch (cause) {
-    // EPERM: the group exists and is not ours to signal; count it as alive so
-    // close() does not report a group gone that is not.
-    return (cause as NodeJS.ErrnoException).code !== 'ESRCH'
-  }
-}
-
-function signalGroup(pid: number, signal: NodeJS.Signals): void {
-  try {
-    process.kill(-pid, signal)
-  } catch {
-    // the group left between the check and the signal
-  }
-}
-
-/** Polls until the condition holds or ms pass; answers whether it held. */
+/**
+ * Polls until the condition holds or ms pass; answers whether it held. The last
+ * sleep is cut to the deadline, so a wait does not overrun it by a poll.
+ */
 async function until(condition: () => boolean, ms: number): Promise<boolean> {
   const deadline = Date.now() + ms
   while (!condition()) {
-    if (Date.now() >= deadline) return false
-    await new Promise((resolve) => setTimeout(resolve, POLL_MS))
+    const left = deadline - Date.now()
+    if (left <= 0) return false
+    await new Promise((resolve) => setTimeout(resolve, Math.min(POLL_MS, left)))
   }
   return true
 }

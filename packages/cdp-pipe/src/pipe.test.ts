@@ -213,6 +213,29 @@ describe('closing ends the whole process group', () => {
     await expect(pipe.send('Fake.echo')).rejects.toThrow(/Fake\.echo/)
   })
 
+  it('never hangs: when the group cannot be signalled it resolves within 3 x graceMs and reports the pid', async () => {
+    const refused: unknown[] = []
+    const incomplete: number[] = []
+    const pipe = await fake(['--ignore-close'], {
+      kill: ((pid: number, signal?: string | number) => {
+        refused.push([pid, signal])
+        throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' })
+      }) as typeof process.kill,
+      onCloseIncomplete: (pid) => incomplete.push(pid),
+    })
+    const grace = 200
+    const started = Date.now()
+
+    await pipe.close(grace)
+
+    // Three graces (ask, SIGTERM, SIGKILL) and timer jitter, nothing more.
+    expect(Date.now() - started).toBeLessThan(3 * grace + 50)
+    expect(incomplete).toEqual([pipe.pid])
+    expect(refused).toContainEqual([-pipe.pid, 'SIGKILL'])
+    // The browser really is still there: close said so rather than pretending.
+    expect(alive(pipe.pid)).toBe(true)
+  })
+
   it('is idempotent', async () => {
     const pipe = await fake()
     await Promise.all([pipe.close(300), pipe.close(300)])
