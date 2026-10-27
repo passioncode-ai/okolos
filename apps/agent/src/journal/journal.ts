@@ -24,6 +24,11 @@
  * Layout: JSON lines under `<data>/journal/`, one file per UTC day (`2026-10-27.jsonl`), each
  * 0600 in a 0700 folder. The retention sweep drops whole days past the window and rewrites the
  * one day that straddles it.
+ *
+ * Durability: every append is fsynced, and the folder is fsynced once when a day file is created,
+ * so the new file's name survives a power loss too. On macOS fsync(2) does not ask the drive to
+ * flush its own cache (that is F_FULLFSYNC, which Node does not expose); the journal relies on
+ * fsync as every other store of the daemon does.
  */
 import { mkdirSync, readdirSync, readFileSync, unlinkSync } from 'node:fs'
 import { open } from 'node:fs/promises'
@@ -62,17 +67,30 @@ export type DoorRejection = RefusalReason | 'bad_content_type' | 'store_unreadab
 /** What a `rejected` entry may carry: a door rejection, or a key that matches no paired agent. */
 export type RejectionCode = DoorRejection | Extract<BridgeRefusal, 'not_paired'>
 
+/**
+ * Keyed by RejectionCode, so a reason the shell adds to RefusalReason later is a missing key here
+ * and the build fails, instead of the journal refusing the rejection at run time.
+ */
+const REJECTION_CODE_SET: Readonly<Record<RejectionCode, true>> = {
+  bad_host: true,
+  bad_origin: true,
+  cross_site: true,
+  bad_request: true,
+  stopping: true,
+  bad_content_type: true,
+  store_unreadable: true,
+  not_paired: true,
+}
+
 /** Every rejection code; the page has a `rejection_<code>` line for each. */
-export const REJECTION_CODES = [
-  'bad_host',
-  'bad_origin',
-  'cross_site',
-  'bad_request',
-  'stopping',
-  'bad_content_type',
-  'store_unreadable',
-  'not_paired',
-] as const satisfies readonly RejectionCode[]
+export const REJECTION_CODES: readonly RejectionCode[] = Object.freeze(Object.keys(REJECTION_CODE_SET) as RejectionCode[])
+
+/**
+ * What a `rejected` entry stores for an Origin header that is no http(s) origin: `null` (a
+ * sandboxed frame, a file), an extension's origin, or anything else. The header itself is never
+ * stored: it is whatever the caller sent.
+ */
+export const OPAQUE_ORIGIN = 'opaque'
 
 /**
  * Codes only the journal has, beside the contract's refusals, in `refused` entries:
@@ -129,7 +147,12 @@ export type JournalEntry =
       readonly at: string
       readonly outcome: 'rejected'
       readonly code: RejectionCode
-      readonly origin?: string
+      /**
+       * The request's Origin header as the door got it. It is stored through `originOf` (scheme
+       * and host lower-cased, no path), or as OPAQUE_ORIGIN when it is no http(s) origin, so a
+       * rejection is journaled whatever the header held. Read back, it is always one of the two.
+       */
+      readonly origin?: string | null
       readonly bytes?: number
     }
 
@@ -168,7 +191,10 @@ export function checkEntry(input: JournalEntry): JournalEntry {
   const allowed: readonly string[] = FIELDS[outcome]
   for (const key of Object.keys(raw)) if (!allowed.includes(key)) throw new InvalidJournalEntry(key)
   if (!isDate(raw.at)) throw new InvalidJournalEntry('at')
-  if (raw.origin !== undefined && (typeof raw.origin !== 'string' || originOf(raw.origin) !== raw.origin)) {
+  // A door rejection is journaled whatever Origin it carried, so its origin is normalised; an
+  // agent call's origin comes from the bridge's own checks and must already be in originOf form.
+  const origin = outcome === 'rejected' && raw.origin !== undefined ? rejectedOrigin(raw.origin) : raw.origin
+  if (outcome !== 'rejected' && origin !== undefined && (typeof origin !== 'string' || originOf(origin) !== origin)) {
     throw new InvalidJournalEntry('origin')
   }
   if (raw.bytes !== undefined && (!Number.isInteger(raw.bytes) || (raw.bytes as number) < 0)) {
@@ -192,17 +218,36 @@ export function checkEntry(input: JournalEntry): JournalEntry {
     if (!known && !(raw.verb === 'unknown' && raw.code === 'bad_call')) throw new InvalidJournalEntry('verb')
   }
   const written: Record<string, unknown> = {}
-  for (const key of allowed) if (raw[key] !== undefined) written[key] = raw[key]
+  for (const key of allowed) if (raw[key] !== undefined) written[key] = key === 'origin' ? origin : raw[key]
   return written as unknown as JournalEntry
+}
+
+/**
+ * The origin a `rejected` entry stores: `originOf` the header (the contract's one rule), or
+ * OPAQUE_ORIGIN for a header that is no http(s) origin. Both map to themselves, so a line read
+ * back is checked the same way it was written.
+ */
+function rejectedOrigin(header: unknown): string {
+  if (typeof header !== 'string') return OPAQUE_ORIGIN
+  return originOf(header) ?? OPAQUE_ORIGIN
 }
 
 function isName(value: unknown): boolean {
   return typeof value === 'string' && value !== '' && value.length <= MAX_NAME
 }
 
+/**
+ * A time in the one form `toISOString()` gives (`2026-10-27T10:00:00.000Z`), from 1970 to the
+ * year 9999: anything else is refused, so no free text is stored in a date and every entry lands
+ * in a day file the journal lists (a year past 9999 would be `+010000-01-01.jsonl`).
+ */
 function isDate(value: unknown): boolean {
-  return typeof value === 'string' && !Number.isNaN(Date.parse(value))
+  if (typeof value !== 'string' || !CANONICAL_TIME.test(value)) return false
+  const ms = Date.parse(value)
+  return ms >= 0 && new Date(ms).toISOString() === value
 }
+
+const CANONICAL_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
 
 function includes(list: readonly string[], value: unknown): boolean {
   return typeof value === 'string' && list.includes(value)
@@ -265,6 +310,12 @@ function readFailure(error: unknown): JournalReadFailure {
     default:
       return 'other'
   }
+}
+
+/** What a sweep removed: entries past the window, and unreadable lines dropped with them. */
+export interface SweepResult {
+  readonly removed: number
+  readonly unreadable: number
 }
 
 /** An answer the agent got. */
@@ -346,28 +397,51 @@ export class Journal {
   }
 
   /**
-   * Drops every entry older than the retention window at `now` (ms since the epoch) and returns
-   * how many went. A day wholly past the window is deleted; the day the window's edge falls in is
-   * rewritten atomically without its older entries. The daemon calls this at start and once a day.
+   * Drops every entry older than the retention window at `now` (ms since the epoch). A day wholly
+   * past the window is deleted; the day the window's edge falls in is rewritten atomically
+   * without its older entries. The daemon calls this at start and once a day.
+   *
+   * Returns how many entries went and how many unreadable lines went with them: a deleted day's,
+   * and the edge day's when it is rewritten (a line that is not an entry has no time to keep it
+   * by). `recent().unreadable` shrinks by exactly that number. Throws a TypeError, before it
+   * touches anything, unless `now` is a safe integer >= 0, so a broken clock (NaN) cannot empty
+   * the journal; and JournalError when the disk fails: a read's reasons with operation `read`, a
+   * delete's or rewrite's with operation `write`.
    */
-  sweep(now: number): number {
+  sweep(now: number): SweepResult {
+    if (typeof now !== 'number' || !Number.isSafeInteger(now) || now < 0) {
+      throw new TypeError(`Journal.sweep: now must be a safe integer >= 0, got ${String(now)}`)
+    }
     const horizon = now - this.retentionDays * DAY_MS
     let removed = 0
-    for (const day of this.days()) {
+    let unreadable = 0
+    for (const day of this.reading(() => this.days())) {
       const start = Date.parse(`${day}T00:00:00.000Z`)
       if (start >= horizon) continue
-      const { entries } = this.read(day)
+      const read = this.reading(() => this.read(day))
+      const file = path.join(this.dir, `${day}.jsonl`)
       if (start + DAY_MS <= horizon) {
-        unlinkSync(path.join(this.dir, `${day}.jsonl`))
-        removed += entries.length
+        this.writing(() => unlinkSync(file))
+        removed += read.entries.length
+        unreadable += read.unreadable
         continue
       }
-      const kept = entries.filter((entry) => Date.parse(entry.at) >= horizon)
-      if (kept.length === entries.length) continue
-      atomicWrite(path.join(this.dir, `${day}.jsonl`), kept.map((entry) => `${JSON.stringify(entry)}\n`).join(''), 0o600)
-      removed += entries.length - kept.length
+      const kept = read.entries.filter((entry) => Date.parse(entry.at) >= horizon)
+      if (kept.length === read.entries.length) continue
+      this.writing(() => atomicWrite(file, kept.map((entry) => `${JSON.stringify(entry)}\n`).join(''), 0o600))
+      removed += read.entries.length - kept.length
+      unreadable += read.unreadable
     }
-    return removed
+    return { removed, unreadable }
+  }
+
+  /** Runs a change to the journal's files, turning a failure into a JournalError with its reason. */
+  private writing(write: () => void): void {
+    try {
+      write()
+    } catch (error) {
+      throw new JournalError(writeFailure(error), 'write', { cause: error })
+    }
   }
 
   /** The days this journal holds a file for, oldest first. */
@@ -422,11 +496,28 @@ export class Journal {
         const torn = size > 0 && last[0] !== 0x0a
         await handle.write(`${torn ? '\n' : ''}${JSON.stringify(written)}\n`)
         await handle.sync()
+        // An empty file before this append is a day file just created: its name is an entry of
+        // the folder, which needs an fsync of its own to survive a power loss. Once per new day.
+        if (size === 0) await this.syncFolder()
       } finally {
         await handle.close()
       }
     } catch (error) {
       throw new JournalError(writeFailure(error), 'write', { cause: error })
+    }
+  }
+
+  /**
+   * Fsyncs the journal's folder. Windows has no folder handle to fsync (Node cannot open one)
+   * and NTFS journals the folder's entries itself, so there it is skipped.
+   */
+  private async syncFolder(): Promise<void> {
+    if (process.platform === 'win32') return
+    const folder = await open(this.dir, 'r')
+    try {
+      await folder.sync()
+    } finally {
+      await folder.close()
     }
   }
 }
