@@ -12,6 +12,8 @@
   "exclude": ["src/**/*.test.ts"],
   "references": [
     { "path": "../../packages/contracts" },
-    { "path": "../../packages/cdp-pipe" }
+    { "path": "../../packages/cdp-pipe" },
+    { "path": "../../packages/core-snapshot" },
+    { "path": "../../packages/storage" }
   ]
 }

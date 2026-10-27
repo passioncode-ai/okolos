@@ -68,6 +68,12 @@ importers:
       '@okolos/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@okolos/core-snapshot':
+        specifier: workspace:*
+        version: link:../../packages/core-snapshot
+      '@okolos/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
 
   apps/extension:
     dependencies:

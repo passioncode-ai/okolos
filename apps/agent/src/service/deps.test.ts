@@ -16,4 +16,15 @@ describe('apps/agent resolves its workspace dependencies', () => {
     const pipe = await import('@okolos/cdp-pipe')
     expect(typeof pipe.CdpPipe).toBe('function')
   })
+
+  it('imports @okolos/core-snapshot', async () => {
+    const snapshot = await import('@okolos/core-snapshot')
+    expect(typeof snapshot.buildSnapshot).toBe('function')
+    expect(typeof snapshot.pageOf).toBe('function')
+  })
+
+  it('imports @okolos/storage', async () => {
+    const storage = await import('@okolos/storage')
+    expect(storage.RETENTION_DAYS.journal).toBeGreaterThan(0)
+  })
 })
