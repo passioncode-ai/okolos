@@ -1539,7 +1539,7 @@ describe('agent entries: at most AGENT_LINES_PER_DAY lines a UTC day, then day_f
   const after = (dir: string, seeded: number) => onDisk(dir).slice(seeded)
 
   it('names its cap and its line', () => {
-    expect(AGENT_LINES_PER_DAY).toBe(50_000)
+    expect(AGENT_LINES_PER_DAY).toBe(5_000)
     expect(DAY_FULL).toBe('day_full')
   })
 

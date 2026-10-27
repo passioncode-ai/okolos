@@ -120,11 +120,11 @@ export const REJECTED_LINES_PER_DAY = 2_000
  * test): an agent line is at most 719 bytes (a 40-code-point name of 4-byte characters, an origin of
  * MAX_ORIGIN_LENGTH, the longest verb and code, the largest `bytes`, the newline and a TORN_SEAL
  * before it), a DAY_FULL line 63. So the agents' part of a day file stays under
- * 50 000 x 719 + 63 = 35 950 063 bytes, about 36 MB, and over the 92 day files the journal can hold
- * (see REJECTED_LINES_PER_DAY) under 3.31 GB; with the door's part, the whole journal stays under
- * 3.52 GB.
+ * 5 000 x 719 + 63 = 3 595 063 bytes, about 3.6 MB, and over the 92 day files the journal can hold
+ * (see REJECTED_LINES_PER_DAY) under 331 MB; with the door's part, the whole journal stays under
+ * 544 MB. 5 000 is ten tasks of the 500-step budget a day (decision 2026-10-27, N-006 round 4).
  */
-export const AGENT_LINES_PER_DAY = 50_000
+export const AGENT_LINES_PER_DAY = 5_000
 
 /**
  * The outcome of the journal's own line for a day whose agent entries reached AGENT_LINES_PER_DAY:
