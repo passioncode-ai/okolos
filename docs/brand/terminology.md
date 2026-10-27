@@ -132,7 +132,7 @@ Contract: brand-contract v1
 | Расширение для агентов (Б2) | **Okolos Bridge**, не переводится и не склоняется | Okolos Bridge | `okolos-bridge` |
 | Локальная служба, через которую агенты входят в браузер | **Okolos Agent**, не переводится и не склоняется | Okolos Agent | `apps/agent`, служба `okolos-agent` |
 | Отдельное фоновое окно Chrome, в котором работает задача | **окно агента** | agent window | `AgentWindows` |
-| Разрешение одному агенту ходить в браузер | **доступ** (выдать, отозвать) | access (grant, revoke) | `Pairing` |
+| Разрешение одному агенту ходить в браузер по задачам и читать перепись процессов (без командных строк) | **доступ** (выдать, отозвать) | access (grant, revoke) | `Pairing` |
 | Запрос агента на доступ | **запрос** | request | `PublicRequest` (строка страницы), `Pairing.request` |
 | Число, которое человек сверяет | **код** | code | `PublicRequest.code` |
 | Подтвердить запрос | **Подтвердить** | Confirm | `[data-role=pairing-confirm]` |
