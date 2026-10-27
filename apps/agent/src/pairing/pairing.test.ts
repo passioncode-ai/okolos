@@ -117,7 +117,7 @@ describe('the pairing request id (spec §11 F5)', () => {
     const claimed = pairing.claim(paired.requestId, T0 + 5)
     expect(claimed).toHaveProperty('key')
     const later = pairing.list(T0 + REQUEST_LIFETIME_MS + 10)
-    expect(pairing.revoke(later.agents[0]!.agentId)).toMatchObject({ name: 'Claude Code' })
+    expect(pairing.revoke(later.agents[0]!.agentId, T0 + REQUEST_LIFETIME_MS + 11)).toMatchObject({ name: 'Claude Code' })
 
     const everything = JSON.stringify({ page, later, notices, store: readFileSync(file, 'utf8') })
     for (const id of ids) expect(everything).not.toContain(id)
@@ -340,9 +340,9 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
     const key = pair(pairing, 'Claude Code', T0)
     const kept = pair(pairing, 'Codex', T0 + 10)
     const agent = pairing.verify(key)!
-    expect(pairing.revoke(agent.agentId)).toEqual(agent)
+    expect(pairing.revoke(agent.agentId, T0 + 20)).toEqual(agent)
     expect(pairing.verify(key)).toBeNull()
-    expect(pairing.revoke(agent.agentId)).toBeNull()
+    expect(pairing.revoke(agent.agentId, T0 + 20)).toBeNull()
     expect(pairing.list(T0 + 20).agents.map((a) => a.name)).toEqual(['Codex'])
     expect(open(file).verify(key)).toBeNull()
     expect(open(file).verify(kept)).toMatchObject({ name: 'Codex' })
@@ -352,9 +352,9 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
     const notices: PairingNotice[] = []
     const pairing = open(storeFile(), notices)
     const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
-    expect(pairing.revoke(agent.agentId)).toEqual(agent)
-    expect(notices.at(-1)).toEqual({ kind: 'revoked', agentId: agent.agentId, name: 'Claude Code' })
-    expect(pairing.revoke('no-such-agent')).toBeNull()
+    expect(pairing.revoke(agent.agentId, T0 + 10)).toEqual(agent)
+    expect(notices.at(-1)).toEqual({ kind: 'revoked', agentId: agent.agentId, name: 'Claude Code', at: T0 + 10 })
+    expect(pairing.revoke('no-such-agent', T0 + 11)).toBeNull()
     expect(notices.filter((n) => n.kind === 'revoked')).toHaveLength(1)
   })
 
@@ -522,7 +522,7 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
   it('pairs the same name again after a revoke, with a new key', () => {
     const pairing = open()
     const old = pair(pairing, 'Claude Code', T0)
-    pairing.revoke(pairing.verify(old)!.agentId)
+    pairing.revoke(pairing.verify(old)!.agentId, T0 + 5)
     const fresh = pair(pairing, 'Claude Code', T0 + 10)
     expect(fresh).not.toBe(old)
     expect(pairing.verify(fresh)).toMatchObject({ name: 'Claude Code' })
@@ -563,15 +563,15 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
     const agent = pairing.verify(key)!
     const before = readFileSync(file, 'utf8')
     chmodSync(path.dirname(file), 0o500)
-    expect(() => pairing.revoke(agent.agentId)).toThrow(PairingStoreError)
-    expect(() => pairing.revoke(agent.agentId)).toThrow(expect.objectContaining({ reason: 'unwritable', file }))
+    expect(() => pairing.revoke(agent.agentId, T0 + 5)).toThrow(PairingStoreError)
+    expect(() => pairing.revoke(agent.agentId, T0 + 5)).toThrow(expect.objectContaining({ reason: 'unwritable', file }))
     chmodSync(path.dirname(file), 0o700)
     expect(pairing.verify(key)).toEqual(agent)
     expect(pairing.list(T0 + 10).agents).toEqual([agent])
     expect(readFileSync(file, 'utf8')).toBe(before)
     expect(notices.filter((n) => n.kind === 'revoked')).toEqual([])
     // Once the store can be written again, the revoke goes through.
-    expect(pairing.revoke(agent.agentId)).toEqual(agent)
+    expect(pairing.revoke(agent.agentId, T0 + 11)).toEqual(agent)
     expect(pairing.verify(key)).toBeNull()
   })
 
@@ -722,6 +722,45 @@ describe('a notice handler that throws (fix round 1)', () => {
     const key = (claimed as { key: string }).key
     expect(pairing.verify(key)).toMatchObject({ name: 'Claude Code' })
     expect(open(file).verify(key)).toMatchObject({ name: 'Claude Code' })
+  })
+})
+
+// Fix round 3: every notice says when it happened, so the journal and the events need no clock of
+// their own: an end at its deadline, everything else at the call that caused it.
+describe('when a notice happened (fix round 3)', () => {
+  it('carries the time of the call that caused it', () => {
+    const notices: PairingNotice[] = []
+    const pairing = open(storeFile(), notices)
+    const paired = asked(pairing.request('Claude Code', T0))
+    const declined = asked(pairing.request('Codex', T0 + 1))
+    expect(confirmAt(pairing, paired, T0 + 2)).toBe(true)
+    expect(declineAt(pairing, declined, T0 + 3)).toBe(true)
+    const claimed = pairing.claim(paired.requestId, T0 + 4)
+    const agent = pairing.verify((claimed as { key: string }).key)!
+    pairing.revoke(agent.agentId, T0 + 5)
+    expect(notices.map((n) => [n.kind, n.at])).toEqual([
+      ['requested', T0],
+      ['requested', T0 + 1],
+      ['confirmed', T0 + 2],
+      ['declined', T0 + 3],
+      ['paired', T0 + 4],
+      ['revoked', T0 + 5],
+    ])
+  })
+
+  it('dates an end by its deadline, not by the call that found it', () => {
+    const notices: PairingNotice[] = []
+    const pairing = open(storeFile(), notices)
+    asked(pairing.request('Never confirmed', T0))
+    const late = asked(pairing.request('Confirmed late', T0 + 1))
+    const confirmedAt = T0 + 2 * MINUTE
+    expect(confirmAt(pairing, late, confirmedAt)).toBe(true)
+    // Nothing looks until long after both ends.
+    pairing.list(T0 + 20 * MINUTE)
+    expect(notices.filter((n) => n.kind === 'expired' || n.kind === 'claim_expired').map((n) => [n.kind, n.name, n.at])).toEqual([
+      ['expired', 'Never confirmed', T0 + REQUEST_LIFETIME_MS],
+      ['claim_expired', 'Confirmed late', confirmedAt + CLAIM_WINDOW_MS],
+    ])
   })
 })
 

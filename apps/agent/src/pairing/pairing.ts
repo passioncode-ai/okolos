@@ -117,12 +117,20 @@ export interface PublicRequest {
 
 /**
  * What happened, for the journal and the events. Carries the handle and the agent id, never the
- * request id, the code or a key.
+ * request id, the code or a key. `at` (ms since the epoch, fix round 3) is when it happened: for
+ * `expired` the request's deadline (its creation plus REQUEST_LIFETIME_MS), for `claim_expired` the
+ * confirm plus CLAIM_WINDOW_MS, whenever a later call found the end; for the others the `now` of the
+ * call that caused it.
  */
 export type PairingNotice =
-  | { readonly kind: 'requested' | 'confirmed' | 'declined' | 'expired' | 'claim_expired'; readonly handle: string; readonly name: string }
-  | { readonly kind: 'paired'; readonly handle: string; readonly agentId: string; readonly name: string }
-  | { readonly kind: 'revoked'; readonly agentId: string; readonly name: string }
+  | {
+      readonly kind: 'requested' | 'confirmed' | 'declined' | 'expired' | 'claim_expired'
+      readonly handle: string
+      readonly name: string
+      readonly at: number
+    }
+  | { readonly kind: 'paired'; readonly handle: string; readonly agentId: string; readonly name: string; readonly at: number }
+  | { readonly kind: 'revoked'; readonly agentId: string; readonly name: string; readonly at: number }
 
 export interface PairingOptions {
   random?: RandomSource
@@ -267,7 +275,7 @@ export class Pairing {
     }
     this.byRequestId.set(entry.requestId, entry)
     this.byHandle.set(entry.handle, entry)
-    this.notify({ kind: 'requested', handle: entry.handle, name: entry.name })
+    this.notify({ kind: 'requested', handle: entry.handle, name: entry.name, at: now })
     return { requestId: entry.requestId, code: entry.code, expiresAt: entry.createdAt + REQUEST_LIFETIME_MS }
   }
 
@@ -284,7 +292,7 @@ export class Pairing {
   /** The person's decline, by handle only, like the confirm. An ended request stays an expired row. */
   declineByHandle(handle: string, now: number): boolean {
     this.sweep(now)
-    return this.declineEntry(this.byHandle.get(handle))
+    return this.declineEntry(this.byHandle.get(handle), now)
   }
 
   claim(requestId: string, now: number): { key: string } | { pending: true } | null {
@@ -297,20 +305,21 @@ export class Pairing {
     // The key is given out only once the store holds its hash.
     this.save([...this.agents, agent])
     this.forget(entry)
-    this.notify({ kind: 'paired', handle: entry.handle, agentId: agent.agentId, name: agent.name })
+    this.notify({ kind: 'paired', handle: entry.handle, agentId: agent.agentId, name: agent.name, at: now })
     return { key }
   }
 
   /**
    * Removes the agent's access and gives back the record it removed, or null when there was none;
-   * the 'revoked' notice carries the same agent id, so the daemon can close its tasks and windows.
+   * the 'revoked' notice carries the same agent id, so the daemon can close its tasks and windows,
+   * and `now` as its time.
    */
-  revoke(agentId: string): AgentRecord | null {
+  revoke(agentId: string, now: number): AgentRecord | null {
     const agent = this.agents.find((a) => a.agentId === agentId)
     if (agent === undefined) return null
     this.save(this.agents.filter((a) => a !== agent))
     this.lastCallWrite.delete(agent.agentId)
-    this.notify({ kind: 'revoked', agentId: agent.agentId, name: agent.name })
+    this.notify({ kind: 'revoked', agentId: agent.agentId, name: agent.name, at: now })
     return record(agent)
   }
 
@@ -358,14 +367,14 @@ export class Pairing {
     if (entry === undefined) return false
     if (entry.confirmedAt !== null) return true
     entry.confirmedAt = now
-    this.notify({ kind: 'confirmed', handle: entry.handle, name: entry.name })
+    this.notify({ kind: 'confirmed', handle: entry.handle, name: entry.name, at: now })
     return true
   }
 
-  private declineEntry(entry: Entry | undefined): boolean {
+  private declineEntry(entry: Entry | undefined, now: number): boolean {
     if (entry === undefined) return false
     this.forget(entry)
-    this.notify({ kind: 'declined', handle: entry.handle, name: entry.name })
+    this.notify({ kind: 'declined', handle: entry.handle, name: entry.name, at: now })
     return true
   }
 
@@ -380,7 +389,7 @@ export class Pairing {
       this.forget(entry)
       const { handle, name, code, createdAt, confirmedAt } = entry
       this.ended.set(handle, { handle, name, code, createdAt, confirmedAt, endedAt })
-      this.notify({ kind: confirmedAt === null ? 'expired' : 'claim_expired', handle, name })
+      this.notify({ kind: confirmedAt === null ? 'expired' : 'claim_expired', handle, name, at: endedAt })
     }
     for (const row of [...this.ended.values()]) {
       if (now - row.endedAt >= EXPIRED_SHOWN_MS) this.ended.delete(row.handle)
