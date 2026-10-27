@@ -30,8 +30,9 @@ import { isMain } from './is-main.mjs'
  *
  *   node tools/install-feed-agent.mjs                      # checkout, bootstrap, plist, load
  *   node tools/install-feed-agent.mjs --dry-run            # print the plist, touch nothing
- *   node tools/install-feed-agent.mjs --allow-branch       # install from HEAD other than origin/main (recorded:
- *                                                          # feed.log, and installedOffMain in every run's status)
+ *   node tools/install-feed-agent.mjs --allow-branch       # install from HEAD other than origin/main, or with
+ *                                                          # uncommitted edits to what it installs (recorded:
+ *                                                          # feed.log, and installedOffMain in every run's record)
  *   node tools/install-feed-agent.mjs --status             # plist, bootstrap (and drift), launchd's view, last run
  *   node tools/install-feed-agent.mjs --uninstall          # bootout, delete the plist and bootstrap, verify
  *   node tools/install-feed-agent.mjs --uninstall --purge  # and the checkout, state and logs
@@ -55,6 +56,13 @@ import { isMain } from './is-main.mjs'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 export const LABEL = 'app.okolos.feed'
 const source = path.join(root, 'tools/launchd', `${LABEL}.plist`)
+
+/**
+ * What the installer takes from the working tree rather than from a commit,
+ * relative to the repository: every file it copies beside launchd and the plist
+ * template it renders. checkBranch holds each to HEAD.
+ */
+export const INSTALLED_SOURCES = [...BOOTSTRAP_FILES.map((file) => `tools/${sourceOf(file)}`), `tools/launchd/${LABEL}.plist`]
 
 const PLACEHOLDERS = [
   '{{CHECKOUT}}',
@@ -192,10 +200,12 @@ export function stableNode({ execPath = process.execPath, pathEnv = process.env.
 
 /**
  * Whether this clone may install the agent: its HEAD is origin/main, freshly
- * fetched, on `main` or detached. The branch name alone is not enough: a `main`
- * behind or ahead of origin/main installs a bootstrap that is not what production
- * runs. ADR-0017: production publishes run only from origin/main, and the clone
- * the installer runs in is what the bootstrap recreates the checkout from.
+ * fetched, and every file the installer copies or renders (INSTALLED_SOURCES) is
+ * HEAD's, with nothing edited, staged, deleted or untracked. The branch name is not
+ * checked, the commit is: a `main` behind or ahead of origin/main, or an edit under
+ * tools/feed, installs a bootstrap that is not what production runs. ADR-0017:
+ * production publishes run only from origin/main, and the clone the installer runs
+ * in is what the bootstrap recreates the checkout from.
  */
 export async function checkBranch({ repo = root, tool = runBounded }) {
   const git = (args, timeoutMs = 15_000) =>
@@ -206,7 +216,12 @@ export async function checkBranch({ repo = root, tool = runBounded }) {
   const fetched = await git(['fetch', '--quiet', 'origin', 'main'], 90_000)
   const head = (await git(['rev-parse', 'HEAD'])).stdout.trim()
   const target = (await git(['rev-parse', 'origin/main'])).stdout.trim()
-  const facts = { branch: name, head, target }
+  const status = await git(['status', '--porcelain', '--untracked-files=all', '--', ...INSTALLED_SOURCES])
+  // Porcelain v1: two status letters, a space, the path from the repository's top. A
+  // file removed from the index but kept on disk is listed twice (D and ??): once here.
+  const changed =
+    status.code === 0 ? [...new Set(status.stdout.split('\n').filter((line) => line.trim() !== '').map((line) => line.slice(3)))] : null
+  const facts = { branch: name, head, target, changed: changed ?? [] }
   if (fetched.code !== 0) {
     return {
       ok: false,
@@ -216,21 +231,42 @@ export async function checkBranch({ repo = root, tool = runBounded }) {
         `Connect and run again, or pass --allow-branch to override.`,
     }
   }
-  if (/^[0-9a-f]{40}$/.test(head) && head === target) return { ok: true, ...facts }
+  if (changed === null) {
+    return {
+      ok: false,
+      ...facts,
+      reason:
+        `git cannot tell whether ${repo} has uncommitted changes in what the installer copies ` +
+        `(${(status.stderr || status.error || '').trim()}). Run again, or pass --allow-branch to override.`,
+    }
+  }
+  const atMain = /^[0-9a-f]{40}$/.test(head) && head === target
+  if (atMain && changed.length === 0) return { ok: true, ...facts }
+  const reasons = []
+  if (!atMain) {
+    reasons.push(
+      `${repo} is ${name} at ${head.slice(0, 7) || 'an unreadable HEAD'}, not origin/main ${target.slice(0, 7) || '(unreadable)'}: ` +
+        `the agent publishes production only from origin/main (ADR-0017), and recreates its checkout from this clone.`,
+    )
+  }
+  if (changed.length) {
+    reasons.push(
+      `${repo} has uncommitted changes in what the installer copies and renders (${changed.join(', ')}): ` +
+        `the installed bootstrap and plist would not be ${atMain ? 'origin/main' : 'HEAD'}'s. Commit or stash them.`,
+    )
+  }
   return {
     ok: false,
     ...facts,
-    reason:
-      `${repo} is ${name} at ${head.slice(0, 7) || 'an unreadable HEAD'}, not origin/main ${target.slice(0, 7) || '(unreadable)'}: ` +
-      `the agent publishes production only from origin/main (ADR-0017), and recreates its checkout from this clone. ` +
-      `Install from the main clone at origin/main, or pass --allow-branch to override.`,
+    reason: `${reasons.join(' ')} Install from the main clone at origin/main, or pass --allow-branch to override.`,
   }
 }
 
 /** One line for an install made past checkBranch's refusal; it rides in the plist into every run's record. */
 export function offMainNote(branch, at = new Date().toISOString()) {
   const short = (sha) => (sha ? String(sha).slice(0, 7) : 'unreadable')
-  return `${branch.branch ?? 'HEAD'} at ${short(branch.head)}, origin/main ${short(branch.target)} (--allow-branch, ${at})`
+  const uncommitted = branch.changed?.length ? `, uncommitted: ${branch.changed.join(', ')}` : ''
+  return `${branch.branch ?? 'HEAD'} at ${short(branch.head)}, origin/main ${short(branch.target)}${uncommitted} (--allow-branch, ${at})`
 }
 
 function digest(file) {
@@ -417,7 +453,7 @@ async function main() {
     else if (!argv.includes('--allow-branch')) throw new Error(branch.reason)
     else {
       offMain = offMainNote(branch)
-      console.log(`installing off origin/main because --allow-branch was given: ${offMain}`)
+      console.log(`installing past the origin/main check because --allow-branch was given: ${offMain}`)
       // Recorded where a person looks: feed.log now, and every run's status
       // (installedOffMain) for as long as this plist is installed.
       openLog(paths.log).write(`install: ${offMain}`)

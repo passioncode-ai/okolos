@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -13,6 +13,7 @@ import {
   agentStatus,
   bootstrapDrift,
   checkBranch,
+  INSTALLED_SOURCES,
   offMainNote,
   ensureCheckout,
   installAgent,
@@ -642,11 +643,13 @@ describe('the installer installs from origin/main only (ADR-0017)', () => {
     return key in answers ? ok(`${answers[key]}\n`) : { ...ok(), code: 128, stderr: `unexpected ${key}` }
   }
   const sha = (c: string) => c.repeat(40)
-  const at = (branch: string, head: string, target: string, fetch = '') => ({
+  const STATUS = `status --porcelain --untracked-files=all -- ${INSTALLED_SOURCES.join(' ')}`
+  const at = (branch: string, head: string, target: string, fetch = '', status = '') => ({
     'fetch --quiet origin main': fetch,
     'rev-parse --abbrev-ref HEAD': branch,
     'rev-parse HEAD': head,
     'rev-parse origin/main': target,
+    [STATUS]: status,
   })
 
   it('accepts main at origin/main, after fetching it', async () => {
@@ -683,6 +686,32 @@ describe('the installer installs from origin/main only (ADR-0017)', () => {
     expect((await checkBranch({ repo: '/r', tool: git({}) })).ok).toBe(false)
   })
 
+  it('names every file it installs from the working tree: the bootstrap’s sources and the plist template', () => {
+    expect(INSTALLED_SOURCES).toEqual([...BOOTSTRAP_FILES.map((file) => `tools/${BOOTSTRAP_SOURCES[file]}`), 'tools/launchd/app.okolos.feed.plist'])
+  })
+
+  it('refuses HEAD at origin/main when what it installs differs from HEAD, naming the files', async () => {
+    const result = await checkBranch({
+      repo: '/r',
+      tool: git(at('main', sha('a'), sha('a'), '', ' M tools/feed/status.mjs\n?? tools/is-main.mjs\nM  tools/launchd/app.okolos.feed.plist')),
+    })
+    expect(result.ok).toBe(false)
+    expect(result.changed).toEqual(['tools/feed/status.mjs', 'tools/is-main.mjs', 'tools/launchd/app.okolos.feed.plist'])
+    expect(result.reason).toMatch(/tools\/feed\/status\.mjs, tools\/is-main\.mjs, tools\/launchd\/app\.okolos\.feed\.plist.*--allow-branch/)
+    expect(result.reason).not.toMatch(/\n/)
+    expect(offMainNote(result, 't')).toBe(
+      'main at aaaaaaa, origin/main aaaaaaa, uncommitted: tools/feed/status.mjs, tools/is-main.mjs, tools/launchd/app.okolos.feed.plist (--allow-branch, t)',
+    )
+  })
+
+  it('refuses when git cannot say whether what it installs is HEAD’s', async () => {
+    const answers = at('main', sha('a'), sha('a')) as Record<string, string>
+    delete answers[STATUS]
+    const result = await checkBranch({ repo: '/r', tool: git(answers) })
+    expect(result.ok).toBe(false)
+    expect(result.reason).toMatch(/uncommitted.*--allow-branch/)
+  })
+
   it('records an install past the refusal in the plist, for every run to carry', () => {
     const text = rendered({
       template: template(),
@@ -702,6 +731,54 @@ describe('the installer installs from origin/main only (ADR-0017)', () => {
     expect(offMainNote({ ok: false, branch: 'sw/sw-03', head: 'b'.repeat(40), target: 'a'.repeat(40) }, '2026-10-27T12:00:00Z')).toBe(
       'sw/sw-03 at bbbbbbb, origin/main aaaaaaa (--allow-branch, 2026-10-27T12:00:00Z)',
     )
+  })
+})
+
+describe('the installer compares what it installs with HEAD, with real git', () => {
+  const run = (...args: string[]) => {
+    const result = spawnSync('git', ['-c', 'user.email=t@example.test', '-c', 'user.name=t', ...args], { encoding: 'utf8' })
+    if (result.status !== 0) throw new Error(`git ${args.join(' ')}: ${result.stderr}`)
+    return result.stdout.trim()
+  }
+
+  /** A clone at a freshly pushed origin/main holding every installed source, and one file that is not installed. */
+  function clone() {
+    const base = mkdtempSync(path.join(os.tmpdir(), 'okolos-install-git-'))
+    const origin = path.join(base, 'origin.git')
+    const repo = path.join(base, 'clone')
+    run('init', '--quiet', '--bare', '--initial-branch=main', origin)
+    run('init', '--quiet', '--initial-branch=main', repo)
+    for (const file of [...INSTALLED_SOURCES, 'README.md']) {
+      mkdirSync(path.dirname(path.join(repo, file)), { recursive: true })
+      writeFileSync(path.join(repo, file), `${file}\n`)
+    }
+    run('-C', repo, 'add', '.')
+    run('-C', repo, 'commit', '--quiet', '-m', 'seed')
+    run('-C', repo, 'remote', 'add', 'origin', origin)
+    run('-C', repo, 'push', '--quiet', 'origin', 'main')
+    return repo
+  }
+
+  it('accepts a clean clone, and an edit to a file it does not install', async () => {
+    const repo = clone()
+    expect(await checkBranch({ repo })).toMatchObject({ ok: true, changed: [] })
+    writeFileSync(path.join(repo, 'README.md'), 'edited\n')
+    expect(await checkBranch({ repo })).toMatchObject({ ok: true })
+  })
+
+  it('refuses an edited, a staged, a deleted and an untracked installed source', async () => {
+    const repo = clone()
+    writeFileSync(path.join(repo, 'tools/feed/status.mjs'), 'edited\n')
+    writeFileSync(path.join(repo, 'tools/launchd/app.okolos.feed.plist'), 'staged\n')
+    run('-C', repo, 'add', 'tools/launchd/app.okolos.feed.plist')
+    rmSync(path.join(repo, 'tools/feed/lock.mjs'))
+    run('-C', repo, 'rm', '--quiet', '--cached', 'tools/is-main.mjs')
+    const result = await checkBranch({ repo })
+    expect(result.ok).toBe(false)
+    expect([...(result.changed ?? [])].sort()).toEqual(
+      ['tools/feed/lock.mjs', 'tools/feed/status.mjs', 'tools/is-main.mjs', 'tools/launchd/app.okolos.feed.plist'].sort(),
+    )
+    expect(result.reason).toMatch(/--allow-branch/)
   })
 })
 

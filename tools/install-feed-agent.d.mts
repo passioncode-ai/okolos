@@ -22,11 +22,15 @@ export function rendered(options: {
 }): string
 export function installBootstrap(options: { dir: string; from?: string; files?: readonly string[]; log?: (line: string) => void }): void
 export function stableNode(options?: { execPath?: string; pathEnv?: string }): string
+/** What the installer takes from the working tree (repository-relative): bootstrap sources and the plist template. */
+export const INSTALLED_SOURCES: readonly string[]
 export interface BranchCheck {
   ok: boolean
   branch: string | null
   head?: string
   target?: string
+  /** Installed sources that differ from HEAD: edited, staged, deleted or untracked. */
+  changed?: string[]
   reason?: string
 }
 export function checkBranch(options: { repo?: string; tool?: Tool }): Promise<BranchCheck>
