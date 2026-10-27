@@ -402,6 +402,22 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
     expect(() => open(file)).toThrow(expect.objectContaining({ reason: 'unreadable' }))
   })
 
+  it('ends every open request at a restart: pending and confirmed ones leave no row, agents stay (fix round 1)', () => {
+    const file = storeFile()
+    const before = open(file)
+    pair(before, 'Claude Code', T0)
+    const pending = asked(before.request('Codex', T0 + 10))
+    const confirmed = asked(before.request('Cursor', T0 + 11))
+    expect(before.confirm(confirmed.requestId, T0 + 12)).toBe(true)
+
+    const after = open(file)
+    const page = after.list(T0 + 13)
+    expect(page.requests).toEqual([])
+    expect(page.agents.map((a) => a.name)).toEqual(['Claude Code'])
+    expect(after.claim(pending.requestId, T0 + 14)).toBeNull()
+    expect(after.claim(confirmed.requestId, T0 + 14)).toBeNull()
+  })
+
   it('opens a missing file as an empty store and writes nothing until a pairing', () => {
     const file = storeFile()
     const pairing = open(file)

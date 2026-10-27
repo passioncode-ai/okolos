@@ -12,7 +12,12 @@
  * when the key is given out or the request ends. The page's handle is a different random value, so
  * a request id offered to the page's actions finds nothing (audit #9).
  *
- * Requests live in memory only: they last five minutes, and a restart ends them.
+ * Requests live in memory only, by design: they last five minutes, and the request id is a secret
+ * that should never reach the disk. So a restart of the daemon ends every open request, pending or
+ * confirmed: after it list() shows no row for them (not even an expired one), a claim finds
+ * nothing, and the agent has to ask again with `okolos-agent pair`. SCR-23 says so to the person.
+ * Agents with access live in the store and survive the restart, with their last call as it was
+ * last written (at most a minute old, see `touch`).
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { readFileSync } from 'node:fs'
