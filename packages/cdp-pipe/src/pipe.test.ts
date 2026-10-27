@@ -314,7 +314,7 @@ describe('a browser that exits on its own', () => {
     expect(error.kind).toBe('exited')
     expect(error.method).toBe('Fake.exit')
     expect((await waiting).kind).toBe('exited')
-    expect(exits).toEqual([{ code: 3, signal: null }])
+    expect(exits).toEqual([{ code: 3, signal: null, requested: false }])
     // A request after the exit is refused at once, with the same kind.
     expect((await rejectionOf(pipe.send('Fake.echo'))).kind).toBe('exited')
   })
@@ -328,7 +328,8 @@ describe('a browser that exits on its own', () => {
     process.kill(pipe.pid, 'SIGKILL')
 
     expect((await waiting).kind).toBe('exited')
-    expect(exits).toEqual([{ code: null, signal: 'SIGKILL' }])
+    // Killed by someone else, not by close(): a crash to its owner.
+    expect(exits).toEqual([{ code: null, signal: 'SIGKILL', requested: false }])
   })
 
   it('is heard by a listener that subscribed after the exit, and not by one that unsubscribed', async () => {
@@ -341,7 +342,7 @@ describe('a browser that exits on its own', () => {
     pipe.onExit((info) => after.push(info))
 
     expect(await eventually(() => after.length > 0)).toBe(true)
-    expect(after).toEqual([{ code: 0, signal: null }])
+    expect(after).toEqual([{ code: 0, signal: null, requested: false }])
     expect(before).toEqual([])
   })
 
@@ -359,6 +360,30 @@ describe('a browser that exits on its own', () => {
 
     expect(await eventually(() => exits.length > 0)).toBe(true)
     expect(reported).toEqual([{ error: boom, event: 'exit' }])
+  })
+})
+
+describe('a browser its owner closed', () => {
+  // A crash handler must tell its own shutdown from a crash: the exit after
+  // close() is marked requested.
+  it('is heard by onExit as a requested exit', async () => {
+    const pipe = await fake()
+    const exits: unknown[] = []
+    pipe.onExit((info) => exits.push(info))
+
+    await pipe.close(300)
+
+    expect(exits).toEqual([{ code: 0, signal: null, requested: true }])
+  })
+
+  it('is a requested exit also when close() had to kill it', async () => {
+    const pipe = await fake(['--ignore-close', '--ignore-term'])
+    const exits: unknown[] = []
+    pipe.onExit((info) => exits.push(info))
+
+    await pipe.close(200)
+
+    expect(exits).toEqual([{ code: null, signal: 'SIGKILL', requested: true }])
   })
 })
 

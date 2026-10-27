@@ -43,6 +43,7 @@ export interface LaunchOptions {
 }
 
 function reportCloseIncomplete(pid: number): void {
+  // i18n-exempt: a diagnostic line on the owner's stderr for whoever runs the daemon; never shown to a person in the product
   process.stderr.write(`cdp-pipe: the group of browser ${pid} still had a process after SIGKILL; close() gave up\n`)
 }
 
@@ -70,6 +71,12 @@ export type EventListener<P = unknown> = (params: P, sessionId?: string) => void
 export interface ExitInfo {
   readonly code: number | null
   readonly signal: NodeJS.Signals | null
+  /**
+   * True when the exit followed close(): the owner ended it. False for a
+   * browser that left on its own or was ended by someone else, a crash to its
+   * owner.
+   */
+  readonly requested: boolean
 }
 
 /** Per-call settings of send(). */
@@ -160,7 +167,7 @@ export class CdpPipe implements CdpTransport {
     // Unread stderr would fill the pipe and stall the browser.
     stderr.resume()
     child.once('exit', (code, signal) => {
-      const info = { code, signal }
+      const info = { code, signal, requested: this.closing !== undefined }
       this.exitInfo = info
       // i18n-exempt: an internal error the daemon maps to a refusal code by its kind; never shown to a person
       this.fail('exited', `the browser exited (${signal ?? `code ${code}`})`)
