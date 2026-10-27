@@ -48,6 +48,7 @@ function reportCloseIncomplete(pid: number): void {
 
 function reportListenerError(error: unknown, event: string): void {
   const kind = error instanceof Error ? error.name : typeof error
+  // i18n-exempt: a diagnostic line on the owner's stderr for whoever runs the daemon; never shown to a person in the product
   process.stderr.write(`cdp-pipe: a listener of ${event} threw (${kind})\n`)
 }
 
@@ -141,15 +142,18 @@ export class CdpPipe implements CdpTransport {
     const fromBrowser = child.stdio[4] as Readable
     fromBrowser.setEncoding('utf8')
     fromBrowser.on('data', (chunk: string) => this.read(chunk))
+    // i18n-exempt: an internal error the daemon maps to a refusal code by its kind; never shown to a person
     fromBrowser.on('end', () => this.lost('the pipe from the browser closed'))
     // An unhandled 'error' on any of the browser's streams would take the
     // owner's process down with it, and every session on the pipe. A write after
     // the browser is gone fails with EPIPE; a read can fail too (EIO).
+    // i18n-exempt: internal errors the daemon maps to a refusal code by their kind; never shown to a person
     fromBrowser.on('error', (cause) => this.lost(`the pipe from the browser broke (${cause.message})`))
     this.toBrowser.on('error', (cause) => this.lost(`the pipe to the browser broke (${cause.message})`))
     // A browser that stops reading fd 3 ends our side of it too, and a write to
     // a stream already closed fails in its callback only, with no 'error': without
     // this, the request would wait out its whole deadline.
+    // i18n-exempt: internal errors the daemon maps to a refusal code by their kind; never shown to a person
     this.toBrowser.on('close', () => this.lost('the pipe to the browser closed'))
     const stderr = child.stdio[2] as Readable
     stderr.on('error', (cause) => this.lost(`the browser's stderr broke (${cause.message})`))
@@ -158,6 +162,7 @@ export class CdpPipe implements CdpTransport {
     child.once('exit', (code, signal) => {
       const info = { code, signal }
       this.exitInfo = info
+      // i18n-exempt: an internal error the daemon maps to a refusal code by its kind; never shown to a person
       this.fail('exited', `the browser exited (${signal ?? `code ${code}`})`)
       for (const listener of [...this.exitListeners]) this.tellExit(listener, info)
     })
@@ -218,6 +223,7 @@ export class CdpPipe implements CdpTransport {
       }
       const timer = setTimeout(() => {
         this.waiting.delete(id)
+        // i18n-exempt: an internal error the daemon maps to a refusal code by its kind; never shown to a person
         reject(new CdpError('timeout', method, `no answer within ${timeoutMs} ms`))
       }, timeoutMs)
       this.waiting.set(id, {
@@ -270,6 +276,7 @@ export class CdpPipe implements CdpTransport {
     const deadline = Date.now() + 3 * graceMs
     const exited = (): boolean => this.exitInfo !== undefined
     // No answer is waited for any more: the owner is ending the browser.
+    // i18n-exempt: an internal error the daemon maps to a refusal code by its kind; never shown to a person
     this.fail('closed', 'its owner closed the pipe')
     if (!exited()) {
       // Written past the closed pipe's refusal, and nothing waits for the
