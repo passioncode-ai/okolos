@@ -97,12 +97,12 @@
   "buildSnapshot всегда получает ключ задачи (taskKey, 16+ байт, не Task.id); ref вида e<id> не появляется ни в одном ответе (N-003)",
   "в настоящем Chrome пробник расширения режет любой текст, скрытый отрисовкой, даже без инструкции: e2e не утверждает, что негативы корпуса остаются в снимке (N-003, открытый пункт 4)",
   "Journal.close() вызывается на каждом пути остановки демона, включая слив по SIGTERM в оболочке службы: оболочка получает хук владельца на слив (apps/agent/src/service/http.ts), тест останавливает демон во время потока отказов двери и находит счёт пропущенных в журнале (N-006 круг 3)",
-  "второй демон на той же папке данных не открывает журнал: замок Journal.open отказывает, демон пишет событие и выходит (N-006 круг 3)",
   "secretFields строится secretFieldIds(корни DOM.getDocument с depth -1 и pierce true) и передаётся в каждый buildSnapshot, пустым множеством, если секретных полей нет (N-003 круг 1)",
   "snapshotVerdict(probe, snapshot) получает unresolved = промахи пробника + сбои DOM.describeNode; snapshot.incomplete означает отказ cleaning_incomplete (N-003 круг 1)",
   "open {ref} и другие глаголы со ссылкой идут через resolveRef из @okolos/core-snapshot; found:false и inField:true для open дают отказ; refMap объединяется по документу, потому что снимок поддерева несёт только свои ссылки (N-003 круг 1)",
   "Chrome-фикстура: трёхзначный cc-csc внутри своего label не доходит до агента; настоящий <select> отдаёт варианты как option или MenuListOption, и секретный select не отдаёт ни одного; текст под display:none не получает узла в дереве (иначе snapshotVerdict отказывает по hiddenUnmatched) (N-003 круг 1)",
   "Journal.open с JournalError(locked, open) пишет событие и выходит; отклонённый close() пишется событием (замок снят всё равно); все записи журнала штампуются одними часами демона; после close() записей нет (N-006 круг 3)",
+  "демон раз в минуту вызывает Journal.flushCounts(now) своими часами (N-006 круг 4); журнал открывается в setup оболочки после service.lock и закрывается на каждом пути остановки",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/agent.test.ts apps/agent/src/verbs && pnpm -s run typecheck"
  ],
  "guards": [
