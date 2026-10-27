@@ -565,7 +565,7 @@
    "id": "N-022",
    "title": "cdp-pipe для потребителей: интерфейс CdpTransport, сигнал выхода, типизированные ошибки, срок на вызов, обработчики ошибок чтения",
    "owner": "implementer",
-   "status": "pending",
+   "status": "done",
    "blocked_by": [
     "N-002"
    ],
@@ -584,25 +584,72 @@
    ],
    "risk": "R2",
    "certification": {
-    "round": 1,
+    "round": 2,
     "tiers": {
      "unit": "pass",
      "seam": "pass",
-     "product": "fail"
+     "product": "pass"
     },
-    "at": "fe74452dc2f23142279a974a77a2f7d88cc439a7",
+    "at": "dfaf5b0b9cfcc3b481a6c642e3ab86b7ed33cfd1",
     "history": [
      {
       "unit": "pass",
       "seam": "pass",
       "product": "fail"
+     },
+     {
+      "unit": "pass",
+      "seam": "pass",
+      "product": "pass"
      }
     ],
     "kinds": [
+     "blind",
      "blind"
     ],
-    "tree": "979f701ad99964eecc9852a5e4dfdab9575edaad"
-   }
+    "tree": "ebc4093ae4222c134df958c02eed02115400226b"
+   },
+   "proof": {
+    "head": "dfaf5b0b9cfcc3b481a6c642e3ab86b7ed33cfd1",
+    "tree": "ebc4093ae4222c134df958c02eed02115400226b",
+    "graph_revision": "9"
+   },
+   "evidence": [
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-022 -s exec vitest run packages/cdp-pipe tools/agent-window-spike.test.ts, run 1 -> Test Files 4 passed, Tests 65 passed, Duration 9.66s (wall 12 s)",
+    "unit: same, run 2 -> 4 files / 65 tests passed, Duration 9.61s (wall 13 s)",
+    "unit: same, run 3 -> 4 files / 65 tests passed, Duration 9.69s (wall 12 s)",
+    "unit: pnpm --dir … -s run typecheck -> exit 0 (tsc -b && tsc -p tsconfig.tests.json; tests are included)",
+    "unit: pgrep -fl fake -> no output, exit 1, after the checks and again after the probes",
+    "unit: scratch probe (vitest from scratchpad, importing pipe.ts): A) EPIPE on fd 3 -> waiting kind closed; close(200) took 227 ms, browser and group gone, exits [{code:null, signal:SIGTERM, requested:true}]; B) send(..., {timeoutMs:0}).catch(...) -> TypeError thrown synchronously past .catch; C) stderr EIO -> after 700 ms send rejects closed; close(300) 28 ms, group gone, requested:true",
+    "unit: scratch tsc probe: an object without onExit assigned to CdpTransport -> error TS2741 Property 'onExit' is missing",
+    "unit: pnpm -s exec vitest run tools/reachable.test.ts -> 1 file, 4 tests passed",
+    "unit: node tools/i18n-sweep.mjs -> exit 0, 0 sentences outside the catalogue, 41 exempt with reasons",
+    "unit: git diff f025a57..HEAD added lines | grep U+2014 -> nothing (exit 1)",
+    "unit: node --version -> v26.10.0, matching the runbook's 'гейты проверены на 26.10.0'",
+    "unit: commit 0daa8b5 carries the Co-Authored-By trailer",
+    "seam: N-022 worktree: node tools/i18n-sweep.mjs -> exit 0, 0 sentences outside the catalogue, 41 exempt",
+    "seam: N-022 worktree: pnpm -s exec vitest run packages/cdp-pipe tools/agent-window-spike.test.ts tools/reachable.test.ts tools/runbook.test.ts tools/docs.test.ts tools/licensing.test.ts -> 8 files, 163 passed",
+    "seam: N-022 worktree: pnpm -s run typecheck -> exit 0; git status clean afterwards",
+    "seam: N-022 worktree: pnpm -s exec vitest run tools --exclude 'tools/gates/**' -> 62 files, 1028 passed, 1 skipped",
+    "seam: git merge-tree --write-tree --name-only b1/n-022 b1/n-005 -> CONFLICT in packages/cdp-pipe/src/pipe.ts and tools/reachable.test.ts only",
+    "seam: merged tree built in scratch (git archive b1/n-022 + N-005's 46 A/M files, each byte-checked against the merge-tree result; pipe.ts identical to N-022's; reachable rows unioned to 12): node tools/i18n-sweep.mjs -> exit 0, 45 exempt; vitest tools/reachable.test.ts -> 4 passed",
+    "seam: merged tree: tsc -b and tsc -p tsconfig.tests.json -> exit 0; eslint packages/cdp-pipe apps/agent tools/reachable.test.ts tools/i18n-sweep.mjs -> exit 0",
+    "seam: merged tree: vitest packages/cdp-pipe apps/agent tools/reachable.test.ts tools/coverage-shape.test.ts -> 198 passed, 3 failed; the 3 failures are build.commit undefined (wellknown.test.ts:28, http.test.ts:614,671) because the scratch copy is not a git checkout, unrelated to the merge",
+    "seam: git merge-tree bridge/b1-run2 b1/n-022 -> clean; git merge-tree bridge/b1-run2 b1/n-005 -> clean",
+    "seam: grep over the tree for CdpPipe|CdpError|CdpTransport|cdp-pipe (excluding node_modules, dist, .git) -> no source consumer outside packages/cdp-pipe; spike imports frames.ts only",
+    "seam: grep for Node version statements -> package.json:14, docs/runbooks/development.md:16, .github/workflows/ci.yml:36,114,160",
+    "product: git diff f025a57..e32e057 -- docs package.json packages/cdp-pipe/package.json packages/cdp-pipe/src/index.ts packages/cdp-pipe/src/errors.ts tools/reachable.test.ts: read in full",
+    "product: read packages/cdp-pipe/src/pipe.ts in full against each README clause",
+    "product: grep -rln cdp-pipe|CdpPipe|CdpError|CdpTransport|onCloseIncomplete|remote-debugging-pipe over README.md AGENTS.md docs .github: docs/README.md, the design spec, modules spec, brief, plan, evidence doc; none outside the README row states close or error behaviour",
+    "product: grep node-version .github/workflows/ci.yml: 22 at lines 36, 114, 160; grep '\"node\"' over all package.json: only the root, >=22.18",
+    "product: grep import of .ts in tools/*.mjs: tools/agent-window-spike.mjs:39 (frames.ts), tools/sign-feed.mjs:26 (core-feeds apply.ts)",
+    "product: ~/.nvm/versions/node/v22.23.1/bin/node import of packages/cdp-pipe/src/frames.ts → splitFrames; of packages/core-feeds/src/apply.ts → applyUpdate,serialiseUpdate (runbook claim for 22.23.1 holds)",
+    "product: ls -d packages/*/ | wc -l → 22, matching docs/README.md:16 and docs/brand/facts.md:61",
+    "product: grep imports in packages/cdp-pipe/src/*.ts: node: builtins and local files only; packages/cdp-pipe/package.json has no dependencies",
+    "product: read docs/ux/scenarios.md SCN-045 (984-1000) and SCN-048 (1043-1062); design spec lines 1-140",
+    "product: pipe.test.ts test names cover each documented clause, including 'never hangs: when the group cannot be signalled it resolves within 3 x graceMs and reports the pid' (pipe.test.ts:517) and 'refuses a binary that does not exist with a CdpError of kind launch' (pipe.test.ts:160); tests were not run at this tier",
+    "proven at dfaf5b0b9cfcc3b481a6c642e3ab86b7ed33cfd1 (tree ebc4093ae4222c134df958c02eed02115400226b)"
+   ]
   },
   {
    "id": "N-023",
@@ -883,6 +930,12 @@
    "verb": "add",
    "node": "N-005",
    "why": "ресурсное ребро по pipe.ts перевёрнуто: N-022 построен параллельно и сам расставил пометки i18n, поэтому он вливается первым, а N-005 при слиянии берёт pipe.ts из N-022"
+  },
+  {
+   "verb": "close",
+   "node": "N-022",
+   "why": "certified at all 3 tiers in round 2",
+   "precondition": "dfaf5b0b9cfcc3b481a6c642e3ab86b7ed33cfd1"
   }
  ]
 }
