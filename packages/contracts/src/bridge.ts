@@ -241,9 +241,68 @@ function normaliseOrigins(value: unknown): { ok: true; list: string[] } | { ok: 
     if (typeof item !== 'string') return { ok: false, reason: 'every origin must be a string' } // i18n-exempt: a refusal read by the agent over MCP, not by the person
     const origin = originOf(item)
     if (origin === null) return { ok: false, reason: `not an http(s) origin: ${item}` } // i18n-exempt: a refusal read by the agent over MCP, not by the person
+    if (isLocalHost(new URL(origin).hostname)) return { ok: false, reason: `not a public origin: ${origin}` } // i18n-exempt: a refusal read by the agent over MCP, not by the person
     if (!list.includes(origin)) list.push(origin)
   }
   return { ok: true, list }
+}
+
+/**
+ * Whether a hostname is this machine or the local network (ревью F9).
+ *
+ * The bridge drives the person's browser, which sits inside their network: a
+ * task that may read `localhost` or `192.168.1.1` reaches the router, the dev
+ * server and the cloud metadata endpoint, none of which a page on the web can
+ * reach. The hostname comes from the URL parser, which already turned `127.1`,
+ * `2130706433` and `0x7f000001` into `127.0.0.1` and wrote IPv6 in its one
+ * compressed form, so each range has a single spelling to recognise.
+ *
+ * Beyond the ranges the review named, `0.0.0.0/8` and `::` (both answer as this
+ * machine on macOS and Linux), `*.localhost` (Chrome resolves it to loopback),
+ * IPv4-mapped IPv6 of any refused address and `fc00::/7` (the IPv6 private range)
+ * are refused too: each is a second spelling of a refused place.
+ */
+function isLocalHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/\.$/, '')
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return true
+  if (host.startsWith('[') && host.endsWith(']')) return isLocalIPv6(host.slice(1, -1))
+  const v4 = ipv4Octets(host)
+  return v4 !== null && isLocalIPv4(v4)
+}
+
+function ipv4Octets(host: string): readonly number[] | null {
+  const parts = host.split('.')
+  if (parts.length !== 4 || !parts.every((p) => /^\d{1,3}$/.test(p))) return null
+  const octets = parts.map(Number)
+  return octets.every((o) => o <= 255) ? octets : null
+}
+
+function isLocalIPv4(octets: readonly number[]): boolean {
+  const [a = -1, b = -1] = octets
+  return (
+    a === 0 || // 0.0.0.0/8, "this network"
+    a === 10 || // 10/8
+    a === 127 || // 127/8, loopback
+    (a === 169 && b === 254) || // 169.254/16, link-local and the cloud metadata address
+    (a === 172 && b >= 16 && b <= 31) || // 172.16/12
+    (a === 192 && b === 168) // 192.168/16
+  )
+}
+
+/** `address` is the parser's compressed, lower-case form, without brackets. */
+function isLocalIPv6(address: string): boolean {
+  if (address === '::' || address === '::1') return true
+  const mapped = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(address)
+  if (mapped) {
+    const hi = parseInt(mapped[1] ?? '', 16)
+    const lo = parseInt(mapped[2] ?? '', 16)
+    return isLocalIPv4([hi >> 8, hi & 0xff, lo >> 8, lo & 0xff])
+  }
+  const first = address.startsWith('::') ? 0 : parseInt(address.split(':')[0] ?? '', 16)
+  return (
+    (first & 0xffc0) === 0xfe80 || // fe80::/10, link-local
+    (first & 0xfe00) === 0xfc00 // fc00::/7, unique local
+  )
 }
 
 /**

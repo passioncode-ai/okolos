@@ -57,6 +57,69 @@ describe('a task scope', () => {
     }
   })
 
+  it('refuses this machine and the local network, naming the origin, however the address is spelled', () => {
+    // An agent that may read localhost or the router reaches what no page on the
+    // web can (ревью F9). The parser canonicalises 127.1, 2130706433 and 0x7f000001
+    // to 127.0.0.1, so the check has one spelling to hold.
+    const refused: Record<string, string> = {
+      'http://localhost:3000/admin': 'http://localhost:3000',
+      'http://LOCALHOST./': 'http://localhost.',
+      'http://app.localhost/': 'http://app.localhost',
+      'http://127.0.0.1/': 'http://127.0.0.1',
+      'http://127.255.255.254/': 'http://127.255.255.254',
+      'http://127.1/': 'http://127.0.0.1',
+      'http://2130706433/': 'http://127.0.0.1',
+      'http://0x7f000001/': 'http://127.0.0.1',
+      'http://0.0.0.0:8080/': 'http://0.0.0.0:8080',
+      'http://[::1]:8080/': 'http://[::1]:8080',
+      'http://[0:0:0:0:0:0:0:1]/': 'http://[::1]',
+      'http://[::]/': 'http://[::]',
+      'http://[::ffff:127.0.0.1]/': 'http://[::ffff:7f00:1]',
+      'http://[::ffff:192.168.0.1]/': 'http://[::ffff:c0a8:1]',
+      'http://10.0.0.1/': 'http://10.0.0.1',
+      'http://10.255.255.255/': 'http://10.255.255.255',
+      'http://172.16.0.1/': 'http://172.16.0.1',
+      'http://172.31.255.255/': 'http://172.31.255.255',
+      'https://192.168.1.1/': 'https://192.168.1.1',
+      'http://169.254.169.254/latest/meta-data/': 'http://169.254.169.254',
+      'http://[fe80::1]/': 'http://[fe80::1]',
+      'http://[febf::1]/': 'http://[febf::1]',
+      'http://[fd00::1]/': 'http://[fd00::1]',
+      'http://printer.local/': 'http://printer.local',
+      'http://printer.local./': 'http://printer.local.',
+    }
+    for (const [url, origin] of Object.entries(refused)) {
+      expect(validateScope({ ...base, origins: { read: [url], write: [] } }), url).toEqual({
+        ok: false,
+        reason: `origins.read: not a public origin: ${origin}`,
+      })
+    }
+    const write = validateScope({
+      ...base,
+      origins: { read: ['https://a.example', 'http://10.1.2.3'], write: ['http://10.1.2.3'] },
+    })
+    expect(write).toEqual({ ok: false, reason: 'origins.read: not a public origin: http://10.1.2.3' })
+  })
+
+  it('accepts the public addresses just outside each local range', () => {
+    for (const url of [
+      'http://126.255.255.255/',
+      'http://128.0.0.1/',
+      'http://11.0.0.1/',
+      'http://172.15.255.255/',
+      'http://172.32.0.0/',
+      'http://192.169.0.1/',
+      'http://169.255.0.1/',
+      'http://[fec0::1]/',
+      'http://[2001:db8::1]/',
+      'https://local.example/',
+      'https://notlocal.example/',
+      'https://localhost.example/',
+    ]) {
+      expect(validateScope({ ...base, origins: { read: [url], write: [] } }).ok, url).toBe(true)
+    }
+  })
+
   it('refuses write origins that the task does not also read', () => {
     const r = validateScope({ ...base, origins: { read: ['https://a.example'], write: ['https://b.example'] } })
     expect(r).toEqual({ ok: false, reason: 'origins.write must be a subset of origins.read: https://b.example' })
