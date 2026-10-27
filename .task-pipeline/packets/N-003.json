@@ -4,7 +4,7 @@
  "intent": "K2: вердикт к снимку, корпус, fuzz секретов",
  "inputs": [
   "`buildSnapshot`, `AxNode` (packages/core-snapshot/src/snapshot.ts); `Verdict` (@okolos/contracts)",
-  "N-001: TaskScope и BridgeRefusal"
+  "N-023: TaskScope и BridgeRefusal"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",

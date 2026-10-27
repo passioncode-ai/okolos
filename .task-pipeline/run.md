@@ -29,3 +29,5 @@ event: memory — board request a6191901 (webpilot shield copy) answered 25fd4f3
 finding: hygiene N-002 docs/README.md:122 split-table — noise — round 0 — base-repro n/a (blank line separates the packages table from the applications table; two tables, not one split)
 event: memory — N-002 verdict re-stamped at 09bfbaa after merge; node code identical to certified 6c2227c (git diff --quiet 6c2227c 09bfbaa -- packages/cdp-pipe tools/agent-window-spike.mjs) — 2026-10-27T07:40:00+01:00
 iter: 1 — item N-002 — closed at gate 5
+event: memory — lesson: N-002 implementer and all three certification tiers ran only the node check; i18n:sweep failed at pre-push after merge (5 unexempted strings in cdp-pipe). From N-005 on, every implementer runs `pnpm gates` before DONE — 2026-10-27T07:55:00+01:00
+holds: 5 — blocker N-001 parked at the certification ceiling (3 failing rounds, seam each time); replaced by N-023 with explicit edge change (revisions); plan-wide seam audit dispatched — 2026-10-27T08:10:00+01:00

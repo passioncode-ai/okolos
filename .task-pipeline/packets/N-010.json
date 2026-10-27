@@ -4,7 +4,8 @@
  "intent": "K4: окно агента",
  "inputs": [
   "CdpTransport, CdpPipe.launch (N-022); launch сам добавляет --remote-debugging-pipe и --user-data-dir, AgentWindows их не передаёт (проверка seam N-002)",
-  "N-022: CdpTransport, onExit, CdpError, timeoutMs на вызов"
+  "N-022: CdpTransport, onExit, CdpError, timeoutMs на вызов",
+  "N-005: apps/agent: package.json с зависимостью @okolos/contracts, tsconfig, каталоги службы"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",

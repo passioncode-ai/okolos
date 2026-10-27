@@ -1,0 +1,39 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-023",
+ "intent": "K0: контракты, замена запаркованного N-001",
+ "inputs": [
+  "ветка b1/n-001 (код N-001 до be67de5, сертифицирован unit и product)"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "packages/contracts/src/bridge.ts",
+   "packages/contracts/src/index.ts",
+   "packages/contracts/src/bridge.test.ts"
+  ]
+ },
+ "outputs": [
+  "всё из N-001, плюс: `isLocalHost(host: string): boolean` — одно правило для localhost, *.localhost, 127/8, 0/8, 10/8, 172.16/12, 192.168/16, 169.254/16, 100.64/10, ::, ::1, fe80::/10, fc00::/7, IPv4 внутри IPv6 (::ffff:, ::a.b.c.d, 64:ff9b::), *.local, имена с точкой на конце; IPv6 в скобках и без; validateScope и проверка фактического IP в N-011 зовут его же; типы входа и выхода каждого глагола: `SessionOpenInput = TaskScope`, `OpenInput`, `SnapshotInput`, `ReadInput`, `GetInput`, `GetResult`, `WaitForInput`, `WaitForResult`, `CloseResult`, `CensusResult = CensusEntry[]`, и `VerbIO` — карта глагол → {input, output}; каноническое написание глагола — с точкой (`session.open`); `toolName` только для имени инструмента MCP; журнал хранит каноническое"
+ ],
+ "acceptance": [
+  "isLocalHost: каждый диапазон списка true, публичные адреса и имена false; 100.64.0.1 и [::ffff:100.64.0.1] true (seam N-001 круг 3, break 2)",
+  "validateScope отвергает http://100.64.0.1 и вызывает isLocalHost (шпион или общий набор кейсов)",
+  "VerbIO покрывает каждый глагол BRIDGE_VERBS и BRIDGE_SESSION_VERBS: глагол без записи в карте — ошибка компиляции (seam N-001 круг 3, risk 2)",
+  "canonicalVerb(toolName(v)) === v для каждого глагола (seam N-001 круг 3, risk 1)",
+  "проверка узла: pnpm -s exec vitest run packages/contracts && pnpm -s run typecheck && pnpm -s run gates"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- packages/contracts/src/bridge.ts packages/contracts/src/index.ts packages/contracts/src/bridge.test.ts; затем первый непройденный тест в списке acceptance"
+}
