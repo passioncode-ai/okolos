@@ -39,3 +39,4 @@ iter: 2 — item N-022 — closed at gate 5
 holds: 5 — blocker N-005 parked at the certification ceiling (r1 all, r2 product, r3 unit+product; seam passed r2, r3); replaced by N-024 with explicit edge change
 iter: 3 — item N-024 — closed at gate 5
 event: memory — INCIDENT: a N-024 test committed "dotfiles" (8a7a78a, 1 file) into bridge/b1-run2 under the pre-push hook (inherited GIT_DIR); push refused, nothing reached origin (dfba2ab); branch restored with git reset --mixed 33a0e75 (767 files, clean); fix N-025 (28f2434) — 2026-10-27T11:30:00+01:00
+iter: 4 — item N-025 — closed at gate 5
