@@ -1,184 +1,244 @@
 {
- "goal": "Долги стабильности и Windows закрыты по аудиту 2026-10-27 (канва docs/superpowers/specs/2026-10-27-stability-windows-canvas.md)",
- "requirements": [
-  "B-161",
-  "B-162",
-  "B-159",
-  "B-164",
-  "B-158",
-  "B-165",
-  "B-166",
-  "B-78",
-  "B-125"
- ],
- "nodes": [
-  {
-   "id": "N-101",
-   "title": "mail-cli: запуск на Windows (закрывает B-161)",
-   "owner": "implementer",
-   "status": "pending",
-   "blocked_by": [],
-   "serves": "B-161",
-   "check": "pnpm -s exec vitest run apps/mail-cli && pnpm gates",
-   "risk": "R1",
-   "wave": 1,
-   "x-sw": "SW-01",
-   "touches": [
-    "apps/mail-cli/**"
-   ]
-  },
-  {
-   "id": "N-102",
-   "title": "инструменты и гейты на Windows (закрывает B-162, B-163)",
-   "owner": "implementer",
-   "status": "pending",
-   "blocked_by": [],
-   "serves": "B-162",
-   "check": "pnpm gates && pnpm package:check",
-   "risk": "R2",
-   "wave": 1,
-   "x-sw": "SW-02",
-   "touches": [
-    "tools/**",
-    "package.json",
-    ".gitattributes",
-    "docs/runbooks/development.md"
-   ]
-  },
-  {
-   "id": "N-103",
-   "title": "агент фида не падает молча (закрывает B-159)",
-   "owner": "implementer",
-   "status": "pending",
-   "blocked_by": [],
-   "serves": "B-159",
-   "check": "pnpm -s exec vitest run tools && pnpm gates",
-   "risk": "R2",
-   "wave": 1,
-   "x-sw": "SW-03",
-   "touches": [
-    "tools/launchd/**",
-    "tools/install-feed-agent.mjs",
-    "tools/feed-job.mjs",
-    "AGENTS.md"
-   ]
-  },
-  {
-   "id": "N-105",
-   "title": "CI на Windows (после SW-01, SW-02) (закрывает B-164)",
-   "owner": "implementer",
-   "status": "pending",
-   "blocked_by": [
-    "N-101",
-    "N-102"
-   ],
-   "serves": "B-164",
-   "check": "pnpm gates",
-   "risk": "R1",
-   "wave": 2,
-   "x-sw": "SW-05",
-   "touches": [
-    ".github/workflows/**"
-   ]
-  },
-  {
-   "id": "N-106",
-   "title": "снимок фида без ручного шага (закрывает B-158)",
-   "owner": "implementer",
-   "status": "pending",
-   "blocked_by": [],
-   "serves": "B-158",
-   "check": "pnpm gates",
-   "risk": "R2",
-   "wave": 2,
-   "x-sw": "SW-06",
-   "touches": [
-    "tools/feed-job.mjs",
-    "tools/feed/**"
-   ]
-  },
-  {
-   "id": "N-107",
-   "title": "Windows-типы и схемы ссылок (закрывает B-165)",
-   "owner": "implementer",
-   "status": "pending",
-   "blocked_by": [],
-   "serves": "B-165",
-   "check": "pnpm gates",
-   "risk": "R2",
-   "wave": 2,
-   "x-sw": "SW-07",
-   "touches": [
-    "packages/core-download/**",
-    "packages/core-traps/**",
-    "packages/platform/**",
-    "docs/ux/**",
-    "packages/i18n/**"
-   ]
-  },
-  {
-   "id": "N-108",
-   "title": "обещание ОС и браузеров; решение для Okolos Agent (закрывает B-166, B-167)",
-   "owner": "implementer",
-   "status": "pending",
-   "blocked_by": [],
-   "serves": "B-166",
-   "check": "pnpm gates",
-   "risk": "R1",
-   "wave": 2,
-   "x-sw": "SW-08",
-   "touches": [
-    "README.md",
-    "docs/brand/**",
-    "docs/runbooks/**",
-    "docs/store/**"
-   ]
-  },
-  {
-   "id": "N-109",
-   "title": "скан под нагрузкой и ожидания в e2e (закрывает B-78, B-168, B-169)",
-   "owner": "implementer",
-   "status": "pending",
-   "blocked_by": [],
-   "serves": "B-78",
-   "check": "pnpm gates",
-   "risk": "R2",
-   "wave": 2,
-   "x-sw": "SW-09",
-   "touches": [
-    "e2e/**",
-    "apps/extension/src/content/**"
-   ]
-  },
-  {
-   "id": "N-110",
-   "title": "ключ HIBP и inference/score (закрывает B-125, B-131)",
-   "owner": "implementer",
-   "status": "pending",
-   "blocked_by": [],
-   "serves": "B-125",
-   "check": "pnpm gates",
-   "risk": "R2",
-   "wave": 2,
-   "x-sw": "SW-10",
-   "touches": [
-    "apps/extension/src/background/**",
-    "packages/contracts/**",
-    "docs/ux/**"
-   ]
-  }
- ],
- "edges": [
-  {
-   "from": "N-101",
-   "to": "N-105",
-   "payload": "переносимые инструменты и CLI, которые CI на Windows запускает"
-  },
-  {
-   "from": "N-102",
-   "to": "N-105",
-   "payload": "переносимые инструменты и CLI, которые CI на Windows запускает"
-  }
- ],
- "revisions": []
+  "goal": "Долги стабильности и Windows закрыты по аудиту 2026-10-27 (канва docs/superpowers/specs/2026-10-27-stability-windows-canvas.md)",
+  "requirements": [
+    "B-161",
+    "B-162",
+    "B-159",
+    "B-164",
+    "B-158",
+    "B-165",
+    "B-166",
+    "B-78",
+    "B-125"
+  ],
+  "nodes": [
+    {
+      "id": "N-101",
+      "title": "mail-cli: запуск на Windows (закрывает B-161)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [],
+      "serves": "B-161",
+      "check": "pnpm -s exec vitest run apps/mail-cli && pnpm gates",
+      "risk": "R1",
+      "wave": 1,
+      "x-sw": "SW-01",
+      "touches": [
+        "apps/mail-cli/**"
+      ],
+      "certification": {
+        "round": 2,
+        "tiers": {
+          "unit": "fail"
+        },
+        "at": "3bd3feec6a4f019bcf53ae83bf96db23131db8d4",
+        "history": [
+          {
+            "unit": "fail"
+          },
+          {
+            "unit": "fail"
+          }
+        ],
+        "kinds": [
+          "blind",
+          "blind"
+        ],
+        "tree": "524b154b66b74c4b37fbda028a71a18c261d439a"
+      }
+    },
+    {
+      "id": "N-102",
+      "title": "инструменты и гейты на Windows (закрывает B-162, B-163)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [],
+      "serves": "B-162",
+      "check": "pnpm gates && pnpm package:check",
+      "risk": "R2",
+      "wave": 1,
+      "x-sw": "SW-02",
+      "touches": [
+        "tools/**",
+        "package.json",
+        ".gitattributes",
+        "docs/runbooks/development.md"
+      ],
+      "certification": {
+        "round": 1,
+        "tiers": {
+          "unit": "fail",
+          "seam": "pass",
+          "product": "fail"
+        },
+        "at": "0bbe63f5187e85393b09e6550a6665e549b5a439",
+        "history": [
+          {
+            "unit": "fail",
+            "seam": "pass",
+            "product": "fail"
+          }
+        ],
+        "kinds": [
+          "blind"
+        ],
+        "tree": "5be9d0bf88bb5c39aef850c7a376af25ae4734f5"
+      }
+    },
+    {
+      "id": "N-103",
+      "title": "агент фида не падает молча (закрывает B-159)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [],
+      "serves": "B-159",
+      "check": "pnpm -s exec vitest run tools && pnpm gates",
+      "risk": "R2",
+      "wave": 1,
+      "x-sw": "SW-03",
+      "touches": [
+        "tools/launchd/**",
+        "tools/install-feed-agent.mjs",
+        "tools/feed-job.mjs",
+        "AGENTS.md"
+      ],
+      "certification": {
+        "round": 1,
+        "tiers": {
+          "unit": "pass",
+          "seam": "fail",
+          "product": "fail"
+        },
+        "at": "75faabf706d3e28301ae82ef3ce87d6ddc7f2cb4",
+        "history": [
+          {
+            "unit": "pass",
+            "seam": "fail",
+            "product": "fail"
+          }
+        ],
+        "kinds": [
+          "blind"
+        ],
+        "tree": "9305d2ed76c1138bed27a83f23a5f81aae0f6ed0"
+      }
+    },
+    {
+      "id": "N-105",
+      "title": "CI на Windows (после SW-01, SW-02) (закрывает B-164)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [
+        "N-101",
+        "N-102"
+      ],
+      "serves": "B-164",
+      "check": "pnpm gates",
+      "risk": "R1",
+      "wave": 2,
+      "x-sw": "SW-05",
+      "touches": [
+        ".github/workflows/**"
+      ]
+    },
+    {
+      "id": "N-106",
+      "title": "снимок фида без ручного шага (закрывает B-158)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [],
+      "serves": "B-158",
+      "check": "pnpm gates",
+      "risk": "R2",
+      "wave": 2,
+      "x-sw": "SW-06",
+      "touches": [
+        "tools/feed-job.mjs",
+        "tools/feed/**"
+      ]
+    },
+    {
+      "id": "N-107",
+      "title": "Windows-типы и схемы ссылок (закрывает B-165)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [],
+      "serves": "B-165",
+      "check": "pnpm gates",
+      "risk": "R2",
+      "wave": 2,
+      "x-sw": "SW-07",
+      "touches": [
+        "packages/core-download/**",
+        "packages/core-traps/**",
+        "packages/platform/**",
+        "docs/ux/**",
+        "packages/i18n/**"
+      ]
+    },
+    {
+      "id": "N-108",
+      "title": "обещание ОС и браузеров; решение для Okolos Agent (закрывает B-166, B-167)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [],
+      "serves": "B-166",
+      "check": "pnpm gates",
+      "risk": "R1",
+      "wave": 2,
+      "x-sw": "SW-08",
+      "touches": [
+        "README.md",
+        "docs/brand/**",
+        "docs/runbooks/**",
+        "docs/store/**"
+      ]
+    },
+    {
+      "id": "N-109",
+      "title": "скан под нагрузкой и ожидания в e2e (закрывает B-78, B-168, B-169)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [],
+      "serves": "B-78",
+      "check": "pnpm gates",
+      "risk": "R2",
+      "wave": 2,
+      "x-sw": "SW-09",
+      "touches": [
+        "e2e/**",
+        "apps/extension/src/content/**"
+      ]
+    },
+    {
+      "id": "N-110",
+      "title": "ключ HIBP и inference/score (закрывает B-125, B-131)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [],
+      "serves": "B-125",
+      "check": "pnpm gates",
+      "risk": "R2",
+      "wave": 2,
+      "x-sw": "SW-10",
+      "touches": [
+        "apps/extension/src/background/**",
+        "packages/contracts/**",
+        "docs/ux/**"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "N-101",
+      "to": "N-105",
+      "payload": "переносимые инструменты и CLI, которые CI на Windows запускает"
+    },
+    {
+      "from": "N-102",
+      "to": "N-105",
+      "payload": "переносимые инструменты и CLI, которые CI на Windows запускает"
+    }
+  ],
+  "revisions": []
 }
