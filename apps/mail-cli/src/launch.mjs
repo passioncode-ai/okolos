@@ -101,7 +101,7 @@ export async function launch({
     write(
       typescript === false && runsFromSources(node, 'strip')
         ? line(`this Node.js ${node} has type stripping switched off, and the command runs from its TypeScript sources; start it without --no-experimental-strip-types`)
-        : line(`Node.js 22.18 or later is needed to run the command from its TypeScript sources; this is Node.js ${node}`),
+        : line(`Node.js 22.18 or later in the 22 line, or 23.6 or later, is needed to run the command from its TypeScript sources; this is Node.js ${node}`),
     )
     return FAILED
   }

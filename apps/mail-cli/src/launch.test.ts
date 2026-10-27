@@ -48,6 +48,20 @@ describe('the launcher, with the node it runs on injected', () => {
     expect(out.lines.join('')).toMatch(/^okolos-mail: .*22\.18.*22\.17\.0/)
   })
 
+  it('names both floors to a node of the 23 line below 23.6, which it also refuses', async () => {
+    const out = quiet()
+    const code = await launch({
+      argv: ['scan', 'x'],
+      env: {},
+      node: '23.3.0',
+      typescript: undefined,
+      load: async () => ({ run: () => undefined }),
+      write: out.write,
+    })
+    expect(code).toBe(EXIT.unreadable)
+    expect(out.lines.join('')).toMatch(/22\.18.*23\.6.*23\.3\.0/)
+  })
+
   it('ends with 2 and a line on stderr when loading the command fails', async () => {
     const out = quiet()
     const code = await launch({
