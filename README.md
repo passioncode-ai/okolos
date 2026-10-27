@@ -88,11 +88,12 @@ sees, a download's file name, is split on both `/` and `\` (`downloads.onCreated
 `packages/platform/src/adapter.ts`). That is read from the code, not run: browser tests run in CI on
 Linux only, in Playwright's Chromium and Firefox, and no run in Edge, on Windows or on macOS has a
 recorded commit yet.
-`okolos-mail scan` targets Windows, macOS and Linux with Node 22.18 or later and reads `.eml` and `.emlx`; its start fixes are in the tree and its test
+`okolos-mail scan` targets Windows, macOS and Linux with Node 22.18 or later in the 22 line or 23.6 or later, and reads `.eml` and `.emlx`; its start fixes are in the tree and its test
 passes on Linux and Windows CI, and the promise holds once B-161 is closed. Mail watching is Apple
 Mail on macOS only, and not built. Contributor tooling (`pnpm gates`, the pre-push hook,
 `pnpm package`, e2e) is built for macOS, Linux and Windows (B-162, B-163 and B-164 are closed):
-CI runs the gates on Linux and on `windows-latest`, and `pnpm gates` passes on macOS. On Windows
+CI runs the gates on Linux and on `windows-latest`, and every pre-push gate passed on macOS when `3276f2c` was pushed. No archive-writing `pnpm package`
+run with a recorded commit exists on any OS. On Windows
 the full pre-push hook, an archive-writing `pnpm package` and e2e have not been run; e2e runs on
 Linux only. Each row with its proof: the
 [development runbook](docs/runbooks/development.md#на-каких-ос); what may be promised to a

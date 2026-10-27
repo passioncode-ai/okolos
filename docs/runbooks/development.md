@@ -12,7 +12,7 @@
 ## На каких ОС
 
 Решение прогона стабильности и Windows от 2026-10-27, принятое по умолчанию (B-166): на вопрос
-1 «Поддержка Windows» канвы прогона оператор не ответил, и действует её рекомендация. Что из
+1 «Поддержка Windows» канва прогона записала сразу с пометкой «принято по умолчанию» (коммит `4c22375`), ответа оператора нет, и действует её рекомендация. Что из
 этого можно обещать пользователю и откуда решение, записано в
 [facts.md](../brand/facts.md#где-работает); здесь то же для того, кто собирает и проверяет.
 Столбец «Обещано» и есть решение, столбец справа говорит, что его доказывает, и где
@@ -24,8 +24,8 @@
 | Расширение | Chrome 137+, Edge 137+ и Firefox 129+ на Windows, macOS и Linux | пороги версий из манифестов и [ADR-0011](../adr/0011-the-signature-primitive-decides-the-supported-range.md); кода, зависящего от ОС, в сборке нет (`tools/docs.test.ts`); Edge получает сборку Chrome; браузерный прогон есть в CI только на Linux, в Chromium и Firefox из Playwright; прогона в Edge, на Windows или на macOS с записанным коммитом нет |
 | `okolos-mail scan` | Windows, macOS и Linux, когда закрыт B-161 | исправления запуска в этом дереве; тест, который запускает саму команду, проходит в CI на Linux и Windows; строка B-161 открыта ([facts.md](../brand/facts.md#где-работает)) |
 | Наблюдение за почтой (SCN-042) | только Apple Mail на macOS | не построено, `docs/ux/scenarios.md` |
-| `pnpm gates` и хук pre-push | macOS, Linux и Windows | Linux и Windows: задачи `gates` и `gates (windows)` в `.github/workflows/ci.yml`, прогон 40572549603 на `3276f2c` зелёный; что гоняет задача Windows и чего она не проверяет (полный прогон хука в том числе), в разделе [«Windows»](#windows). macOS: `pnpm build` и `pnpm gates` 2026-10-27 на ветке `sw/sw-08`, код 0 |
-| `pnpm package` | macOS, Linux и Windows | на Windows архив пишет `tar.exe` (раздел [«Windows»](#windows), `tools/archive.test.ts`). CI гоняет `pnpm package:check`, те же проверки без записи архива; сам `pnpm package` в CI не идёт ни на одной ОС |
+| `pnpm gates` и хук pre-push | macOS, Linux и Windows | Linux и Windows: задачи `gates` и `gates (windows)` в `.github/workflows/ci.yml`, прогон 40572549603 на `3276f2c` зелёный; что гоняет задача Windows и чего она не проверяет (полный прогон хука в том числе), в разделе [«Windows»](#windows). macOS: все гейты хука pre-push прошли 2026-10-27 на этом Mac при отправке `3276f2c` (lint, typecheck, build, unit, ux, brand, i18n, package) |
+| `pnpm package` | macOS, Linux и Windows | прогона с записью архива и с записанным коммитом нет ни на одной ОС; на Windows архив пишет `tar.exe` (раздел [«Windows»](#windows), `tools/archive.test.ts`). CI гоняет `pnpm package:check`, те же проверки без записи архива; сам `pnpm package` в CI не идёт ни на одной ОС |
 | `pnpm test:e2e`, `pnpm test:e2e:firefox` | macOS, Linux и Windows | задачи `e2e (chromium)` и `e2e (firefox)` только на `ubuntu-latest`; на macOS и Windows e2e в CI нет (раздел [«Windows»](#windows)) |
 | Агент фида (`pnpm feed:agent`) | только macOS | launchd, [ADR-0017](../adr/0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md) |
 | Okolos Agent (мост, фаза Б1) | только macOS; Windows отдельной фазой | B-167 |
