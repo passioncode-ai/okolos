@@ -1120,80 +1120,189 @@ describe('closing the pairing (fix round 4)', () => {
   })
 })
 
-// Fix round 4: the pairing remembers the bytes it last read or wrote, and writes nothing over a
-// store someone else changed in between (another daemon, a hand edit, a restore).
-describe('a store changed on disk (fix round 4)', () => {
-  function changedOnDisk(file: string): ReturnType<typeof expect.objectContaining> {
-    return expect.objectContaining({ name: 'PairingStoreError', reason: 'changed_on_disk', file })
+// Fix round 4: the pairing remembers the bytes it last read or wrote. Fix round 5: a store someone
+// else changed in between (another daemon, a hand edit, a restore) is read again with the checks of
+// the open; a valid one is taken as it is and the operation runs against it, an invalid one is
+// refused with that check's reason and nothing is written. verify sees the change too.
+describe('a store changed on disk (fix rounds 4 and 5)', () => {
+  function watched(file: string): { pairing: Pairing; reloads: () => number } {
+    let count = 0
+    const pairing = Pairing.open(file, { random: seeded(), onReload: () => count++ })
+    return { pairing, reloads: () => count }
   }
 
-  it('gives no key when the file changed since it was last written, and leaves the file as it is', () => {
+  function names(file: string): string[] {
+    return (JSON.parse(readFileSync(file, 'utf8')) as { agents: Array<{ name: string }> }).agents.map((a) => a.name)
+  }
+
+  it('takes a valid edit made on disk, then gives the key and writes both', () => {
     const file = storeFile()
-    const pairing = open(file)
-    pair(pairing, 'Claude Code', T0)
+    const { pairing, reloads } = watched(file)
+    const claude = pair(pairing, 'Claude Code', T0)
     const request = asked(pairing.request('Codex', T0 + 10))
     expect(confirmAt(pairing, request, T0 + 11)).toBe(true)
-    const edited = readFileSync(file, 'utf8').replace('"Claude Code"', '"Claude"')
-    writeFileSync(file, edited, { mode: 0o600 })
+    writeFileSync(file, readFileSync(file, 'utf8').replace('"Claude Code"', '"Claude"'), { mode: 0o600 })
 
-    expect(() => pairing.claim(request.requestId, T0 + 12)).toThrow(changedOnDisk(file))
-    expect(readFileSync(file, 'utf8')).toBe(edited)
-    expect(pairing.list(T0 + 13).agents.map((a) => a.name)).toEqual(['Claude Code'])
-    // The request stays confirmed and the claim keeps failing until the daemon reopens the store.
-    expect(pairing.list(T0 + 13).requests[0]).toMatchObject({ name: 'Codex', state: 'confirmed' })
-    expect(() => pairing.claim(request.requestId, T0 + 14)).toThrow(changedOnDisk(file))
+    expect(pairing.claim(request.requestId, T0 + 12)).toHaveProperty('key')
+    expect(reloads()).toBe(1)
+    expect(names(file)).toEqual(['Claude', 'Codex'])
+    expect(pairing.list(T0 + 13).agents.map((a) => a.name)).toEqual(['Claude', 'Codex'])
+    expect(pairing.verify(claude)).toMatchObject({ name: 'Claude' })
+    expect(statSync(file).mode & 0o777).toBe(0o600)
   })
 
-  it('refuses a revoke, a last-call write and a flush over a changed file', () => {
+  it('sees a revoke another pairing wrote at the next verify', () => {
     const file = storeFile()
-    const pairing = open(file)
-    const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
-    const edited = `${readFileSync(file, 'utf8')} `
-    writeFileSync(file, edited, { mode: 0o600 })
+    const { pairing: a, reloads } = watched(file)
+    const gone = pair(a, 'Claude Code', T0)
+    const kept = pair(a, 'Codex', T0 + 10)
+    const b = open(file)
+    expect(b.revoke(b.verify(gone)!.agentId, T0 + 20)).toMatchObject({ name: 'Claude Code' })
 
-    expect(() => pairing.revoke(agent.agentId, T0 + 10)).toThrow(changedOnDisk(file))
-    expect(() => pairing.touch(agent.agentId, T0 + 20)).toThrow(changedOnDisk(file))
-    expect(() => pairing.flush()).toThrow(changedOnDisk(file))
-    expect(readFileSync(file, 'utf8')).toBe(edited)
-    expect(pairing.list(T0 + 30).agents).toEqual([{ ...agent, lastCallAt: T0 + 20 }])
+    expect(a.verify(gone)).toBeNull()
+    expect(reloads()).toBe(1)
+    expect(a.verify(kept)).toMatchObject({ name: 'Codex' })
+    expect(a.list(T0 + 30).agents.map((x) => x.name)).toEqual(['Codex'])
+    expect(reloads()).toBe(1)
   })
 
-  it('sees an edit that keeps the size of the file: the bytes are compared, not only the size', () => {
+  it('reads nothing again while the file is as it was last read or written', () => {
     const file = storeFile()
-    const pairing = open(file)
-    const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    const { pairing, reloads } = watched(file)
+    const key = pair(pairing, 'Claude Code', T0)
+    for (let n = 0; n < 5; n++) expect(pairing.verify(key)).toMatchObject({ name: 'Claude Code' })
+    pair(pairing, 'Codex', T0 + 10)
+    expect(pairing.verify(key)).toMatchObject({ name: 'Claude Code' })
+    expect(reloads()).toBe(0)
+  })
+
+  it('refuses an invalid edit with the reason the open gives it, writes nothing, and recovers once it is fixed', () => {
+    const file = storeFile()
+    const { pairing, reloads } = watched(file)
+    const key = pair(pairing, 'Claude Code', T0)
+    const valid = readFileSync(file, 'utf8')
+    const request = asked(pairing.request('Codex', T0 + 10))
+    expect(confirmAt(pairing, request, T0 + 11)).toBe(true)
+    const invalid: Array<[string, string]> = [
+      ['not json', 'not_json'],
+      [JSON.stringify({ schema: 'something-else/1', agents: [] }), 'not_a_store'],
+      [valid.replace('"Claude Code"', '"agent\\u202ex"'), 'bad_record'],
+    ]
+    for (const [content, reason] of invalid) {
+      writeFileSync(file, content, { mode: 0o600 })
+      const refused = expect.objectContaining({ name: 'PairingStoreError', reason, file })
+      expect(() => pairing.claim(request.requestId, T0 + 12), reason).toThrow(refused)
+      expect(() => pairing.verify(key), reason).toThrow(refused)
+      expect(readFileSync(file, 'utf8')).toBe(content)
+      expect(pairing.list(T0 + 13).agents.map((a) => a.name)).toEqual(['Claude Code'])
+      expect(pairing.list(T0 + 13).requests[0]).toMatchObject({ name: 'Codex', state: 'confirmed' })
+    }
+    expect(reloads()).toBe(0)
+
+    writeFileSync(file, valid, { mode: 0o600 })
+    expect(pairing.verify(key)).toMatchObject({ name: 'Claude Code' })
+    expect(pairing.claim(request.requestId, T0 + 14)).toHaveProperty('key')
+    expect(names(file)).toEqual(['Claude Code', 'Codex'])
+  })
+
+  it('takes an edit that keeps the size of the file: the bytes are compared, not only the size', () => {
+    const file = storeFile()
+    const { pairing, reloads } = watched(file)
+    const key = pair(pairing, 'Claude Code', T0)
     const before = readFileSync(file, 'utf8')
     const edited = before.replace('"Claude Code"', '"Claude Coda"')
     expect(edited.length).toBe(before.length)
     writeFileSync(file, edited, { mode: 0o600 })
-    expect(() => pairing.revoke(agent.agentId, T0 + 10)).toThrow(changedOnDisk(file))
-    expect(readFileSync(file, 'utf8')).toBe(edited)
+    const agent = pairing.verify(key)!
+    expect(agent).toMatchObject({ name: 'Claude Coda' })
+    expect(reloads()).toBe(1)
+    expect(pairing.revoke(agent.agentId, T0 + 10)).toMatchObject({ name: 'Claude Coda' })
+    expect(names(file)).toEqual([])
   })
 
-  it('refuses to write over a file removed, or created, since it was last read', () => {
+  it('runs a revoke, a last-call write and a flush against the file as it is now', () => {
+    const file = storeFile()
+    const { pairing, reloads } = watched(file)
+    const a = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    const b = pairing.verify(pair(pairing, 'Codex', T0 + 10))!
+    writeFileSync(file, `${readFileSync(file, 'utf8')} `, { mode: 0o600 })
+    expect(pairing.touch(a.agentId, T0 + 20)).toBe(true)
+    expect(reloads()).toBe(1)
+    writeFileSync(file, readFileSync(file, 'utf8').replace('"Codex"', '"Codex CLI"'), { mode: 0o600 })
+    expect(pairing.revoke(a.agentId, T0 + 30)).toMatchObject({ name: 'Claude Code' })
+    expect(names(file)).toEqual(['Codex CLI'])
+    expect(pairing.touch(b.agentId, T0 + 40)).toBe(true)
+    expect(pairing.touch(b.agentId, T0 + 50)).toBe(true) // in memory: within the minute
+    writeFileSync(file, `${readFileSync(file, 'utf8')} `, { mode: 0o600 })
+    pairing.flush()
+    expect(open(file).list(T0 + 60).agents).toEqual([{ agentId: b.agentId, name: 'Codex CLI', pairedAt: T0 + 12, lastCallAt: T0 + 50 }])
+  })
+
+  it('keeps a last call held in memory only across a reload, for an agent still in the store', () => {
+    const file = storeFile()
+    const pairing = open(file)
+    const a = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    expect(pairing.touch(a.agentId, T0 + 10_000)).toBe(true) // written
+    expect(pairing.touch(a.agentId, T0 + 20_000)).toBe(true) // memory only
+    writeFileSync(file, `${readFileSync(file, 'utf8')} `, { mode: 0o600 })
+    expect(pairing.verify('f'.repeat(64))).toBeNull() // the reload
+    expect(pairing.list(T0 + 30_000).agents[0]).toMatchObject({ lastCallAt: T0 + 20_000 })
+    pairing.flush()
+    expect(open(file).list(T0 + 30_000).agents[0]).toMatchObject({ lastCallAt: T0 + 20_000 })
+  })
+
+  it('answers false to a last call due for writing when the agent was revoked on disk, and writes nothing', () => {
+    const file = storeFile()
+    const a = open(file)
+    const agent = a.verify(pair(a, 'Claude Code', T0))!
+    const b = open(file)
+    b.revoke(agent.agentId, T0 + 5)
+    const after = readFileSync(file, 'utf8')
+    expect(a.touch(agent.agentId, T0 + 10)).toBe(false)
+    expect(readFileSync(file, 'utf8')).toBe(after)
+    expect(a.list(T0 + 11).agents).toEqual([])
+  })
+
+  it('takes a file removed since it was last read as an empty store, and one created as what it holds', () => {
     const removed = storeFile()
     const first = open(removed)
-    pair(first, 'Claude Code', T0)
+    const old = pair(first, 'Claude Code', T0)
     rmSync(removed)
-    expect(() => pair(first, 'Codex', T0 + 10)).toThrow(changedOnDisk(removed))
-    expect(readdirSync(path.dirname(removed))).toEqual([])
+    expect(first.verify(old)).toBeNull()
+    pair(first, 'Codex', T0 + 10)
+    expect(names(removed)).toEqual(['Codex'])
 
     const created = storeFile()
     const second = open(created) // missing: an empty store
-    writeFileSync(created, JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: [] }), { mode: 0o600 })
-    expect(() => pair(second, 'Codex', T0)).toThrow(changedOnDisk(created))
+    const other = open(storeFile())
+    const key = pair(other, 'Cursor', T0)
+    writeFileSync(created, readFileSync(other.file, 'utf8'), { mode: 0o600 })
+    pair(second, 'Codex', T0 + 10)
+    expect(names(created)).toEqual(['Cursor', 'Codex'])
+    expect(second.verify(key)).toMatchObject({ name: 'Cursor' })
   })
 
-  it('lets one of two pairings on the same file write, and refuses the other', () => {
+  it('lets two pairings on the same file both write, neither losing the other one\'s agents', () => {
     const file = storeFile()
     const a = open(file)
     const b = open(file)
     pair(a, 'Claude Code', T0)
-    expect(() => pair(b, 'Codex', T0 + 10)).toThrow(changedOnDisk(file))
-    expect(open(file).list(T0 + 20).agents.map((agent) => agent.name)).toEqual(['Claude Code'])
-    // A pairing that writes again after its own write is not refused.
+    pair(b, 'Codex', T0 + 10)
     pair(a, 'Cursor', T0 + 30)
-    expect(open(file).list(T0 + 40).agents.map((agent) => agent.name)).toEqual(['Claude Code', 'Cursor'])
+    expect(open(file).list(T0 + 40).agents.map((agent) => agent.name)).toEqual(['Claude Code', 'Codex', 'Cursor'])
+  })
+
+  it('goes on when onReload throws: the reload stands', () => {
+    const file = storeFile()
+    const pairing = Pairing.open(file, {
+      random: seeded(),
+      onReload: () => {
+        throw new Error('log is down')
+      },
+    })
+    const key = pair(pairing, 'Claude Code', T0)
+    writeFileSync(file, readFileSync(file, 'utf8').replace('"Claude Code"', '"Claude"'), { mode: 0o600 })
+    expect(pairing.verify(key)).toMatchObject({ name: 'Claude' })
   })
 })
 
@@ -1269,7 +1378,8 @@ describe('what a store may hold (fix round 4)', () => {
     const good = agentRow(ID1, 'Claude Code', 'a'.repeat(64))
     expect(refusal(store([{ ...good, note: 'hi' }]))).toBe('bad_record')
     expect(refusal(store([{ ...good, key: 'the key' }]))).toBe('bad_record')
-    const { lastCallAt: _dropped, ...withoutLastCall } = good
+    const withoutLastCall = { ...good }
+    delete withoutLastCall['lastCallAt']
     expect(refusal(store([withoutLastCall]))).toBe('bad_record')
     // A field the store itself does not know is refused too: a write would drop it.
     expect(refusal(JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: [good], extra: 1 }))).toBe('not_a_store')

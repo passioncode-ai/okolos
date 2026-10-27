@@ -39,11 +39,11 @@ export function pairingStoreFile(dirs: ServiceDirs): string {
 /**
  * The pairing store cannot be read, holds something that is not a pairing store, or cannot be
  * written. A store that cannot be opened pairs and checks nothing until it is fixed (SCR-23, error
- * state), and the file is never overwritten. A write that fails (`unwritable`, `changed_on_disk`)
- * changes nothing: the file and the agents in memory stay as they were. `changed_on_disk` (fix round
- * 4): the file is not what this pairing last read or wrote (another daemon, a hand edit, a restore),
- * so writing would lose that change; every later write is refused the same way until the daemon
- * opens the store again.
+ * state), and the file is never overwritten. A write that fails (`unwritable`, `too_large`) changes
+ * nothing: the file and the agents in memory stay as they were. A file changed on disk since this
+ * pairing last read or wrote it (another daemon, a hand edit, a restore) is read again with the
+ * checks of the open (fix round 5): a valid one is taken as it is, an invalid one is refused with
+ * the reason the open would give it, and nothing is written over it.
  */
 export class PairingStoreError extends Error {
   readonly file: string
@@ -57,7 +57,7 @@ export class PairingStoreError extends Error {
   }
 }
 
-export type StoreRefusal = 'unreadable' | 'not_json' | 'not_a_store' | 'bad_record' | 'unwritable' | 'too_large' | 'changed_on_disk'
+export type StoreRefusal = 'unreadable' | 'not_json' | 'not_a_store' | 'bad_record' | 'unwritable' | 'too_large'
 
 /**
  * A store file larger than this is not opened (`not_a_store`, fix round 4): a pairing is about 200
@@ -177,6 +177,12 @@ export interface PairingOptions {
    * option the failure goes to `process.emitWarning`.
    */
   onNoticeError?: (error: unknown, notice: PairingNotice) => void
+  /**
+   * Hears that the store was read again because it changed on disk and the pairing took what it
+   * holds now (fix round 5), for the service log. No notice is sent for it. A handler that throws is
+   * ignored: the reload stands.
+   */
+  onReload?: () => void
 }
 
 function warn(error: unknown, notice: PairingNotice): void {
@@ -221,6 +227,9 @@ export class Pairing {
   private agents: StoredAgent[]
   /** What the file held when this pairing last read or wrote it; null for no file (fix round 4). */
   private onDisk: Fingerprint | null
+  /** What stat said of the file then; null for no file, or when unknown (fix round 5). */
+  private seen: StatMark | null
+  private readonly onReload: () => void
   private readonly byRequestId = new Map<string, Entry>()
   private readonly byHandle = new Map<string, Entry>()
   private readonly ended = new Map<string, Ended>()
@@ -235,10 +244,19 @@ export class Pairing {
   /** `close` ran: no request, confirm, decline or claim any more. */
   private closed = false
 
-  private constructor(file: string, store: { agents: StoredAgent[]; onDisk: Fingerprint | null }, options: PairingOptions) {
+  private constructor(file: string, store: Snapshot, options: PairingOptions) {
     this.file = file
     this.agents = store.agents
     this.onDisk = store.onDisk
+    this.seen = store.seen
+    const onReload = options.onReload ?? (() => {})
+    this.onReload = () => {
+      try {
+        onReload()
+      } catch {
+        // A log that cannot take the line does not undo the reload.
+      }
+    }
     this.random = options.random ?? randomBytes
     const onNotice = options.onNotice ?? (() => {})
     const onNoticeError = options.onNoticeError ?? warn
@@ -263,8 +281,14 @@ export class Pairing {
     return new Pairing(file, readStore(file), options)
   }
 
-  /** The agent a key belongs to, or null. Every stored hash is compared, in constant time. */
+  /**
+   * The agent a key belongs to, or null. Every stored hash is compared, in constant time. First the
+   * file is looked at (stat: inode, size, mtime, ctime); when it changed, it is read again like at a
+   * write (fix round 5), so a revoke another process wrote is seen here; a store that no longer
+   * opens throws PairingStoreError, and no key is taken until it is fixed.
+   */
   verify(key: string): AgentRecord | null {
+    this.sync(false)
     const presented = createHash('sha256').update(key, 'utf8').digest()
     let found: StoredAgent | null = null
     for (const agent of this.agents) {
@@ -279,7 +303,9 @@ export class Pairing {
    * so each agent's stored call is at most LAST_CALL_WRITE_MS older than its newest one, whatever
    * the other agents do. A write that fails throws PairingStoreError once; the call stays in memory
    * for the next write or `flush`, and the failed attempt counts as that agent's write, so the next
-   * one is tried a minute later, not on every call of a busy agent (fix round 3).
+   * one is tried a minute later, not on every call of a busy agent (fix round 3). A write runs
+   * against the file as it is now (fix round 5); when the agent is no longer in it, the answer is
+   * false and nothing is written.
    */
   touch(agentId: string, now: number): boolean {
     if (!this.agents.some((a) => a.agentId === agentId)) return false
@@ -287,6 +313,8 @@ export class Pairing {
     this.callsUnsaved = true
     if (now - (this.lastCallWrite.get(agentId) ?? Number.NEGATIVE_INFINITY) >= LAST_CALL_WRITE_MS) {
       this.lastCallWrite.set(agentId, now)
+      this.sync(true)
+      if (!this.agents.some((a) => a.agentId === agentId)) return false
       this.save(this.agents)
     }
     return true
@@ -297,6 +325,8 @@ export class Pairing {
    * writes nothing when there is none. A write that fails throws PairingStoreError and keeps them.
    */
   flush(): void {
+    if (!this.callsUnsaved) return
+    this.sync(true)
     if (this.callsUnsaved) this.save(this.agents)
   }
 
@@ -371,8 +401,16 @@ export class Pairing {
     const entry = this.byRequestId.get(requestId)
     if (entry === undefined) return { refused: this.refusals.get(sha256(requestId))?.refused ?? 'unknown' }
     if (entry.confirmedAt === null) return { pending: true }
-    const key = this.hex(32)
-    const agent: StoredAgent = { agentId: this.hex(8), name: entry.name, pairedAt: now, lastCallAt: null, keyHash: sha256(key) }
+    this.sync(true)
+    // An id or a key already in the store is drawn again: the store would not open with it twice
+    // (fix round 5; with real randomness this never repeats, with a seeded source it can).
+    let key: string
+    do key = this.hex(32)
+    while (this.agents.some((a) => a.keyHash === sha256(key)))
+    let agentId: string
+    do agentId = this.hex(8)
+    while (this.agents.some((a) => a.agentId === agentId))
+    const agent: StoredAgent = { agentId, name: entry.name, pairedAt: now, lastCallAt: null, keyHash: sha256(key) }
     // The key is given out only once the store holds its hash.
     this.save([...this.agents, agent])
     this.forget(entry, 'claimed', now)
@@ -386,6 +424,7 @@ export class Pairing {
    * and `now` as its time.
    */
   revoke(agentId: string, now: number): AgentRecord | null {
+    this.sync(true)
     const agent = this.agents.find((a) => a.agentId === agentId)
     if (agent === undefined) return null
     this.save(this.agents.filter((a) => a !== agent))
@@ -485,14 +524,54 @@ export class Pairing {
   }
 
   /**
-   * Writes `agents` and only then takes them as the agents in memory; throws PairingStoreError.
-   * First the file is checked against what this pairing last read or wrote: a file that changed
-   * since is not written over (`changed_on_disk`). The check and the write are two steps, so a
-   * change in between them is not seen; the daemon is the store's only writer, and this catches a
-   * second daemon or a hand edit made between two operations.
+   * Looks at the file and, when it is not what this pairing last read or wrote, reads it again with
+   * the checks of the open (fix round 5). A valid file is taken as it is (`adopt`); an invalid one
+   * throws PairingStoreError with the reason the open gives it, and memory stays as it was. `full`,
+   * before a write: the bytes are compared even when stat says nothing changed, for a file system
+   * whose times are too coarse to tell an edit made within the same tick; a verify trusts stat.
+   */
+  private sync(full: boolean): void {
+    const unchanged = sameMark(statMark(this.file), this.seen) && (!full || sameFingerprint(fingerprintOnDisk(this.file, this.onDisk?.size), this.onDisk))
+    if (unchanged) return
+    const store = readStore(this.file)
+    if (sameFingerprint(store.onDisk, this.onDisk)) {
+      this.seen = store.seen
+      return
+    }
+    this.adopt(store)
+  }
+
+  /**
+   * Takes the agents the file holds now in place of those in memory. A last call held in memory
+   * only is kept when it is newer than the file's and the agent is still there under the same key:
+   * the file cannot know it, and the next write or `flush` saves it.
+   */
+  private adopt(store: Snapshot): void {
+    const mine = new Map(this.agents.map((agent) => [agent.agentId, agent]))
+    let unsaved = false
+    this.agents = store.agents.map((agent) => {
+      const held = mine.get(agent.agentId)
+      if (held === undefined || held.keyHash !== agent.keyHash || held.lastCallAt === null) return agent
+      if (agent.lastCallAt !== null && agent.lastCallAt >= held.lastCallAt) return agent
+      unsaved = true
+      return { ...agent, lastCallAt: held.lastCallAt }
+    })
+    this.callsUnsaved = unsaved
+    this.onDisk = store.onDisk
+    this.seen = store.seen
+    for (const agentId of [...this.lastCallWrite.keys()]) {
+      if (!this.agents.some((agent) => agent.agentId === agentId)) this.lastCallWrite.delete(agentId)
+    }
+    this.onReload()
+  }
+
+  /**
+   * Writes `agents` and only then takes them as the agents in memory; throws PairingStoreError. The
+   * caller runs `sync(true)` first in the same call and builds `agents` from what it found, so a
+   * change made on disk before the operation is kept. The read and the write are two steps, so a
+   * change in between them is not seen; the daemon is the store's only writer.
    */
   private save(agents: StoredAgent[]): void {
-    if (!sameFingerprint(fingerprintOnDisk(this.file, this.onDisk?.size), this.onDisk)) throw new PairingStoreError(this.file, 'changed_on_disk')
     // Only the known fields are written, whatever the objects carry (fix round 5).
     const content: StoreFile = {
       schema: SCHEMA,
@@ -506,6 +585,12 @@ export class Pairing {
       throw new PairingStoreError(this.file, 'unwritable', { cause: error })
     }
     this.onDisk = fingerprint(Buffer.from(text, 'utf8'))
+    try {
+      this.seen = statMark(this.file)
+    } catch {
+      // Unknown: the next look reads the bytes and finds them the same.
+      this.seen = null
+    }
     this.agents = agents
     // The file now holds every agent as it is in memory, last calls included.
     this.callsUnsaved = false
@@ -541,6 +626,36 @@ function fingerprint(bytes: Buffer): Fingerprint {
 
 function sameFingerprint(a: Fingerprint | null, b: Fingerprint | null): boolean {
   return a === null || b === null ? a === b : a.size === b.size && a.sha256 === b.sha256
+}
+
+/** What stat says of the file, enough to tell a change without reading it (fix round 5). */
+interface StatMark {
+  readonly ino: bigint
+  readonly size: bigint
+  readonly mtimeNs: bigint
+  readonly ctimeNs: bigint
+}
+
+/** The store as read: its agents, the fingerprint of its bytes and its stat; all empty for no file. */
+interface Snapshot {
+  readonly agents: StoredAgent[]
+  readonly onDisk: Fingerprint | null
+  readonly seen: StatMark | null
+}
+
+/** The file's stat, null when there is no file; PairingStoreError when it cannot be looked at. */
+function statMark(file: string): StatMark | null {
+  try {
+    const { ino, size, mtimeNs, ctimeNs } = statSync(file, { bigint: true })
+    return { ino, size, mtimeNs, ctimeNs }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+    throw new PairingStoreError(file, 'unreadable', { cause: error })
+  }
+}
+
+function sameMark(a: StatMark | null, b: StatMark | null): boolean {
+  return a === null || b === null ? a === b : a.ino === b.ino && a.size === b.size && a.mtimeNs === b.mtimeNs && a.ctimeNs === b.ctimeNs
 }
 
 /** The file's bytes, or null when there is no file; PairingStoreError when it cannot be read. */
@@ -580,17 +695,13 @@ function fingerprintOnDisk(file: string, expectedSize?: number): Fingerprint | n
  * agents); or a name the store rule refuses (`isStorableName`). The store rule is looser than the
  * request rule on purpose, so an agent paired under an earlier rule keeps its access (fix round 5).
  */
-function readStore(file: string): { agents: StoredAgent[]; onDisk: Fingerprint | null } {
-  let size: number
-  try {
-    size = statSync(file).size
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { agents: [], onDisk: null }
-    throw new PairingStoreError(file, 'unreadable', { cause: error })
-  }
-  if (size > MAX_STORE_BYTES) throw new PairingStoreError(file, 'not_a_store')
+function readStore(file: string): Snapshot {
+  const seen = statMark(file)
+  if (seen === null) return { agents: [], onDisk: null, seen: null }
+  if (seen.size > BigInt(MAX_STORE_BYTES)) throw new PairingStoreError(file, 'not_a_store')
   const bytes = readBytes(file)
-  if (bytes === null) return { agents: [], onDisk: null }
+  // Removed between the stat and the read: an empty store, looked at again next time.
+  if (bytes === null) return { agents: [], onDisk: null, seen: null }
   // The file may have grown between the size check and the read.
   if (bytes.length > MAX_STORE_BYTES) throw new PairingStoreError(file, 'not_a_store')
   const text = bytes.toString('utf8')
@@ -608,7 +719,7 @@ function readStore(file: string): { agents: StoredAgent[]; onDisk: Fingerprint |
   // One agent id twice would make a revoke and a last call ambiguous (fix round 3).
   if (new Set(agents.map((agent) => agent.agentId)).size !== agents.length) throw new PairingStoreError(file, 'bad_record')
   if (new Set(agents.map((agent) => agent.keyHash)).size !== agents.length) throw new PairingStoreError(file, 'bad_record')
-  return { agents, onDisk: fingerprint(bytes) }
+  return { agents, onDisk: fingerprint(bytes), seen }
 }
 
 /** The record the page and the door see; the key's hash stays in the store. */
