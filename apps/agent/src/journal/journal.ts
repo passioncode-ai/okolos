@@ -35,20 +35,29 @@
  * it ends in a newline: a last line without one was never fsynced whole and is counted unreadable,
  * and the next append seals it (TORN_SEAL) so a newline cannot turn it into an entry afterwards.
  *
- * Volume (decision 2026-10-27, N-006 round 3; spec section 3): any local page can make the door
- * reject requests, so door rejections are bounded per UTC day and per group (REJECTION_GROUPS):
+ * Volume (decisions 2026-10-27, N-006 rounds 3 and 4; spec section 3): any local page can make the
+ * door reject requests, so door rejections are bounded per UTC day and per group (REJECTION_GROUPS):
  * request faults, and key or service state. Each rejection is written and fsynced before its answer,
  * like any entry, until its group holds REJECTED_LINES_PER_DAY lines that day. The next one writes
  * one CAP_REACHED line naming the group (once a day per group); later ones are not written but
- * counted, and the count is written as a CAP_REACHED line with `count` at the first record a minute
- * (COUNT_INTERVAL_MS) or more after the last, at `close()` and at the day roll. A crash loses at
- * most the count not yet written, a minute's worth. Agent entries (`answered`, `refused`) are never
- * capped. The cap survives a restart: the first record of a day reads that day's file.
+ * counted. The count is written as a CAP_REACHED line with `count` when the daemon calls
+ * `flushCounts(now)` (once a minute), at the first record a minute (COUNT_INTERVAL_MS) or more after
+ * the last count line, at `close()` and at the day roll; `recent()` shows a count not yet written, so
+ * the page never shows fewer than were counted. A crash loses at most the count not yet written, a
+ * minute's worth. Agent entries (`answered`, `refused`) are bounded too, at AGENT_LINES_PER_DAY a
+ * UTC day: past it an agent's answer is refused (JournalError `day_full`, so the agent gets
+ * `internal`) and one DAY_FULL line says so. Both caps survive a restart: the first record of a day
+ * reads that day's file.
  *
- * One writer (decision 2026-10-27): `Journal.open` takes JOURNAL_LOCK in the folder and `close()`
- * releases it, so two daemons cannot each keep a cap of their own or cut each other's lines.
+ * One writer (decision 2026-10-27, N-006 round 4): the journal has no lock of its own. It is opened
+ * only by the daemon's `setup`, which the service shell (`apps/agent/src/service/http.ts`,
+ * `startService`) runs after `holdSingleInstance` holds `<data>/service.lock`: a kernel lock that the
+ * kernel drops when the process dies, so an unclean stop leaves nothing to clear and a second daemon
+ * stops at that lock before it reaches the journal. The daemon closes the journal before it releases
+ * that lock. Two Journals open on one folder would each keep a cap of their own; that is a caller's
+ * bug, which this rule keeps out.
  */
-import { mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, unlinkSync } from 'node:fs'
 import { open, type FileHandle } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -78,29 +87,53 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const DAY_FILE = /^(\d{4}-\d{2}-\d{2})\.jsonl$/
 
 /**
- * Past a group's cap, how often its count is written: at the first record (an agent's or a door's)
- * this long or more after the last count line or the CAP_REACHED line. Measured on the entries' own
- * times; a time earlier than the last write (a clock stepped back) starts the minute again from it.
+ * Past a group's cap, how often its count is written by the records themselves: at the first record
+ * (an agent's or a door's) this long or more after the last count line, the CAP_REACHED line or the
+ * last `flushCounts(now)` that wrote one. Measured on the entries' own times (and that `now`); a time
+ * earlier than the last write (a clock stepped back) starts the minute again from it.
  */
 export const COUNT_INTERVAL_MS = 60_000
 
 /**
  * The most rejection lines a group holds in one UTC day. The next rejection of that group writes one
- * CAP_REACHED line instead, and later ones are counted. Bound (LC-12, every file bounded): a
- * rejection line is at most 393 bytes (an origin of MAX_ORIGIN_LENGTH, the largest `bytes`, the
- * newline and a TORN_SEAL before it), a count line at most 127; a group writes in a day at most
- * 2 000 rejection lines, one CAP_REACHED and 1 441 count lines (one a minute, one at the day roll),
- * plus one count line per clean stop. So a day stays under 2 x (2 000 x 393 + 1 442 x 127) bytes,
- * about 1.94 MB, and the 90 days the journal keeps under 175 MB whatever a page sends, plus 254
- * bytes per clean stop (decision 2026-10-27). Agent entries are not in this bound.
+ * CAP_REACHED line instead, and later ones are counted.
+ *
+ * Bound (LC-12, every file bounded; the line sizes are pinned by a test): a rejection line is at
+ * most 393 bytes (an origin of MAX_ORIGIN_LENGTH, the largest `bytes`, the newline and a TORN_SEAL
+ * before it), a CAP_REACHED line with or without its count at most 127. With a clock that runs
+ * forward and `flushCounts` called once a minute (the daemon), a group writes in a day at most
+ * 2 000 rejection lines, one CAP_REACHED, 1 440 count lines from `flushCounts`, 1 440 from the
+ * records' own minute and one at the day roll, plus one per clean stop. So the door's part of a day
+ * file stays under 2 x (2 000 x 393 + 2 882 x 127) = 2 304 028 bytes, about 2.3 MB. The sweep runs at
+ * start and once a day and keeps the day its horizon cuts, so the journal holds up to 92 day files
+ * (the cut day, 90 days and today, and one more until the next daily sweep): the door's part stays
+ * under 212 MB whatever a page sends, plus 254 bytes per clean stop. Day files dated after the clock
+ * (one that once ran ahead) are not swept until their day comes, and are outside this number.
  */
 export const REJECTED_LINES_PER_DAY = 2_000
 
-/** The file in the journal's folder that names, by pid, the one process writing it. */
-export const JOURNAL_LOCK = 'journal.lock'
+/**
+ * The most agent entries (`answered` and `refused`, together) one UTC day holds (decision
+ * 2026-10-27, N-006 round 4). The next agent entry that day is not written: `record` rejects with
+ * JournalError `day_full`, so `answerAfterRecord` sends the `internal` refusal with that cause, and
+ * one DAY_FULL line is written once that day for SCR-24. Bound (the line sizes are pinned by a
+ * test): an agent line is at most 719 bytes (a 40-code-point name of 4-byte characters, an origin of
+ * MAX_ORIGIN_LENGTH, the longest verb and code, the largest `bytes`, the newline and a TORN_SEAL
+ * before it), a DAY_FULL line 63. So the agents' part of a day file stays under
+ * 50 000 x 719 + 63 = 35 950 063 bytes, about 36 MB, and over the 92 day files the journal can hold
+ * (see REJECTED_LINES_PER_DAY) under 3.31 GB; with the door's part, the whole journal stays under
+ * 3.52 GB.
+ */
+export const AGENT_LINES_PER_DAY = 50_000
 
-/** A lock that names no pid and is older than this is a stale one; younger, it may be another open mid-write. */
-const LOCK_UNREADABLE_STALE_MS = 10_000
+/**
+ * The outcome of the journal's own line for a day whose agent entries reached AGENT_LINES_PER_DAY:
+ * `{"at": ..., "outcome": "day_full"}`, `at` being the first agent entry it refused. Written once a
+ * day and only by the journal: a caller's entry cannot carry this outcome. It is also the code of the
+ * JournalError a refused agent entry gets. The page owes it a line that the journal is full for the
+ * day (N-014, N-015).
+ */
+export const DAY_FULL = 'day_full'
 
 /**
  * The longest origin an entry stores: `https://`, a 253-character host (the most DNS allows) and
@@ -265,8 +298,15 @@ export interface RejectedLine {
   readonly count?: number
 }
 
-/** A line of the journal as it is read back: an agent entry, or a stored rejected line. */
-export type JournalLine = Exclude<JournalEntry, { readonly outcome: 'rejected' }> | RejectedLine
+/** The journal's own line for a day whose agent entries reached AGENT_LINES_PER_DAY (see DAY_FULL). */
+export interface DayFullLine {
+  /** The first agent entry the full day refused. */
+  readonly at: string
+  readonly outcome: typeof DAY_FULL
+}
+
+/** A line of the journal as it is read back: an agent entry, a stored rejected line, or a DAY_FULL line. */
+export type JournalLine = Exclude<JournalEntry, { readonly outcome: 'rejected' }> | RejectedLine | DayFullLine
 
 /** Members each outcome may carry, in the order they are written. */
 const FIELDS = {
@@ -277,6 +317,9 @@ const FIELDS = {
 
 /** The members of the journal's own CAP_REACHED line, in the order they are written. */
 const CAP_FIELDS: readonly string[] = ['at', 'outcome', 'code', 'group', 'count']
+
+/** The members of the journal's own DAY_FULL line, in the order they are written. */
+const DAY_FULL_FIELDS: readonly string[] = ['at', 'outcome']
 
 /**
  * An entry the journal will not write. The message names the member that is wrong or not allowed
@@ -294,7 +337,8 @@ export class InvalidJournalEntry extends TypeError {
 /**
  * The entry as it is written, with its members in a fixed order and its times in the one form
  * `journalTime` gives, or InvalidJournalEntry naming the first member that is not allowed or not
- * valid. A caller's entry may not carry `count` or CAP_REACHED: those are the journal's own.
+ * valid. A caller's entry may not carry `count`, CAP_REACHED or the DAY_FULL outcome: those are
+ * the journal's own.
  */
 export function checkEntry(input: JournalEntry): JournalLine {
   return checkLine(input, false)
@@ -305,6 +349,12 @@ function checkLine(input: unknown, stored: boolean): JournalLine {
   const raw = input as Record<string, unknown>
   if (typeof raw !== 'object' || raw === null) throw new InvalidJournalEntry('entry')
   const outcome = raw.outcome
+  if (stored && outcome === DAY_FULL) {
+    for (const key of Object.keys(raw)) if (!DAY_FULL_FIELDS.includes(key)) throw new InvalidJournalEntry(key)
+    const at = journalTimeOf(raw.at)
+    if (at === null) throw new InvalidJournalEntry('at')
+    return { at, outcome: DAY_FULL }
+  }
   if (outcome !== 'answered' && outcome !== 'refused' && outcome !== 'rejected') throw new InvalidJournalEntry('outcome')
   const capLine = stored && outcome === 'rejected' && raw.code === CAP_REACHED
   const allowed: readonly string[] = capLine ? CAP_FIELDS : FIELDS[outcome]
@@ -409,29 +459,27 @@ function includes(list: readonly string[], value: unknown): boolean {
   return typeof value === 'string' && list.includes(value)
 }
 
-/** Why the journal could not write an entry, from the errno: the `$WHAT$` of `journalError`. */
-export type JournalWriteFailure = 'no_space' | 'no_permission' | 'other'
+/**
+ * Why the journal could not write an entry: from the errno (no_space, no_permission, other), the
+ * `$WHAT$` of `journalError`; or `day_full`, an agent entry past AGENT_LINES_PER_DAY, which the page
+ * names with its own line (the journal is full for the day), not as a fault of the disk.
+ */
+export type JournalWriteFailure = 'no_space' | 'no_permission' | 'other' | typeof DAY_FULL
 
 /** Why the journal could not be read, from the errno: the `$WHAT$` of `journalUnreadable`. */
 export type JournalReadFailure = 'no_permission' | 'unreadable' | 'other'
 
-/**
- * Why `Journal.open` could not take the folder: another live process holds JOURNAL_LOCK. The daemon
- * writes an event and exits (N-011); the page never shows it.
- */
-export type JournalOpenFailure = 'locked'
-
-export type JournalFailure = JournalWriteFailure | JournalReadFailure | JournalOpenFailure
+export type JournalFailure = JournalWriteFailure | JournalReadFailure
 
 /**
- * The journal could not open, write or read. `code` is the closed reason the page names; the
- * message names the operation and the code, never a path or an entry, and the errno stays in
- * `cause` for the daemon's log.
+ * The journal could not write or read. `code` is the closed reason the page names; the message
+ * names the operation and the code, never a path or an entry, and the errno stays in `cause` for
+ * the daemon's log.
  */
 export class JournalError<C extends JournalFailure = JournalFailure> extends Error {
   constructor(
     readonly code: C,
-    readonly operation: 'open' | 'write' | 'read' | 'export',
+    readonly operation: 'write' | 'read' | 'export',
     options?: { cause?: unknown },
   ) {
     super(`journal ${operation} failed: ${code}`, options)
@@ -486,14 +534,20 @@ export type AnsweredEntry = Extract<JournalLine, { readonly outcome: 'answered' 
 /** A refusal the bridge's policy gave a paired agent (or a call it could not take, bad_call). */
 export type RefusalEntry = Extract<JournalLine, { readonly outcome: 'refused' }>
 
-/** What the page shows of the journal: three lists, each with its own limit, so none evicts another. */
+/** What the page shows of the journal: lists that each have their own limit, so none evicts another. */
 export interface RecentJournal {
   /** The newest answers, oldest first. */
   readonly answers: AnsweredEntry[]
   /** The newest refusals given to paired agents, oldest first. */
   readonly refusals: RefusalEntry[]
-  /** The newest door rejections, CAP_REACHED lines included, oldest first: a flood of them cannot push a refusal off. */
-  readonly rejections: RejectedLine[]
+  /**
+   * The newest door rejections of each group, oldest first, CAP_REACHED lines included (a count not
+   * yet written is its group's newest line): a flood of request faults cannot push a `state`
+   * rejection such as `not_paired` off, and no rejection can push an agent's refusal off.
+   */
+  readonly rejections: Readonly<Record<RejectionGroup, RejectedLine[]>>
+  /** The newest DAY_FULL lines, oldest first: days whose agent entries reached AGENT_LINES_PER_DAY. */
+  readonly dayFull: DayFullLine[]
   /** Lines anywhere in the journal that are not an entry (`journalLinesSkipped`). */
   readonly unreadable: number
 }
@@ -512,10 +566,14 @@ interface GroupState {
   since: number | undefined
 }
 
-/** The day the cap counts, read from its file the first time a record falls on it. */
+/** The day the caps count, read from its file the first time a record falls on it. */
 interface DayState {
   readonly day: string
   readonly groups: Record<RejectionGroup, GroupState>
+  /** Agent entries (`answered`, `refused`) in the day file. */
+  agentLines: number
+  /** Whether the day file holds its DAY_FULL line. */
+  full: boolean
 }
 
 export class Journal {
@@ -524,8 +582,8 @@ export class Journal {
   private today: DayState | null = null
   /** Set by `close()`: no record is taken after it. */
   private closing = false
-  /** Whether this journal still holds JOURNAL_LOCK, so a second `close()` cannot take another's. */
-  private locked = true
+  /** The first `close()`: a later call waits for it and touches nothing. */
+  private closed: Promise<void> | null = null
 
   private constructor(
     readonly dir: string,
@@ -533,11 +591,9 @@ export class Journal {
   ) {}
 
   /**
-   * Opens the journal in `dir` (`<data>/journal`), creating the folder 0700 when it is missing, and
-   * takes JOURNAL_LOCK: a file created exclusively ('wx', 0600) that holds this process's pid. A lock
-   * whose pid is no longer alive (a daemon that died) is replaced, and so is one that names no pid
-   * once it is LOCK_UNREADABLE_STALE_MS old. Throws JournalError `locked` (operation `open`) while a
-   * live process holds it, this one included; `close()` releases it.
+   * Opens the journal in `dir` (`<data>/journal`), creating the folder 0700 when it is missing. It
+   * takes no lock: the caller holds the service shell's `<data>/service.lock` (see the module's
+   * "One writer"), and opens one Journal per folder.
    */
   static open(dir: string, options: { retentionDays: number }): Journal {
     // A window of NaN or zero days would make the sweep drop every entry.
@@ -545,21 +601,29 @@ export class Journal {
       throw new RangeError(`retentionDays: ${String(options.retentionDays)}`)
     }
     mkdirSync(dir, { recursive: true, mode: 0o700 })
-    takeLock(path.join(dir, JOURNAL_LOCK))
     return new Journal(dir, options.retentionDays)
   }
 
   /**
-   * The newest `limit` answers, the newest `limit` refusals and, in a list of their own, the newest
-   * `rejectionLimit` door rejections, so neither a stream of answers nor a flood at the door pushes
-   * an agent's refusal off the page. Reads every day, so `unreadable` counts the bad lines of the
-   * whole journal, not of the page. Throws JournalError (no_permission, unreadable, other) when the
-   * journal cannot be read. A count not yet written (under a minute old) is not in it.
+   * The newest `limit` answers, the newest `limit` refusals, the newest `limit` DAY_FULL lines and,
+   * in a list of their own for each group, the newest `rejectionLimit` door rejections of that group,
+   * so neither a stream of answers nor a flood at the door pushes an agent's refusal off the page,
+   * and a flood of request faults does not push a `state` rejection off. A group's count not yet
+   * written is its newest line, as the CAP_REACHED line `flushCounts` would write now, so the page
+   * never shows fewer rejections than were counted. Reads every day, so `unreadable` counts the bad
+   * lines of the whole journal, not of the page. Throws JournalError (no_permission, unreadable,
+   * other) when the journal cannot be read.
    */
   recent(limit: number, rejectionLimit: number = limit): RecentJournal {
     const answers: AnsweredEntry[] = []
     const refusals: RefusalEntry[] = []
-    const rejections: RejectedLine[] = []
+    const dayFull: DayFullLine[] = []
+    const rejections: Record<RejectionGroup, RejectedLine[]> = { request: [], state: [] }
+    // Newest first while collecting: a count not yet written is newer than any line on disk.
+    for (const group of GROUPS) {
+      const pending = this.pendingCount(group)
+      if (pending !== null) rejections[group].push(pending)
+    }
     let unreadable = 0
     for (const day of this.reading(() => this.days()).reverse()) {
       const read = this.reading(() => this.read(day))
@@ -567,11 +631,25 @@ export class Journal {
       for (const entry of read.entries.reverse()) {
         if (entry.outcome === 'answered') answers.push(entry)
         else if (entry.outcome === 'refused') refusals.push(entry)
-        else rejections.push(entry)
+        else if (entry.outcome === DAY_FULL) dayFull.push(entry)
+        else rejections[entry.group ?? REJECTION_GROUPS[entry.code as RejectionCode]].push(entry)
       }
     }
     const newest = <T>(list: T[], most: number): T[] => (most <= 0 ? [] : list.slice(0, most).reverse())
-    return { answers: newest(answers, limit), refusals: newest(refusals, limit), rejections: newest(rejections, rejectionLimit), unreadable }
+    return {
+      answers: newest(answers, limit),
+      refusals: newest(refusals, limit),
+      rejections: { request: newest(rejections.request, rejectionLimit), state: newest(rejections.state, rejectionLimit) },
+      dayFull: newest(dayFull, limit),
+      unreadable,
+    }
+  }
+
+  /** The CAP_REACHED line with `count` that would carry the group's count not yet written, or null. */
+  private pendingCount(group: RejectionGroup): RejectedLine | null {
+    const state = this.today?.groups[group]
+    if (state === undefined || state.pending === 0) return null
+    return { at: state.lastDropped, outcome: 'rejected', code: CAP_REACHED, group, count: state.pending }
   }
 
   /**
@@ -688,12 +766,16 @@ export class Journal {
 
   /**
    * Records the entry: appended and fsynced before the promise resolves, an agent's entry and a door
-   * rejection alike. A rejection whose group has reached REJECTED_LINES_PER_DAY that day is the one
-   * exception: the first writes the group's CAP_REACHED line instead, and later ones are counted
-   * (see COUNT_INTERVAL_MS). A count that is due, or the last day's at a day roll, is written first.
-   * Rejects with InvalidJournalEntry for an entry it will not write, and with JournalError
-   * (no_space, no_permission, other) when the disk did not take it or a count written first; a
-   * count that failed is kept for the next try. After `close()` every record rejects (other).
+   * rejection alike. Two exceptions, each per UTC day. A rejection whose group has reached
+   * REJECTED_LINES_PER_DAY: the first writes the group's CAP_REACHED line instead, and later ones are
+   * counted (see COUNT_INTERVAL_MS and `flushCounts`). An agent entry once the day holds
+   * AGENT_LINES_PER_DAY of them: it is not written and the record rejects with JournalError
+   * `day_full`; the first such entry writes the DAY_FULL line first (if that line cannot be written,
+   * the record rejects with the disk's reason and the next agent entry tries again). A count that is
+   * due, or the last day's at a day roll, is written first. A line counts toward its cap only once
+   * it is written. Rejects with InvalidJournalEntry for an entry it will not write, and with
+   * JournalError (no_space, no_permission, other) when the disk did not take it or a count written
+   * first; a count that failed is kept for the next try. After `close()` every record rejects (other).
    */
   async record(entry: JournalEntry): Promise<void> {
     const line = checkEntry(entry)
@@ -702,22 +784,40 @@ export class Journal {
   }
 
   /**
-   * Writes the count of every group past its cap, once every append asked for before it has run,
-   * then releases JOURNAL_LOCK. Records asked for after it are refused. Rejects with JournalError
-   * when the count could not be written (the lock is released all the same); a second call resolves.
+   * Writes every group's count not yet written, now, once every append asked for before it has run,
+   * whatever time has passed since the last count line; the daemon calls it once a minute with its
+   * clock, so a crash loses at most a minute's count even when no record follows a flood. `now` is
+   * where the records' own minute (COUNT_INTERVAL_MS) starts again for a group it wrote. Rejects with
+   * a TypeError, before it touches anything, unless `now` is a safe integer >= 0 (like `sweep`); with
+   * JournalError (no_space, no_permission, other) when a count could not be written, which is kept
+   * for the next try; and after `close()` (other).
    */
-  async close(): Promise<void> {
-    this.closing = true
-    try {
-      await this.enqueue(async () => {
-        if (this.today !== null) await this.writeCounts(this.today, null)
-      })
-    } finally {
-      if (this.locked) {
-        this.locked = false
-        releaseLock(path.join(this.dir, JOURNAL_LOCK))
-      }
+  async flushCounts(now: number): Promise<void> {
+    if (typeof now !== 'number' || !Number.isSafeInteger(now) || now < 0) {
+      throw new TypeError(`Journal.flushCounts: now must be a safe integer >= 0, got ${String(now)}`)
     }
+    if (this.closing) throw closedError()
+    await this.enqueue(async () => {
+      if (this.today !== null) await this.writeCounts(this.today, null, now)
+    })
+  }
+
+  /**
+   * Writes every group's count not yet written, whatever the clock says, once every append asked for
+   * before it has run; records and flushes asked for after it are refused. The daemon calls it after
+   * the shell's drain and before the shell releases `service.lock`. Rejects with JournalError when a
+   * count could not be written. Only the first call writes: a later one resolves once the first has
+   * finished, without touching the folder, because by then the shell may have released
+   * `service.lock` to another daemon. A count the first call could not write is so lost, as a crash
+   * would lose it.
+   */
+  close(): Promise<void> {
+    if (this.closed !== null) return this.closed.catch(() => undefined)
+    this.closing = true
+    this.closed = this.enqueue(async () => {
+      if (this.today !== null) await this.writeCounts(this.today, null)
+    })
+    return this.closed
   }
 
   /** Runs `work` after every append asked for before it. */
@@ -730,11 +830,21 @@ export class Journal {
   private async write(line: JournalLine): Promise<void> {
     const at = Date.parse(line.at)
     const today = await this.dayOf(line.at.slice(0, 10))
-    if (line.outcome !== 'rejected') {
+    if (line.outcome === 'answered' || line.outcome === 'refused') {
       await this.writeCounts(today, at)
+      if (today.agentLines >= AGENT_LINES_PER_DAY) {
+        if (!today.full) {
+          await this.append({ at: line.at, outcome: DAY_FULL })
+          today.full = true
+        }
+        throw new JournalError(DAY_FULL, 'write')
+      }
       await this.append(line)
+      today.agentLines += 1
       return
     }
+    // A caller's line is an agent entry or a door rejection: checkEntry gives no other.
+    if (line.outcome !== 'rejected') throw new InvalidJournalEntry('outcome')
     const group = REJECTION_GROUPS[line.code as RejectionCode]
     const state = today.groups[group]
     if (state.capped) {
@@ -759,7 +869,7 @@ export class Journal {
   /**
    * The cap state of `day`. At a day roll the last day's counts are written first (into its own
    * file); when that fails the roll does not happen, so the count is kept for the next try. A day
-   * seen for the first time is read from its file, so a restart keeps the cap.
+   * seen for the first time is read from its file, so a restart keeps both caps and their lines.
    */
   private async dayOf(day: string): Promise<DayState> {
     if (this.today?.day === day) return this.today
@@ -767,22 +877,26 @@ export class Journal {
     const { entries } = this.writing(() => this.read(day))
     const groups = {} as Record<RejectionGroup, GroupState>
     for (const group of GROUPS) groups[group] = { lines: 0, capped: false, pending: 0, lastDropped: '', since: undefined }
+    let agentLines = 0
+    let full = false
     for (const entry of entries) {
-      if (entry.outcome !== 'rejected') continue
-      if (entry.code !== CAP_REACHED) groups[REJECTION_GROUPS[entry.code]].lines += 1
+      if (entry.outcome === 'answered' || entry.outcome === 'refused') agentLines += 1
+      else if (entry.outcome === DAY_FULL) full = true
+      else if (entry.code !== CAP_REACHED) groups[REJECTION_GROUPS[entry.code]].lines += 1
       else if (entry.count === undefined && entry.group !== undefined) groups[entry.group].capped = true
     }
-    this.today = { day, groups }
+    this.today = { day, groups, agentLines, full }
     return this.today
   }
 
   /**
    * Writes each group's count line that is due at `at` (ms): a minute or more after the group's last
-   * count or CAP_REACHED line. `at` null writes every pending count (`close`, a day roll). A time
+   * count or CAP_REACHED line. `at` null writes every pending count (`flushCounts`, `close`, a day
+   * roll); `flushedAt` is then where the group's minute starts again (`flushCounts`' now). A time
    * before the last line (a clock stepped back) starts the minute again from it. A failed write
    * throws and keeps the count.
    */
-  private async writeCounts(today: DayState, at: number | null): Promise<void> {
+  private async writeCounts(today: DayState, at: number | null, flushedAt?: number): Promise<void> {
     for (const group of GROUPS) {
       const state = today.groups[group]
       if (state.pending === 0) continue
@@ -795,7 +909,8 @@ export class Journal {
       }
       await this.append({ at: state.lastDropped, outcome: 'rejected', code: CAP_REACHED, group, count: state.pending })
       state.pending = 0
-      if (at !== null) state.since = at
+      const since = at ?? flushedAt
+      if (since !== undefined) state.since = since
     }
   }
 
@@ -889,70 +1004,15 @@ function closedError(): JournalError {
   return new JournalError('other', 'write', { cause: new Error('journal closed') })
 }
 
-/** Creates the lock exclusively with this pid, replacing a stale one once; JournalError `locked` otherwise. */
-function takeLock(lock: string): void {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      writeFileSync(lock, `${process.pid}\n`, { flag: 'wx', mode: 0o600 })
-      return
-    } catch (error) {
-      if (errnoOf(error) !== 'EEXIST') throw new JournalError(writeFailure(error), 'open', { cause: error })
-    }
-    if (attempt === 1 || !staleLock(lock)) break
-    try {
-      unlinkSync(lock)
-    } catch (error) {
-      if (errnoOf(error) !== 'ENOENT') throw new JournalError(writeFailure(error), 'open', { cause: error })
-    }
-  }
-  throw new JournalError('locked', 'open')
-}
-
-/**
- * Whether the lock may be replaced: its pid is no longer alive, or it names no pid and is old
- * enough that no open can still be writing it. A lock that cannot be read is not stale.
- */
-function staleLock(lock: string): boolean {
-  let text: string
-  let modified: number
-  try {
-    text = readFileSync(lock, 'utf8')
-    modified = statSync(lock).mtimeMs
-  } catch (error) {
-    return errnoOf(error) === 'ENOENT'
-  }
-  const pid = /^(\d{1,10})\n?$/.exec(text)?.[1]
-  const n = pid === undefined ? 0 : Number(pid)
-  if (n < 1 || !Number.isSafeInteger(n)) return Date.now() - modified > LOCK_UNREADABLE_STALE_MS
-  return !alive(n)
-}
-
-/** Whether a process with this pid exists (signal 0 checks without sending); EPERM is a live one. */
-function alive(pid: number): boolean {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    return errnoOf(error) !== 'ESRCH'
-  }
-}
-
-/** Removes the lock if it still names this process; a failure is left to the next open (stale pid). */
-function releaseLock(lock: string): void {
-  try {
-    if (readFileSync(lock, 'utf8') === `${process.pid}\n`) unlinkSync(lock)
-  } catch {
-    // Gone already, or unreadable: the next open finds it stale once this process ends.
-  }
-}
-
 /** The envelope an agent gets instead of an answer the journal could not record. */
 export type JournalRefusal = ReturnType<typeof refuse>
 
 /**
- * Why answerAfterRecord sent `internal`: the disk's reason (no_space, no_permission, other), or
- * `invalid` when the journal refused the entry itself (InvalidJournalEntry), which is a bug in the
- * caller and not a fault of the disk, so the page must not send the person to check the disk.
+ * Why answerAfterRecord sent `internal`: the disk's reason (no_space, no_permission, other);
+ * `day_full` when the day already holds AGENT_LINES_PER_DAY agent entries (the page says the journal
+ * is full for the day); or `invalid` when the journal refused the entry itself (InvalidJournalEntry),
+ * which is a bug in the caller and not a fault of the disk, so the page must not send the person to
+ * check the disk.
  */
 export type AnswerFailure = JournalWriteFailure | 'invalid'
 
@@ -966,7 +1026,8 @@ export type AnswerOutcome =
  * and only then is `send()` called to send the answer. When the record fails, `send` is called
  * with the `internal` refusal instead, which the wrapper builds itself and which carries nothing
  * of the page, and the caller gets the cause: no_space, no_permission or other for `journalError`,
- * or `invalid` for an entry the journal refused (a bug in the caller, logged, not a disk state).
+ * `day_full` for a day whose agent entries reached AGENT_LINES_PER_DAY, or `invalid` for an entry
+ * the journal refused (a bug in the caller, logged, not a disk state).
  */
 export async function answerAfterRecord(
   journal: Journal,
@@ -976,9 +1037,15 @@ export async function answerAfterRecord(
   try {
     await journal.record(entry)
   } catch (error) {
-    // i18n-exempt: a refusal read by the agent over MCP, not by the person
-    await send(refuse('internal', 'The journal could not record this answer, so it was not sent.'))
-    return { recorded: false, cause: causeOf(error) }
+    const cause = causeOf(error)
+    const message =
+      cause === DAY_FULL
+        ? // i18n-exempt: a refusal read by the agent over MCP, not by the person
+          'The journal holds the most entries it keeps for this UTC day, so this answer was not sent.'
+        : // i18n-exempt: a refusal read by the agent over MCP, not by the person
+          'The journal could not record this answer, so it was not sent.'
+    await send(refuse('internal', message))
+    return { recorded: false, cause }
   }
   await send()
   return { recorded: true }

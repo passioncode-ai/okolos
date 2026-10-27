@@ -1,5 +1,4 @@
-import { appendFileSync, chmodSync, fstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
-import { spawnSync } from 'node:child_process'
+import { appendFileSync, chmodSync, fstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { open } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -11,13 +10,14 @@ import { RETENTION_DAYS } from '@okolos/storage'
 import { BRIDGE_REFUSALS, BRIDGE_SESSION_VERBS, BRIDGE_VERBS, toolName, type AnyBridgeVerb, type BridgeSessionVerb } from '@okolos/contracts'
 
 import {
+  AGENT_LINES_PER_DAY,
   answerAfterRecord,
   CAP_REACHED,
   checkEntry,
   COUNT_INTERVAL_MS,
+  DAY_FULL,
   Journal,
   JournalError,
-  JOURNAL_LOCK,
   JOURNAL_REFUSAL_CODES,
   journalTime,
   journalVerbOf,
@@ -29,6 +29,7 @@ import {
   RETENTION_DAYS_JOURNAL,
   STORED_REJECTION_CODES,
   type JournalEntry,
+  type JournalFailure,
   type JournalVerb,
   type RejectionCode,
   type RejectionGroup,
@@ -76,7 +77,7 @@ function onDisk(dir: string): unknown[] {
     .map((line) => JSON.parse(line) as unknown)
 }
 
-/** The journal's day files, sorted: the folder without its lock. */
+/** The journal's day files, sorted. */
 function dayFiles(dir: string): string[] {
   return readdirSync(dir)
     .filter((name) => name.endsWith('.jsonl'))
@@ -354,7 +355,7 @@ describe('retention: the journal keeps what the extension’s journal keeps', ()
     expect(journal.sweep(now)).toEqual({ removed: 2, unreadable: 0 })
 
     expect(onDisk(dir)).toEqual([justInside, sameDayInside, yesterday])
-    expect(journal.recent(10)).toEqual({ answers: [justInside], refusals: [yesterday], rejections: [sameDayInside], unreadable: 0 })
+    expect(journal.recent(10)).toEqual({ answers: [justInside], refusals: [yesterday], rejections: { request: [sameDayInside], state: [] }, dayFull: [], unreadable: 0 })
     // A day wholly past the window leaves no file behind.
     expect(readdirSync(dir)).not.toContain(`${tooOld.at.slice(0, 10)}.jsonl`)
     expect(journal.sweep(now)).toEqual({ removed: 0, unreadable: 0 })
@@ -377,7 +378,7 @@ describe('retention: the journal keeps what the extension’s journal keeps', ()
     expect(journal.sweep(now)).toEqual({ removed: 2, unreadable: 3 })
 
     // What the page counts shrinks by exactly what the sweep said it dropped.
-    expect(journal.recent(10)).toEqual({ answers: [justInside, yesterday], refusals: [], rejections: [], unreadable: 1 })
+    expect(journal.recent(10)).toEqual({ answers: [justInside, yesterday], refusals: [], rejections: { request: [], state: [] }, dayFull: [], unreadable: 1 })
   })
 
   it('sweep refuses a time that is not a safe integer >= 0, so a broken clock cannot empty the journal', async () => {
@@ -423,7 +424,7 @@ describe('retention: the journal keeps what the extension’s journal keeps', ()
 
     expect(journal.recent(2).answers).toEqual(entries.slice(-2))
     expect(journal.recent(10).answers).toEqual(entries)
-    expect(journal.recent(0)).toEqual({ answers: [], refusals: [], rejections: [], unreadable: 0 })
+    expect(journal.recent(0)).toEqual({ answers: [], refusals: [], rejections: { request: [], state: [] }, dayFull: [], unreadable: 0 })
   })
 
   it('refuses a window that is not a whole number of days, so a bad setting cannot empty the journal', () => {
@@ -451,7 +452,7 @@ describe('the journal on disk', () => {
 
     await journal.record(next)
 
-    expect(journal.recent(10)).toEqual({ answers: [answered, next], refusals: [], rejections: [], unreadable: 1 })
+    expect(journal.recent(10)).toEqual({ answers: [answered, next], refusals: [], rejections: { request: [], state: [] }, dayFull: [], unreadable: 1 })
   })
 })
 
@@ -621,7 +622,7 @@ describe('recent: refusals apart from answers, and every unreadable line counted
 
     const page = journal.recent(5)
     expect(page.refusals).toEqual([busy])
-    expect(page.rejections).toEqual([door])
+    expect(page.rejections).toEqual({ request: [], state: [door] })
     expect(page.answers).toEqual(answers.slice(-5))
     expect(page.unreadable).toBe(0)
   })
@@ -636,7 +637,7 @@ describe('recent: refusals apart from answers, and every unreadable line counted
     appendFileSync(path.join(dir, '2026-10-27.jsonl'), '\n')
 
     // A limit of one still counts the old day's bad line: the count is the journal's, not the page's.
-    expect(journal.recent(1)).toEqual({ answers: [answered], refusals: [], rejections: [], unreadable: 2 })
+    expect(journal.recent(1)).toEqual({ answers: [answered], refusals: [], rejections: { request: [], state: [] }, dayFull: [], unreadable: 2 })
   })
 })
 
@@ -734,7 +735,7 @@ describe('a door rejection is always journaled, whatever Origin header it carrie
 
       const entry = { at: answered.at, outcome: 'rejected', code: 'bad_origin', origin: stored }
       expect(onDisk(dir)).toEqual([entry])
-      expect(journal.recent(10)).toEqual({ answers: [], refusals: [], rejections: [entry], unreadable: 0 })
+      expect(journal.recent(10)).toEqual({ answers: [], refusals: [], rejections: { request: [entry], state: [] }, dayFull: [], unreadable: 0 })
       expect(journal.export()).toBe(`${JSON.stringify(entry)}\n`)
     })
   }
@@ -836,7 +837,7 @@ describe('a short write is a failed write, never a recorded answer', () => {
     // The 20 bytes that reached the file are taken back: it holds exactly the line it held before.
     expect(readFileSync(path.join(dir, '2026-10-27.jsonl'), 'utf8')).toBe(`${JSON.stringify(answered)}\n`)
     vi.restoreAllMocks()
-    expect(journal.recent(10)).toEqual({ answers: [answered], refusals: [], rejections: [], unreadable: 0 })
+    expect(journal.recent(10)).toEqual({ answers: [answered], refusals: [], rejections: { request: [], state: [] }, dayFull: [], unreadable: 0 })
   })
 
   it('when the bytes cannot be taken back either, the next reader sees one unreadable line, never an entry', async () => {
@@ -848,12 +849,12 @@ describe('a short write is a failed write, never a recorded answer', () => {
 
     await expect(journal.record(answered)).rejects.toMatchObject({ code: 'no_space' })
     vi.restoreAllMocks()
-    expect(journal.recent(10)).toEqual({ answers: [], refusals: [], rejections: [], unreadable: 1 })
+    expect(journal.recent(10)).toEqual({ answers: [], refusals: [], rejections: { request: [], state: [] }, dayFull: [], unreadable: 1 })
 
     // The next record seals the cut line: it stays one unreadable line, and the new entry is whole.
     const next: JournalEntry = { ...answered, at: '2026-10-27T11:00:00.000Z' }
     await journal.record(next)
-    expect(journal.recent(10)).toEqual({ answers: [next], refusals: [], rejections: [], unreadable: 1 })
+    expect(journal.recent(10)).toEqual({ answers: [next], refusals: [], rejections: { request: [], state: [] }, dayFull: [], unreadable: 1 })
   })
 
   it('a line that reached the file whole but for its newline is not an entry, before or after the next record', async () => {
@@ -866,11 +867,11 @@ describe('a short write is a failed write, never a recorded answer', () => {
     await expect(journal.record(answered)).rejects.toMatchObject({ code: 'no_space' })
     vi.restoreAllMocks()
     expect(readFileSync(path.join(dir, '2026-10-27.jsonl'), 'utf8')).toBe(JSON.stringify(answered))
-    expect(journal.recent(10)).toEqual({ answers: [], refusals: [], rejections: [], unreadable: 1 })
+    expect(journal.recent(10)).toEqual({ answers: [], refusals: [], rejections: { request: [], state: [] }, dayFull: [], unreadable: 1 })
 
     const next: JournalEntry = { ...answered, at: '2026-10-27T11:00:00.000Z' }
     await journal.record(next)
-    expect(journal.recent(10)).toEqual({ answers: [next], refusals: [], rejections: [], unreadable: 1 })
+    expect(journal.recent(10)).toEqual({ answers: [next], refusals: [], rejections: { request: [], state: [] }, dayFull: [], unreadable: 1 })
     expect(journal.export()).toBe(`${JSON.stringify(next)}\n`)
   })
 
@@ -905,11 +906,11 @@ describe('a short write is a failed write, never a recorded answer', () => {
     const dir = temp()
     const journal = Journal.open(dir, { retentionDays: 90 })
     writeFileSync(path.join(dir, '2026-10-27.jsonl'), JSON.stringify(answered), { mode: 0o600 })
-    expect(journal.recent(10)).toEqual({ answers: [], refusals: [], rejections: [], unreadable: 1 })
+    expect(journal.recent(10)).toEqual({ answers: [], refusals: [], rejections: { request: [], state: [] }, dayFull: [], unreadable: 1 })
 
     const next: JournalEntry = { ...answered, at: '2026-10-27T11:00:00.000Z' }
     await journal.record(next)
-    expect(journal.recent(10)).toEqual({ answers: [next], refusals: [], rejections: [], unreadable: 1 })
+    expect(journal.recent(10)).toEqual({ answers: [next], refusals: [], rejections: { request: [], state: [] }, dayFull: [], unreadable: 1 })
   })
 })
 
@@ -1045,10 +1046,6 @@ describe('door rejections: each one is written before its answer, up to a daily 
   }
   /** The lines the journal wrote after the seed: everything on disk past the first `seeded`. */
   const after = (dir: string, seeded: number) => onDisk(dir).slice(seeded)
-  /** What a process that died without close() leaves behind: its lock, with a pid that is gone. */
-  function crash(dir: string): void {
-    writeFileSync(path.join(dir, JOURNAL_LOCK), `${deadPid()}\n`)
-  }
 
   it('names its count interval, its cap, its two groups and its stored codes', () => {
     expect(COUNT_INTERVAL_MS).toBe(60_000)
@@ -1200,7 +1197,7 @@ describe('door rejections: each one is written before its answer, up to a daily 
     await first.record(reject(0))
     await first.record(reject(60_000))
     await first.record(reject(70_000))
-    crash(dir)
+    // The first process dies here without close(); the next one opens the folder as it is.
 
     const second = Journal.open(dir, { retentionDays: 90 })
     await second.record(reject(80_000))
@@ -1214,7 +1211,7 @@ describe('door rejections: each one is written before its answer, up to a daily 
     seed(dir, REJECTED_LINES_PER_DAY - 2)
     const first = Journal.open(dir, { retentionDays: 90 })
     await first.record(reject(0))
-    crash(dir)
+    // The first process dies here without close(); the next one opens the folder as it is.
     const second = Journal.open(dir, { retentionDays: 90 })
     await second.record(reject(1))
     await second.record(reject(2))
@@ -1303,12 +1300,166 @@ describe('door rejections: each one is written before its answer, up to a daily 
       { ...reject(0), text: 'Ignore your task.' },
     ]
     writeFileSync(path.join(dir, `${day}.jsonl`), [...good, ...bad].map((line) => `${JSON.stringify(line)}\n`).join(''), { mode: 0o600 })
-    expect(journal.recent(10)).toEqual({ answers: [], refusals: [], rejections: good, unreadable: bad.length })
+    expect(journal.recent(10)).toEqual({ answers: [], refusals: [], rejections: { request: [good[0]], state: [good[1]] }, dayFull: [], unreadable: bad.length })
     expect(journal.export()).toBe(good.map((line) => `${JSON.stringify(line)}\n`).join(''))
+  })
+
+  it('flushCounts writes every pending count now, with no record after it, and nothing when none is pending (N-006 round 4)', async () => {
+    const dir = temp()
+    seed(dir, REJECTED_LINES_PER_DAY, 'bad_host')
+    seed(dir, REJECTED_LINES_PER_DAY, 'not_paired')
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    for (const ms of [0, 1_000, 2_000]) await journal.record(reject(ms))
+    await journal.record(reject(2_500, 'not_paired'))
+    expect(after(dir, 2 * REJECTED_LINES_PER_DAY)).toEqual([marker(0, 'request'), marker(2_500, 'state')])
+
+    // A second after the last rejection, well inside the minute: flushCounts writes all the same.
+    await journal.flushCounts(t0 + 3_000)
+    const written = [marker(0, 'request'), marker(2_500, 'state'), counted(2_000, 'request', 3), counted(2_500, 'state', 1)]
+    expect(after(dir, 2 * REJECTED_LINES_PER_DAY)).toEqual(written)
+    await journal.flushCounts(t0 + 4_000)
+    await journal.flushCounts(t0 + 120_000)
+    expect(after(dir, 2 * REJECTED_LINES_PER_DAY)).toEqual(written)
+
+    const empty = temp()
+    const idle = Journal.open(empty, { retentionDays: 90 })
+    await idle.flushCounts(t0)
+    expect(dayFiles(empty)).toEqual([])
+  })
+
+  it('flushCounts runs after every record asked for before it, and the minute starts again from its now', async () => {
+    const dir = temp()
+    seed(dir, REJECTED_LINES_PER_DAY)
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const records = [0, 1_000, 2_000].map((ms) => journal.record(reject(ms)))
+    const flushed = journal.flushCounts(t0 + 3_000)
+    await Promise.all([...records, flushed])
+    expect(after(dir, REJECTED_LINES_PER_DAY)).toEqual([marker(0, 'request'), counted(2_000, 'request', 3)])
+
+    await journal.record(reject(10_000))
+    await journal.record(reject(3_000 + COUNT_INTERVAL_MS - 1))
+    expect(after(dir, REJECTED_LINES_PER_DAY)).toHaveLength(2)
+    await journal.record(reject(3_000 + COUNT_INTERVAL_MS))
+    expect(after(dir, REJECTED_LINES_PER_DAY)).toEqual([
+      marker(0, 'request'),
+      counted(2_000, 'request', 3),
+      counted(3_000 + COUNT_INTERVAL_MS, 'request', 3),
+    ])
+  })
+
+  it('flushCounts refuses a time that is not a safe integer >= 0, writing nothing, and is refused after close', async () => {
+    const dir = temp()
+    seed(dir, REJECTED_LINES_PER_DAY)
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    await journal.record(reject(0))
+    for (const now of [Number.NaN, -1, 1.5, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1, '60000', null]) {
+      await expect(journal.flushCounts(now as number)).rejects.toThrow(TypeError)
+    }
+    expect(after(dir, REJECTED_LINES_PER_DAY)).toEqual([marker(0, 'request')])
+    await journal.close()
+    expect(after(dir, REJECTED_LINES_PER_DAY)).toEqual([marker(0, 'request'), counted(0, 'request', 1)])
+    await expect(journal.flushCounts(t0 + 60_000)).rejects.toMatchObject({ name: 'JournalError', operation: 'write' })
+    expect(after(dir, REJECTED_LINES_PER_DAY)).toHaveLength(2)
+  })
+
+  it('a count flushCounts could not write is kept, and written whole by the next flush', async () => {
+    const dir = temp()
+    seed(dir, REJECTED_LINES_PER_DAY)
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    await journal.record(reject(0))
+    await journal.record(reject(1_000))
+    const write = vi.spyOn(await handleMethods(), 'write').mockRejectedValueOnce(Object.assign(new Error('ENOSPC: simulated'), { code: 'ENOSPC' }))
+    await expect(journal.flushCounts(t0 + 60_000)).rejects.toMatchObject({ name: 'JournalError', code: 'no_space', operation: 'write' })
+    write.mockRestore()
+    expect(after(dir, REJECTED_LINES_PER_DAY)).toEqual([marker(0, 'request')])
+    await journal.flushCounts(t0 + 61_000)
+    expect(after(dir, REJECTED_LINES_PER_DAY)).toEqual([marker(0, 'request'), counted(1_000, 'request', 2)])
+  })
+
+  it('recent shows a count not yet written as the line flushCounts would write, so the page never shows fewer than were counted', async () => {
+    const dir = temp()
+    seed(dir, REJECTED_LINES_PER_DAY)
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    // 2 000 + 500 within one second, then silence: no record after them.
+    await journal.record(reject(0))
+    for (let ms = 1; ms <= 500; ms++) await journal.record(reject(ms))
+    expect(after(dir, REJECTED_LINES_PER_DAY)).toEqual([marker(0, 'request')])
+
+    const shown = journal.recent(10, 10)
+    expect(shown.rejections.request.slice(-2)).toEqual([marker(0, 'request'), counted(500, 'request', 501)])
+    expect(shown.rejections.state).toEqual([])
+    // The line not yet written is the newest of its group, and the group's limit counts it.
+    expect(journal.recent(10, 1).rejections.request).toEqual([counted(500, 'request', 501)])
+
+    await journal.flushCounts(t0 + 1_000)
+    expect(after(dir, REJECTED_LINES_PER_DAY)).toEqual([marker(0, 'request'), counted(500, 'request', 501)])
+    expect(journal.recent(10, 10)).toEqual(shown)
+  })
+
+  it('a rejection whose write failed is not counted toward the cap: the next one is still written as a line', async () => {
+    const dir = temp()
+    seed(dir, REJECTED_LINES_PER_DAY - 1)
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const write = vi.spyOn(await handleMethods(), 'write').mockRejectedValueOnce(Object.assign(new Error('ENOSPC: simulated'), { code: 'ENOSPC' }))
+    await expect(journal.record(reject(0))).rejects.toMatchObject({ name: 'JournalError', code: 'no_space' })
+    write.mockRestore()
+    await journal.record(reject(1))
+    await journal.record(reject(2))
+    expect(after(dir, REJECTED_LINES_PER_DAY - 1)).toEqual([reject(1), marker(2, 'request')])
+  })
+
+  it('a cap_reached line whose write failed is written by the next rejection, once', async () => {
+    const dir = temp()
+    seed(dir, REJECTED_LINES_PER_DAY)
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const write = vi.spyOn(await handleMethods(), 'write').mockRejectedValueOnce(Object.assign(new Error('EIO: simulated'), { code: 'EIO' }))
+    await expect(journal.record(reject(0))).rejects.toMatchObject({ name: 'JournalError', code: 'other' })
+    write.mockRestore()
+    expect(after(dir, REJECTED_LINES_PER_DAY)).toEqual([])
+    await journal.record(reject(1))
+    await journal.record(reject(2))
+    await journal.close()
+    expect(after(dir, REJECTED_LINES_PER_DAY)).toEqual([marker(1, 'request'), counted(2, 'request', 2)])
+  })
+
+  it('close writes every pending count whatever the clock says, stamps from the real clock included', async () => {
+    const now = Date.now()
+    const today = journalTime(now).slice(0, 10)
+    const dir = temp()
+    mkdirSync(dir, { recursive: true, mode: 0o700 })
+    const line = `${JSON.stringify({ at: journalTime(now), outcome: 'rejected', code: 'bad_host' })}\n`
+    writeFileSync(path.join(dir, `${today}.jsonl`), line.repeat(REJECTED_LINES_PER_DAY), { mode: 0o600 })
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const at = (ms: number) => journalTime(now + ms)
+    await journal.record({ at: at(0), outcome: 'rejected', code: 'bad_host' })
+    await journal.record({ at: at(1), outcome: 'rejected', code: 'bad_host' })
+    await journal.close()
+    expect(after(dir, REJECTED_LINES_PER_DAY)).toEqual([
+      { at: at(0), outcome: 'rejected', code: CAP_REACHED, group: 'request' },
+      { at: at(1), outcome: 'rejected', code: CAP_REACHED, group: 'request', count: 2 },
+    ])
+  })
+
+  it('a second close after a failed count write resolves and writes nothing, even once the disk is back', async () => {
+    const dir = temp()
+    seed(dir, REJECTED_LINES_PER_DAY)
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    await journal.record(reject(0))
+    await journal.record(reject(1_000))
+    const write = vi.spyOn(await handleMethods(), 'write').mockRejectedValue(Object.assign(new Error('ENOSPC: simulated'), { code: 'ENOSPC' }))
+    const first = journal.close()
+    const second = journal.close()
+    await expect(first).rejects.toMatchObject({ name: 'JournalError', code: 'no_space' })
+    await expect(second).resolves.toBeUndefined()
+    write.mockRestore()
+    await expect(journal.close()).resolves.toBeUndefined()
+    expect(after(dir, REJECTED_LINES_PER_DAY)).toEqual([marker(0, 'request')])
+    await expect(journal.record(reject(2_000))).rejects.toMatchObject({ name: 'JournalError', operation: 'write' })
+    expect(after(dir, REJECTED_LINES_PER_DAY)).toEqual([marker(0, 'request')])
   })
 })
 
-describe('recent: door rejections apart from agents\' refusals, each list with its own limit (SCR-24)', () => {
+describe('recent: door rejections apart from agents\' refusals, one list per group, each with its own limit (SCR-24; N-006 round 4)', () => {
   it('a flood of door rejections never pushes an agent\'s refusal off the page', async () => {
     const dir = temp()
     const journal = Journal.open(dir, { retentionDays: 90 })
@@ -1325,11 +1476,195 @@ describe('recent: door rejections apart from agents\' refusals, each list with i
 
     const page = journal.recent(5)
     expect(page.refusals).toEqual([busy])
-    expect(page.rejections).toEqual(flood.slice(-5))
+    expect(page.rejections).toEqual({ request: flood.slice(-5), state: [] })
     expect(page.answers).toEqual([])
-    expect(journal.recent(5, 2)).toEqual({ answers: [], refusals: [busy], rejections: flood.slice(-2), unreadable: 0 })
-    expect(journal.recent(0, 3).rejections).toEqual(flood.slice(-3))
-    expect(journal.recent(3, 0)).toEqual({ answers: [], refusals: [busy], rejections: [], unreadable: 0 })
+    expect(journal.recent(5, 2)).toEqual({ answers: [], refusals: [busy], rejections: { request: flood.slice(-2), state: [] }, dayFull: [], unreadable: 0 })
+    expect(journal.recent(0, 3).rejections.request).toEqual(flood.slice(-3))
+    expect(journal.recent(3, 0)).toEqual({ answers: [], refusals: [busy], rejections: { request: [], state: [] }, dayFull: [], unreadable: 0 })
+  })
+
+  it('a flood of request faults never pushes a state rejection (not_paired) off the page', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const t = Date.parse('2026-10-27T09:30:00.000Z')
+    const replayed: JournalEntry = { at: journalTime(t), outcome: 'rejected', code: 'not_paired' }
+    await journal.record(replayed)
+    const flood: JournalEntry[] = Array.from({ length: 200 }, (_, i) => ({
+      at: journalTime(t + 1 + i),
+      outcome: 'rejected',
+      code: 'cross_site',
+      origin: `https://h${i}.example`,
+    }))
+    for (const entry of flood) await journal.record(entry)
+
+    expect(journal.recent(50, 50).rejections).toEqual({ request: flood.slice(-50), state: [replayed] })
+    // Each group gets the whole limit: the state group is not cut to share it with the request group.
+    const stopping: JournalEntry[] = [1, 2, 3].map((i) => ({ at: journalTime(t + 1_000 + i), outcome: 'rejected', code: 'stopping' }))
+    for (const entry of stopping) await journal.record(entry)
+    expect(journal.recent(10, 3).rejections).toEqual({ request: flood.slice(-3), state: stopping })
+    expect(journal.recent(10, 4).rejections.state).toEqual([replayed, ...stopping])
+  })
+
+  it('a cap_reached line goes to the list of the group it names', async () => {
+    const dir = temp()
+    const at = '2026-10-27T09:30:00.000Z'
+    mkdirSync(dir, { recursive: true, mode: 0o700 })
+    const lines = [
+      { at, outcome: 'rejected', code: CAP_REACHED, group: 'state' },
+      { at, outcome: 'rejected', code: CAP_REACHED, group: 'request', count: 4 },
+    ]
+    writeFileSync(path.join(dir, '2026-10-27.jsonl'), lines.map((line) => `${JSON.stringify(line)}\n`).join(''), { mode: 0o600 })
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    expect(journal.recent(10).rejections).toEqual({ request: [lines[1]], state: [lines[0]] })
+  })
+})
+
+describe('agent entries: at most AGENT_LINES_PER_DAY lines a UTC day, then day_full (decision 2026-10-27, N-006 round 4)', () => {
+  const t0 = Date.parse('2026-10-27T10:00:00.000Z')
+  const day = '2026-10-27'
+  const call = (ms: number): JournalEntry => ({ ...answered, at: journalTime(t0 + ms) })
+  const refusal = (ms: number): JournalEntry => ({ ...answered, at: journalTime(t0 + ms), outcome: 'refused', code: 'busy' })
+  const full = (ms: number) => ({ at: journalTime(t0 + ms), outcome: DAY_FULL })
+  const enospc = () => Object.assign(new Error('ENOSPC: simulated'), { code: 'ENOSPC' })
+
+  /** A day file that already holds `lines` agent entries, answers and refusals in turn, as a busy day would have left it. */
+  function seedAgents(dir: string, lines: number): void {
+    mkdirSync(dir, { recursive: true, mode: 0o700 })
+    const at = journalTime(t0 - 3_600_000)
+    const answer = JSON.stringify({ ...who, at, verb: 'open', outcome: 'answered' })
+    const refused = JSON.stringify({ ...who, at, verb: 'open', outcome: 'refused', code: 'busy' })
+    const text = Array.from({ length: lines }, (_, i) => (i % 2 === 0 ? answer : refused)).join('\n')
+    writeFileSync(path.join(dir, `${day}.jsonl`), lines === 0 ? '' : `${text}\n`, { mode: 0o600 })
+  }
+  const after = (dir: string, seeded: number) => onDisk(dir).slice(seeded)
+
+  it('names its cap and its line', () => {
+    expect(AGENT_LINES_PER_DAY).toBe(50_000)
+    expect(DAY_FULL).toBe('day_full')
+  })
+
+  it(`the ${AGENT_LINES_PER_DAY}th agent entry of a day is written; the next is refused day_full and writes one day_full line, later ones none`, async () => {
+    const dir = temp()
+    seedAgents(dir, AGENT_LINES_PER_DAY - 1)
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    await journal.record(call(0))
+    expect(after(dir, AGENT_LINES_PER_DAY - 1)).toEqual([call(0)])
+
+    await expect(journal.record(call(1))).rejects.toMatchObject({ name: 'JournalError', code: 'day_full', operation: 'write' })
+    await expect(journal.record(refusal(2))).rejects.toMatchObject({ code: 'day_full' })
+    const sent: unknown[] = []
+    expect(await answerAfterRecord(journal, call(3), (envelope) => void sent.push(envelope ?? 'the page content'))).toEqual({
+      recorded: false,
+      cause: 'day_full',
+    })
+    expect(sent).toEqual([{ success: false, error: expect.objectContaining({ code: 'internal' }) as unknown }])
+    expect(after(dir, AGENT_LINES_PER_DAY - 1)).toEqual([call(0), full(1)])
+    expect(journal.recent(1, 1).dayFull).toEqual([full(1)])
+
+    // Door rejections keep their own cap, and the next UTC day starts a count of its own.
+    const door: JournalEntry = { at: journalTime(t0 + 4), outcome: 'rejected', code: 'not_paired' }
+    await journal.record(door)
+    const tomorrow: JournalEntry = { ...answered, at: '2026-10-28T00:00:00.000Z' }
+    await journal.record(tomorrow)
+    expect(after(dir, AGENT_LINES_PER_DAY - 1)).toEqual([call(0), full(1), door, tomorrow])
+  })
+
+  it('a restart at the cap keeps refusing and writes no second day_full line; one that finds the cap reached without it writes it', async () => {
+    const dir = temp()
+    seedAgents(dir, AGENT_LINES_PER_DAY - 1)
+    const first = Journal.open(dir, { retentionDays: 90 })
+    await first.record(call(0))
+    await expect(first.record(call(1))).rejects.toMatchObject({ code: 'day_full' })
+    // The first process dies here without close(); the next one reads the day file.
+    const second = Journal.open(dir, { retentionDays: 90 })
+    await expect(second.record(call(2))).rejects.toMatchObject({ code: 'day_full' })
+    expect(after(dir, AGENT_LINES_PER_DAY - 1)).toEqual([call(0), full(1)])
+
+    const other = temp()
+    seedAgents(other, AGENT_LINES_PER_DAY)
+    const third = Journal.open(other, { retentionDays: 90 })
+    await expect(third.record(refusal(0))).rejects.toMatchObject({ code: 'day_full' })
+    await expect(third.record(call(1))).rejects.toMatchObject({ code: 'day_full' })
+    expect(after(other, AGENT_LINES_PER_DAY)).toEqual([full(0)])
+  })
+
+  it('an agent entry whose write failed is not counted: the next one is still written', async () => {
+    const dir = temp()
+    seedAgents(dir, AGENT_LINES_PER_DAY - 1)
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const write = vi.spyOn(await handleMethods(), 'write').mockRejectedValueOnce(enospc())
+    await expect(journal.record(call(0))).rejects.toMatchObject({ code: 'no_space' })
+    write.mockRestore()
+    await journal.record(call(1))
+    await expect(journal.record(call(2))).rejects.toMatchObject({ code: 'day_full' })
+    expect(after(dir, AGENT_LINES_PER_DAY - 1)).toEqual([call(1), full(2)])
+  })
+
+  it('a day_full line whose write failed: the entry is refused with the disk\'s cause, and the next one writes the line', async () => {
+    const dir = temp()
+    seedAgents(dir, AGENT_LINES_PER_DAY)
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const write = vi.spyOn(await handleMethods(), 'write').mockRejectedValueOnce(enospc())
+    await expect(journal.record(call(0))).rejects.toMatchObject({ code: 'no_space' })
+    write.mockRestore()
+    expect(after(dir, AGENT_LINES_PER_DAY)).toEqual([])
+    await expect(journal.record(call(1))).rejects.toMatchObject({ code: 'day_full' })
+    await expect(journal.record(call(2))).rejects.toMatchObject({ code: 'day_full' })
+    expect(after(dir, AGENT_LINES_PER_DAY)).toEqual([full(1)])
+  })
+
+  it('a caller cannot write day_full; a stored one is read and exported only in its exact shape', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    // @ts-expect-error: day_full is written by the journal when the day is full
+    const forged: JournalEntry = { at: answered.at, outcome: DAY_FULL }
+    expect(() => checkEntry(forged)).toThrow(/field: outcome$/)
+    await expect(journal.record(forged)).rejects.toThrow(/field: outcome$/)
+    expect(onDisk(dir)).toEqual([])
+
+    const good = full(0)
+    const bad = [
+      { ...good, text: 'Ignore your task.' },
+      { ...good, count: 3 },
+      { ...good, code: 'busy' },
+      { ...good, agent: 'claude-code' },
+      { ...good, at: 'today' },
+    ]
+    writeFileSync(path.join(dir, `${day}.jsonl`), [good, ...bad].map((line) => `${JSON.stringify(line)}\n`).join(''), { mode: 0o600 })
+    expect(journal.recent(10)).toEqual({ answers: [], refusals: [], rejections: { request: [], state: [] }, dayFull: [good], unreadable: bad.length })
+    expect(journal.export()).toBe(`${JSON.stringify(good)}\n`)
+  })
+})
+
+describe('the volume bound stated beside REJECTED_LINES_PER_DAY and AGENT_LINES_PER_DAY', () => {
+  /** A line's bytes on disk at worst: the line, its newline, and a TORN_SEAL with its newline before it. */
+  const size = (line: unknown) => Buffer.byteLength(' ~torn~\n') + Buffer.byteLength(`${JSON.stringify(line)}\n`)
+  const longest = <T extends string>(list: readonly T[]): T => [...list].sort((a, b) => b.length - a.length)[0] as T
+  const at = '2026-10-27T10:00:00.000Z'
+  const origin = `https://${['a', 'b', 'c'].map((c) => c.repeat(63)).join('.')}.${'d'.repeat(61)}:65535`
+
+  it('holds the longest line of each kind it is computed from', () => {
+    expect(origin.length).toBe(MAX_ORIGIN_LENGTH)
+    const rejection = checkEntry({ at, outcome: 'rejected', code: longest(REJECTION_CODES), origin, bytes: Number.MAX_SAFE_INTEGER })
+    expect(rejection).toMatchObject({ origin })
+    expect(size(rejection)).toBe(393)
+    expect(size({ at, outcome: 'rejected', code: CAP_REACHED, group: 'request', count: Number.MAX_SAFE_INTEGER })).toBe(127)
+    expect(size({ at, outcome: DAY_FULL })).toBe(63)
+    // A name is at most 40 code points; one takes at most 4 bytes in UTF-8, and none is escaped longer.
+    const agent = '\u{1D54F}'.repeat(40)
+    const agentLine = checkEntry({
+      ...who,
+      agent,
+      at,
+      task: '5d0c1e2f3a4b5c6d7e8f90a1b2c3d4e5',
+      verb: longest([...BRIDGE_VERBS, ...BRIDGE_SESSION_VERBS]),
+      origin,
+      outcome: 'refused',
+      code: longest([...BRIDGE_REFUSALS, ...JOURNAL_REFUSAL_CODES]),
+      bytes: Number.MAX_SAFE_INTEGER,
+      verdict: 'finding',
+    })
+    expect(size(agentLine)).toBe(719)
   })
 })
 
@@ -1433,71 +1768,44 @@ describe('a read that fails with EIO is unreadable (journalUnreadable, journalEx
   })
 })
 
-/** A pid no process has: a child that has already exited. */
-function deadPid(): number {
-  const child = spawnSync(process.execPath, ['-e', ''])
-  expect(child.pid).toBeGreaterThan(0)
-  return child.pid as number
-}
+describe('one writer is the service shell\'s: the journal has no lock of its own (decision 2026-10-27, N-006 round 4)', () => {
+  it('exports no lock, writes no lock file and has no locked failure', async () => {
+    const journalModule: Record<string, unknown> = await import('./journal.js')
+    expect(journalModule).not.toHaveProperty('JOURNAL_LOCK')
+    // @ts-expect-error: the journal no longer fails to open as locked
+    const locked: JournalFailure = 'locked'
+    expect(locked).toBe('locked')
 
-describe('one process writes the journal: Journal.open locks the folder', () => {
-  it('a second open on the same folder fails with locked while the first is open, and succeeds after close', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    await journal.record(answered)
+    expect(readdirSync(dir)).toEqual(['2026-10-27.jsonl'])
+    await journal.close()
+    expect(readdirSync(dir)).toEqual(['2026-10-27.jsonl'])
+  })
+
+  it('a journal.lock left in the folder by an earlier build, naming a live pid, neither stops the open nor is touched', async () => {
+    for (const pid of [process.pid, process.ppid, 1]) {
+      const dir = temp()
+      mkdirSync(dir, { recursive: true, mode: 0o700 })
+      const leftover = path.join(dir, 'journal.lock')
+      writeFileSync(leftover, `${pid}\n`)
+      const journal = Journal.open(dir, { retentionDays: 90 })
+      await journal.record(answered)
+      expect(onDisk(dir)).toEqual([answered])
+      expect(readFileSync(leftover, 'utf8')).toBe(`${pid}\n`)
+      await journal.close()
+      expect(readFileSync(leftover, 'utf8')).toBe(`${pid}\n`)
+    }
+  })
+
+  it('opening the folder again after a crash (no close) needs nothing cleared', async () => {
     const dir = temp()
     const first = Journal.open(dir, { retentionDays: 90 })
-    expect(readFileSync(path.join(dir, JOURNAL_LOCK), 'utf8')).toBe(`${process.pid}\n`)
-    expect(statSync(path.join(dir, JOURNAL_LOCK)).mode & 0o777).toBe(0o600)
-    expect(() => Journal.open(dir, { retentionDays: 90 })).toThrow(expect.objectContaining({ name: 'JournalError', code: 'locked', operation: 'open' }) as Error)
     await first.record(answered)
-
-    await first.close()
-    expect(readdirSync(dir)).not.toContain(JOURNAL_LOCK)
+    const next: JournalEntry = { ...answered, at: '2026-10-27T11:00:00.000Z' }
     const second = Journal.open(dir, { retentionDays: 90 })
-    await second.record({ ...answered, at: '2026-10-27T11:00:00.000Z' })
-    expect(onDisk(dir)).toHaveLength(2)
-    // The first journal's second close does not take the lock the second journal holds.
-    await first.close()
-    expect(readFileSync(path.join(dir, JOURNAL_LOCK), 'utf8')).toBe(`${process.pid}\n`)
-  })
-
-  it('a lock held by another live process makes open fail', () => {
-    const dir = temp()
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(path.join(dir, JOURNAL_LOCK), `${process.ppid}\n`)
-    expect(() => Journal.open(dir, { retentionDays: 90 })).toThrow(expect.objectContaining({ code: 'locked' }) as Error)
-    expect(readFileSync(path.join(dir, JOURNAL_LOCK), 'utf8')).toBe(`${process.ppid}\n`)
-  })
-
-  it.skipIf(process.getuid?.() === 0)('a lock held by a live process this user may not signal (EPERM, pid 1) makes open fail', () => {
-    const dir = temp()
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(path.join(dir, JOURNAL_LOCK), '1\n')
-    expect(() => Journal.open(dir, { retentionDays: 90 })).toThrow(expect.objectContaining({ code: 'locked' }) as Error)
-    expect(readFileSync(path.join(dir, JOURNAL_LOCK), 'utf8')).toBe('1\n')
-  })
-
-  it('a stale lock, whose pid is no longer alive, is replaced', async () => {
-    const dir = temp()
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(path.join(dir, JOURNAL_LOCK), `${deadPid()}\n`)
-    const journal = Journal.open(dir, { retentionDays: 90 })
-    expect(readFileSync(path.join(dir, JOURNAL_LOCK), 'utf8')).toBe(`${process.pid}\n`)
-    await journal.record(answered)
-    expect(onDisk(dir)).toEqual([answered])
-  })
-
-  it('a lock that names no pid is replaced only once it is old: a fresh one may be another open mid-write', async () => {
-    const dir = temp()
-    mkdirSync(dir, { recursive: true })
-    const lock = path.join(dir, JOURNAL_LOCK)
-    for (const content of ['', 'not a pid\n', '0\n', '-1\n']) {
-      writeFileSync(lock, content)
-      expect(() => Journal.open(dir, { retentionDays: 90 })).toThrow(expect.objectContaining({ code: 'locked' }) as Error)
-      const old = (Date.now() - 60_000) / 1000
-      utimesSync(lock, old, old)
-      const journal = Journal.open(dir, { retentionDays: 90 })
-      expect(readFileSync(lock, 'utf8')).toBe(`${process.pid}\n`)
-      await journal.close()
-      expect(readdirSync(dir)).not.toContain(JOURNAL_LOCK)
-    }
+    await second.record(next)
+    expect(onDisk(dir)).toEqual([answered, next])
   })
 })
