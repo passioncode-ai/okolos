@@ -6,3 +6,5 @@ Run: `bridge-b1` · started `2026-10-27` · module map: `docs/superpowers/specs/
 
 stage: 0 intake — gate auto — verdict pass — 2026-10-27T04:45:00+01:00
 holds: 0 — 2 (retro over budget: 161645 B / 12000, owner stage 10; README «Статус» false since 2026-10-26, owner stage 9) — enumerated 8/8 classes
+stage: 1 docs-study — gate auto — verdict pass — 2026-10-27T05:20:00+01:00
+holds: 1 — 2 (unchanged from stage 0) — enumerated 8/8 classes
