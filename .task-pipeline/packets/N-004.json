@@ -19,15 +19,16 @@
   ]
  },
  "outputs": [
-  "`DEFAULT_MAX_BYTES = 32 * 1024`; `encodeCursor({from, digest}) / decodeCursor(c): {from, digest} | null`; `paginate(lines, {cursor?, maxBytes?}): {text, cursor?, partial}` — курсор несёт дайджест снимка, курсор от другого снимка отвергается"
+  "`encodeCursor({from, digest}) / decodeCursor(c): {from, digest} | null`; `paginate(lines, {cursor?, maxBytes?}): {text, cursor?, partial}` зажимает maxBytes через clampMaxBytes из @okolos/core-snapshot (MIN_PAGE_BYTES..MAX_PAGE_BYTES, своего DEFAULT_MAX_BYTES нет); дайджест курсора строится экспортированным sha256; курсор от другого снимка отвергается"
  ],
  "acceptance": [
   "дерево формы Википедии (29 714 узлов, детерминированное): каждая страница ≤ 32 КБ UTF-8, страниц ≥ 8, конкатенация страниц равна полному тексту",
   "курсор чужого снимка → null, демон отвечает stale_cursor (ревью R10)",
-  "maxBytes больше потолка обрезается до потолка; меньше 1 КБ поднимается до 1 КБ; NaN, дробь, строка, отрицательное приводятся к границам внутри pageOf (ревью F10)",
+  "maxBytes больше потолка обрезается до потолка; меньше 1 КБ поднимается до 1 КБ; NaN, дробь, строка, отрицательное приводятся к границам внутри paginate (ревью F10)",
   "вердикт целого снимка приложен к каждой странице",
   "страница всегда двигается вперёд, даже если одна строка длиннее maxBytes",
   "paginate возвращает refs строк своей страницы и кладёт вердикт целого снимка в каждую страницу (аудит #29)",
+  "maxBytes зажимается clampMaxBytes из @okolos/core-snapshot внутри paginate (pageOf не зажимает); дайджест курсора строится экспортированным sha256; snapshot.ts N-004 не правит (N-003 круг 1)",
   "проверка узла: pnpm -s exec vitest run packages/core-snapshot && pnpm -s run typecheck"
  ],
  "guards": [
