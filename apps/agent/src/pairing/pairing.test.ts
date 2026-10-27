@@ -322,18 +322,18 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
   })
 
   it('does not open a file of foreign content: a store error, and the file is left as it was', () => {
-    const foreign = [
-      'not json',
-      '',
-      '[]',
-      '{}',
-      JSON.stringify({ schema: 'something-else/1', agents: [] }),
-      JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: {} }),
-      JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: [{ agentId: 1, name: 'x', pairedAt: 0, keyHash: 'a'.repeat(64) }] }),
-      JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: [{ agentId: 'a1', name: 'x', pairedAt: 0, keyHash: 'not a hash' }] }),
-      JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: [null] }),
+    const foreign: Array<[string, string]> = [
+      ['not json', 'not_json'],
+      ['', 'not_json'],
+      ['[]', 'not_a_store'],
+      ['{}', 'not_a_store'],
+      [JSON.stringify({ schema: 'something-else/1', agents: [] }), 'not_a_store'],
+      [JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: {} }), 'not_a_store'],
+      [JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: [{ agentId: 1, name: 'x', pairedAt: 0, keyHash: 'a'.repeat(64) }] }), 'bad_record'],
+      [JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: [{ agentId: 'a1', name: 'x', pairedAt: 0, keyHash: 'not a hash' }] }), 'bad_record'],
+      [JSON.stringify({ schema: 'okolos-agent/pairings/1', agents: [null] }), 'bad_record'],
     ]
-    for (const content of foreign) {
+    for (const [content, reason] of foreign) {
       const file = storeFile()
       writeFileSync(file, content, { mode: 0o600 })
       let thrown: unknown = null
@@ -344,6 +344,7 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
       }
       expect(thrown, content).toBeInstanceOf(PairingStoreError)
       expect((thrown as PairingStoreError).file).toBe(file)
+      expect((thrown as PairingStoreError).reason, content).toBe(reason)
       expect(readFileSync(file, 'utf8')).toBe(content)
     }
   })
@@ -352,6 +353,7 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
     const file = storeFile()
     mkdirSync(file)
     expect(() => open(file)).toThrow(PairingStoreError)
+    expect(() => open(file)).toThrow(expect.objectContaining({ reason: 'unreadable' }))
   })
 
   it('opens a missing file as an empty store and writes nothing until a pairing', () => {

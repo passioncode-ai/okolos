@@ -33,12 +33,17 @@ export function pairingStoreFile(dirs: ServiceDirs): string {
  */
 export class PairingStoreError extends Error {
   readonly file: string
-  constructor(file: string, reason: string, options?: { cause?: unknown }) {
+  /** A machine code; the page maps it through the catalogue. */
+  readonly reason: StoreRefusal
+  constructor(file: string, reason: StoreRefusal, options?: { cause?: unknown }) {
     super(`pairing store ${file}: ${reason}`, options)
     this.name = 'PairingStoreError'
     this.file = file
+    this.reason = reason
   }
 }
+
+export type StoreRefusal = 'unreadable' | 'not_json' | 'not_a_store' | 'bad_record'
 
 /** A request lives this long from its creation, unless it is confirmed. */
 export const REQUEST_LIFETIME_MS = 5 * 60_000
@@ -325,19 +330,19 @@ function readStore(file: string): StoredAgent[] {
     text = readFileSync(file, 'utf8')
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
-    throw new PairingStoreError(file, 'cannot be read', { cause: error })
+    throw new PairingStoreError(file, 'unreadable', { cause: error })
   }
   let value: unknown
   try {
     value = JSON.parse(text)
   } catch (error) {
-    throw new PairingStoreError(file, 'is not JSON', { cause: error })
+    throw new PairingStoreError(file, 'not_json', { cause: error })
   }
   if (!isRecord(value) || value['schema'] !== SCHEMA || !Array.isArray(value['agents'])) {
-    throw new PairingStoreError(file, `is not a ${SCHEMA} document`)
+    throw new PairingStoreError(file, 'not_a_store')
   }
   const agents = value['agents'] as unknown[]
-  if (!agents.every(isStoredAgent)) throw new PairingStoreError(file, 'holds an agent record of the wrong shape')
+  if (!agents.every(isStoredAgent)) throw new PairingStoreError(file, 'bad_record')
   return agents
 }
 
