@@ -71,7 +71,7 @@ export const WRANGLER_ARGS = [
 export function loadEnv(env, file = path.join(homedir(), '.okolos/cloudflare.env')) {
   const merged = { ...env }
   if (!existsSync(file)) return merged
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
+  for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
     const m = /^\s*(?:export\s+)?([A-Z0-9_]+)=(?:'([^']*)'|"([^"]*)"|(.*))\s*$/.exec(line)
     if (m) merged[m[1]] ??= m[2] ?? m[3] ?? m[4]
   }

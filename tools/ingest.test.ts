@@ -62,6 +62,13 @@ describe('the sweep keeps order and drops repeats', () => {
     expect(hosts).toEqual(['a.test', 'b.test', 'c.test'])
   })
 
+  it('reads a source served with CRLF line endings as it reads LF', () => {
+    expect(hostsFrom('https://a.test/1\r\nb.test\r\nhttps://c.test/3\r\n')).toEqual(
+      hostsFrom('https://a.test/1\nb.test\nhttps://c.test/3\n'),
+    )
+    expect(hostsFrom('https://a.test/1\r\nb.test\r\n')).toEqual(['a.test', 'b.test'])
+  })
+
   it('keeps the first sighting of a host that appears twice', () => {
     expect(hostsFrom('https://a.test/1\nhttps://a.test/2\nhttps://b.test/')).toEqual([
       'a.test',

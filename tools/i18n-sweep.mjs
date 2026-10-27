@@ -142,7 +142,7 @@ for (const base of ROOTS) {
     continue
   }
   for (const file of walk(dir)) {
-    const lines = readFileSync(file, 'utf8').split('\n')
+    const lines = readFileSync(file, 'utf8').split(/\r?\n/)
     const relative = path.relative(root, file)
     /** Which marker lines were used by a hit, so the unused ones can be named. */
     const used = new Set()

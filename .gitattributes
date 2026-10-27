@@ -1,0 +1,21 @@
+# Line endings are LF in the index and in every checkout, Windows included (B-162).
+# The gates read docs and sources line by line, the pre-push hook is a shell script
+# Git for Windows runs with its own sh, and a CRLF checkout breaks both.
+* text=auto eol=lf
+
+# Binary: never converted, never diffed as text. tools/ci.test.ts fails when Git
+# finds a binary file in the index whose type is not listed here.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.zip binary
+*.xpi binary
+*.crx binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.onnx binary

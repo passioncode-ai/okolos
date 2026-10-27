@@ -53,7 +53,7 @@ const FEED_KEY = path.join(STORE, 'feed-signing-key.pem')
 export function parseEnv(text) {
   /** @type {Record<string, string>} */
   const out = {}
-  for (const line of text.split('\n')) {
+  for (const line of text.split(/\r?\n/)) {
     const m = /^\s*(?:export\s+)?([A-Za-z0-9_]+)=(?:'([^']*)'|"([^"]*)"|(.*?))\s*$/.exec(line)
     if (m) out[m[1]] = m[2] ?? m[3] ?? m[4] ?? ''
   }

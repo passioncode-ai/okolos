@@ -190,6 +190,43 @@ describe('the repository tracks no test-run artefacts', () => {
   })
 })
 
+describe('line endings are LF on every checkout', () => {
+  /**
+   * A Windows clone with `core.autocrlf=true` checked every file out with CRLF, and
+   * the gates that read docs line by line, and the hook Git for Windows runs with
+   * its own sh, read a `\r` at the end of every line (B-162). `.gitattributes`
+   * pins LF for text and marks binaries; this reads what Git itself decided.
+   */
+  const entries = execFileSync('git', ['ls-files', '--eol'], { cwd: root, encoding: 'utf8' })
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => {
+      const m = /^i\/(\S*)\s+w\/\S*\s+attr\/(.*?)\s*\t(.+)$/.exec(line)
+      if (!m) throw new Error(`unexpected git ls-files --eol line: ${line}`)
+      return { index: m[1] as string, attr: m[2] as string, file: m[3] as string }
+    })
+
+  it('reads the index, so an empty list cannot pass', () => {
+    expect(entries.length).toBeGreaterThan(50)
+  })
+
+  it('pins text to LF for every checkout', () => {
+    const attributes = readFileSync(path.join(root, '.gitattributes'), 'utf8')
+    expect(attributes).toMatch(/^\* text=auto eol=lf$/m)
+  })
+
+  it('holds no CRLF in the index', () => {
+    const crlf = entries.filter((e) => e.index === 'crlf' || e.index === 'mixed').map((e) => e.file)
+    expect(crlf, `these would check out with \\r on every line: ${crlf.join(', ')}`).toEqual([])
+  })
+
+  it('marks every binary file as binary, so nothing converts its bytes', () => {
+    // `-text` in the index column is Git's own reading: the content is not text.
+    const unmarked = entries.filter((e) => e.index === '-text' && !e.attr.includes('-text')).map((e) => e.file)
+    expect(unmarked, `add their extension to .gitattributes as binary: ${unmarked.join(', ')}`).toEqual([])
+  })
+})
+
 describe('the pre-push hook exists and runs the gates', () => {
   /**
    * The one standing instruction that cannot be followed by reading it. A rule

@@ -32,6 +32,12 @@ describe('reading a secrets file', () => {
     expect(parseEnv("X='abc'").X).toBe('abc')
     expect(parseEnv('X="abc"').X).toBe('abc')
   })
+
+  it('reads a file saved with Windows line endings the same way', () => {
+    // Notepad writes CRLF; a `\r` kept on a value is a credential present and wrong (B-162).
+    const parsed = parseEnv("export A=1\r\nB='two'\r\nC=\"three\"\r\nD=four\r\n")
+    expect(parsed).toEqual({ A: '1', B: 'two', C: 'three', D: 'four' })
+  })
 })
 
 describe('normalising a pasted value', () => {

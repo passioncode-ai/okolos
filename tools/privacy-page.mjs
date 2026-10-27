@@ -52,7 +52,7 @@ export function toHtml(markdown) {
       paragraph = []
     }
   }
-  for (const raw of markdown.split('\n')) {
+  for (const raw of markdown.split(/\r?\n/)) {
     const structural =
       raw.trim() === '' || raw.startsWith('|') || raw.startsWith('- ') || raw.startsWith('#')
     if (structural) {
