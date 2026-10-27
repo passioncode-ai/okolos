@@ -252,6 +252,38 @@ function writeFailure(error: unknown): JournalWriteFailure {
   }
 }
 
+function readFailure(error: unknown): JournalReadFailure {
+  switch (errnoOf(error)) {
+    case 'EACCES':
+    case 'EPERM':
+      return 'no_permission'
+    case 'ENOENT':
+    case 'ENOTDIR':
+    case 'EISDIR':
+    case 'EIO':
+    case 'ELOOP':
+      return 'unreadable'
+    default:
+      return 'other'
+  }
+}
+
+/** An answer the agent got. */
+export type AnsweredEntry = Extract<JournalEntry, { readonly outcome: 'answered' }>
+
+/** A refusal: the bridge's policy said no to a paired agent, or the door turned a request away. */
+export type RefusalEntry = Exclude<JournalEntry, { readonly outcome: 'answered' }>
+
+/** What the page shows of the journal. */
+export interface RecentJournal {
+  /** The newest answers, oldest first. */
+  readonly answers: AnsweredEntry[]
+  /** The newest refusals (`refused` and `rejected`), oldest first, counted apart from the answers. */
+  readonly refusals: RefusalEntry[]
+  /** Lines anywhere in the journal that are not an entry (`journalLinesSkipped`). */
+  readonly unreadable: number
+}
+
 export class Journal {
   private constructor(
     readonly dir: string,
@@ -268,14 +300,35 @@ export class Journal {
     return new Journal(dir, options.retentionDays)
   }
 
-  /** The newest `limit` entries across days, oldest first. Lines that do not parse are skipped. */
-  recent(limit: number): JournalEntry[] {
-    const found: JournalEntry[] = []
-    for (const day of this.days().reverse()) {
-      if (found.length >= limit) break
-      found.unshift(...this.read(day))
+  /**
+   * The newest `limit` answers and, apart from them, the newest `limit` refusals, so a stream of
+   * answers never pushes a refusal off the page. Reads every day, so `unreadable` counts the bad
+   * lines of the whole journal, not of the page. Throws JournalError (no_permission, unreadable,
+   * other) when the journal cannot be read.
+   */
+  recent(limit: number): RecentJournal {
+    const answers: AnsweredEntry[] = []
+    const refusals: RefusalEntry[] = []
+    let unreadable = 0
+    for (const day of this.reading(() => this.days()).reverse()) {
+      const read = this.reading(() => this.read(day))
+      unreadable += read.unreadable
+      for (const entry of read.entries.reverse()) {
+        if (entry.outcome === 'answered') answers.push(entry)
+        else refusals.push(entry)
+      }
     }
-    return limit <= 0 ? [] : found.slice(-limit)
+    const newest = <T>(list: T[]): T[] => (limit <= 0 ? [] : list.slice(0, limit).reverse())
+    return { answers: newest(answers), refusals: newest(refusals), unreadable }
+  }
+
+  /** Runs a read of the journal, turning a failure into a JournalError with its reason. */
+  private reading<T>(read: () => T, operation: 'read' | 'export' = 'read'): T {
+    try {
+      return read()
+    } catch (error) {
+      throw new JournalError(readFailure(error), operation, { cause: error })
+    }
   }
 
   /**
@@ -289,7 +342,7 @@ export class Journal {
     for (const day of this.days()) {
       const start = Date.parse(`${day}T00:00:00.000Z`)
       if (start >= horizon) continue
-      const entries = this.read(day)
+      const { entries } = this.read(day)
       if (start + DAY_MS <= horizon) {
         unlinkSync(path.join(this.dir, `${day}.jsonl`))
         removed += entries.length
@@ -311,17 +364,30 @@ export class Journal {
       .sort()
   }
 
-  private read(day: string): JournalEntry[] {
+  /**
+   * The entries of one day, and how many of its lines are not one: a line cut short by a power
+   * loss or edited by hand is not fatal, and it is counted, not dropped silently. A day whose file
+   * went between listing and reading (the sweep took it) is an empty day.
+   */
+  private read(day: string): { entries: JournalEntry[]; unreadable: number } {
+    let text: string
+    try {
+      text = readFileSync(path.join(this.dir, `${day}.jsonl`), 'utf8')
+    } catch (error) {
+      if (errnoOf(error) === 'ENOENT') return { entries: [], unreadable: 0 }
+      throw error
+    }
     const entries: JournalEntry[] = []
-    for (const line of readFileSync(path.join(this.dir, `${day}.jsonl`), 'utf8').split('\n')) {
+    let unreadable = 0
+    for (const line of text.split('\n')) {
       if (line === '') continue
       try {
         entries.push(checkEntry(JSON.parse(line) as JournalEntry))
       } catch {
-        // A line cut short by a power loss, or edited by hand: not an entry, and not fatal.
+        unreadable += 1
       }
     }
-    return entries
+    return { entries, unreadable }
   }
 
   /**

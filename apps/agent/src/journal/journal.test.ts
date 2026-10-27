@@ -1,4 +1,4 @@
-import { appendFileSync, chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { appendFileSync, chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { open } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -270,7 +270,7 @@ describe('retention: the journal keeps what the extension’s journal keeps', ()
     expect(journal.sweep(now)).toBe(2)
 
     expect(onDisk(dir)).toEqual([justInside, sameDayInside, yesterday])
-    expect(journal.recent(10)).toEqual([justInside, sameDayInside, yesterday])
+    expect(journal.recent(10)).toEqual({ answers: [justInside], refusals: [sameDayInside, yesterday], unreadable: 0 })
     // A day wholly past the window leaves no file behind.
     expect(readdirSync(dir)).not.toContain(`${tooOld.at.slice(0, 10)}.jsonl`)
     expect(journal.sweep(now)).toBe(0)
@@ -282,9 +282,9 @@ describe('retention: the journal keeps what the extension’s journal keeps', ()
     const entries: JournalEntry[] = [3, 2, 1, 0].map((days) => ({ ...answered, at: at(days * DAY) }))
     for (const entry of entries) await journal.record(entry)
 
-    expect(journal.recent(2)).toEqual(entries.slice(-2))
-    expect(journal.recent(10)).toEqual(entries)
-    expect(journal.recent(0)).toEqual([])
+    expect(journal.recent(2).answers).toEqual(entries.slice(-2))
+    expect(journal.recent(10).answers).toEqual(entries)
+    expect(journal.recent(0)).toEqual({ answers: [], refusals: [], unreadable: 0 })
   })
 
   it('refuses a window that is not a whole number of days, so a bad setting cannot empty the journal', () => {
@@ -303,7 +303,7 @@ describe('the journal on disk', () => {
     expect(statSync(path.join(dir, '2026-10-27.jsonl')).mode & 0o777).toBe(0o600)
   })
 
-  it('a line cut short by a crash is skipped, and the next entry still lands on a line of its own', async () => {
+  it('a line cut short by a crash is counted, and the next entry still lands on a line of its own', async () => {
     const dir = temp()
     const journal = Journal.open(dir, { retentionDays: RETENTION_DAYS_JOURNAL })
     await journal.record(answered)
@@ -312,7 +312,7 @@ describe('the journal on disk', () => {
 
     await journal.record(next)
 
-    expect(journal.recent(10)).toEqual([answered, next])
+    expect(journal.recent(10)).toEqual({ answers: [answered, next], refusals: [], unreadable: 1 })
   })
 })
 
@@ -445,5 +445,76 @@ describe('MCP protocol answers: one way for the journal and the door (N-008)', (
       await expect(journal.record({ ...answered, verb } as unknown as JournalEntry)).rejects.toThrow(/verb/)
     }
     expect(onDisk(dir)).toEqual([])
+  })
+})
+
+describe('recent: refusals apart from answers, and every unreadable line counted (SCR-24)', () => {
+  it('a stream of answers does not push the refusals off the page', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const door: JournalEntry = { at: '2026-10-27T09:00:00.000Z', outcome: 'rejected', code: 'not_paired' }
+    const busy: JournalEntry = { ...answered, at: '2026-10-27T09:30:00.000Z', outcome: 'refused', code: 'busy' }
+    await journal.record(door)
+    await journal.record(busy)
+    const answers: JournalEntry[] = []
+    for (let minute = 0; minute < 30; minute++) {
+      const entry: JournalEntry = { ...answered, at: new Date(Date.parse(answered.at) + minute * 60_000).toISOString() }
+      answers.push(entry)
+      await journal.record(entry)
+    }
+
+    const page = journal.recent(5)
+    expect(page.refusals).toEqual([door, busy])
+    expect(page.answers).toEqual(answers.slice(-5))
+    expect(page.unreadable).toBe(0)
+  })
+
+  it('counts every line that is not an entry, across the whole journal, instead of dropping it silently', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    await journal.record({ ...answered, at: '2026-10-20T10:00:00.000Z' })
+    await journal.record(answered)
+    appendFileSync(path.join(dir, '2026-10-20.jsonl'), 'not json\n')
+    appendFileSync(path.join(dir, '2026-10-27.jsonl'), `${JSON.stringify({ ...answered, text: 'page text' })}\n`)
+    appendFileSync(path.join(dir, '2026-10-27.jsonl'), '\n')
+
+    // A limit of one still counts the old day's bad line: the count is the journal's, not the page's.
+    expect(journal.recent(1)).toEqual({ answers: [answered], refusals: [], unreadable: 2 })
+  })
+})
+
+describe('recent: a journal that cannot be read says why (journalUnreadable)', () => {
+  it('a folder it may not list is no_permission', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    await journal.record(answered)
+    chmodSync(dir, 0o000)
+    try {
+      expect(() => journal.recent(10)).toThrow(JournalError)
+      expect(() => journal.recent(10)).toThrow(expect.objectContaining({ code: 'no_permission', operation: 'read' }) as Error)
+    } finally {
+      chmodSync(dir, 0o700)
+    }
+  })
+
+  it('a day file it may not open is no_permission', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    await journal.record(answered)
+    chmodSync(path.join(dir, '2026-10-27.jsonl'), 0o000)
+    expect(() => journal.recent(10)).toThrow(expect.objectContaining({ code: 'no_permission' }) as Error)
+  })
+
+  it('a day that is a folder, or a journal folder that is gone, is unreadable', () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    mkdirSync(path.join(dir, '2026-10-27.jsonl'))
+    expect(() => journal.recent(10)).toThrow(expect.objectContaining({ code: 'unreadable' }) as Error)
+
+    rmSync(dir, { recursive: true })
+    writeFileSync(dir, '')
+    expect(() => journal.recent(10)).toThrow(expect.objectContaining({ code: 'unreadable' }) as Error)
+    rmSync(dir)
+    expect(() => journal.recent(10)).toThrow(expect.objectContaining({ code: 'unreadable' }) as Error)
   })
 })
