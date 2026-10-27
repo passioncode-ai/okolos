@@ -18,9 +18,10 @@
  * that should never reach the disk. So a restart of the daemon ends every open request, pending or
  * confirmed: after it list() shows no row for them (not even an expired one), a claim is told
  * `unknown`, and the agent has to ask again with `okolos-agent pair`. SCR-23 says so to the person.
- * Agents with access live in the store and survive the restart, each with its last call as it was
- * last written: at most a minute older than its newest call (see `touch`), or exactly that call
- * when the daemon ran `flush` before it stopped.
+ * Before it stops, the daemon runs `close`, which ends the open requests with their notices (so the
+ * journal says how each ended) and flushes. Agents with access live in the store and survive the
+ * restart, each with its last call as it was last written: at most a minute older than its newest
+ * call (see `touch`), or exactly that call when the daemon ran `close` or `flush` before it stopped.
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { readFileSync } from 'node:fs'
@@ -72,7 +73,8 @@ export const MAX_NEW_PER_MINUTE = 6
 /** Gives `size` random bytes; tests pass a seeded one. */
 export type RandomSource = (size: number) => Buffer
 
-export type RequestRefusal = NameRefusal | 'too_many_pending' | 'too_many_requests'
+/** `closed`: the daemon is stopping (`close`), and takes no request any more. */
+export type RequestRefusal = NameRefusal | 'too_many_pending' | 'too_many_requests' | 'closed'
 
 /**
  * Why a claim gets no key (fix round 3), so the CLI can tell the person the true reason: the person
@@ -205,6 +207,8 @@ export class Pairing {
   private readonly lastCallWrite = new Map<string, number>()
   /** Some agent's last call is in memory only; `flush` writes it. Any write of the store clears it. */
   private callsUnsaved = false
+  /** `close` ran: no request, confirm, decline or claim any more. */
+  private closed = false
 
   private constructor(file: string, agents: StoredAgent[], options: PairingOptions) {
     this.file = file
@@ -270,7 +274,26 @@ export class Pairing {
     if (this.callsUnsaved) this.save(this.agents)
   }
 
+  /**
+   * Ends the pairing, for the daemon to run before it stops (fix round 4). Every request still open
+   * ends at `now`: a pending one as `expired`, a confirmed one as `claim_expired`, each with its
+   * notice dated `now` and its row kept for the page like any ended one (a request already past its
+   * deadline ends at that deadline, as always). Then the last calls are flushed; a flush that fails
+   * throws PairingStoreError, and the requests stay ended. After the close a request is refused as
+   * `closed`, a claim is told `unknown` (as after a restart), a confirm and a decline find nothing;
+   * list, verify, touch, revoke and flush still work. A second close only flushes.
+   */
+  close(now: number): void {
+    if (!this.closed) {
+      this.sweep(now)
+      this.closed = true
+      for (const entry of [...this.byHandle.values()]) this.end(entry, now)
+    }
+    this.flush()
+  }
+
   request(agentName: string, now: number): { requestId: string; code: string; expiresAt: number } | { refused: RequestRefusal } {
+    if (this.closed) return { refused: 'closed' }
     const refused = checkAgentName(agentName)
     if (refused !== null) return { refused }
     this.sweep(now)
@@ -313,6 +336,7 @@ export class Pairing {
    * and otherwise the reason it gets none (`ClaimRefusal`). A claim never makes a new request.
    */
   claim(requestId: string, now: number): { key: string } | { pending: true } | { refused: ClaimRefusal } {
+    if (this.closed) return { refused: 'unknown' }
     this.sweep(now)
     const entry = this.byRequestId.get(requestId)
     if (entry === undefined) return { refused: this.refusals.get(sha256(requestId))?.refused ?? 'unknown' }
@@ -400,10 +424,7 @@ export class Pairing {
     for (const entry of [...this.byHandle.values()]) {
       const endedAt = deadline(entry)
       if (now < endedAt) continue
-      this.forget(entry, entry.confirmedAt === null ? 'expired' : 'claim_expired', endedAt)
-      const { handle, name, code, createdAt, confirmedAt } = entry
-      this.ended.set(handle, { handle, name, code, createdAt, confirmedAt, endedAt })
-      this.notify({ kind: confirmedAt === null ? 'expired' : 'claim_expired', handle, name, at: endedAt })
+      this.end(entry, endedAt)
     }
     for (const row of [...this.ended.values()]) {
       if (now - row.endedAt >= EXPIRED_SHOWN_MS) this.ended.delete(row.handle)
@@ -411,6 +432,18 @@ export class Pairing {
     for (const [idHash, { endedAt }] of [...this.refusals]) {
       if (now - endedAt >= EXPIRED_SHOWN_MS) this.refusals.delete(idHash)
     }
+  }
+
+  /**
+   * Ends a waiting request at `endedAt`, nobody having declined or claimed it: `expired` when never
+   * confirmed, `claim_expired` when confirmed. The page keeps a row without the request id.
+   */
+  private end(entry: Entry, endedAt: number): void {
+    const kind = entry.confirmedAt === null ? 'expired' : 'claim_expired'
+    this.forget(entry, kind, endedAt)
+    const { handle, name, code, createdAt, confirmedAt } = entry
+    this.ended.set(handle, { handle, name, code, createdAt, confirmedAt, endedAt })
+    this.notify({ kind, handle, name, at: endedAt })
   }
 
   /** Ends a request: its id is dropped, and only the id's SHA-256 is kept with why it ended. */

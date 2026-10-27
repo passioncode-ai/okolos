@@ -1016,3 +1016,77 @@ describe('the page acts by handle, never by request id (audit #9)', () => {
     expect(pairing.claim(requestId, T0 + REQUEST_LIFETIME_MS)).toEqual({ refused: 'expired' })
   })
 })
+
+// Fix round 4: the daemon closes the pairing before it stops, so nothing is left half done.
+describe('closing the pairing (fix round 4)', () => {
+  it('ends every open request with a notice dated by the close, and flushes the last calls', () => {
+    const file = storeFile()
+    const notices: PairingNotice[] = []
+    const pairing = open(file, notices)
+    const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    expect(pairing.touch(agent.agentId, T0 + 10)).toBe(true)
+    expect(pairing.touch(agent.agentId, T0 + 20)).toBe(true) // in memory only: within the minute
+    asked(pairing.request('Codex', T0 + 30))
+    const confirmed = asked(pairing.request('Cursor', T0 + 31))
+    expect(confirmAt(pairing, confirmed, T0 + 32)).toBe(true)
+    notices.length = 0
+
+    const at = T0 + 40
+    pairing.close(at)
+    expect(notices.map((n) => [n.kind, 'name' in n ? n.name : '', n.at])).toEqual([
+      ['expired', 'Codex', at],
+      ['claim_expired', 'Cursor', at],
+    ])
+    expect(pairing.list(at + 1).requests.map((row) => [row.name, row.state, row.expiresAt])).toEqual([
+      ['Codex', 'expired', at],
+      ['Cursor', 'claim_expired', at],
+    ])
+    expect(open(file).list(at).agents[0]).toMatchObject({ agentId: agent.agentId, lastCallAt: T0 + 20 })
+  })
+
+  it('refuses requests, claims, confirms and declines after the close; list still answers', () => {
+    const pairing = open()
+    pair(pairing, 'Claude Code', T0)
+    const pending = asked(pairing.request('Codex', T0 + 10))
+    const confirmed = asked(pairing.request('Cursor', T0 + 11))
+    expect(confirmAt(pairing, confirmed, T0 + 12)).toBe(true)
+    const handles = pairing.list(T0 + 13).requests.map((row) => row.handle)
+
+    pairing.close(T0 + 20)
+    expect(pairing.request('Aider', T0 + 21)).toEqual({ refused: 'closed' })
+    expect(pairing.claim(pending.requestId, T0 + 21)).toEqual({ refused: 'unknown' })
+    expect(pairing.claim(confirmed.requestId, T0 + 21)).toEqual({ refused: 'unknown' })
+    for (const handle of handles) {
+      expect(pairing.confirmByHandle(handle, T0 + 21)).toBe(false)
+      expect(pairing.declineByHandle(handle, T0 + 21)).toBe(false)
+    }
+    const page = pairing.list(T0 + 22)
+    expect(page.agents.map((a) => a.name)).toEqual(['Claude Code'])
+    expect(page.requests.map((row) => row.state)).toEqual(['expired', 'claim_expired'])
+  })
+
+  it('says nothing more when closed twice', () => {
+    const notices: PairingNotice[] = []
+    const pairing = open(storeFile(), notices)
+    asked(pairing.request('Codex', T0))
+    pairing.close(T0 + 1)
+    const count = notices.length
+    pairing.close(T0 + 2)
+    expect(notices).toHaveLength(count)
+  })
+
+  it('ends the requests even when the flush cannot write, and throws the store error', () => {
+    const file = storeFile()
+    const notices: PairingNotice[] = []
+    const pairing = open(file, notices)
+    const agent = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    pairing.touch(agent.agentId, T0 + 10)
+    pairing.touch(agent.agentId, T0 + 20)
+    asked(pairing.request('Codex', T0 + 30))
+    chmodSync(path.dirname(file), 0o500)
+    expect(() => pairing.close(T0 + 40)).toThrow(expect.objectContaining({ name: 'PairingStoreError', reason: 'unwritable' }))
+    chmodSync(path.dirname(file), 0o700)
+    expect(notices.at(-1)).toMatchObject({ kind: 'expired', name: 'Codex', at: T0 + 40 })
+    expect(pairing.request('Aider', T0 + 41)).toEqual({ refused: 'closed' })
+  })
+})
