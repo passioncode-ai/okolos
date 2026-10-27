@@ -312,8 +312,8 @@
    "REQ-61"
   ],
   "files": [
-   "Create: apps/agent/src/window/chrome.ts, src/window/window.ts",
-   "Test: apps/agent/src/window/window.test.ts, src/window/window.chrome.test.ts (настоящий Chrome, пропуск с причиной, если его нет)"
+   "Create: apps/agent/src/window/chrome.ts, apps/agent/src/window/window.ts",
+   "Test: apps/agent/src/window/window.test.ts, apps/agent/src/window/window.chrome.test.ts (настоящий Chrome, пропуск с причиной, если его нет)"
   ],
   "consumes": "CdpTransport, CdpPipe.launch (N-022); launch сам добавляет --remote-debugging-pipe и --user-data-dir, AgentWindows их не передаёт (проверка seam N-002)",
   "produces": "`findChrome(): string | null`; `class AgentWindows { constructor({binary, profileDir, launch: (o) => Promise<CdpTransport> = CdpPipe.launch, extraArgs?: readonly string[] /* для тестов: --host-resolver-rules; --enable-automation и --remote-debugging-port отвергаются (аудит #21) */}); openWindow(): Promise<{targetId, cdpSessionId}> /* targetId и есть windowId в SessionOpenResult; cdpSessionId агенту не уходит (аудит #28) */; closeWindow(targetId); shutdown() }` — свои аргументы `--no-startup-window --no-first-run --no-default-browser-check` и никогда `--enable-automation`",
@@ -347,7 +347,7 @@
    "Test: apps/agent/src/agent.test.ts, apps/agent/src/verbs/verbs.test.ts, apps/agent/src/verbs/skeleton.chrome.test.ts"
   ],
   "consumes": "Tasks и checkLanded (N-009), AgentWindows (N-010), Journal и answerAfterRecord (N-006), doorRoute, pair, mcp-stdio (N-008), buildSnapshot, snapshotVerdict, paginate (N-003, N-004), census и readCensus (N-012), VerbIO, toolName, canonicalVerb, isLocalAddress, toSnapshotFinding (N-023), service из N-005 (capStdoutLog, buildIdentity с корнем релиза), runProbe (бандл apps/extension/src/agent-probe.ts)",
-  "produces": "`createAgent({dataDir, port, allowLoopbackForTests?, extraChromeArgs?, routes?}): Promise<Agent>` в src/agent.ts: служба, дверь, задачи, окна, журнал, перепись; onRevoke(agentId) закрывает задачи агента и их окна (аудит #13); таймер Journal.sweep раз в сутки (аудит #30); main.ts: serve → createAgent, pair, mcp-stdio; инструменты MCP под toolName: session_open, open, snapshot, read, get, waitFor, close, hygiene_census; схемы zod типа z.ZodType<VerbIO[V]['input']> (аудит #26); журнал хранит canonicalVerb (аудит #19); SessionOpenResult.sessionId = Task.id, cdpSessionId не уходит агенту (аудит #28); находки только через toSnapshotFinding",
+  "produces": "`createAgent({home?, port, allowLoopbackForTests?, extraChromeArgs?}): Promise<Agent>` (каталоги из serviceDirs(home); тесты передают временный home; журнал, привязки и окна строятся в setup N-005 после замка, проверка seam N-005) в src/agent.ts: служба, дверь, задачи, окна, журнал, перепись; onRevoke(agentId) закрывает задачи агента и их окна (аудит #13); таймер Journal.sweep раз в сутки (аудит #30); main.ts: serve → createAgent, pair, mcp-stdio; инструменты MCP под toolName: session_open, open, snapshot, read, get, waitFor, close, hygiene_census; схемы zod типа z.ZodType<VerbIO[V]['input']> (аудит #26); журнал хранит canonicalVerb (аудит #19); SessionOpenResult.sessionId = Task.id, cdpSessionId не уходит агенту (аудит #28); находки только через toSnapshotFinding",
   "tests": [
    "skeleton на Chrome: session.open → open локальной фикстуры со скрытой инструкцией из корпуса → snapshot не содержит текста инструкции, verdict.level = finding → close: окна нет",
    "корпус в Chrome: HTML-фикстура из каждого позитива positives.json (по носителю и сокрытию), ответы snapshot, read, get text, waitFor {text} не содержат текста позитива (ревью F1, F3)",
@@ -368,7 +368,9 @@
    "отзыв доступа закрывает задачи агента и их окна: окна с targetId задачи больше нет (аудит #13)",
    "журнал несёт глагол в каноническом виде (session.open), инструмент зовётся session_open (аудит #19)",
    "бандл несёт apps/agent/src/fabric (.mjs набор не копирует tsc)",
-   "тот же таймер раз в сутки обрезает events.jsonl по правилу N-005 (7 дней или 1000 событий), а не только при старте (отчёт N-005, fix 0)"
+   "тот же таймер раз в сутки обрезает events.jsonl по правилу N-005 (7 дней или 1000 событий), а не только при старте (отчёт N-005, fix 0)",
+   "вторая копия демона на том же home выходит с 75, не открыв журнал, хранилище привязок и Chrome (setup после замка, проверка seam N-005)",
+   "отказы двери до разбора пишутся в журнал через onRefused оболочки N-005 с DoorRejection (проверка seam N-005)"
   ],
   "dod": "vitest apps/agent/src/verbs зелёный на Chrome stable"
  },
@@ -473,7 +475,8 @@
    "страница принимает только сессию, выданную N-005; атрибуты куки проверяет N-005 (аудит #12)",
    "строка задачи SCR-24 показывает профиль: с логинами человека или без них; SCN-045 шаг 1 и FLW-22 называют цель задачи (проверка product N-001 круг 2)",
    "GET /api/journal выгружает журнал агентов (JSONL, без содержимого страниц) для [data-role=agent-journal-link] (аудит #40)",
-   "состояние «сессия истекла» на SCR-23 и SCR-24: страница отвечает 401, хост входит заново, экран называет причину; запись в screens.md (проверка product N-005)"
+   "состояние «сессия истекла» на SCR-23 и SCR-24: страница отвечает 401, хост входит заново, экран называет причину; запись в screens.md (проверка product N-005)",
+   "страница ставит свой Content-Security-Policy (script-src 'self', без inline) и читает сессию через operatorSession запущенной службы (проверка seam N-005)"
   ],
   "dod": "vitest apps/agent/src/dashboard зелёный; SCN-044, SCN-045 переведены в built в том же изменении, python3 docs/ux/lint.py 0"
  },
@@ -499,7 +502,8 @@
    "tools/runbook.test.ts видит новые скрипты в раннбуке",
    "фальшивый launchctl первым в PATH: install зовёт bootout, ждёт, bootstrap",
    "релиз содержит бандл, apps/agent/src/fabric и apps/agent/static (аудит #37)",
-   "install пишет plist через launchdPlist набора и зовёт capStdoutLog при старте"
+   "install пишет plist через launchdPlist набора и зовёт capStdoutLog при старте",
+   "дескриптор берёт auth.tokenFile из servicePaths(dirs) N-005, а не из своей копии пути (проверка seam N-005)"
   ],
   "dod": "vitest tools/install-agent.test.ts tools/runbook.test.ts зелёные"
  },
@@ -518,7 +522,7 @@
    "Create: e2e/bridge/skeleton.spec.ts, e2e/bridge/scn-044.spec.ts, e2e/bridge/scn-045.spec.ts, playwright.bridge.config.ts",
    "Modify: package.json (test:e2e:bridge, аудит #14), playwright.config.ts (testIgnore bridge/**, аудит #15), docs/runbooks/development.md"
   ],
-  "consumes": "демон в процессе теста через createAgent({dataDir, port, allowLoopbackForTests: true, extraChromeArgs}) импортом из apps/agent/src/agent.ts (типы есть, аудит #35), не через CLI и не через переменную окружения; ключ в X-Okolos-Agent-Key (аудит #31); страницы фикстур по имени fixture.test через --host-resolver-rules; Chrome stable",
+  "consumes": "демон в процессе теста через createAgent({home: <временный>, port, allowLoopbackForTests: true, extraChromeArgs}) импортом из apps/agent/src/agent.ts (типы есть, аудит #35), не через CLI и не через переменную окружения; ключ в X-Okolos-Agent-Key (аудит #31); страницы фикстур по имени fixture.test через --host-resolver-rules; Chrome stable",
   "produces": "`pnpm test:e2e:bridge`",
   "tests": [
    "skeleton: MCP-клиент вызывает инструменты по toolName (session_open …), журнал хранит каноническое написание (session.open) → привязка через страницу → session.open → open → snapshot без скрытой инструкции → close",

@@ -46,6 +46,7 @@
   "строка задачи SCR-24 показывает профиль: с логинами человека или без них; SCN-045 шаг 1 и FLW-22 называют цель задачи (проверка product N-001 круг 2)",
   "GET /api/journal выгружает журнал агентов (JSONL, без содержимого страниц) для [data-role=agent-journal-link] (аудит #40)",
   "состояние «сессия истекла» на SCR-23 и SCR-24: страница отвечает 401, хост входит заново, экран называет причину; запись в screens.md (проверка product N-005)",
+  "страница ставит свой Content-Security-Policy (script-src 'self', без inline) и читает сессию через operatorSession запущенной службы (проверка seam N-005)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/dashboard && pnpm -s run typecheck"
  ],
  "guards": [

@@ -31,7 +31,7 @@
   ]
  },
  "outputs": [
-  "`createAgent({dataDir, port, allowLoopbackForTests?, extraChromeArgs?, routes?}): Promise<Agent>` в src/agent.ts: служба, дверь, задачи, окна, журнал, перепись; onRevoke(agentId) закрывает задачи агента и их окна (аудит #13); таймер Journal.sweep раз в сутки (аудит #30); main.ts: serve → createAgent, pair, mcp-stdio; инструменты MCP под toolName: session_open, open, snapshot, read, get, waitFor, close, hygiene_census; схемы zod типа z.ZodType<VerbIO[V]['input']> (аудит #26); журнал хранит canonicalVerb (аудит #19); SessionOpenResult.sessionId = Task.id, cdpSessionId не уходит агенту (аудит #28); находки только через toSnapshotFinding"
+  "`createAgent({home?, port, allowLoopbackForTests?, extraChromeArgs?}): Promise<Agent>` (каталоги из serviceDirs(home); тесты передают временный home; журнал, привязки и окна строятся в setup N-005 после замка, проверка seam N-005) в src/agent.ts: служба, дверь, задачи, окна, журнал, перепись; onRevoke(agentId) закрывает задачи агента и их окна (аудит #13); таймер Journal.sweep раз в сутки (аудит #30); main.ts: serve → createAgent, pair, mcp-stdio; инструменты MCP под toolName: session_open, open, snapshot, read, get, waitFor, close, hygiene_census; схемы zod типа z.ZodType<VerbIO[V]['input']> (аудит #26); журнал хранит canonicalVerb (аудит #19); SessionOpenResult.sessionId = Task.id, cdpSessionId не уходит агенту (аудит #28); находки только через toSnapshotFinding"
  ],
  "acceptance": [
   "skeleton на Chrome: session.open → open локальной фикстуры со скрытой инструкцией из корпуса → snapshot не содержит текста инструкции, verdict.level = finding → close: окна нет",
@@ -54,6 +54,8 @@
   "журнал несёт глагол в каноническом виде (session.open), инструмент зовётся session_open (аудит #19)",
   "бандл несёт apps/agent/src/fabric (.mjs набор не копирует tsc)",
   "тот же таймер раз в сутки обрезает events.jsonl по правилу N-005 (7 дней или 1000 событий), а не только при старте (отчёт N-005, fix 0)",
+  "вторая копия демона на том же home выходит с 75, не открыв журнал, хранилище привязок и Chrome (setup после замка, проверка seam N-005)",
+  "отказы двери до разбора пишутся в журнал через onRefused оболочки N-005 с DoorRejection (проверка seam N-005)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/agent.test.ts apps/agent/src/verbs && pnpm -s run typecheck"
  ],
  "guards": [

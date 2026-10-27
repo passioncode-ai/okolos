@@ -308,9 +308,9 @@
    "check": "pnpm -s exec vitest run apps/agent/src/window && pnpm -s run typecheck",
    "touches": [
     "apps/agent/src/window/chrome.ts",
-    "src/window/window.ts",
+    "apps/agent/src/window/window.ts",
     "apps/agent/src/window/window.test.ts",
-    "src/window/window.chrome.test.ts"
+    "apps/agent/src/window/window.chrome.test.ts"
    ],
    "risk": "R3"
   },

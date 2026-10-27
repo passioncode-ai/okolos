@@ -3,7 +3,7 @@
  "node": "N-017",
  "intent": "e2e моста",
  "inputs": [
-  "демон в процессе теста через createAgent({dataDir, port, allowLoopbackForTests: true, extraChromeArgs}) импортом из apps/agent/src/agent.ts (типы есть, аудит #35), не через CLI и не через переменную окружения; ключ в X-Okolos-Agent-Key (аудит #31); страницы фикстур по имени fixture.test через --host-resolver-rules; Chrome stable",
+  "демон в процессе теста через createAgent({home: <временный>, port, allowLoopbackForTests: true, extraChromeArgs}) импортом из apps/agent/src/agent.ts (типы есть, аудит #35), не через CLI и не через переменную окружения; ключ в X-Okolos-Agent-Key (аудит #31); страницы фикстур по имени fixture.test через --host-resolver-rules; Chrome stable",
   "N-015: страница для подтверждения",
   "N-016: скрипт agent:build и релиз"
  ],
