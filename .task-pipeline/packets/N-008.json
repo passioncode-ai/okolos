@@ -3,7 +3,7 @@
  "node": "N-008",
  "intent": "K3: дверь /mcp и stdio-шим",
  "inputs": [
-  "Pairing.verify/request/claim; Journal.record; Route из N-005",
+  "Pairing.verify/request/claim; Journal.record; Route из N-024",
   "N-023: BRIDGE_VERBS, toolName, BridgeResult, refuse",
   "N-006: Journal.record до ответа",
   "N-007: Pairing.verify и запрос привязки",
@@ -48,6 +48,7 @@
   "ключ пишется во временный файл и переименовывается только после успешного забора; существующий файл заменяется только с --replace; привязка того же имени после отзыва проходит с --replace (ревью S5)",
   "маршруты /mcp, /pair, /pair/claim объявляют paths, и well-known показывает surfaces.mcp (проверка seam N-005 круг 2)",
   "тексты, которые читает человек, идут ключами каталога apps/agent/_locales с проверкой Copylot; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
+  "долгий поток /mcp при остановке: дверь закрывает его сама до срока слива и пишет ответ в журнал; агент за stdio-шимом получает отказ контракта internal с retryable, а не голый 503 (product N-005 круг 3, риски)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/door apps/agent/src/cli && pnpm -s run typecheck && pnpm -s run i18n:sweep"
  ],
  "guards": [

@@ -155,7 +155,7 @@
    "status": "pending",
    "blocked_by": [
     "N-023",
-    "N-005"
+    "N-024"
    ],
    "serves": "REQ-55",
    "check": "pnpm -s exec vitest run packages/core-snapshot && pnpm -s run typecheck",
@@ -193,7 +193,7 @@
    "id": "N-005",
    "title": "K3 оболочка службы fabric-service/0.1",
    "owner": "implementer",
-   "status": "pending",
+   "status": "parked",
    "blocked_by": [
     "N-002",
     "N-022"
@@ -218,13 +218,13 @@
    ],
    "risk": "R2",
    "certification": {
-    "round": 2,
+    "round": 3,
     "tiers": {
-     "unit": "pass",
+     "unit": "fail",
      "seam": "pass",
      "product": "fail"
     },
-    "at": "dfba2abf3afa3446d51246c9b71bcda8bb159398",
+    "at": "f0606148a4b406aeba350c3218c11f2c8ccfffa5",
     "history": [
      {
       "unit": "fail",
@@ -235,14 +235,21 @@
       "unit": "pass",
       "seam": "pass",
       "product": "fail"
+     },
+     {
+      "unit": "fail",
+      "seam": "pass",
+      "product": "fail"
      }
     ],
     "kinds": [
      "blind",
+     "blind",
      "blind"
     ],
-    "tree": "cf420836a8e3562b8c2949b3f0e2ab06270ac9e4"
-   }
+    "tree": "3b35e0957363238c8aad2bf60e30dd7edc4acb1f"
+   },
+   "parked_reason": "certification ceiling: 3 failing round(s), ceiling 3; failing tier(s) unit, product; stuck on product; first break apps/agent/src/service/http.ts:287-289: The per-request log write in the response 'finish' listener is outside every catch. RotatingLog.write throws on any open/rename failure (EACCES, ENOSPC, a failed rotate), and a throw inside an EventEmitter listener emitted from the stream's afterWrite tick is an uncaughtException: the daemon dies with exit 1 on the first request after its log becomes unwritable, without an answer, without a drain and without its stopping event. This contradicts the shell's own contract at http.ts:333 ('No throw inside handle, the log's included, may ... end the daemon') and the care taken at http.ts:336-340, 371, 393, 401 to make every other log write non-fatal. Reproduced: a scratch script started the service on a temp home, chmod 0400 the service.jsonl, sent GET /.well-known/fabric-service; the process exited 1 with 'EACCES ... at RotatingLog.write ... at ServerResponse.<anonymous> (http.ts:288)' before the first answer was read.; check: pnpm -s exec vitest run apps/agent/src/service -t 'log cannot be written' passes with a test that chmods servicePaths(dirs).serviceLog to 0400 after start, calls /.well-known/fabric-service twice and gets 200 both times, then close() resolves; the existing suite stays 99+ green. Blocker row owed on the board"
   },
   {
    "id": "N-006",
@@ -250,7 +257,7 @@
    "owner": "implementer",
    "status": "pending",
    "blocked_by": [
-    "N-005"
+    "N-024"
    ],
    "serves": "REQ-60",
    "check": "pnpm -s exec vitest run apps/agent/src/journal && pnpm -s run typecheck",
@@ -266,7 +273,7 @@
    "owner": "implementer",
    "status": "pending",
    "blocked_by": [
-    "N-005"
+    "N-024"
    ],
    "serves": "REQ-58",
    "check": "pnpm -s exec vitest run apps/agent/src/pairing && pnpm -s run typecheck",
@@ -312,7 +319,7 @@
    "status": "pending",
    "blocked_by": [
     "N-023",
-    "N-005"
+    "N-024"
    ],
    "serves": "REQ-59",
    "check": "pnpm -s exec vitest run apps/agent/src/tasks && pnpm -s run typecheck",
@@ -329,7 +336,7 @@
    "status": "pending",
    "blocked_by": [
     "N-022",
-    "N-005"
+    "N-024"
    ],
    "serves": "REQ-61",
    "check": "pnpm -s exec vitest run apps/agent/src/window && pnpm -s run typecheck && pnpm -s run i18n:sweep",
@@ -378,7 +385,7 @@
    "status": "pending",
    "blocked_by": [
     "N-023",
-    "N-005"
+    "N-024"
    ],
    "serves": "REQ-62",
    "check": "pnpm -s exec vitest run apps/agent/src/hygiene && pnpm -s run typecheck && pnpm -s run i18n:sweep",
@@ -410,7 +417,8 @@
    "owner": "implementer",
    "status": "pending",
    "blocked_by": [
-    "N-013"
+    "N-013",
+    "N-024"
    ],
    "serves": "REQ-66",
    "check": "python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts",
@@ -671,6 +679,24 @@
     "packages/contracts/src/bridge.test.ts"
    ],
    "risk": "R2"
+  },
+  {
+   "id": "N-024",
+   "title": "K3: оболочка службы, замена запаркованного N-005",
+   "owner": "implementer",
+   "status": "pending",
+   "blocked_by": [],
+   "serves": "REQ-63",
+   "check": "pnpm -s exec vitest run apps/agent/src/service && pnpm -s run typecheck && pnpm -s run lint && pnpm -s run i18n:sweep",
+   "touches": [
+    "apps/agent/src/service/http.ts",
+    "apps/agent/src/service/events.ts",
+    "apps/agent/_locales/ru/messages.json",
+    "apps/agent/_locales/en/messages.json",
+    "apps/agent/src/service/http.test.ts",
+    "apps/agent/src/service/events.test.ts"
+   ],
+   "risk": "R2"
   }
  ],
  "edges": [
@@ -678,21 +704,6 @@
    "from": "N-002",
    "to": "N-022",
    "payload": "CdpPipe и его тесты"
-  },
-  {
-   "from": "N-023",
-   "to": "N-003",
-   "payload": "toSnapshotFinding, SnapshotFinding, TaskScope"
-  },
-  {
-   "from": "N-005",
-   "to": "N-003",
-   "payload": "resource: pnpm-lock.yaml; N-003 правит lockfile после N-005"
-  },
-  {
-   "from": "N-003",
-   "to": "N-004",
-   "payload": "Snapshot с вердиктом"
   },
   {
    "from": "N-002",
@@ -705,12 +716,27 @@
    "payload": "resource: packages/cdp-pipe/src/pipe.ts; N-022 вливается первым, при слиянии N-005 файл берётся из N-022 (его пометки i18n-exempt покрывают весь файл)"
   },
   {
-   "from": "N-005",
-   "to": "N-006",
-   "payload": "каталоги данных службы"
+   "from": "N-023",
+   "to": "N-003",
+   "payload": "toSnapshotFinding, SnapshotFinding, TaskScope"
   },
   {
-   "from": "N-005",
+   "from": "N-024",
+   "to": "N-003",
+   "payload": "resource: pnpm-lock.yaml; N-003 правит lockfile после N-005"
+  },
+  {
+   "from": "N-003",
+   "to": "N-004",
+   "payload": "Snapshot с вердиктом"
+  },
+  {
+   "from": "N-024",
+   "to": "N-006",
+   "payload": "каталоги данных службы, servicePaths, setup после замка"
+  },
+  {
+   "from": "N-024",
    "to": "N-007",
    "payload": "каталоги данных и токен хоста"
   },
@@ -740,7 +766,7 @@
    "payload": "validateScope, inScope, verbAllowed, refuse"
   },
   {
-   "from": "N-005",
+   "from": "N-024",
    "to": "N-009",
    "payload": "apps/agent: package.json, tsconfig"
   },
@@ -750,7 +776,7 @@
    "payload": "CdpTransport, onExit, CdpError, timeoutMs на вызов"
   },
   {
-   "from": "N-005",
+   "from": "N-024",
    "to": "N-010",
    "payload": "apps/agent: package.json, tsconfig"
   },
@@ -795,7 +821,7 @@
    "payload": "CensusEntry"
   },
   {
-   "from": "N-005",
+   "from": "N-024",
    "to": "N-012",
    "payload": "apps/agent: package.json, tsconfig"
   },
@@ -803,6 +829,11 @@
    "from": "N-013",
    "to": "N-014",
    "payload": "список строк экранов"
+  },
+  {
+   "from": "N-024",
+   "to": "N-014",
+   "payload": "resource: apps/agent/_locales/{ru,en}/messages.json; N-014 дописывает строки страницы после строк службы N-024"
   },
   {
    "from": "N-006",
@@ -942,6 +973,21 @@
    "node": "N-022",
    "why": "certified at all 3 tiers in round 2",
    "precondition": "dfaf5b0b9cfcc3b481a6c642e3ab86b7ed33cfd1"
+  },
+  {
+   "verb": "park",
+   "node": "N-005",
+   "why": "certification ceiling: 3 failing round(s), ceiling 3; failing tier(s) unit, product; stuck on product; first break apps/agent/src/service/http.ts:287-289: The per-request log write in the response 'finish' listener is outside every catch. RotatingLog.write throws on any open/rename failure (EACCES, ENOSPC, a failed rotate), and a throw inside an EventEmitter listener emitted from the stream's afterWrite tick is an uncaughtException: the daemon dies with exit 1 on the first request after its log becomes unwritable, without an answer, without a drain and without its stopping event. This contradicts the shell's own contract at http.ts:333 ('No throw inside handle, the log's included, may ... end the daemon') and the care taken at http.ts:336-340, 371, 393, 401 to make every other log write non-fatal. Reproduced: a scratch script started the service on a temp home, chmod 0400 the service.jsonl, sent GET /.well-known/fabric-service; the process exited 1 with 'EACCES ... at RotatingLog.write ... at ServerResponse.<anonymous> (http.ts:288)' before the first answer was read.; check: pnpm -s exec vitest run apps/agent/src/service -t 'log cannot be written' passes with a test that chmods servicePaths(dirs).serviceLog to 0400 after start, calls /.well-known/fabric-service twice and gets 200 both times, then close() resolves; the existing suite stays 99+ green. Blocker row owed on the board"
+  },
+  {
+   "verb": "park",
+   "node": "N-005",
+   "why": "потолок проверки: 3 непроходящих круга (r1 unit+seam+product, r2 product, r3 unit+product); seam прошёл во 2 и 3 кругах; код в b1/n-005 продолжается в N-024"
+  },
+  {
+   "verb": "add",
+   "node": "N-024",
+   "why": "альтернативный производитель для потребителей N-005 (N-003, N-006, N-007, N-009, N-010, N-012): явная смена рёбер"
   }
  ]
 }

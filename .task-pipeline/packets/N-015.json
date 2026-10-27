@@ -3,7 +3,7 @@
  "node": "N-015",
  "intent": "Страница демона: SCR-23, SCR-24",
  "inputs": [
-  "Pairing.list/confirmByHandle/declineByHandle/revoke (N-007), Tasks.list (N-009), Journal.recent (N-006), проверка сессии из N-005, createAgent (N-011), refusalKey (N-023), каталоги строк",
+  "Pairing.list/confirmByHandle/declineByHandle/revoke (N-007), Tasks.list (N-009), Journal.recent (N-006), проверка сессии из N-024, createAgent (N-011), refusalKey (N-023), каталоги строк",
   "N-006: Journal.recent, JournalEntry, DoorRejection",
   "N-007: список привязок и отзыв",
   "N-009: список активных задач",

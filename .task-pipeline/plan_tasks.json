@@ -104,7 +104,7 @@
   "title": "K2: вердикт к снимку, корпус, fuzz секретов",
   "deps": [
    "N-023",
-   "N-005"
+   "N-024"
   ],
   "req": [
    "REQ-55"
@@ -190,10 +190,32 @@
   "dod": "vitest apps/agent/src/service зелёный; сервер слушает только 127.0.0.1 (тест читает address())"
  },
  {
+  "n": "N-024",
+  "title": "K3: оболочка службы, замена запаркованного N-005",
+  "deps": [],
+  "req": [
+   "REQ-63"
+  ],
+  "files": [
+   "Modify: apps/agent/src/service/http.ts, apps/agent/src/service/events.ts, apps/agent/_locales/ru/messages.json, apps/agent/_locales/en/messages.json",
+   "Test: apps/agent/src/service/http.test.ts, apps/agent/src/service/events.test.ts"
+  ],
+  "consumes": "ветка b1/n-005 (код N-005 до 9dbaf1e; seam прошёл во всех кругах) и bridge/b1-run2 с N-022",
+  "produces": "всё из N-005, плюс: запись лога после запроса не роняет демон (quietly); событие eventDrainCutOff пишется один раз даже при двух close(); eventsUnreadable — разовое событие при старте уровня warning, не постоянный degraded; 503 во время остановки проходит через onRefused с причиной 'stopping', чтобы дверь записала его в журнал",
+  "tests": [
+   "лог только для чтения после старта: два запроса к well-known получают 200, close() завершается (unit N-005 круг 3, break)",
+   "два одновременных close() при зависшем запросе пишут eventDrainCutOff один раз (unit N-005 круг 3, риск)",
+   "eventDrainCutOff: ru «Okolos Agent остановился, не дождавшись конца вызовов. Оборвано: $COUNT$.» en «Okolos Agent stopped before all calls finished. Cut off: $COUNT$.» (Copylot ru 8748c348-95f2-4054-9401-70cde29d7d72, en 4658bee7-8c88-425b-aff6-d1ae2996bf48; слово «запрос» закреплено за доступом, product N-005 круг 3)",
+   "eventsUnreadable: ru «В файле событий нашлись нечитаемые строки: $COUNT$. При запуске они удалены, остальные события сохранены.» en «The events file had unreadable lines: $COUNT$. They were removed at start; the other events are kept.» как разовое событие warning при старте; well-known после старта без degraded источника events (product N-005 круг 3)",
+   "запрос во время остановки: onRefused вызывается с причиной 'stopping' до записи 503 (product N-005 круг 3, break 3)"
+  ],
+  "dod": "vitest apps/agent/src/service зелёный; typecheck, lint, pnpm gates 0"
+ },
+ {
   "n": "N-006",
   "title": "K3: журнал до ответа",
   "deps": [
-   "N-005"
+   "N-024"
   ],
   "req": [
    "REQ-60"
@@ -203,7 +225,7 @@
    "Test: apps/agent/src/journal/journal.test.ts"
   ],
   "consumes": "serviceDirs().data",
-  "produces": "`class Journal { static open(dir, {retentionDays}): Journal; record(e: JournalEntry): Promise<void> /* append + fsync, бросает при сбое */; recent(limit): JournalEntry[]; sweep(now) }`; `JournalEntry {at, agent, task?, verb, origin?, outcome: 'answered'|'refused'|'rejected', code?: BridgeRefusal | DoorRejection, bytes?, verdict?}`; `DoorRejection = 'bad_host'|'bad_origin'|'cross_site'|'bad_content_type'|'bad_request'` (значения onRefused оболочки N-005); JournalEntry — объединение по outcome: у 'rejected' нет agent и verb (аудит #38); verb: AnyBridgeVerb, канонический (аудит #19); `answerAfterRecord(journal, entry, send)` — единственная обёртка «запись до ответа», при сбое записи отправляет конверт отказа internal без содержимого страницы (аудит #18); RETENTION_DAYS_JOURNAL = 90, тест сверяет с RETENTION_DAYS.journal из @okolos/storage (аудит #30) (проверка seam N-001 круг 2) — без текста страницы и значений полей",
+  "produces": "`class Journal { static open(dir, {retentionDays}): Journal; record(e: JournalEntry): Promise<void> /* append + fsync, бросает при сбое */; recent(limit): JournalEntry[]; sweep(now) }`; `JournalEntry {at, agent, task?, verb, origin?, outcome: 'answered'|'refused'|'rejected', code?: BridgeRefusal | DoorRejection, bytes?, verdict?}`; `DoorRejection = 'bad_host'|'bad_origin'|'cross_site'|'stopping'|'bad_content_type'|'bad_request'` (значения onRefused оболочки N-024); JournalEntry — объединение по outcome: у 'rejected' нет agent и verb (аудит #38); verb: AnyBridgeVerb, канонический (аудит #19); `answerAfterRecord(journal, entry, send)` — единственная обёртка «запись до ответа», при сбое записи отправляет конверт отказа internal без содержимого страницы (аудит #18); RETENTION_DAYS_JOURNAL = 90, тест сверяет с RETENTION_DAYS.journal из @okolos/storage (аудит #30) (проверка seam N-001 круг 2) — без текста страницы и значений полей",
   "tests": [
    "record дописывает строку и делает fsync до возврата (шпион на fd.sync)",
    "каталог только для чтения → record бросает, и обёртка answerAfterRecord отдаёт internal, а не ответ",
@@ -216,7 +238,7 @@
   "n": "N-007",
   "title": "K3: привязка",
   "deps": [
-   "N-005"
+   "N-024"
   ],
   "req": [
    "REQ-58"
@@ -255,7 +277,7 @@
    "Modify: apps/agent/package.json (зависимости @modelcontextprotocol/server, @modelcontextprotocol/node, zod), pnpm-lock.yaml",
    "Test: apps/agent/src/door/door.test.ts, apps/agent/src/door/guard.test.ts, apps/agent/src/door/stdio-shim.test.ts, apps/agent/src/cli/pair.test.ts"
   ],
-  "consumes": "Pairing.verify/request/claim; Journal.record; Route из N-005",
+  "consumes": "Pairing.verify/request/claim; Journal.record; Route из N-024",
   "produces": "`doorGuard(req): {status, code} | null` (Host, Origin, Sec-Fetch-*, Content-Type); `doorRoute({pairing, journal, tools, onRevoke}): Route`; ключ агента в `X-Okolos-Agent-Key` (аудит #31); каждый ответ через answerAfterRecord из N-006 (аудит #18); onRevoke(agentId) зовётся при отзыве, подключает N-011 (аудит #13); шим и CLI говорят с дверью через node:http, не fetch (аудит #32); подкоманды pair и mcp-stdio экспортируются функциями, main.ts их подключает в N-011 для POST /mcp, POST /pair, POST /pair/claim; обёртка journaled(res) пишет запись до тела; `type ToolSet = (agent: AgentRecord) => McpServer`; `okolos-agent pair --name <имя>`; `okolos-agent mcp-stdio --as <имя>`",
   "tests": [
    "без ключа: 403, тело {error: not_paired}, нет WWW-Authenticate, запроса привязки не создаётся",
@@ -273,7 +295,8 @@
    "имя ../x и a/b: файл ключа называется по SHA-256 имени в hex внутри clients/, 0600 (ревью R6)",
    "ключ пишется во временный файл и переименовывается только после успешного забора; существующий файл заменяется только с --replace; привязка того же имени после отзыва проходит с --replace (ревью S5)",
    "маршруты /mcp, /pair, /pair/claim объявляют paths, и well-known показывает surfaces.mcp (проверка seam N-005 круг 2)",
-   "тексты, которые читает человек, идут ключами каталога apps/agent/_locales с проверкой Copylot; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)"
+   "тексты, которые читает человек, идут ключами каталога apps/agent/_locales с проверкой Copylot; остальные строки помечены i18n-exempt с причиной; pnpm run i18n:sweep → 0 (проверка seam N-005 круг 2)",
+   "долгий поток /mcp при остановке: дверь закрывает его сама до срока слива и пишет ответ в журнал; агент за stdio-шимом получает отказ контракта internal с retryable, а не голый 503 (product N-005 круг 3, риски)"
   ],
   "dod": "vitest apps/agent/src/door зелёный"
  },
@@ -282,7 +305,7 @@
   "title": "K3: задачи",
   "deps": [
    "N-023",
-   "N-005"
+   "N-024"
   ],
   "req": [
    "REQ-59"
@@ -308,7 +331,7 @@
   "title": "K4: окно агента",
   "deps": [
    "N-022",
-   "N-005"
+   "N-024"
   ],
   "req": [
    "REQ-61"
@@ -354,7 +377,7 @@
    "Modify: apps/agent/package.json (bin okolos-agent → ./src/main.ts), tools/imports.mjs (бандл агента как точка входа)",
    "Test: apps/agent/src/agent.test.ts, apps/agent/src/verbs/verbs.test.ts, apps/agent/src/verbs/skeleton.chrome.test.ts"
   ],
-  "consumes": "Tasks и checkLanded (N-009), AgentWindows (N-010), Journal и answerAfterRecord (N-006), doorRoute, pair, mcp-stdio (N-008), buildSnapshot, snapshotVerdict, paginate (N-003, N-004), census и readCensus (N-012), VerbIO, toolName, canonicalVerb, isLocalAddress, toSnapshotFinding (N-023), service из N-005 (capStdoutLog, buildIdentity с корнем релиза), runProbe (бандл apps/extension/src/agent-probe.ts)",
+  "consumes": "Tasks и checkLanded (N-009), AgentWindows (N-010), Journal и answerAfterRecord (N-006), doorRoute, pair, mcp-stdio (N-008), buildSnapshot, snapshotVerdict, paginate (N-003, N-004), census и readCensus (N-012), VerbIO, toolName, canonicalVerb, isLocalAddress, toSnapshotFinding (N-023), service из N-024 (capStdoutLog, buildIdentity с корнем релиза), runProbe (бандл apps/extension/src/agent-probe.ts)",
   "produces": "`createAgent({home?, port, allowLoopbackForTests?, extraChromeArgs?}): Promise<Agent>` (каталоги из serviceDirs(home); тесты передают временный home; журнал, привязки и окна строятся в setup N-005 после замка, проверка seam N-005) в src/agent.ts: служба, дверь, задачи, окна, журнал, перепись; onRevoke(agentId) закрывает задачи агента и их окна (аудит #13); таймер Journal.sweep раз в сутки (аудит #30); main.ts: serve → createAgent, pair, mcp-stdio; bin okolos-agent указывает на собранный бандл (исходники импортируют ./x.js, обычный node их не запустит; проверка seam N-005 круг 2); инструменты MCP под toolName: session_open, open, snapshot, read, get, waitFor, close, hygiene_census; схемы zod типа z.ZodType<VerbIO[V]['input']> (аудит #26); журнал хранит canonicalVerb (аудит #19); SessionOpenResult.sessionId = Task.id, cdpSessionId не уходит агенту (аудит #28); находки только через toSnapshotFinding",
   "tests": [
    "skeleton на Chrome: session.open → open локальной фикстуры со скрытой инструкцией из корпуса → snapshot не содержит текста инструкции, verdict.level = finding → close: окна нет",
@@ -389,7 +412,7 @@
   "title": "K5: перепись процессов",
   "deps": [
    "N-023",
-   "N-005"
+   "N-024"
   ],
   "req": [
    "REQ-62"
@@ -431,7 +454,8 @@
   "n": "N-014",
   "title": "Термины и строки (каталог apps/agent/_locales, ревью F22)",
   "deps": [
-   "N-013"
+   "N-013",
+   "N-024"
   ],
   "req": [
    "REQ-66"
@@ -473,7 +497,7 @@
    "Modify: apps/agent/src/agent.ts (монтирует маршруты страницы и инструменты pairing.confirm, pairing.decline, agent.revoke; аудит #10, #11), docs/ux/screens.md, docs/ux/scenarios.md, docs/ux/flows.md (SCR-24 показывает профиль, SCN-045 и FLW-22 называют цель; аудит #20)",
    "Test: apps/agent/src/dashboard/page.test.ts, apps/agent/src/dashboard/api.test.ts, apps/agent/src/dashboard/actions.test.ts"
   ],
-  "consumes": "Pairing.list/confirmByHandle/declineByHandle/revoke (N-007), Tasks.list (N-009), Journal.recent (N-006), проверка сессии из N-005, createAgent (N-011), refusalKey (N-023), каталоги строк",
+  "consumes": "Pairing.list/confirmByHandle/declineByHandle/revoke (N-007), Tasks.list (N-009), Journal.recent (N-006), проверка сессии из N-024, createAgent (N-011), refusalKey (N-023), каталоги строк",
   "produces": "GET /dashboard (сессия-кука от кода входа), GET /api/state, POST /api/pairing/:id/confirm|decline, POST /api/agents/:id/revoke — запись требует куку и заголовок X-Okolos-Request: 1; CSP без inline-скрипта; действия fabric-actions: pairing.confirm (human, consent), pairing.decline (human, consent), agent.revoke (relayed)",
   "tests": [
    "без куки → 401; запись без X-Okolos-Request → 403; запись без Origin или с чужим Origin → 403; чужой Host на любом маршруте → 403 (ревью F4)",
@@ -598,7 +622,7 @@
    "REQ-69"
   ],
   "files": [
-   "Modify: AGENTS.md (Commands: MCP; Lifecycle: app.okolos.agent), docs/README.md (Статус, карта кода), docs/privacy.md (демон не выходит в сеть; его хранилища со сроками: события, лог, токен хоста, сессии, хранилище привязок, журнал агентов; проверка product N-005), docs/brand/facts.md, docs/backlog.md (Touch ID для подтверждения: строка на Б2), docs/superpowers/backlog.md, SECURITY.md (граница угроз Б1)"
+   "Modify: AGENTS.md (Commands: MCP; Lifecycle: app.okolos.agent), docs/README.md (Статус, карта кода), docs/privacy.md (демон не выходит в сеть; его хранилища со сроками: события службы (7 дней или 1000; названы иначе, чем «журнал событий» расширения), лог, токен хоста, сессии, хранилище привязок, журнал агентов; проверка product N-005), docs/brand/facts.md, docs/backlog.md (Touch ID для подтверждения: строка на Б2), docs/superpowers/backlog.md, SECURITY.md (граница угроз Б1)"
   ],
   "consumes": "команды N-016, N-017",
   "produces": "доки в синхроне",

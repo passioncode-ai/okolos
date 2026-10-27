@@ -4,7 +4,7 @@
  "intent": "K3: привязка",
  "inputs": [
   "serviceDirs().data",
-  "N-005: каталоги данных и токен хоста"
+  "N-024: каталоги данных и токен хоста"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",

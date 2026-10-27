@@ -36,3 +36,4 @@ finding: hygiene N-022 docs/README.md:122 split-table — noise — round 0 — 
 event: memory — merge note: when N-005 merges after N-022, take pipe.ts from N-022 and KEEP both sets of rows in tools/reachable.test.ts (N-022 errors.ts row + N-005 rows) — seam N-022 r1 risk 3
 event: memory — open question for the Fabric Dashboards owner: every local service sets cookie fabric_session on 127.0.0.1 (kit has no name option; check_service.py reads only that name); are sessions of different services kept apart? (N-005 fix 1, item 13)
 iter: 2 — item N-022 — closed at gate 5
+holds: 5 — blocker N-005 parked at the certification ceiling (r1 all, r2 product, r3 unit+product; seam passed r2, r3); replaced by N-024 with explicit edge change

@@ -4,7 +4,8 @@
  "intent": "Термины и строки (каталог apps/agent/_locales, ревью F22)",
  "inputs": [
   "—",
-  "N-013: список строк экранов"
+  "N-013: список строк экранов",
+  "N-024: resource: apps/agent/_locales/{ru,en}/messages.json; N-014 дописывает строки страницы после строк службы N-024"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",

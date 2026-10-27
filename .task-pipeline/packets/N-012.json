@@ -5,7 +5,7 @@
  "inputs": [
   "CensusEntry (bridge.ts)",
   "N-023: CensusEntry",
-  "N-005: apps/agent: package.json, tsconfig"
+  "N-024: apps/agent: package.json, tsconfig"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",

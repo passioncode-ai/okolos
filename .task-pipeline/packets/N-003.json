@@ -5,7 +5,7 @@
  "inputs": [
   "`buildSnapshot`, `AxNode` (packages/core-snapshot/src/snapshot.ts); `Verdict` (@okolos/contracts)",
   "N-023: toSnapshotFinding, SnapshotFinding, TaskScope",
-  "N-005: resource: pnpm-lock.yaml; N-003 правит lockfile после N-005"
+  "N-024: resource: pnpm-lock.yaml; N-003 правит lockfile после N-005"
  ],
  "decision_refs": [
   "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
