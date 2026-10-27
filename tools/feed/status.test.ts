@@ -14,21 +14,35 @@ import { readStatus, writeStatus } from './status.mjs'
 
 const file = () => path.join(mkdtempSync(path.join(os.tmpdir(), 'okolos-status-')), 'state', 'feed-status.json')
 
+/**
+ * Windows has no POSIX mode bits (`stat().mode & 0o777` reads 0o666 there whatever
+ * was asked), so the owner-only assertion runs on macOS and Linux, where the feed
+ * agent runs, and is skipped on win32 rather than loosened everywhere (B-162).
+ */
+const NO_POSIX_MODES = process.platform === 'win32'
+
+const published = {
+  startedAt: '2026-10-03T12:00:00.000Z',
+  at: '2026-10-03T12:01:00.000Z',
+  outcome: 'published',
+  stage: 'done',
+  exit: 0,
+  version: 52,
+  entries: 280,
+} as const
+
 describe('the feed status record', () => {
-  it('holds the fields a host reads, owner-only', () => {
+  it('holds the fields a host reads', () => {
     const f = file()
-    writeStatus(f, {
-      startedAt: '2026-10-03T12:00:00.000Z',
-      at: '2026-10-03T12:01:00.000Z',
-      outcome: 'published',
-      stage: 'done',
-      exit: 0,
-      version: 52,
-      entries: 280,
-    })
+    writeStatus(f, published)
     const record = readStatus(f)
     expect(record).toMatchObject({ outcome: 'published', stage: 'done', exit: 0, version: 52, entries: 280 })
     expect(record?.consecutiveFailures).toBe(0)
+  })
+
+  it.skipIf(NO_POSIX_MODES)('is written owner-only', () => {
+    const f = file()
+    writeStatus(f, published)
     expect(statSync(f).mode & 0o777).toBe(0o600)
   })
 

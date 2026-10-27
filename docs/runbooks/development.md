@@ -15,7 +15,7 @@
 |---|---|---|
 | Node | `>=22` (проверено на 26.4.0) | всё остальное |
 | pnpm | `11.10.0` — задан в `packageManager` | воркспейс из 21 пакета |
-| Python 3 | любой 3.x (проверено на 3.14.6) | `docs/ux/lint.py`, `tools/model/evaluate.py` |
+| Python 3 | любой 3.x (проверено на 3.14.6), под именем `python3`, `python` или `py -3` | `docs/ux/lint.py`, `docs/brand/lint.py`, `tools/model/evaluate.py` |
 | Браузеры Playwright | ставятся командой ниже | e2e в Chromium и Firefox |
 
 Corepack включит нужный pnpm сам:
@@ -30,6 +30,39 @@ pnpm exec playwright install chromium firefox
 `.githooks`, и с этого момента `git push` не уходит без гейтов. Это не
 формальность — 2026-08-07 красный коммит ушёл именно потому, что правило жило в
 документе, а push в шелле.
+
+### Windows
+
+`pnpm gates` и хук pre-push рассчитаны и на Windows-чекаут (B-162, B-163). Сверх
+таблицы выше нужны:
+
+- **Git for Windows.** Хук запускает его `sh`; `tools/ci.test.ts` находит этот `sh`
+  рядом с `git` (`git --exec-path`), даже когда в PATH его нет, как в PowerShell и cmd.
+- **Node и pnpm**, как выше: pnpm включает corepack.
+- **Python 3 под одним из имён `py -3`, `python`, `python3`.** Гейты зовут Python через
+  `tools/python.mjs`: он берёт первое имя, которое докажет, что это Python 3, поэтому
+  заглушка из Microsoft Store не проходит. На Windows линтеры получают `PYTHONUTF8=1`,
+  иначе русский вывод через трубу хука падает в cp1252.
+
+Что на Windows делается иначе, и где это проверено:
+
+| Что | macOS, Linux | Windows | Проверка |
+|---|---|---|---|
+| Python | `python3`, затем `python` | `py -3`, `python`, `python3` | `tools/python.test.ts` |
+| `pnpm`, `npx` из инструментов | без оболочки | через cmd.exe; аргумент со спецсимволом cmd отклоняется | `tools/bin.test.ts` |
+| архив `pnpm package` | `zip -q -r -X` | `%SystemRoot%\System32\tar.exe -a` | `tools/archive.test.ts` |
+| дерево процессов фида | сигнал группе | `taskkill /T`, через паузу `/T /F` | `tools/feed/bounded.test.ts` |
+| права 0600 на файлы с секретами | проверяются | тесты пропущены с причиной, `access.mjs` пишет `n/a` | `tools/feed/log.test.ts`, `tools/access.test.ts` |
+| Firefox для e2e | кэш Playwright в домашней папке | `%LOCALAPPDATA%\ms-playwright\firefox-*\firefox\firefox.exe` | `tools/find-firefox.test.ts` |
+
+`pnpm package` сверяет архив со сборкой по списку файлов из центрального каталога zip,
+а не по байтам: `zip` и `tar` пишут разные байты. Концы строк держит `.gitattributes`
+(`* text=auto eol=lf`): чекаут получает LF при любом `core.autocrlf`, и это проверяет
+`tools/ci.test.ts` («line endings are LF on every checkout»).
+
+Ветки Windows проверены на macOS тестами, которым платформа передаётся параметром.
+Настоящий прогон на Windows появится с задачей CI на `windows-latest` (B-164). Агент фида
+работает только под launchd на macOS (ADR-0017), на Windows его нет.
 
 ## Цикл разработки
 

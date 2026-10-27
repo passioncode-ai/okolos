@@ -28,6 +28,10 @@
  *   - least secret (F2): the Cloudflare token reaches only the publish step. The
  *     secret runner (`OKOLOS_SECRET_RUNNER`, a JSON argv the installer writes)
  *     wraps that step alone, and an inherited token is stripped from every other.
+ *   - started by a bootstrap outside the checkout (B-159): launchd runs
+ *     ~/.okolos/bin/feed-agent/bootstrap.mjs, which recreates a missing checkout and
+ *     then starts this file with OKOLOS_RUN_ID and OKOLOS_RECOVERED_CHECKOUT; both
+ *     land in the status record.
  *   - a login is not a publish: with --if-stale a run whose served feed is younger
  *     than its interval records "skipped" and ends. RunAtLoad used to publish a new
  *     version at every login.
@@ -186,7 +190,18 @@ export async function runJob({
 
   let stage = 'start'
   let aborted = false
-  const facts = { commit: null, pinned: true, version: undefined, entries: undefined }
+  // What the bootstrap (tools/feed/bootstrap.mjs, B-159) tells the run: its id, so it
+  // can tell this record from an older one, and whether it had to recreate the
+  // checkout first. A manual run has neither and records `recoveredCheckout: false`.
+  const facts = {
+    commit: null,
+    pinned: true,
+    version: undefined,
+    entries: undefined,
+    ...(env.OKOLOS_RUN_ID ? { runId: env.OKOLOS_RUN_ID } : {}),
+    recoveredCheckout: Boolean(env.OKOLOS_RECOVERED_CHECKOUT),
+    ...(env.OKOLOS_RECOVERED_CHECKOUT ? { recovery: env.OKOLOS_RECOVERED_CHECKOUT } : {}),
+  }
   const setStage = (next) => {
     stage = next
     onStage(next)
@@ -381,6 +396,8 @@ function onSignal(signal, current) {
         stage: current.stage,
         exit: EXIT.signal,
         reason: `stopped by ${signal}`,
+        ...(process.env.OKOLOS_RUN_ID ? { runId: process.env.OKOLOS_RUN_ID } : {}),
+        recoveredCheckout: Boolean(process.env.OKOLOS_RECOVERED_CHECKOUT),
       })
     } finally {
       process.exit(EXIT.signal)

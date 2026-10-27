@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { BOOTSTRAP_FILES } from './feed/bootstrap.mjs'
 import { runBounded } from './feed/bounded.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { readStatus } from './feed/status.mjs'
@@ -12,10 +13,10 @@ import { discover, quote, runnerArgv, xml } from './feed-agent-credential.mjs'
 /**
  * Installs the feed-refresh agent on this machine, or prints what it would do.
  *
- *   node tools/install-feed-agent.mjs                      # checkout, plist, load
+ *   node tools/install-feed-agent.mjs                      # checkout, bootstrap, plist, load
  *   node tools/install-feed-agent.mjs --dry-run            # print the plist, touch nothing
- *   node tools/install-feed-agent.mjs --status             # plist, launchd's view, last run
- *   node tools/install-feed-agent.mjs --uninstall          # bootout, delete the plist, verify
+ *   node tools/install-feed-agent.mjs --status             # plist, bootstrap, launchd's view, last run
+ *   node tools/install-feed-agent.mjs --uninstall          # bootout, delete the plist and bootstrap, verify
  *   node tools/install-feed-agent.mjs --uninstall --purge  # and the checkout, state and logs
  *
  * The schedule cannot live in CI: ADR-0002 keeps the signing key off every
@@ -27,7 +28,9 @@ import { discover, quote, runnerArgv, xml } from './feed-agent-credential.mjs'
  *
  * Symmetric by construction (LC-14): uninstall removes what install added and
  * proves launchd no longer knows the label — the plist used to stay behind and
- * launchd loaded it again at the next login (F5). And the operator's intent wins:
+ * launchd loaded it again at the next login (F5). launchd starts a bootstrap copied
+ * to ~/.okolos/bin/feed-agent, outside the checkout, so a missing checkout is
+ * recreated and recorded rather than a shell error nobody reads (B-159). And the operator's intent wins:
  * an install over an agent the operator disabled updates the file and loads
  * nothing.
  */
@@ -36,7 +39,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 export const LABEL = 'app.okolos.feed'
 const source = path.join(root, 'tools/launchd', `${LABEL}.plist`)
 
-const PLACEHOLDERS = ['{{CHECKOUT}}', '{{RUNNER}}', '{{LOG_DIR}}']
+const PLACEHOLDERS = ['{{CHECKOUT}}', '{{RUNNER}}', '{{LOG_DIR}}', '{{BOOTSTRAP}}', '{{NODE}}', '{{SOURCE_REPO}}', '{{ORIGIN}}']
 const LAUNCHCTL_TIMEOUT_MS = 15_000
 
 /** launchctl, bounded. Returns `{ code, stdout, stderr }`. */
@@ -50,12 +53,26 @@ async function realLaunchctl(args) {
  * no comment is rewritten, and a template that lost one is refused rather than
  * guessed at — launchd would fail silently every twelve hours.
  */
-export function rendered({ template = readFileSync(source, 'utf8'), checkout, runner, logDir }) {
+export function rendered({
+  template = readFileSync(source, 'utf8'),
+  checkout,
+  runner,
+  logDir,
+  bootstrap,
+  node = process.execPath,
+  sourceRepo = root,
+  origin = '',
+}) {
   for (const token of PLACEHOLDERS) {
     if (!template.includes(token)) throw new Error(`${source} no longer contains ${token} — refusing to guess`)
   }
+  // Words in the shell command are shell-quoted; values of environment variables are not.
   const out = template
-    .replaceAll('{{CHECKOUT}}', xml(quote(checkout)))
+    .replaceAll('{{BOOTSTRAP}}', xml(quote(bootstrap)))
+    .replaceAll('{{NODE}}', xml(quote(node)))
+    .replaceAll('{{CHECKOUT}}', xml(checkout))
+    .replaceAll('{{SOURCE_REPO}}', xml(sourceRepo))
+    .replaceAll('{{ORIGIN}}', xml(origin))
     .replaceAll('{{RUNNER}}', runner ? xml(JSON.stringify(runner)).replaceAll('"', '&quot;') : '')
     .replaceAll('{{LOG_DIR}}', xml(logDir))
   if (out.includes('{{')) throw new Error('a placeholder survived rendering')
@@ -81,6 +98,9 @@ export async function ensureCheckout({ repo = root, checkout, tool = runBounded,
   const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' }
   delete env.CLOUDFLARE_API_TOKEN
   const steps = [
+    // A folder deleted under git leaves its worktree entry, and `add` refuses that
+    // path until the entry is pruned (B-150).
+    ['git', ['-C', repo, 'worktree', 'prune'], { env, timeoutMs: 90_000 }],
     ['git', ['-C', repo, 'fetch', '--quiet', 'origin', 'main'], { env, timeoutMs: 90_000 }],
     ['git', ['-C', repo, 'worktree', 'add', '--detach', checkout, 'origin/main'], { env, timeoutMs: 120_000 }],
     ['pnpm', ['install', '--frozen-lockfile', '--filter', '@okolos/proxy'], { cwd: checkout, env, timeoutMs: 600_000 }],
@@ -92,6 +112,32 @@ export async function ensureCheckout({ repo = root, checkout, tool = runBounded,
     }
   }
   log(`agent checkout: ${checkout} at origin/main`)
+}
+
+/**
+ * Copies the bootstrap launchd starts, and every module it imports, to `dir`
+ * (B-159). The whole folder is replaced at once — built beside it, then renamed in
+ * — so an update leaves no retired module behind and launchd never starts a half
+ * copy.
+ */
+export function installBootstrap({ dir, from = path.join(root, 'tools/feed'), files = BOOTSTRAP_FILES, log = () => {} }) {
+  const staging = `${dir}.staging-${process.pid}`
+  rmSync(staging, { recursive: true, force: true })
+  mkdirSync(staging, { recursive: true, mode: 0o700 })
+  for (const file of files) {
+    copyFileSync(path.join(from, file), path.join(staging, file))
+    chmodSync(path.join(staging, file), 0o600)
+  }
+  chmodSync(staging, 0o700)
+  rmSync(dir, { recursive: true, force: true })
+  renameSync(staging, dir)
+  log(`bootstrap: ${path.join(dir, 'bootstrap.mjs')} (${files.length} files, outside the checkout)`)
+}
+
+/** The clone's origin URL, which the bootstrap clones from when the clone itself is gone; '' when none. */
+export async function originUrl({ repo = root, tool = runBounded }) {
+  const result = await tool('git', ['-C', repo, 'remote', 'get-url', 'origin'], { timeoutMs: 15_000 })
+  return result.code === 0 ? result.stdout.trim() : ''
 }
 
 /** Writes the plist and loads it — unless the operator disabled the service. */
@@ -118,14 +164,16 @@ export async function installAgent({ label = LABEL, domain, target, plist, launc
 }
 
 /**
- * Boots the agent out, deletes its plist, and verifies with `launchctl print` that
- * launchd no longer knows the label. With `purge`, also removes the agent's
- * checkout, state and logs.
+ * Boots the agent out, deletes its plist and its bootstrap, and verifies with
+ * `launchctl print` that launchd no longer knows the label. With `purge`, also
+ * removes the agent's checkout (and a broken one the bootstrap moved aside),
+ * state and logs.
  */
-export async function uninstallAgent({ label = LABEL, domain, target, launchctl = realLaunchctl, log = console.log, purge }) {
+export async function uninstallAgent({ label = LABEL, domain, target, bin, launchctl = realLaunchctl, log = console.log, purge }) {
   // Not loaded is the outcome asked for, not a failure.
   await launchctl(['bootout', `${domain}/${label}`])
   rmSync(target, { force: true })
+  if (bin) rmSync(bin, { recursive: true, force: true })
 
   if (purge) {
     const { repo, paths, tool = runBounded } = purge
@@ -134,6 +182,8 @@ export async function uninstallAgent({ label = LABEL, domain, target, launchctl 
       if (removed.code !== 0) log(`git worktree remove failed (${(removed.stderr || '').trim()}); removing the directory`)
       rmSync(paths.agentCheckout, { recursive: true, force: true })
     }
+    rmSync(`${paths.agentCheckout}.broken`, { recursive: true, force: true })
+    await tool('git', ['-C', repo, 'worktree', 'prune'], { timeoutMs: 60_000 })
     rmSync(paths.state, { recursive: true, force: true })
     rmSync(paths.logs, { recursive: true, force: true })
     log(`purged ${paths.agentCheckout}, ${paths.state} and ${paths.logs}`)
@@ -143,7 +193,7 @@ export async function uninstallAgent({ label = LABEL, domain, target, launchctl 
   if (still.code === 0) {
     return { ok: false, reason: `${domain}/${label} is still loaded after bootout — check launchctl print ${domain}/${label}` }
   }
-  log(`removed ${label}: no plist at ${target}, and launchd no longer lists it`)
+  log(`removed ${label}: no plist at ${target}${bin ? `, no bootstrap at ${bin}` : ''}, and launchd no longer lists it`)
   return { ok: true }
 }
 
@@ -159,6 +209,7 @@ export async function agentStatus({ label = LABEL, domain, target, launchctl = r
   const lastExit = Number(field(printed.stdout, 'last exit code'))
   return {
     plist: existsSync(target),
+    bootstrap: existsSync(paths.bootstrap),
     loaded,
     launchd: loaded
       ? {
@@ -196,6 +247,7 @@ async function main() {
     const result = await uninstallAgent({
       domain,
       target,
+      bin: paths.agentBin,
       purge: argv.includes('--purge') ? { repo: root, paths } : undefined,
     })
     if (!result.ok) {
@@ -205,16 +257,25 @@ async function main() {
     return
   }
 
-  const plist = rendered({ checkout: paths.agentCheckout, runner: runnerArgv(discover()), logDir: paths.logs })
+  const plist = rendered({
+    checkout: paths.agentCheckout,
+    runner: runnerArgv(discover()),
+    logDir: paths.logs,
+    bootstrap: paths.bootstrap,
+    sourceRepo: root,
+    origin: await originUrl({ repo: root }),
+  })
   if (argv.includes('--dry-run')) {
     console.log(plist)
     console.log(`\n— would create ${paths.agentCheckout} (a worktree at origin/main) if missing`)
+    console.log(`— would copy ${BOOTSTRAP_FILES.join(', ')} to ${paths.agentBin}`)
     console.log(`— would write ${target}`)
     console.log(`— would run: launchctl bootstrap ${domain} ${target} (unless the operator disabled it)`)
     return
   }
 
   await ensureCheckout({ checkout: paths.agentCheckout })
+  installBootstrap({ dir: paths.agentBin, log: console.log })
   mkdirSync(paths.logs, { recursive: true, mode: 0o700 })
   const { state } = await installAgent({ domain, target, plist })
   if (state === 'loaded') {

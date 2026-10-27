@@ -28,3 +28,13 @@ export function runBounded(command: string, args: readonly string[], options: Bo
 export function liveGroups(): number
 /** SIGTERM to every live group, SIGKILL after the grace. */
 export function killAllGroups(graceMs?: number): Promise<void>
+
+export type KillPlan =
+  | { readonly kind: 'group'; readonly pid: number; readonly signal: string }
+  | { readonly kind: 'taskkill'; readonly command: string; readonly args: string[] }
+/** How a signal reaches the tree under `pid`: a group signal, or `taskkill` on win32. */
+export function killPlan(pid: number, signal: 'SIGTERM' | 'SIGKILL', platform?: string): KillPlan
+/** `detached` where process groups exist; never on win32. */
+export function groupSpawnOptions(platform?: string): { detached: boolean; windowsHide: boolean }
+/** Whether a child that exited on its own still has its group swept (POSIX only). */
+export function sweepsAfterExit(platform?: string): boolean

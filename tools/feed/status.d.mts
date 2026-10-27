@@ -11,6 +11,12 @@ export interface RunRecord {
   readonly entries?: number
   readonly commit?: string | null
   readonly pinned?: boolean
+  /** The bootstrap's id for this run, so it can tell the job's record from an older one. */
+  readonly runId?: string
+  /** True when the bootstrap had to recreate the checkout before this run (B-159, B-150). */
+  readonly recoveredCheckout?: boolean
+  /** What was wrong with the checkout: `missing` or `broken: <reason>`. */
+  readonly recovery?: string
 }
 
 export interface StatusRecord extends RunRecord {

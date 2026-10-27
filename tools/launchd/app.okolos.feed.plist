@@ -7,7 +7,7 @@
   CI is precisely the trade that decision refused. That makes the schedule a
   human step by construction, and this file is what reduces it to one command:
 
-      pnpm feed:agent      # write this plist and load it
+      pnpm feed:agent      # copy the bootstrap, write this plist, load it
 
   The same script takes a status flag (loaded? last run? last exit?) and an
   uninstall flag, optionally with purge — see docs/runbooks/feed-signing.md.
@@ -23,11 +23,20 @@
   <string>app.okolos.feed</string>
 
   <!--
-    From the agent's own checkout, never a developer's clone: production publishes
-    run only from origin/main, and the job fast-forwards that checkout itself
-    (tools/feed-job.mjs, F2). Through a login shell because `node` and `pnpm`
-    arrive from a version manager on most machines and launchd's own environment
-    has almost nothing in it; measured 2026-10-03 at 0.02 s.
+    A bootstrap outside the agent's checkout, never a `cd` into it (B-159). The
+    plist used to run `cd <checkout> && exec node tools/feed-job.mjs`; from
+    2026-10-09 to 2026-10-26 the checkout was gone, every run died in the shell,
+    nothing wrote the status record, and production served a seventeen-day-old
+    feed while the failure count read 0 (B-149). The installer copies
+    tools/feed/bootstrap.mjs and the modules it imports to ~/.okolos/bin/feed-agent;
+    it recreates a missing or broken checkout at origin/main, runs the job from it,
+    and writes the status record on every path, that one included.
+
+    Production publishes still run only from origin/main: the job fast-forwards the
+    checkout itself (tools/feed-job.mjs, F2). Through a login shell because `node`
+    and `pnpm` arrive from a version manager on most machines and launchd's own
+    environment has almost nothing in it; measured 2026-10-03 at 0.02 s. When that
+    shell finds no `node`, the one that ran the installer is used.
 
     Agent mode is if-stale plus follow: a run whose served feed is younger than
     its interval records "skipped" and ends, so a login is not a publish.
@@ -36,7 +45,7 @@
   <array>
     <string>/bin/sh</string>
     <string>-lc</string>
-    <string>cd {{CHECKOUT}} &amp;&amp; exec node tools/feed-job.mjs --agent</string>
+    <string>command -v node &gt;/dev/null 2&gt;&amp;1 &amp;&amp; exec node {{BOOTSTRAP}}; exec {{NODE}} {{BOOTSTRAP}}</string>
   </array>
 
   <!--
@@ -44,9 +53,19 @@
     publish step alone, so the Cloudflare token never reaches the ingest, git or
     pnpm. It is a JSON argv (paths only, no secret), empty when this machine has no
     vault. Wrangler's telemetry is off for everything the job starts.
+
+    The other three tell the bootstrap where the checkout is and what to recreate
+    it from: a worktree of the clone the installer ran in, or, when that clone is
+    gone too, a fresh clone of its origin (empty when it has none).
   -->
   <key>EnvironmentVariables</key>
   <dict>
+    <key>OKOLOS_AGENT_CHECKOUT</key>
+    <string>{{CHECKOUT}}</string>
+    <key>OKOLOS_SOURCE_REPO</key>
+    <string>{{SOURCE_REPO}}</string>
+    <key>OKOLOS_ORIGIN_URL</key>
+    <string>{{ORIGIN}}</string>
     <key>OKOLOS_SECRET_RUNNER</key>
     <string>{{RUNNER}}</string>
     <key>WRANGLER_SEND_METRICS</key>

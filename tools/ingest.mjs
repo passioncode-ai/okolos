@@ -181,7 +181,7 @@ export function hostFrom(line) {
 export function hostsFrom(text) {
   const seen = new Set()
   const hosts = []
-  for (const line of text.split('\n')) {
+  for (const line of text.split(/\r?\n/)) {
     const host = hostFrom(line)
     if (host === null || seen.has(host)) continue
     seen.add(host)

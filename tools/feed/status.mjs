@@ -4,7 +4,8 @@ import path from 'node:path'
 /**
  * The feed agent's last-run record (LC-03), written whole at the end of every run.
  *
- * `{ startedAt, at, outcome, stage, exit, reason?, version?, entries?, commit? }`
+ * `{ startedAt, at, outcome, stage, exit, reason?, version?, entries?, commit?, runId?,
+ * recoveredCheckout?, recovery? }`
  * plus what a host needs without history: `consecutiveFailures` (alert at two) and
  * `lastPublished` (alert when it is older than the feed's freshness budget). Before
  * this, a failure was visible only in `launchctl print … last exit code` (B-133).

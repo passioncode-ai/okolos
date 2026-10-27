@@ -174,7 +174,7 @@ describe('the extractor knows about every shape the sources use', () => {
        */
       const addressed = new Set(
         tests
-          .split('\n')
+          .split(/\r?\n/)
           .filter((line) => !line.includes('toBeNull'))
           .flatMap((line) => [...line.matchAll(/\[data-role=([a-z0-9-]+)\]/g)])
           .map((m) => m[1] as string),

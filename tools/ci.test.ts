@@ -1,7 +1,9 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+
+import { shCandidates } from './bin.mjs'
 
 /**
  * What CI claims about itself.
@@ -29,6 +31,9 @@ function gateSteps(): string[] {
   return steps
 }
 
+/** Files that start another file and check nothing themselves. */
+const LAUNCHERS = new Set(['tools/python.mjs'])
+
 /** Fails with the script's name rather than on `undefined` three lines later. */
 function script(name: string): string {
   const value = scripts[name]
@@ -49,8 +54,12 @@ function shares(body: string, command: string): boolean {
   if (body.includes(command)) return true
   // `python3 docs/ux/lint.py` and `node tools/i18n-sweep.mjs` are the same gate
   // whether reached through pnpm or called directly; the file is the identity.
-  const file = /([\w./-]+\.(?:py|mjs|js|ts))/.exec(command)
-  return file !== null && body.includes(file[1] as string)
+  // A launcher is not the gate: `node tools/python.mjs docs/ux/lint.py` runs the
+  // linter through the Python finder (B-162), and the linter is what CI must run.
+  const file = [...command.matchAll(/([\w./-]+\.(?:py|mjs|js|ts))/g)]
+    .map((match) => match[1] as string)
+    .find((name) => !LAUNCHERS.has(name))
+  return file !== undefined && body.includes(file)
 }
 
 /** The `run:` values of a workflow — what it executes, without what it says about it. */
@@ -183,6 +192,43 @@ describe('the repository tracks no test-run artefacts', () => {
   })
 })
 
+describe('line endings are LF on every checkout', () => {
+  /**
+   * A Windows clone with `core.autocrlf=true` checked every file out with CRLF, and
+   * the gates that read docs line by line, and the hook Git for Windows runs with
+   * its own sh, read a `\r` at the end of every line (B-162). `.gitattributes`
+   * pins LF for text and marks binaries; this reads what Git itself decided.
+   */
+  const entries = execFileSync('git', ['ls-files', '--eol'], { cwd: root, encoding: 'utf8' })
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => {
+      const m = /^i\/(\S*)\s+w\/\S*\s+attr\/(.*?)\s*\t(.+)$/.exec(line)
+      if (!m) throw new Error(`unexpected git ls-files --eol line: ${line}`)
+      return { index: m[1] as string, attr: m[2] as string, file: m[3] as string }
+    })
+
+  it('reads the index, so an empty list cannot pass', () => {
+    expect(entries.length).toBeGreaterThan(50)
+  })
+
+  it('pins text to LF for every checkout', () => {
+    const attributes = readFileSync(path.join(root, '.gitattributes'), 'utf8')
+    expect(attributes).toMatch(/^\* text=auto eol=lf$/m)
+  })
+
+  it('holds no CRLF in the index', () => {
+    const crlf = entries.filter((e) => e.index === 'crlf' || e.index === 'mixed').map((e) => e.file)
+    expect(crlf, `these would check out with \\r on every line: ${crlf.join(', ')}`).toEqual([])
+  })
+
+  it('marks every binary file as binary, so nothing converts its bytes', () => {
+    // `-text` in the index column is Git's own reading: the content is not text.
+    const unmarked = entries.filter((e) => e.index === '-text' && !e.attr.includes('-text')).map((e) => e.file)
+    expect(unmarked, `add their extension to .gitattributes as binary: ${unmarked.join(', ')}`).toEqual([])
+  })
+})
+
 describe('the pre-push hook exists and runs the gates', () => {
   /**
    * The one standing instruction that cannot be followed by reading it. A rule
@@ -191,10 +237,22 @@ describe('the pre-push hook exists and runs the gates', () => {
    */
   const hook = path.join(root, '.githooks/pre-push')
 
-  it('is present and executable', () => {
+  it('is present', () => {
     expect(existsSync(hook), '.githooks/pre-push is missing').toBe(true)
+  })
+
+  it('is committed executable, so every clone gets the bit', () => {
     // A hook without the bit set is a hook git silently never runs — the exact
-    // failure mode this is meant to remove.
+    // failure mode this is meant to remove. The index is read rather than the disk:
+    // it is what a clone checks out, on every platform, Windows included.
+    const staged = execFileSync('git', ['ls-files', '-s', '.githooks/pre-push'], { cwd: root, encoding: 'utf8' })
+    expect(staged.split(' ')[0]).toBe('100755')
+  })
+
+  // Windows has no execute bit on disk (`stat().mode & 0o111` is 0 there, and Git
+  // for Windows runs a hook by its shebang), so the working-tree check runs on macOS
+  // and Linux and is skipped on win32; the index check above covers it there (B-162).
+  it.skipIf(process.platform === 'win32')('is executable in this working tree', () => {
     expect(statSync(hook).mode & 0o111).toBeGreaterThan(0)
   })
 
@@ -240,8 +298,16 @@ describe('the pre-push hook exists and runs the gates', () => {
   describe('decides from what is pushed', () => {
     const zero = '0'.repeat(40)
     const sha = 'a'.repeat(40)
+    // Git runs the hook with its own sh; on Windows outside Git Bash that sh is not on
+    // PATH, so it is looked for beside git (B-162). On macOS and Linux it is `sh`.
+    const gitExecPath =
+      process.platform === 'win32' ? execFileSync('git', ['--exec-path'], { encoding: 'utf8' }).trim() : ''
+    const sh =
+      shCandidates(process.platform, gitExecPath).find(
+        (candidate) => spawnSync(candidate, ['-c', 'exit 0']).status === 0,
+      ) ?? 'sh'
     const decide = (stdin: string): string =>
-      execFileSync('sh', [hook], {
+      execFileSync(sh, [hook], {
         cwd: root,
         input: stdin,
         env: { ...process.env, OKOLOS_PREPUSH_DECIDE: '1', OKOLOS_SKIP_GATES: '' },
@@ -280,6 +346,16 @@ describe('the pre-push hook exists and runs the gates', () => {
       scripts: Record<string, string>
     }
     expect(pkg.scripts.prepare ?? '').toContain('core.hooksPath')
+  })
+
+  it('wires it on Windows too, where pnpm runs scripts with cmd.exe', () => {
+    // `|| true` has no `true` to run in cmd.exe, so a checkout outside Git made
+    // `pnpm install` fail there; `|| exit 0` means the same in sh and in cmd (B-162).
+    const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>
+    }
+    expect(pkg.scripts.prepare ?? '').not.toMatch(/\|\|\s*true\b/)
+    expect(pkg.scripts.prepare ?? '').toMatch(/\|\| exit 0$/)
   })
 })
 
