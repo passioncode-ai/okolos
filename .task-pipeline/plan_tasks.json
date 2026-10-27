@@ -367,7 +367,8 @@
    "remoteIPAddress пуст или отсутствует: snapshot и read отказывают cleaning_incomplete (аудит #27)",
    "отзыв доступа закрывает задачи агента и их окна: окна с targetId задачи больше нет (аудит #13)",
    "журнал несёт глагол в каноническом виде (session.open), инструмент зовётся session_open (аудит #19)",
-   "бандл несёт apps/agent/src/fabric (.mjs набор не копирует tsc)"
+   "бандл несёт apps/agent/src/fabric (.mjs набор не копирует tsc)",
+   "тот же таймер раз в сутки обрезает events.jsonl по правилу N-005 (7 дней или 1000 событий), а не только при старте (отчёт N-005, fix 0)"
   ],
   "dod": "vitest apps/agent/src/verbs зелёный на Chrome stable"
  },
