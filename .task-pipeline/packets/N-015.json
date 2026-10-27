@@ -73,6 +73,7 @@
   "элементы pairing-grants (строка pairingGrants рядом с кнопками) и строка окна задачи (taskWindowOpen или taskWindowClosed) проверены по data-role; журнальные коды bad_call и local_answer показываются строками refusal_bad_call и refusal_local_answer, глагол unknown строкой verb_unknown; сборка строки отказа без двух двоеточий подряд для каждого кода (проверки N-013 круг 16)",
   "цель показана через goalShown из apps/agent/src/tasks/tasks.ts, своей копии правила 200 символов на странице нет (риск N-009 r1 seam #5); цель сокращается в демоне (goalShown при сборке /api/state), а не в браузере: модуль задач тянет node:crypto и в страницу не попадает (риск N-009 r2 seam #2)",
   "задача, чей срок вышел, остаётся в списке SCR-24 со строкой taskTimeOver вместо оставшегося времени, пока её окно не закрыто таймером (Tasks.list отдаёт её с пометкой expired; N-009 круг 2)",
+  "список отказов и сбоев (Journal.recent) не входит в двухсекундный опрос SCR-23: журнал читается при открытии страницы и не чаще раза в 30 секунд, иначе демон перечитывает 90 дней каждые 2 с (риск N-006 r2 seam #3)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/dashboard && pnpm -s run typecheck"
  ],
  "guards": [
