@@ -18,7 +18,8 @@
 | Python 3 | любой 3.x (проверено на 3.14.6), под именем `python3`, `python` или `py -3` | `docs/ux/lint.py`, `docs/brand/lint.py`, `tools/model/evaluate.py` |
 | Браузеры Playwright | ставятся командой ниже | e2e в Chromium и Firefox |
 
-Corepack включит нужный pnpm сам:
+Corepack включит нужный pnpm сам (Node 22–24; с Node 25 corepack в поставку Node не
+входит, и pnpm ставится сам, см. «Windows» ниже, на macOS и Linux так же):
 
 ```bash
 corepack enable
@@ -38,7 +39,12 @@ pnpm exec playwright install chromium firefox
 
 - **Git for Windows.** Хук запускает его `sh`; `tools/ci.test.ts` находит этот `sh`
   рядом с `git` (`git --exec-path`), даже когда в PATH его нет, как в PowerShell и cmd.
-- **Node и pnpm**, как выше: pnpm включает corepack.
+- **Оболочка: Git Bash или PowerShell 7** (`pwsh`). Команды этого раннбука написаны
+  для них; в `cmd.exe` и Windows PowerShell 5.1 часть из них читается иначе.
+- **Node и pnpm.** На Node 22–24 pnpm включает corepack, как выше. С Node 25 corepack
+  в Node не входит: pnpm ставится `npm i -g pnpm` или автономным установщиком с
+  pnpm.io (`iwr https://get.pnpm.io/install.ps1 -useb | iex` в PowerShell); версию
+  всё равно задаёт `packageManager`.
 - **Python 3 под одним из имён `py -3`, `python`, `python3`.** Гейты зовут Python через
   `tools/python.mjs`: он берёт первое имя, которое докажет, что это Python 3, поэтому
   заглушка из Microsoft Store не проходит. На Windows линтеры получают `PYTHONUTF8=1`,
@@ -52,8 +58,24 @@ pnpm exec playwright install chromium firefox
 | `pnpm`, `npx` из инструментов | без оболочки | через cmd.exe; аргумент со спецсимволом cmd отклоняется | `tools/bin.test.ts` |
 | архив `pnpm package` | `zip -q -r -X` | `%SystemRoot%\System32\tar.exe -a` | `tools/archive.test.ts` |
 | дерево процессов фида | сигнал группе | `taskkill /T`, через паузу `/T /F` | `tools/feed/bounded.test.ts` |
+| geckodriver в e2e Firefox, сборка в `pnpm package` по сроку | `child.kill()` | `taskkill /PID <pid> /T /F`: иначе кончается только cmd.exe | `tools/bin.test.ts` |
 | права 0600 на файлы с секретами | проверяются | тесты пропущены с причиной, `access.mjs` пишет `n/a` | `tools/feed/log.test.ts`, `tools/access.test.ts` |
 | Firefox для e2e | кэш Playwright в домашней папке | `%LOCALAPPDATA%\ms-playwright\firefox-*\firefox\firefox.exe` | `tools/find-firefox.test.ts` |
+
+Клон, сделанный до появления `.gitattributes`, держит в рабочем дереве CRLF, пока
+файлы не перезаписаны. Его переводят один раз:
+
+```bash
+git add --renormalize .
+git status             # пусто: индекс уже был в LF, поменялось только рабочее дерево
+```
+
+Если `git status` после этого что-то показывает, в индексе был CRLF: это изменение
+коммитят отдельно.
+
+Firefox для e2e: `FIREFOX_BINARY` побеждает кэш Playwright на любой платформе
+(`tools/find-firefox.test.ts`, «lets FIREFOX_BINARY win»). Кэш читается, только когда
+переменная не задана.
 
 `pnpm package` сверяет архив со сборкой по списку файлов из центрального каталога zip,
 а не по байтам: `zip` и `tar` пишут разные байты. Концы строк держит `.gitattributes`

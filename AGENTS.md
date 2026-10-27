@@ -52,7 +52,8 @@ fails when a script is missing from it.
   term from `terminology.md` is mandatory, a number from `facts.md` is taken by command
   at the time of the edit. `tools/docs.test.ts` holds this.
 - **User-facing behaviour starts in [docs/ux/scenarios.md](docs/ux/scenarios.md)**, and
-  `python3 docs/ux/lint.py` must pass after any UX change.
+  `pnpm ux:lint` (it runs `docs/ux/lint.py` with whichever Python 3 the machine has) must
+  pass after any UX change.
 - **Decisions** are [docs/adr/](docs/adr/); a record naming a missing file fails the build.
 - **Licence is the organisation's** — `AGPL-3.0-only OR LicenseRef-PassionCode-Commercial`:
   open source under the GNU AGPL-3.0, commercial licence through https://passioncode.ai/business/

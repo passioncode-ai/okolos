@@ -130,7 +130,7 @@ PEM-заголовок — [runbooks/feed-signing.md](runbooks/feed-signing.md).
 [приёмка](superpowers/audits/2026-08-05-acceptance.md).
 
 Что осталось в силе на будущее: **любое изменение user-facing поведения
-обновляет `docs/ux/` тем же изменением**, а `python3 docs/ux/lint.py` это
+обновляет `docs/ux/` тем же изменением**, а `pnpm ux:lint` это
 проверяет. Разбор каждой ошибки, найденной за прогон, — в
 [retro.md](superpowers/retro.md); там же 8 постоянных инструкций, выведенных из
 них.
