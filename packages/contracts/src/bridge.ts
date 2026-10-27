@@ -545,13 +545,21 @@ function normaliseOrigins(value: unknown): { ok: true; list: string[] } | { ok: 
  *
  * Beyond the ranges the review named, `0.0.0.0/8` and `::` (both answer as this
  * machine on macOS and Linux), `*.localhost` (Chrome resolves it to loopback),
- * `100.64/10` (CGNAT, and the range Tailscale gives the person's own machines),
- * `fc00::/7` (the IPv6 private range) and every IPv6 form that carries an IPv4
- * address (mapped, compatible, SIIT, NAT64) are refused too: each is a second
- * spelling of a refused place.
+ * `100.64/10` (CGNAT, and the range Tailscale gives the person's own machines)
+ * and `fc00::/7` (the IPv6 private range) are refused too. So are the IPv6 forms
+ * that carry an IPv4 address where this rule can find it: mapped (`::ffff:0:0/96`),
+ * compatible (`::/96`), SIIT (`::ffff:0:0:0/96`), well-known NAT64
+ * (`64:ff9b::/96`), local-use NAT64 (`64:ff9b:1::/48`, the IPv4 address in the
+ * last 32 bits) and 6to4 (`2002::/16`, in the second and third groups); each is
+ * judged by the IPv4 address it carries. A NAT64 prefix a network chose for
+ * itself cannot be told apart from a public address, which is one more reason
+ * the daemon also judges the address a response came from.
  *
- * A string that is not a host or an address at all counts as local: the caller
- * is asking whether the agent may reach it, and an answer it cannot read is no.
+ * A zone (`fe80::1%en0`, written `%25en0` inside a URL) names the interface an
+ * address is reached through, not the address, and is dropped before it is
+ * judged. A string that is not a host or an address at all counts as local: the
+ * caller is asking whether the agent may reach it, and an answer it cannot read
+ * is no.
  *
  * This judges the literal only. A public name that resolves to `127.0.0.1` passes
  * here, which is why the daemon also asks it of the address the response came from.
@@ -561,6 +569,7 @@ export function isLocalHost(host: string): boolean {
   if (canonical === null) return true
   if (canonical.startsWith('[')) return isLocalIPv6(ipv6Hextets(canonical.slice(1, -1)))
   const name = canonical.replace(/\.+$/, '')
+  if (name === '') return true
   if (name === 'localhost' || name.endsWith('.localhost')) return true
   // `local` itself is the mDNS domain, never a public name.
   if (name === 'local' || name.endsWith('.local')) return true
@@ -569,20 +578,38 @@ export function isLocalHost(host: string): boolean {
 }
 
 /**
+ * Whether the address a response actually came from (CDP `remoteIPAddress`) is
+ * this machine or the local network. The same rule as `isLocalHost`, under the
+ * name the daemon's post-navigation check reads: an address arrives bare or in
+ * brackets, may carry a zone, and is empty when the browser did not say, which
+ * counts as local, so a missing answer never reads as public. A delegate and not
+ * a second implementation, so the scope check and the address check cannot
+ * drift apart.
+ */
+export function isLocalAddress(ip: string): boolean {
+  return isLocalHost(ip)
+}
+
+/**
  * The host as the URL parser writes it: lower case, IPv4 in dotted decimal,
- * IPv6 bracketed and compressed. `null` when it is not a host on its own (a
- * path, a port, user info, whitespace): those would make the parser read a
- * different host than the caller meant.
+ * IPv6 bracketed and compressed, without a zone. `null` when it is not a host on
+ * its own (a path, a port, user info, a query, whitespace): those would make the
+ * parser read a different host than the caller meant. Any other name the parser
+ * accepts is kept, so a valid origin is judged by the rule rather than refused
+ * for a reason that is not true.
  */
 function canonicalHost(host: string): string | null {
   const bracketed = host.startsWith('[') && host.endsWith(']')
   const inner = bracketed ? host.slice(1, -1) : host
   let literal: string
   if (bracketed || inner.includes(':')) {
-    if (!/^[0-9a-f:.]+$/i.test(inner)) return null
-    literal = `[${inner}]`
+    const zoneAt = inner.indexOf('%')
+    const address = zoneAt === -1 ? inner : inner.slice(0, zoneAt)
+    if (zoneAt !== -1 && !/^%(?:25)?[0-9a-z._~-]+$/i.test(inner.slice(zoneAt))) return null
+    if (!/^[0-9a-f:.]+$/i.test(address)) return null
+    literal = `[${address}]`
   } else {
-    if (!/^[a-z0-9._-]+$/i.test(inner)) return null
+    if (inner === '' || /[\s/\\?#@:[\]%]/.test(inner)) return null
     literal = inner
   }
   try {
@@ -636,6 +663,8 @@ function isLocalIPv6(h: readonly number[]): boolean {
   if (zero(5) && f === 0xffff) return isLocalIPv4(embedded) // ::ffff:a.b.c.d, mapped
   if (zero(4) && e === 0xffff && f === 0) return isLocalIPv4(embedded) // ::ffff:0:a.b.c.d, SIIT
   if (a === 0x64 && b === 0xff9b && c === 0 && d === 0 && e === 0 && f === 0) return isLocalIPv4(embedded) // 64:ff9b::/96, NAT64
+  if (a === 0x64 && b === 0xff9b && c === 1) return isLocalIPv4(embedded) // 64:ff9b:1::/48, local-use NAT64
+  if (a === 0x2002) return isLocalIPv4([b >> 8, b & 0xff, c >> 8, c & 0xff]) // 2002::/16, 6to4
   return (
     (a & 0xffc0) === 0xfe80 || // fe80::/10, link-local
     (a & 0xfe00) === 0xfc00 // fc00::/7, unique local

@@ -86,6 +86,7 @@ export {
   SCOPE_LIMITS,
   canonicalVerb,
   inScope,
+  isLocalAddress,
   isLocalHost,
   originOf,
   refusalKey,
