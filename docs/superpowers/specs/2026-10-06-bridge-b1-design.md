@@ -170,7 +170,7 @@ covers: REQ-63, REQ-64, REQ-65, REQ-66, REQ-67, REQ-68, REQ-69, REQ-70
 | REQ | Требование | Как проверяется |
 |---|---|---|
 | REQ-64 | Панель привязки: SCR-23 в `docs/ux/screens.md`, FLW-21 ведёт к нему, SCN-044 `built` | `python3 docs/ux/lint.py`; e2e SCN-044 |
-| REQ-65 | Вид активности: SCR-24, агенты, задачи, отказы, отзыв | e2e SCN-045 читает страницу |
+| REQ-65 | Вид активности: SCR-24, задачи агентов и отказы (отзыв доступа живёт в SCR-23) | e2e SCN-045 читает страницу |
 | REQ-66 | Термины моста в `docs/brand/terminology.md` → «Мост для агентов» | `python3 docs/brand/lint.py` |
 | REQ-67 | ADR B-146 и ADR о 32 КБ; механизмы моста в ADR-0019 | `tools/adr.test.ts` |
 | REQ-68 | Исключения `tools/reachable.test.ts` для моста сняты | `tools/reachable.test.ts` |
@@ -197,7 +197,7 @@ covers: REQ-63, REQ-64, REQ-65, REQ-66, REQ-67, REQ-68, REQ-69, REQ-70
 
 covers: REQ-64, REQ-65, REQ-66
 
-- **Тексты.** 54 строки (47 в первом проходе) в `apps/agent/_locales/{ru,en}/messages.json`. Голос Okolos сохранён в Copylot
+- **Тексты.** 58 строк (47 в первом проходе) в `apps/agent/_locales/{ru,en}/messages.json`. Голос Okolos сохранён в Copylot
   (`266030ff-8cfb-415f-8ed9-6269a66167ed`, версия 1) из `docs/brand/voice.md`. `copylot_check`,
   регистр `ui`: ru `e88f88b3-c221-4a25-8e0f-ca664440aac5` (одно замечание-совет, пассив с деятелем,
   исправлено, повтор `268e1a50-5925-4528-8be5-c1fd45fd7fb2` чистый), en
@@ -209,7 +209,10 @@ covers: REQ-64, REQ-65, REQ-66
   eventsUnreadable как разовое предупреждение при старте, не состояние degraded (ru
   `8748c348-95f2-4054-9401-70cde29d7d72` проверяет обе строки, en `4658bee7-8c88-425b-aff6-d1ae2996bf48`
   тоже обе). eventStarted и serviceStopping проверены раньше (ru `f151b377-0656-42df-b567-296c562b8c3b`,
-  en `510d3ad7-9ac3-4db0-baac-7fdb336a5edc`). Всего строк 54.
+  en `510d3ad7-9ac3-4db0-baac-7fdb336a5edc`). Строки SCR-23 после проверки N-013 (новая подсказка о
+  `okolos-agent pair`, подтверждённая привязка до забора ключа, ключ не забран, одинаковые имена, время
+  запроса): ru `9c7100bd-c997-466b-941e-29e1df09b543`, en `392677a5-2a8f-45dd-a8de-fd518ca4ac22`
+  (чисто). Всего строк 58.
   Английский написан тем же голосом, а не адаптирован `copylot_prepare`: строки короткие и
   интерфейсные, это записано как решение, а не пропуск.
 - **Вид.** Визуальный трек отклонён с причиной:

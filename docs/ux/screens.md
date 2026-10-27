@@ -600,7 +600,7 @@ generator, and the sheet declares no colour of its own.
 - **Used by:** FLW-21 (the person's half of it)
 - **Purpose:** let the person decide, one agent at a time, whether it may reach the browser, after comparing a code the agent shows with the code this page shows
 - **Surface:** a page of Okolos Agent, the local daemon, opened in Fabric Dashboards (`/dashboard`, first section). Not in the Okolos extension: in Б1 the extension has no channel to the daemon; how the two meet is decided with Б2 and recorded in the bridge's ADR
-- **Elements:** `[data-role=pairing-requests]`, one row per agent asking, each with the name **the agent gave itself**, labelled as such because nothing verifies it; the six-digit code, large, grouped three and three; when it asked and how long the request stays open; `[data-role=pairing-confirm]` and `[data-role=pairing-refuse]`. `[data-role=paired-agents]`, one row per paired agent: name, when it was paired, its last call, how many tasks it holds, `[data-role=agent-revoke]`. `[data-role=pairing-how]`: one sentence on how an agent connects, with the door's address
+- **Elements:** `[data-role=pairing-requests]`, one row per agent asking, each with the name **the agent gave itself**, labelled as such because nothing verifies it; `[data-role=pairing-code]`, the six-digit code, large, grouped three and three, in its own element; `[data-role=pairing-asked]`, when it asked and how long the request stays open; `[data-role=pairing-duplicate]` on every row whose name another waiting request also uses, telling the person to compare the code with special care; `[data-role=pairing-confirm]` and `[data-role=pairing-decline]`. `[data-role=paired-agents]`, one row per agent with access: name, when it got access, its last call (or that there was none yet), how many tasks it holds, `[data-role=agent-revoke]`. `[data-role=pairing-how]`: how an agent asks for access (run `okolos-agent pair --name "<name>"` in a terminal; its code then appears here), with the door's address
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
@@ -608,7 +608,9 @@ generator, and the sheet declares no colour of its own.
   | empty | no request and no paired agent | - | says no agent is connected and shows how one connects; never an empty box |
   | error | the daemon's store cannot be read | - | says which store and that no agent can be paired or checked until it is fixed; the door refuses every call meanwhile |
   | success | a request, a paired agent, or both | - | requests first, then paired agents |
-  | expired | a request outlived its five minutes | - | the row says it expired and offers nothing to press; the agent has to ask again |
+  | expired | a request outlived its five minutes before anyone confirmed it | - | the row says it expired and offers nothing to press; the agent has to ask again |
+  | confirmed | the person confirmed, the agent has not collected its key yet (it has five minutes) | - | the row says access is confirmed and the agent is collecting its key, until when; nothing to press |
+  | claim-expired | the agent did not collect its key within five minutes of the confirmation | - | the row says the key was not collected and no access was given; the agent has to ask again |
 - **The code is the whole decision.** A request whose code differs from the one the agent shows is refused, not confirmed "to see what happens". The page says so next to the buttons, because the research behind this feature found every 2025–2026 bridge breach came through a door that trusted a local caller.
 - **Confirm is a person's act on this page only, and that has a boundary.** The same action exists as a tool for parity (`fabric-actions/0.1`, gate `human`, step `consent`), and the tool answers that a person must confirm on this page; an agent coming through the door cannot pair itself. Code already running as the person is outside what Б1 defends against: it can read the host token and open this page, as it can read the Chrome profile. Confirmation by Touch ID is planned with Б2. Every route of this page checks `Host`, and every write requires its own `Origin`, the session cookie and the `X-Okolos-Request` header.
 - **The agent's name is shown as text and fenced.** At most 40 characters, no run of three or more digits, no control or bidirectional characters; the code sits in its own element, so a name cannot imitate it.
@@ -621,13 +623,13 @@ generator, and the sheet declares no colour of its own.
 - **Used by:** FLW-21 (after pairing), FLW-22 (watching a task)
 - **Purpose:** show what each agent is doing in the browser right now, and what it was refused, so the person never has to guess why a window opened
 - **Surface:** the same page as SCR-23, second section
-- **Elements:** `[data-role=agent-tasks]`, one row per open task: agent, the goal in the agent's words (labelled as the agent's), sites it may read, time left, steps used of its budget, whether its window is open; `[data-role=agent-refusals]`, the last refusals with their code in words (`origin_not_in_task` as "a site outside the task"); `[data-role=agent-journal-link]` to the journal export
+- **Elements:** `[data-role=agent-tasks]`, one row per open task: agent, the goal in the agent's words (labelled as the agent's), sites it may read, time left, steps used of its budget, whether its window is open; `[data-role=agent-refusals]`, the last refusals with what was asked and the code in words (`origin_not_in_task` as "a site outside the task"), including the door's own refusals before any agent is known (a web page, a foreign address), shown as such and not counted against an agent; `[data-role=agent-journal-link]` to the journal export
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
   | loading | page opened | - | names what it is reading: open tasks |
-  | empty | no open task | - | says no agent is working in the browser now |
-  | error | the task list or journal cannot be read | - | says which, and that the door refuses new tasks until it can record them |
+  | empty | no open task | - | says no agent is working in the browser now; recent refusals still show below if there are any |
+  | error | the journal cannot be read or written | - | says so, and that the door answers every agent with a refusal until it can record again (an answer not in the journal is never sent) |
   | success | one or more tasks | - | tasks first, newest first; refusals below |
 - **A refusal is a policy answer, shown as one.** It is listed with what was asked and why it was refused, never as a failure of the product.
 - **Scenarios:** SCN-045

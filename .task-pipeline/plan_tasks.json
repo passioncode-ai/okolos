@@ -466,12 +466,14 @@
  {
   "n": "N-013",
   "title": "UX: экраны SCR-23/24, потоки, сценарии",
-  "deps": [],
+  "deps": [
+   "N-024"
+  ],
   "req": [
    "REQ-64"
   ],
   "files": [
-   "Modify: docs/ux/screens.md, docs/ux/flows.md, docs/ux/scenarios.md"
+   "Modify: docs/ux/screens.md, docs/ux/flows.md, docs/ux/scenarios.md, docs/ux/foundation.md, docs/design/agent-dashboard/director-record.md, docs/superpowers/specs/2026-10-06-bridge-b1-design.md, apps/agent/_locales/ru/messages.json, apps/agent/_locales/en/messages.json"
   ],
   "consumes": "—",
   "produces": "SCR-23, SCR-24 со состояниями; FLW-21/22 ведут к ним",

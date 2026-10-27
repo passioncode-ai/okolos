@@ -407,13 +407,20 @@
    "title": "UX: FLW-21/22 к экранам, SCR привязки и активности, вайрфреймы, сценарии",
    "owner": "ux",
    "status": "pending",
-   "blocked_by": [],
+   "blocked_by": [
+    "N-024"
+   ],
    "serves": "REQ-64",
    "check": "python3 docs/ux/lint.py",
    "touches": [
     "docs/ux/screens.md",
     "docs/ux/flows.md",
-    "docs/ux/scenarios.md"
+    "docs/ux/scenarios.md",
+    "docs/ux/foundation.md",
+    "docs/design/agent-dashboard/director-record.md",
+    "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+    "apps/agent/_locales/ru/messages.json",
+    "apps/agent/_locales/en/messages.json"
    ],
    "risk": "R2",
    "surface_class": "product"
@@ -975,6 +982,11 @@
    "from": "N-014",
    "to": "N-012",
    "payload": "ключи причин переписи"
+  },
+  {
+   "from": "N-024",
+   "to": "N-013",
+   "payload": "resource: каталоги строк агента; N-013 дописывает строки SCR-23 после строк службы"
   },
   {
    "from": "N-013",

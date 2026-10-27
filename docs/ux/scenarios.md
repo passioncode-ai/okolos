@@ -970,13 +970,13 @@ every rule below; where they differ, the scenario says so.
 - **Entry point:** an agent's first call to the local door
 - **Preconditions:** Okolos Agent is running; the agent has never connected
 - **Steps:**
-  1. The agent asks for access through `okolos-agent pair` -> it shows a six-digit code; a call to the door without a key is refused and creates no request
+  1. The agent asks for access through `okolos-agent pair` (`POST /pair`, a door route that needs no key) -> the terminal shows a six-digit code; a call to `/mcp` without a key is refused and creates no request
   2. The person sees the agent's name and the same six-digit code on the Okolos Agent page and confirms -> a key is issued to that agent once; the daemon keeps only its SHA-256
   3. The person later revokes the agent -> its next call is refused and any task it holds stops
-- **Expected result:** only agents the person confirmed can reach the browser, and each one can be taken back on its own
+- **Expected result:** only agents the person confirmed reach the browser through the door, and each one can be taken back on its own. Code already running as the person is outside Б1's boundary (spec §11 F4)
 - **Alt paths:** the codes differ, or the person refuses or does not answer -> no key, and the attempt is recorded
-- **UI elements:** SCR-23: `[data-role=pairing-requests]` with the code, `[data-role=pairing-confirm]`, `[data-role=pairing-refuse]`, `[data-role=agent-revoke]`
-- **States covered:** success, error, empty
+- **UI elements:** SCR-23: `[data-role=pairing-requests]` with the code, `[data-role=pairing-confirm]`, `[data-role=pairing-decline]`, `[data-role=agent-revoke]`
+- **States covered:** success, error, empty, expired, confirmed (the agent has not collected its key yet)
 - **Errors & recovery:** a call carrying no key or a wrong key -> refused and recorded; a call carrying any `Origin` or `Sec-Fetch-*` header (a web page) -> refused before any pairing request is made, and recorded, never treated as "local, so the person". Loopback is not a person: the research behind this feature found that every 2025–2026 bridge breach came through a door that believed it was
 - **Status:** draft
 - **Coverage:** none — designed 2026-10-06, not built
@@ -995,7 +995,7 @@ every rule below; where they differ, the scenario says so.
 - **Expected result:** the agent reads what the job needs, cannot be steered by text the page hid from people, and never sees a secret
 - **Alt paths:** the agent asks for a site outside the task -> refused with `origin_not_in_task`; the page has a finding -> the finding travels with the snapshot and the task's writes go to the person (SCN-046)
 - **UI elements:** SCR-24: `[data-role=agent-tasks]`, `[data-role=agent-refusals]`
-- **States covered:** success, error, partial
+- **States covered:** success, error, empty (SCR-24); partial (the snapshot arrives in parts, on the agent's side)
 - **Errors & recovery:** the browser is closed -> the agent is told `browser_offline`, marked retryable, not that the page is empty; nothing is queued; the snapshot could not be cleaned -> the agent receives nothing rather than an uncleaned tree
 - **Why a window and not a tab.** Measured 2026-10-06: input to a background tab never reaches the page, while a separate background window's tab is visible and receives trusted input, and an open agent window took the person's focus in none of the readings (`docs/superpowers/evidence/2026-10-06-b0-agent-window.md`)
 - **Why the snapshot comes in parts.** Measured the same day: Wikipedia's raw tree is about 10.5 MB, and even compacted it is about 66 thousand tokens
