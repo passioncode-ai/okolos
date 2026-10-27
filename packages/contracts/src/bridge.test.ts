@@ -227,7 +227,8 @@ describe('the answers', () => {
   })
 
   it('carry the shapes of spec §2.2, and no fragment-bearing or argv field', () => {
-    expectTypeOf<SessionOpenResult>().toEqualTypeOf<{ readonly sessionId: string; readonly windowId: number }>()
+    // windowId is the CDP targetId of the task's window, a string.
+    expectTypeOf<SessionOpenResult>().toEqualTypeOf<{ readonly sessionId: string; readonly windowId: string }>()
     expectTypeOf<OpenResult>().toEqualTypeOf<{ readonly url: string }>()
     expectTypeOf<SnapshotFinding>().toEqualTypeOf<{
       readonly kind: VerdictCategory

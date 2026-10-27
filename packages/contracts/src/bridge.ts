@@ -147,10 +147,13 @@ export function refuse(code: BridgeRefusal, message: string): { success: false; 
  * snapshot, and every URL has lost its fragment, before it reaches these types.
  */
 
-/** `sessionId` is 128 random bits; the task belongs to the agent that opened it. */
+/**
+ * `sessionId` is 128 random bits; the task belongs to the agent that opened it.
+ * `windowId` is the CDP targetId of the task's window, which is a string.
+ */
 export interface SessionOpenResult {
   readonly sessionId: string
-  readonly windowId: number
+  readonly windowId: string
 }
 
 /** The URL the tab actually landed on after navigation, without its fragment. */
