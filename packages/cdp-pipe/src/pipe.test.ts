@@ -305,6 +305,28 @@ describe('a deadline for one request', () => {
   })
 })
 
+describe('a deadline that is not a whole number of milliseconds in 1..2^31-1', () => {
+  // setTimeout turns each of these into about 1 ms, so a caller asking for a
+  // longer or no deadline would get an instant timeout. Refused at the call.
+  const refused = [Infinity, Number.NaN, 0, -1, 2 ** 31, 1.5]
+
+  it.each(refused)('timeoutMs %s is refused at send() with a TypeError', async (timeoutMs) => {
+    const pipe = await fake()
+    expect(() => pipe.send('Fake.echo', {}, undefined, { timeoutMs })).toThrow(TypeError)
+  })
+
+  it.each(refused)('requestTimeoutMs %s is refused at launch() with a TypeError, before any process starts', (requestTimeoutMs) => {
+    expect(() =>
+      CdpPipe.launch({ binary: process.execPath, args: [FAKE], userDataDir: PROFILE, requestTimeoutMs }),
+    ).toThrow(TypeError)
+  })
+
+  it('accepts the largest deadline setTimeout keeps, 2^31-1 ms', async () => {
+    const pipe = await fake([], { requestTimeoutMs: 2 ** 31 - 1 })
+    expect(await pipe.send('Fake.echo', { n: 1 }, undefined, { timeoutMs: 2 ** 31 - 1 })).toEqual({ n: 1 })
+  })
+})
+
 describe('a browser that exits on its own', () => {
   it('is heard by onExit with its exit code, and requests waiting are rejected as exited', async () => {
     const pipe = await fake([], { requestTimeoutMs: 60_000 })

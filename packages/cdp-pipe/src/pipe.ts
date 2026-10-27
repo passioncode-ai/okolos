@@ -23,7 +23,11 @@ export interface LaunchOptions {
   readonly args: readonly string[]
   /** The profile directory, passed as `--user-data-dir`. */
   readonly userDataDir: string
-  /** How long a request may wait for its answer before it is rejected. */
+  /**
+   * How long a request may wait for its answer before it is rejected. A whole
+   * number of ms in 1..2^31-1; anything else is a TypeError thrown by launch().
+   * Default 10 000.
+   */
   readonly requestTimeoutMs?: number
   /**
    * Hears a listener registered with on() or onExit() that threw (event is the
@@ -81,7 +85,10 @@ export interface ExitInfo {
 
 /** Per-call settings of send(). */
 export interface SendOptions {
-  /** This request's deadline, instead of the pipe's requestTimeoutMs. */
+  /**
+   * This request's deadline, instead of the pipe's requestTimeoutMs. A whole
+   * number of ms in 1..2^31-1; anything else is a TypeError thrown by send().
+   */
   readonly timeoutMs?: number
 }
 
@@ -105,6 +112,21 @@ interface Waiting {
   readonly method: string
   readonly resolve: (result: unknown) => void
   readonly reject: (error: Error) => void
+}
+
+/** The longest delay setTimeout keeps; past it, and below 1, Node fires in 1 ms. */
+const MAX_TIMEOUT_MS = 2 ** 31 - 1
+
+/**
+ * Refuses a deadline setTimeout would not keep: Infinity, NaN, a fraction,
+ * anything under 1 or above 2^31-1 ms. Node would turn each into about 1 ms
+ * with a warning, and a caller asking for a long deadline would time out at once.
+ */
+function checkTimeout(name: string, ms: number): number {
+  if (!Number.isInteger(ms) || ms < 1 || ms > MAX_TIMEOUT_MS) {
+    throw new TypeError(`cdp-pipe: ${name} must be a whole number of milliseconds in 1..${MAX_TIMEOUT_MS}, got ${ms}`)
+  }
+  return ms
 }
 
 /** How often close() looks whether the browser and its group are gone. */
@@ -204,6 +226,8 @@ export class CdpPipe implements CdpTransport {
 
   /** Starts the browser on a pipe; resolves once the process exists. */
   static launch(options: LaunchOptions): Promise<CdpPipe> {
+    // Before anything starts: a refused deadline leaves no process behind.
+    if (options.requestTimeoutMs !== undefined) checkTimeout('requestTimeoutMs', options.requestTimeoutMs)
     const child = spawn(
       options.binary,
       [...options.args, '--remote-debugging-pipe', `--user-data-dir=${options.userDataDir}`],
@@ -222,7 +246,7 @@ export class CdpPipe implements CdpTransport {
    * target. opts.timeoutMs replaces requestTimeoutMs for this call alone.
    */
   send<T = unknown>(method: string, params?: object, sessionId?: string, opts?: SendOptions): Promise<T> {
-    const timeoutMs = opts?.timeoutMs ?? this.requestTimeoutMs
+    const timeoutMs = opts?.timeoutMs === undefined ? this.requestTimeoutMs : checkTimeout('timeoutMs', opts.timeoutMs)
     const id = this.nextId++
     const message = { id, method, params: params ?? {}, ...(sessionId === undefined ? {} : { sessionId }) }
     return new Promise<T>((resolve, reject) => {
