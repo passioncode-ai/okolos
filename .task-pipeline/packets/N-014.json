@@ -1,0 +1,39 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-014",
+ "intent": "Термины и строки",
+ "inputs": [
+  "—",
+  "N-013: список строк экранов"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "docs/brand/terminology.md",
+   "apps/agent/_locales/ru/messages.json",
+   "apps/agent/_locales/en/messages.json",
+   "tools/locales.test.ts"
+  ]
+ },
+ "outputs": [
+  "47 ключей строк; термины раздела «Мост для агентов»"
+ ],
+ "acceptance": [
+  "оба каталога с одинаковыми ключами; каждый $X$ объявлен в placeholders",
+  "python3 docs/brand/lint.py → 0",
+  "проверка узла: python3 docs/brand/lint.py && pnpm -s exec vitest run tools/docs.test.ts tools/locales.test.ts tools/copy.test.ts"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- docs/brand/terminology.md apps/agent/_locales/ru/messages.json apps/agent/_locales/en/messages.json; затем первый непройденный тест в списке acceptance"
+}

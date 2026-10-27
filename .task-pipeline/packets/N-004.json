@@ -1,0 +1,39 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-004",
+ "intent": "K2: выдача частями",
+ "inputs": [
+  "`pageOf`, `utf8Bytes`, `SnapshotLine` (snapshot.ts)",
+  "N-003: Snapshot с вердиктом"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "packages/core-snapshot/src/pages.ts",
+   "packages/core-snapshot/src/pages.test.ts"
+  ]
+ },
+ "outputs": [
+  "`DEFAULT_MAX_BYTES = 32 * 1024`; `encodeCursor({from, digest}) / decodeCursor(c): {from, digest} | null`; `paginate(lines, {cursor?, maxBytes?}): {text, cursor?, partial}` — курсор несёт дайджест снимка, курсор от другого снимка отвергается"
+ ],
+ "acceptance": [
+  "дерево формы Википедии (29 714 узлов, детерминированное): каждая страница ≤ 32 КБ UTF-8, страниц ≥ 8, конкатенация страниц равна полному тексту",
+  "курсор чужого снимка → null (и демон отвечает invalid_scope)",
+  "maxBytes больше потолка обрезается до потолка; меньше 1 КБ поднимается до 1 КБ",
+  "страница всегда двигается вперёд, даже если одна строка длиннее maxBytes",
+  "проверка узла: pnpm -s exec vitest run packages/core-snapshot"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- packages/core-snapshot/src/pages.ts packages/core-snapshot/src/pages.test.ts; затем первый непройденный тест в списке acceptance"
+}

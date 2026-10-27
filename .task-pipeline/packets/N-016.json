@@ -1,0 +1,44 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-016",
+ "intent": "K6: установка",
+ "inputs": [
+  "бандл из tools/build-agent.mjs; набор Fabric: writeDescriptor, launchdPlist, launchdInstall, launchdUninstall, pruneReleases",
+  "N-011: точка входа main",
+  "N-012: инструмент переписи",
+  "N-015: статика страницы"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "tools/install-agent.mjs",
+   "tools/install-agent.test.ts",
+   "tools/launchd/app.okolos.agent.plist",
+   "package.json",
+   "docs/runbooks/development.md",
+   "docs/runbooks/agent.md"
+  ]
+ },
+ "outputs": [
+  "`pnpm agent:install` → релиз в ~/.local/share/okolos-agent/releases/<версия>-<sha12>/, дескриптор, plist, загрузка, ожидание well-known; `--uninstall`, `--status`, `--dry-run`; `okolos-agent doctor --json`"
+ ],
+ "acceptance": [
+  "dry-run печатает plist: RunAtLoad, KeepAlive, ThrottleInterval 10, ProcessType Standard, FABRIC_SERVICE_SUPERVISOR=launchd, абсолютный node, путь в релизе, ни одного секрета",
+  "tools/runbook.test.ts видит новые скрипты в раннбуке",
+  "фальшивый launchctl первым в PATH: install зовёт bootout, ждёт, bootstrap",
+  "проверка узла: pnpm -s exec vitest run tools/install-agent.test.ts tools/runbook.test.ts"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- tools/install-agent.mjs tools/install-agent.test.ts tools/launchd/app.okolos.agent.plist; затем первый непройденный тест в списке acceptance"
+}

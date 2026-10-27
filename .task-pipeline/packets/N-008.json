@@ -1,0 +1,47 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-008",
+ "intent": "K3: дверь /mcp и stdio-шим",
+ "inputs": [
+  "Pairing.verify/request/claim; Journal.record; Route из N-005",
+  "N-001: глаголы и конверт",
+  "N-006: Journal.record до ответа",
+  "N-007: Pairing.verify и запрос привязки"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "apps/agent/src/door/door.ts",
+   "src/door/stdio-shim.ts",
+   "apps/agent/src/door/door.test.ts",
+   "src/door/stdio-shim.test.ts",
+   "apps/agent/package.json",
+   "@modelcontextprotocol/node"
+  ]
+ },
+ "outputs": [
+  "`doorRoute({pairing, journal, tools}): Route` — POST /mcp: ключ в `X-Okolos-Agent-Key`; токен хоста отвергается; без ключа → результат not_paired с {requestId, code}; `claim` через заголовок `X-Okolos-Pairing-Request`; `type ToolSet = (agent: AgentRecord) => McpServer`; `okolos-agent mcp-stdio` проксирует stdio ↔ /mcp с ключом из файла 0600"
+ ],
+ "acceptance": [
+  "без ключа: not_paired с кодом, запрос виден в pairing.list()",
+  "токен хоста в Authorization: not_paired, не 200",
+  "Host rebinding (Host: attacker.example:47871) → 403 до разбора",
+  "Origin http://evil.example → 403; без Origin, но без ключа → not_paired",
+  "ключ отозван → not_paired, задачи агента закрыты",
+  "тестовый MCP-клиент (@modelcontextprotocol/client) получает tools/list после привязки",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/door"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/door/door.ts src/door/stdio-shim.ts apps/agent/src/door/door.test.ts; затем первый непройденный тест в списке acceptance"
+}

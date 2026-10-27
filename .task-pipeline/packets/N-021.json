@@ -1,0 +1,38 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-021",
+ "intent": "Регресс",
+ "inputs": [
+  "всё",
+  "N-019: чистый reachable",
+  "N-020: доки в синхроне"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "(проверка без правок)"
+  ]
+ },
+ "outputs": [
+  "—"
+ ],
+ "acceptance": [
+  "pnpm gates → 0",
+  "pnpm test:e2e → 0",
+  "tools/manifest.test.ts «the line between Okolos and Okolos Bridge» зелёный",
+  "проверка узла: pnpm gates && pnpm test:e2e"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- .; затем первый непройденный тест в списке acceptance"
+}

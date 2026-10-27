@@ -88,7 +88,9 @@
    "title": "K3 оболочка службы fabric-service/0.1",
    "owner": "implementer",
    "status": "pending",
-   "blocked_by": [],
+   "blocked_by": [
+    "N-002"
+   ],
    "serves": "REQ-63",
    "check": "pnpm -s exec vitest run apps/agent/src/service",
    "touches": [
@@ -515,7 +517,18 @@
    "from": "N-020",
    "to": "N-021",
    "payload": "доки в синхроне"
+  },
+  {
+   "from": "N-002",
+   "to": "N-005",
+   "payload": "resource: корневой tsconfig.json, ссылки на проекты; N-005 дописывает после N-002"
   }
  ],
- "revisions": []
+ "revisions": [
+  {
+   "verb": "add",
+   "node": "N-005",
+   "why": "plan_audit: N-002 и N-005 оба правят корневой tsconfig.json и не были упорядочены; добавлено ресурсное ребро N-002→N-005"
+  }
+ ]
 }

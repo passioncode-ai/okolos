@@ -1,0 +1,44 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-015",
+ "intent": "Страница демона: SCR-23, SCR-24",
+ "inputs": [
+  "Pairing.list/confirm/decline/revoke, Tasks.list, Journal.recent, каталоги строк",
+  "N-007: список привязок и отзыв",
+  "N-009: список активных задач",
+  "N-013: состояния экранов SCR",
+  "N-014: ключи строк i18n"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "apps/agent/src/dashboard/page.ts",
+   "src/dashboard/api.ts",
+   "apps/agent/static/",
+   "apps/agent/src/dashboard/*.test.ts"
+  ]
+ },
+ "outputs": [
+  "GET /dashboard (сессия-кука от кода входа), GET /api/state, POST /api/pairing/:id/confirm|decline, POST /api/agents/:id/revoke — запись требует куку и заголовок X-Okolos-Request: 1; CSP без inline-скрипта; действия fabric-actions: pairing.confirm (human, consent), pairing.decline (human, consent), agent.revoke (relayed)"
+ ],
+ "acceptance": [
+  "без куки → 401; запись без X-Okolos-Request → 403",
+  "состояния SCR-23: loading, empty, error, success, expired; SCR-24: loading, empty, error, success — каждое по data-role",
+  "инструмент pairing.confirm через MCP отвечает human-step-required со ссылкой /dashboard",
+  "строки берутся из каталога; ключ без строки виден как [key]",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/dashboard"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/dashboard/page.ts src/dashboard/api.ts apps/agent/static/; затем первый непройденный тест в списке acceptance"
+}

@@ -1,0 +1,39 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-012",
+ "intent": "K5: перепись процессов",
+ "inputs": [
+  "CensusEntry (bridge.ts)",
+  "N-001: тип ответа hygiene.census"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "apps/agent/src/hygiene/census.ts",
+   "apps/agent/src/hygiene/census.test.ts"
+  ]
+ },
+ "outputs": [
+  "`census(ps: string, launchctl: string, opts: {selfPid, home}): CensusEntry[]` — `{pid, ppid, kind, owner, keep: boolean, reason}`; `readCensus()` вызывает `ps -axo pid=,ppid=,lstart=,command=` и `launchctl list` с таймаутом"
+ ],
+ "acceptance": [
+  "процесс --remote-debugging-port с живым родителем-сессией: keep, owner = сессия",
+  "потомок задачи launchd с ppid 1: keep, причина «служба ОС»",
+  "Chrome человека без флагов автоматизации: keep, «браузер человека»",
+  "chrome-headless-shell с мёртвым родителем на $TMPDIR-профиле: keep=false, причина «сирота», но ничего не завершается",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/hygiene"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/hygiene/census.ts apps/agent/src/hygiene/census.test.ts; затем первый непройденный тест в списке acceptance"
+}

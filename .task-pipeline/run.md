@@ -12,3 +12,6 @@ stage: 2 brainstorm — gate auto — verdict pass — 2026-10-27T05:45:00+01:00
 gate:  2 — command "graph.py validate && graph.py coverage" — exit 0 — 2026-10-27T05:45:00+01:00
 holds: 2 — 2 (unchanged) — enumerated 8/8 classes
 loop: not armed — no pipeline.json; the run walks the graph without check-ins under the operator rule "act, then report"
+stage: 3 spec — gate auto — verdict pending-review — 2026-10-27T07:10:00+01:00
+stage: 4 plan — gate auto — verdict pass — 2026-10-27T07:30:00+01:00
+gate:  4 — command "plan_audit.py --graph .task-pipeline/graph.json --packets .task-pipeline/packets" — exit 0 — 2026-10-27T07:30:00+01:00

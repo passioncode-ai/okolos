@@ -1,0 +1,38 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-018",
+ "intent": "ADR моста и снимка частями",
+ "inputs": [
+  "имена тестов N-006, N-008, N-011",
+  "N-011: механизмы для таблиц ADR"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "docs/adr/0020-bridge-is-part-of-okolos-agent.md",
+   "docs/adr/0021-agent-snapshot-in-pages-of-32-kb.md",
+   "docs/adr/0019-page-content-never-reaches-our-infrastructure.md",
+   "docs/adr/0018-…md"
+  ]
+ },
+ "outputs": [
+  "два ADR"
+ ],
+ "acceptance": [
+  "tools/adr.test.ts: каждый названный файл существует",
+  "проверка узла: pnpm -s exec vitest run tools/adr.test.ts"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- docs/adr/0020-bridge-is-part-of-okolos-agent.md docs/adr/0021-agent-snapshot-in-pages-of-32-kb.md docs/adr/0019-page-content-never-reaches-our-infrastructure.md; затем первый непройденный тест в списке acceptance"
+}

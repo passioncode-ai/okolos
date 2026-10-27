@@ -1,0 +1,41 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-020",
+ "intent": "Документы",
+ "inputs": [
+  "команды N-016, N-017",
+  "N-016: команды установки",
+  "N-017: команда e2e моста"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "AGENTS.md",
+   "docs/README.md",
+   "docs/privacy.md",
+   "docs/brand/facts.md",
+   "docs/backlog.md",
+   "docs/superpowers/backlog.md"
+  ]
+ },
+ "outputs": [
+  "доки в синхроне"
+ ],
+ "acceptance": [
+  "tools/docs.test.ts, tools/runbook.test.ts зелёные",
+  "проверка узла: pnpm -s exec vitest run tools/docs.test.ts tools/runbook.test.ts"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- AGENTS.md docs/README.md docs/privacy.md; затем первый непройденный тест в списке acceptance"
+}

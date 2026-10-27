@@ -1,0 +1,36 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-013",
+ "intent": "UX: экраны SCR-23/24, потоки, сценарии",
+ "inputs": [
+  "—"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "docs/ux/screens.md",
+   "docs/ux/flows.md",
+   "docs/ux/scenarios.md"
+  ]
+ },
+ "outputs": [
+  "SCR-23, SCR-24 со состояниями; FLW-21/22 ведут к ним"
+ ],
+ "acceptance": [
+  "python3 docs/ux/lint.py → 0",
+  "проверка узла: python3 docs/ux/lint.py"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- docs/ux/screens.md docs/ux/flows.md docs/ux/scenarios.md; затем первый непройденный тест в списке acceptance"
+}

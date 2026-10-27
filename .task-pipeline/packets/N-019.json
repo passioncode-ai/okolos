@@ -1,0 +1,35 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-019",
+ "intent": "Снять исключения reachable",
+ "inputs": [
+  "apps/agent как вызывающий core-snapshot и agent-probe",
+  "N-011: вызывающий код для core-snapshot и agent-probe"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "tools/reachable.test.ts"
+  ]
+ },
+ "outputs": [
+  "—"
+ ],
+ "acceptance": [
+  "tools/reachable.test.ts без строк «Okolos Bridge Б1»",
+  "проверка узла: pnpm -s exec vitest run tools/reachable.test.ts"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- tools/reachable.test.ts; затем первый непройденный тест в списке acceptance"
+}

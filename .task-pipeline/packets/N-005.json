@@ -1,0 +1,46 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-005",
+ "intent": "K3: оболочка службы fabric-service/0.1",
+ "inputs": [
+  "набор Fabric: holdSingleInstance, ensureToken, checkRequest, buildWellKnown, LoginCodes, JsonlEventLog, Drain, RotatingLog",
+  "N-002: resource: корневой tsconfig.json, ссылки на проекты; N-005 дописывает после N-002"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "apps/agent/package.json",
+   "apps/agent/tsconfig.json",
+   "apps/agent/src/fabric/",
+   "apps/agent/src/service/dirs.ts",
+   "apps/agent/src/service/http.ts",
+   "apps/agent/src/service/wellknown.ts",
+   "tsconfig.json",
+   "apps/agent/src/service/*.test.ts"
+  ]
+ },
+ "outputs": [
+  "`SERVICE_ID='okolos-agent'`, `PORT=47871`; `serviceDirs(home?)`; `startService({port, dirs, routes}): Promise<{close()}>` — замок до побочных эффектов, токен 0600, guard на каждом пути, маршруты /.well-known/fabric-service, /fabric/v1/events, /fabric/v1/login-code, /fabric/v1/login; `Route = (req, res, ctx) => Promise<boolean>`"
+ ],
+ "acceptance": [
+  "вторая копия на тех же данных выходит с 75, первая отвечает",
+  "Host evil.example → 403 на каждом маршруте, включая well-known",
+  "Origin https://evil.example → 403; Sec-Fetch-Site: cross-site → 403",
+  "well-known: id okolos-agent, instance default, build.commit, process.pid, degraded присутствует, surfaces.mcp.auth = own",
+  "события без токена → 401; код входа одноразовый",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/service"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/package.json apps/agent/tsconfig.json apps/agent/src/fabric/; затем первый непройденный тест в списке acceptance"
+}

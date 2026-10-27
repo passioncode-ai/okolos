@@ -1,0 +1,37 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-001",
+ "intent": "K0: контракты моста",
+ "inputs": [
+  "—"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "packages/contracts/src/bridge.ts",
+   "packages/contracts/src/bridge.test.ts"
+  ]
+ },
+ "outputs": [
+  "`BRIDGE_SESSION_VERBS = ['session.open','hygiene.census'] as const`; типы ответов `SessionOpenResult {sessionId, windowId}`, `OpenResult {url}`, `SnapshotResult {text, refs: string[], verdict: SnapshotVerdict, cursor?: string, partial: boolean}`, `ReadResult {text, boundary: {nonce, origin}}`, `CensusEntry`; `refusalKey(code: BridgeRefusal): string` — исчерпывающий `switch`, ключ строки `refusal_<code>`"
+ ],
+ "acceptance": [
+  "refusalKey даёт ключ для каждого из BRIDGE_REFUSALS, и каждый ключ есть в apps/agent/_locales/{ru,en}/messages.json",
+  "добавление кода в BRIDGE_REFUSALS без ветки в refusalKey — ошибка компиляции (посадка наблюдается: tsc TS2322/TS2366)",
+  "validateScope отвергает write ⊄ read, ttlSeconds > 3600, stepBudget > 500 (уже есть, сохраняется)",
+  "проверка узла: pnpm -s exec vitest run packages/contracts && pnpm -s typecheck"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- packages/contracts/src/bridge.ts packages/contracts/src/bridge.test.ts; затем первый непройденный тест в списке acceptance"
+}

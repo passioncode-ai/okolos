@@ -1,0 +1,47 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-002",
+ "intent": "K1: packages/cdp-pipe",
+ "inputs": [
+  "—"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "packages/cdp-pipe/package.json",
+   "packages/cdp-pipe/tsconfig.json",
+   "packages/cdp-pipe/src/index.ts",
+   "packages/cdp-pipe/src/frames.ts",
+   "packages/cdp-pipe/src/pipe.ts",
+   "tsconfig.json",
+   "packages/cdp-pipe/src/frames.test.ts",
+   "packages/cdp-pipe/src/pipe.test.ts",
+   "tools/agent-window-spike.mjs",
+   "tools/agent-window-spike.test.ts"
+  ]
+ },
+ "outputs": [
+  "`splitFrames(pending, chunk): {messages, pending}`; `class CdpPipe { static launch(o: {binary, args, userDataDir, requestTimeoutMs?}): Promise<CdpPipe>; send<T>(method, params?, sessionId?): Promise<T>; on(event, (params, sessionId?) => void): () => void; readonly pid: number; close(graceMs = 2000): Promise<void> }` — дочерний процесс `detached` в своей группе, fd 3 в браузер, fd 4 из браузера; `close` шлёт `Browser.close`, затем SIGTERM группе, затем SIGKILL"
+ ],
+ "acceptance": [
+  "кадры: сообщение, разрезанное между чтениями, собирается; пустые куски пропускаются (переезжают из спайка)",
+  "send без ответа за requestTimeoutMs отклоняется с ошибкой, называющей метод",
+  "ответ с error превращается в отклонение с текстом CDP",
+  "close завершает всю группу: после close процесса с pid нет (фальшивый браузер — node-скрипт, читающий fd 3 и пишущий в fd 4)",
+  "события с sessionId доставляются подписчику с этим sessionId",
+  "проверка узла: pnpm -s exec vitest run packages/cdp-pipe tools/agent-window-spike.test.ts"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- packages/cdp-pipe/package.json packages/cdp-pipe/tsconfig.json packages/cdp-pipe/src/index.ts; затем первый непройденный тест в списке acceptance"
+}

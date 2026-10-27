@@ -1,0 +1,41 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-007",
+ "intent": "K3: привязка",
+ "inputs": [
+  "serviceDirs().data",
+  "N-005: каталоги данных и токен хоста"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "apps/agent/src/pairing/pairing.ts",
+   "src/pairing/keychain.ts",
+   "apps/agent/src/pairing/pairing.test.ts",
+   "src/pairing/keychain.test.ts"
+  ]
+ },
+ "outputs": [
+  "`class Pairing { request(agentName): {requestId, code, expiresAt}; confirm(requestId): void; decline(requestId); claim(requestId): {key} | null /* один раз, ≤ 5 мин, только после confirm */; verify(key): AgentRecord | null; revoke(agentId); list(): {requests, agents} }`; `interface KeyStore { put(agentId, sha256hex); get(agentId); remove(agentId) }`; `MacKeychain implements KeyStore` через `security -i` по stdin"
+ ],
+ "acceptance": [
+  "claim до confirm → null; claim после confirm → ключ; второй claim → null",
+  "код из 6 цифр; запрос живёт 5 минут; больше 5 открытых запросов → старейший отклоняется; 3 claim подряд с неверным requestId от одного имени → запросы этого имени отклоняются",
+  "verify сравнивает в постоянном времени; отозванный ключ → null",
+  "MacKeychain: команда уходит в stdin, argv не содержит отпечатка (шпион spawn); интеграционный тест на одноразовом имени службы удаляет за собой",
+  "проверка узла: pnpm -s exec vitest run apps/agent/src/pairing"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- apps/agent/src/pairing/pairing.ts src/pairing/keychain.ts apps/agent/src/pairing/pairing.test.ts; затем первый непройденный тест в списке acceptance"
+}
