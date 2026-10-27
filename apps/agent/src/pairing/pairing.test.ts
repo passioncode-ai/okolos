@@ -1343,6 +1343,121 @@ describe('a store changed on disk (fix rounds 4 and 5)', () => {
   })
 })
 
+// Fix round 6: an agent that leaves the store on disk (another process revoked it, a hand edit, the
+// file removed) has lost its access, so the reload says so the way a revoke does: one `revoked`
+// notice per such agent, for the daemon to close its tasks and windows, and the ids in onReload.
+describe('agents gone from a reloaded store (fix round 6)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function watchedAll(file: string): { pairing: Pairing; notices: PairingNotice[]; reloads: Array<{ removed: readonly string[] }> } {
+    const notices: PairingNotice[] = []
+    const reloads: Array<{ removed: readonly string[] }> = []
+    const pairing = Pairing.open(file, { random: seeded(), onNotice: (notice) => notices.push(notice), onReload: (reload) => reloads.push(reload) })
+    return { pairing, notices, reloads }
+  }
+
+  it('sends a revoked notice dated by the clock at verify, which takes no time of its own', () => {
+    const file = storeFile()
+    const { pairing: a, notices, reloads } = watchedAll(file)
+    const gone = a.verify(pair(a, 'Claude Code', T0))!
+    const kept = pair(a, 'Codex', T0 + 10)
+    const b = open(file)
+    b.revoke(gone.agentId, T0 + 20)
+    vi.spyOn(Date, 'now').mockReturnValue(T0 + 30)
+
+    expect(a.verify(kept)).toMatchObject({ name: 'Codex' })
+    expect(reloads).toEqual([{ removed: [gone.agentId] }])
+    expect(notices.at(-1)).toEqual({ kind: 'revoked', agentId: gone.agentId, name: 'Claude Code', at: T0 + 30 })
+    expect(notices.filter((notice) => notice.kind === 'revoked')).toHaveLength(1)
+  })
+
+  it('dates it by the now of list, and names nobody when an edit only renames', () => {
+    const file = storeFile()
+    const { pairing, notices, reloads } = watchedAll(file)
+    const a = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    const b = pairing.verify(pair(pairing, 'Codex', T0 + 10))!
+    const stored = JSON.parse(readFileSync(file, 'utf8')) as { schema: string; agents: Array<{ agentId: string; name: string }> }
+    writeFileSync(file, JSON.stringify({ ...stored, agents: stored.agents.filter((x) => x.agentId === b.agentId) }), { mode: 0o600 })
+
+    expect(pairing.list(T0 + 40).agents.map((x) => x.agentId)).toEqual([b.agentId])
+    expect(reloads).toEqual([{ removed: [a.agentId] }])
+    expect(notices.at(-1)).toEqual({ kind: 'revoked', agentId: a.agentId, name: 'Claude Code', at: T0 + 40 })
+
+    writeFileSync(file, readFileSync(file, 'utf8').replace('"Codex"', '"Codex CLI"'), { mode: 0o600 })
+    const count = notices.length
+    expect(pairing.list(T0 + 50).agents.map((x) => x.name)).toEqual(['Codex CLI'])
+    expect(reloads.at(-1)).toEqual({ removed: [] })
+    expect(notices).toHaveLength(count)
+  })
+
+  it('names every agent when the file is removed, dated by the call that writes next', () => {
+    const file = storeFile()
+    const { pairing, notices, reloads } = watchedAll(file)
+    const a = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    const b = pairing.verify(pair(pairing, 'Codex', T0 + 10))!
+    const request = asked(pairing.request('Cursor', T0 + 20))
+    expect(confirmAt(pairing, request, T0 + 21)).toBe(true)
+    rmSync(file)
+    const count = notices.length
+
+    expect(pairing.claim(request.requestId, T0 + 22)).toHaveProperty('key')
+    expect(reloads).toEqual([{ removed: [a.agentId, b.agentId] }])
+    expect(notices.slice(count, count + 2)).toEqual([
+      { kind: 'revoked', agentId: a.agentId, name: 'Claude Code', at: T0 + 22 },
+      { kind: 'revoked', agentId: b.agentId, name: 'Codex', at: T0 + 22 },
+    ])
+    expect(notices.at(-1)).toMatchObject({ kind: 'paired', name: 'Cursor' })
+  })
+
+  it('says it once when the agent a revoke names is already gone on disk: the revoke finds nothing', () => {
+    const file = storeFile()
+    const { pairing, notices } = watchedAll(file)
+    const a = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    open(file).revoke(a.agentId, T0 + 10)
+
+    expect(pairing.revoke(a.agentId, T0 + 20)).toBeNull()
+    expect(notices.filter((notice) => notice.kind === 'revoked')).toEqual([{ kind: 'revoked', agentId: a.agentId, name: 'Claude Code', at: T0 + 20 }])
+  })
+
+  it('dates it by the close at a close, and by the clock at a flush', () => {
+    const file = storeFile()
+    const { pairing, notices } = watchedAll(file)
+    const a = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    const b = pairing.verify(pair(pairing, 'Codex', T0 + 10))!
+    expect(pairing.touch(a.agentId, T0 + 20)).toBe(true)
+    expect(pairing.touch(a.agentId, T0 + 30)).toBe(true) // memory only
+    open(file).revoke(b.agentId, T0 + 35)
+    vi.spyOn(Date, 'now').mockReturnValue(T0 + 40)
+    pairing.flush()
+    expect(notices.at(-1)).toEqual({ kind: 'revoked', agentId: b.agentId, name: 'Codex', at: T0 + 40 })
+
+    expect(pairing.touch(a.agentId, T0 + 50)).toBe(true) // memory only
+    open(file).revoke(a.agentId, T0 + 55)
+    pairing.close(T0 + 60)
+    expect(notices.at(-1)).toEqual({ kind: 'revoked', agentId: a.agentId, name: 'Claude Code', at: T0 + 60 })
+  })
+
+  it('keeps the reload when a notice handler throws', () => {
+    const file = storeFile()
+    const errors: unknown[] = []
+    const pairing = Pairing.open(file, {
+      random: seeded(),
+      onNotice: (notice) => {
+        if (notice.kind === 'revoked') throw new Error('journal is down')
+      },
+      onNoticeError: (error) => errors.push(error),
+    })
+    const a = pairing.verify(pair(pairing, 'Claude Code', T0))!
+    const kept = pair(pairing, 'Codex', T0 + 10)
+    open(file).revoke(a.agentId, T0 + 20)
+    expect(pairing.verify(kept)).toMatchObject({ name: 'Codex' })
+    expect(pairing.list(T0 + 30).agents.map((x) => x.name)).toEqual(['Codex'])
+    expect(errors).toHaveLength(1)
+  })
+})
+
 // Fix round 4: a store is checked for what it holds, not only for its shape.
 describe('what a store may hold (fix round 4)', () => {
   function agentRow(agentId: string, name: string, keyHash: string): Record<string, unknown> {

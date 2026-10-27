@@ -152,7 +152,10 @@ export interface PublicRequest {
  * `expired` the request's deadline (its creation plus REQUEST_LIFETIME_MS), for `claim_expired` the
  * confirm plus CLAIM_WINDOW_MS, whenever a later call found the end; for the others the `now` of the
  * call that caused it. An end carries its `cause` (fix round 5): `timeout` for a deadline, `stopped`
- * for a request `close` ended, dated by the close.
+ * for a request `close` ended, dated by the close. A `revoked` notice comes from `revoke`, or (fix
+ * round 6) from a reload that found the agent gone from the file; that one is dated by the `now` of
+ * the call that read the file again, and by `Date.now()` when that call takes no time (`verify`,
+ * `flush`).
  */
 export type PairingNotice =
   | {
@@ -182,10 +185,12 @@ export interface PairingOptions {
   onNoticeError?: (error: unknown, notice: PairingNotice) => void
   /**
    * Hears that the store was read again because it changed on disk and the pairing took what it
-   * holds now (fix round 5), for the service log. No notice is sent for it. A handler that throws is
-   * ignored: the reload stands.
+   * holds now (fix round 5), for the service log. `removed` (fix round 6) holds the ids of the agents
+   * that were in memory and are not in the file any more (another process revoked them, a hand edit,
+   * the file removed), in the order memory held them; empty when none left. Each of them also gets
+   * a `revoked` notice, sent after this handler. A handler that throws is ignored: the reload stands.
    */
-  onReload?: () => void
+  onReload?: (reload: { readonly removed: readonly string[] }) => void
 }
 
 function warn(error: unknown, notice: PairingNotice): void {
@@ -232,7 +237,7 @@ export class Pairing {
   private onDisk: Fingerprint | null
   /** What stat said of the file then; null for no file, or when unknown (fix round 5). */
   private seen: StatMark | null
-  private readonly onReload: () => void
+  private readonly onReload: (reload: { readonly removed: readonly string[] }) => void
   private readonly byRequestId = new Map<string, Entry>()
   private readonly byHandle = new Map<string, Entry>()
   private readonly ended = new Map<string, Ended>()
@@ -253,9 +258,9 @@ export class Pairing {
     this.onDisk = store.onDisk
     this.seen = store.seen
     const onReload = options.onReload ?? (() => {})
-    this.onReload = () => {
+    this.onReload = (reload) => {
       try {
-        onReload()
+        onReload(reload)
       } catch {
         // A log that cannot take the line does not undo the reload.
       }
@@ -288,10 +293,11 @@ export class Pairing {
    * The agent a key belongs to, or null. Every stored hash is compared, in constant time. First the
    * file is looked at (stat: inode, size, mtime, ctime); when it changed, it is read again like at a
    * write (fix round 5), so a revoke another process wrote is seen here; a store that no longer
-   * opens throws PairingStoreError, and no key is taken until it is fixed.
+   * opens throws PairingStoreError, and no key is taken until it is fixed. An agent the reload finds
+   * gone gets its `revoked` notice dated by `Date.now()`: verify takes no time of its own (fix round 6).
    */
   verify(key: string): AgentRecord | null {
-    this.sync(false)
+    this.sync(false, Date.now())
     const presented = createHash('sha256').update(key, 'utf8').digest()
     let found: StoredAgent | null = null
     for (const agent of this.agents) {
@@ -317,7 +323,7 @@ export class Pairing {
     this.callsUnsaved = true
     if (now - (this.lastCallWrite.get(agentId) ?? Number.NEGATIVE_INFINITY) >= LAST_CALL_WRITE_MS) {
       this.lastCallWrite.set(agentId, now)
-      this.sync(true)
+      this.sync(true, now)
       if (!this.agents.some((a) => a.agentId === agentId)) return false
       this.save(this.agents)
     }
@@ -327,10 +333,16 @@ export class Pairing {
   /**
    * Writes every last call that is still in memory only, for the daemon to run before it stops;
    * writes nothing when there is none. A write that fails throws PairingStoreError and keeps them.
+   * An agent the reload before the write finds gone gets its `revoked` notice dated by `Date.now()`:
+   * flush takes no time of its own (fix round 6).
    */
   flush(): void {
+    this.flushAt(Date.now())
+  }
+
+  private flushAt(now: number): void {
     if (!this.callsUnsaved) return
-    this.sync(true)
+    this.sync(true, now)
     if (this.callsUnsaved) this.save(this.agents)
   }
 
@@ -352,7 +364,7 @@ export class Pairing {
       this.closed = true
       for (const entry of [...this.byHandle.values()]) this.end(entry, now, 'stopped')
     }
-    this.flush()
+    this.flushAt(now)
   }
 
   request(agentName: string, now: number): { requestId: string; code: string; expiresAt: number } | { refused: RequestRefusal } {
@@ -419,7 +431,7 @@ export class Pairing {
     const entry = this.byRequestId.get(requestId)
     if (entry === undefined) return { refused: this.refusals.get(sha256(requestId))?.refused ?? 'unknown' }
     if (entry.confirmedAt === null) return { pending: true }
-    this.sync(true)
+    this.sync(true, now)
     // An id or a key already in the store is drawn again: the store would not open with it twice
     // (fix round 5; with real randomness this never repeats, with a seeded source it can).
     let key: string
@@ -443,7 +455,7 @@ export class Pairing {
    */
   revoke(agentId: string, now: number): AgentRecord | null {
     checkClock(now, 'revoke')
-    this.sync(true)
+    this.sync(true, now)
     const agent = this.agents.find((a) => a.agentId === agentId)
     if (agent === undefined) return null
     this.save(this.agents.filter((a) => a !== agent))
@@ -461,7 +473,7 @@ export class Pairing {
   list(now: number): { requests: PublicRequest[]; agents: AgentRecord[] } {
     checkClock(now, 'list')
     this.sweep(now)
-    this.sync(false)
+    this.sync(false, now)
     const waiting = [...this.byHandle.values()]
     const live = waiting.map((entry): PublicRequest => {
       const sameNameAgents = this.agents
@@ -556,8 +568,9 @@ export class Pairing {
    * throws PairingStoreError with the reason the open gives it, and memory stays as it was. `full`,
    * before a write: the bytes are compared even when stat says nothing changed, for a file system
    * whose times are too coarse to tell an edit made within the same tick; a verify trusts stat.
+   * `now` dates the `revoked` notices of the agents the reload finds gone.
    */
-  private sync(full: boolean): void {
+  private sync(full: boolean, now: number): void {
     const unchanged = sameMark(statMark(this.file), this.seen) && (!full || sameFingerprint(fingerprintOnDisk(this.file, this.onDisk?.size), this.onDisk))
     if (unchanged) return
     const store = readStore(this.file)
@@ -565,15 +578,19 @@ export class Pairing {
       this.seen = store.seen
       return
     }
-    this.adopt(store)
+    this.adopt(store, now)
   }
 
   /**
    * Takes the agents the file holds now in place of those in memory. A last call held in memory
    * only is kept when it is newer than the file's and the agent is still there under the same key:
-   * the file cannot know it, and the next write or `flush` saves it.
+   * the file cannot know it, and the next write or `flush` saves it. An agent in memory that the file
+   * no longer holds has lost its access (fix round 6): `onReload` hears its id, and then it gets a
+   * `revoked` notice dated `now`, as a revoke would send, so the daemon closes its tasks and windows.
    */
-  private adopt(store: Snapshot): void {
+  private adopt(store: Snapshot, now: number): void {
+    const kept = new Set(store.agents.map((agent) => agent.agentId))
+    const removed = this.agents.filter((agent) => !kept.has(agent.agentId))
     const mine = new Map(this.agents.map((agent) => [agent.agentId, agent]))
     let unsaved = false
     this.agents = store.agents.map((agent) => {
@@ -589,12 +606,13 @@ export class Pairing {
     for (const agentId of [...this.lastCallWrite.keys()]) {
       if (!this.agents.some((agent) => agent.agentId === agentId)) this.lastCallWrite.delete(agentId)
     }
-    this.onReload()
+    this.onReload({ removed: removed.map((agent) => agent.agentId) })
+    for (const agent of removed) this.notify({ kind: 'revoked', agentId: agent.agentId, name: agent.name, at: now })
   }
 
   /**
    * Writes `agents` and only then takes them as the agents in memory; throws PairingStoreError. The
-   * caller runs `sync(true)` first in the same call and builds `agents` from what it found, so a
+   * caller runs `sync(true, now)` first in the same call and builds `agents` from what it found, so a
    * change made on disk before the operation is kept. The read and the write are two steps, so a
    * change in between them is not seen; the daemon is the store's only writer.
    */
