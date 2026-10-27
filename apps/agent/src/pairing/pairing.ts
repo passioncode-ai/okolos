@@ -35,8 +35,10 @@ export function pairingStoreFile(dirs: ServiceDirs): string {
 }
 
 /**
- * The pairing store cannot be read, or holds something that is not a pairing store. Nothing is
- * paired or checked until it is fixed (SCR-23, error state); the file is never overwritten.
+ * The pairing store cannot be read, holds something that is not a pairing store, or cannot be
+ * written. A store that cannot be opened pairs and checks nothing until it is fixed (SCR-23, error
+ * state), and the file is never overwritten. A write that fails (`unwritable`) changes nothing:
+ * the file and the agents in memory stay as they were.
  */
 export class PairingStoreError extends Error {
   readonly file: string
@@ -50,7 +52,7 @@ export class PairingStoreError extends Error {
   }
 }
 
-export type StoreRefusal = 'unreadable' | 'not_json' | 'not_a_store' | 'bad_record'
+export type StoreRefusal = 'unreadable' | 'not_json' | 'not_a_store' | 'bad_record' | 'unwritable'
 
 /** A request lives this long from its creation, unless it is confirmed. */
 export const REQUEST_LIFETIME_MS = 5 * 60_000
@@ -378,9 +380,14 @@ export class Pairing {
     this.byHandle.delete(entry.handle)
   }
 
+  /** Writes `agents` and only then takes them as the agents in memory; throws PairingStoreError. */
   private save(agents: StoredAgent[]): void {
     const content: StoreFile = { schema: SCHEMA, agents }
-    atomicWrite(this.file, `${JSON.stringify(content, null, 2)}\n`, 0o600)
+    try {
+      atomicWrite(this.file, `${JSON.stringify(content, null, 2)}\n`, 0o600)
+    } catch (error) {
+      throw new PairingStoreError(this.file, 'unwritable', { cause: error })
+    }
     this.agents = agents
   }
 

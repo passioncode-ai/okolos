@@ -393,11 +393,32 @@ describe('checking a key and the pairing store (spec §3, §11 F13)', () => {
     const { requestId } = asked(pairing.request('Claude Code', T0))
     pairing.confirm(requestId, T0 + 1)
     chmodSync(path.dirname(file), 0o500)
-    expect(() => pairing.claim(requestId, T0 + 2)).toThrow()
+    expect(() => pairing.claim(requestId, T0 + 2)).toThrow(PairingStoreError)
+    expect(() => pairing.claim(requestId, T0 + 2)).toThrow(expect.objectContaining({ reason: 'unwritable', file }))
     chmodSync(path.dirname(file), 0o700)
     expect(pairing.list(T0 + 3).agents).toEqual([])
     expect(pairing.claim(requestId, T0 + 4)).toHaveProperty('key')
     expect(pairing.list(T0 + 5).agents).toHaveLength(1)
+  })
+
+  it('keeps the agent its access when a revoke cannot write the store: a store error (fix round 2)', () => {
+    const file = storeFile()
+    const notices: PairingNotice[] = []
+    const pairing = open(file, notices)
+    const key = pair(pairing, 'Claude Code', T0)
+    const agent = pairing.verify(key)!
+    const before = readFileSync(file, 'utf8')
+    chmodSync(path.dirname(file), 0o500)
+    expect(() => pairing.revoke(agent.agentId)).toThrow(PairingStoreError)
+    expect(() => pairing.revoke(agent.agentId)).toThrow(expect.objectContaining({ reason: 'unwritable', file }))
+    chmodSync(path.dirname(file), 0o700)
+    expect(pairing.verify(key)).toEqual(agent)
+    expect(pairing.list(T0 + 10).agents).toEqual([agent])
+    expect(readFileSync(file, 'utf8')).toBe(before)
+    expect(notices.filter((n) => n.kind === 'revoked')).toEqual([])
+    // Once the store can be written again, the revoke goes through.
+    expect(pairing.revoke(agent.agentId)).toEqual(agent)
+    expect(pairing.verify(key)).toBeNull()
   })
 
   it('does not open a file of foreign content: a store error, and the file is left as it was', () => {
