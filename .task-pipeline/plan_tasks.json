@@ -491,7 +491,11 @@
    "после ответа глагола задача проверяется ещё раз (`checkLanded` или `get`): вызов, который летел во время отзыва или закрытия, ответа не получает (риск N-009 r1 seam #3)",
    "N-011 вызывает Tasks.charge(task, verb, now, url?) с часами демона и ставит окно задачи через Tasks.setWindow(task, {windowId, windowOpen}) на живой задаче из open/get; снимки из list/sweep для этого не годятся (N-009 круг 1)",
    "Journal.sweep при старте и по суточному таймеру: TypeError или JournalError не роняют демон, а пишутся событием и показываются как сбой журнала на SCR-24 (риск N-006 r2 seam #2)",
-   "время записей журнала берётся только из journalTime(ms) из apps/agent/src/journal/journal.ts (риск N-006 r2 seam, break)"
+   "время записей журнала берётся только из journalTime(ms) из apps/agent/src/journal/journal.ts (риск N-006 r2 seam, break)",
+   "окно задачи не открылось: задача закрывается Tasks.close, агент получает отказ без sessionId, на SCR-24 строки не остаётся (риск N-009 r3 seam #2)",
+   "окно задачи, чей срок вышел, но которую таймер ещё не убрал, закрылось само: setWindow через ручку, сохранённую при open, ставит windowOpen false (риск N-009 r3 seam #3)",
+   "задача с profile 'disposable' получает своё временное окружение профиля у N-010; openWindow без профиля для неё не годится (наблюдение N-009 r3 seam)",
+   "ключ HMAC для ref и хранилище снимка задачи принадлежат N-011; Task.id (это sessionId агента) ключом ref не служит (риск N-009 r3 seam #1)"
   ],
   "dod": "vitest apps/agent/src/verbs зелёный на Chrome stable"
  },
@@ -607,7 +611,7 @@
    "Modify: apps/agent/src/agent.ts (монтирует маршруты страницы и инструменты pairing.confirm, pairing.decline, agent.revoke; аудит #10, #11), docs/ux/screens.md, docs/ux/scenarios.md, docs/ux/flows.md (SCR-24 показывает профиль, SCN-045 и FLW-22 называют цель; аудит #20)",
    "Test: apps/agent/src/dashboard/page.test.ts, apps/agent/src/dashboard/api.test.ts, apps/agent/src/dashboard/actions.test.ts"
   ],
-  "consumes": "Pairing.list/confirmByHandle/declineByHandle/revoke (N-007), Tasks.list (N-009), Journal.recent (N-006), проверка сессии из N-024, createAgent (N-011), refusalKey (N-023), каталоги строк",
+  "consumes": "Pairing.list/confirmByHandle/declineByHandle/revoke (N-007), Tasks.list (N-009), Journal.recent (N-006), проверка сессии из N-024, createAgent (N-011), refusalKey (N-023), каталоги строк; goalShown и TaskSnapshot (expired) из apps/agent/src/tasks/tasks.ts (N-009)",
   "produces": "GET /dashboard (сессия-кука от кода входа), GET /api/state, POST /api/pairing/:id/confirm|decline, POST /api/agents/:id/revoke — запись требует куку и заголовок X-Okolos-Request: 1; CSP без inline-скрипта; действия fabric-actions: pairing.confirm (human, consent), pairing.decline (human, consent), agent.revoke (relayed)",
   "tests": [
    "без куки → 401; запись без X-Okolos-Request → 403; запись без Origin или с чужим Origin → 403; чужой Host на любом маршруте → 403 (ревью F4)",
@@ -648,7 +652,9 @@
    "элементы pairing-grants (строка pairingGrants рядом с кнопками) и строка окна задачи (taskWindowOpen или taskWindowClosed) проверены по data-role; журнальные коды bad_call и local_answer показываются строками refusal_bad_call и refusal_local_answer, глагол unknown строкой verb_unknown; сборка строки отказа без двух двоеточий подряд для каждого кода (проверки N-013 круг 16)",
    "цель показана через goalShown из apps/agent/src/tasks/tasks.ts, своей копии правила 200 символов на странице нет (риск N-009 r1 seam #5); цель сокращается в демоне (goalShown при сборке /api/state), а не в браузере: модуль задач тянет node:crypto и в страницу не попадает (риск N-009 r2 seam #2)",
    "задача, чей срок вышел, остаётся в списке SCR-24 со строкой taskTimeOver вместо оставшегося времени, пока её окно не закрыто таймером (Tasks.list отдаёт её с пометкой expired; N-009 круг 2)",
-   "список отказов и сбоев (Journal.recent) не входит в двухсекундный опрос SCR-23: журнал читается при открытии страницы и не чаще раза в 30 секунд, иначе демон перечитывает 90 дней каждые 2 с (риск N-006 r2 seam #3)"
+   "список отказов и сбоев (Journal.recent) не входит в двухсекундный опрос SCR-23: журнал читается при открытии страницы и не чаще раза в 30 секунд, иначе демон перечитывает 90 дней каждые 2 с (риск N-006 r2 seam #3)",
+   "задачи на SCR-24 идут новыми сверху: Tasks.list отдаёт старые первыми, страница переворачивает (риск N-009 r3 seam #4)",
+   "строка истёкшей задачи с уже закрытым окном не говорит «закрывает её окно»: taskTimeOver только пока windowOpen, иначе taskWindowClosed (наблюдение N-009 r3)"
   ],
   "dod": "vitest apps/agent/src/dashboard зелёный; SCN-044, SCN-045 переведены в implemented (SCR-23, SCR-24 в built) в том же изменении, python3 docs/ux/lint.py 0"
  },

@@ -457,7 +457,7 @@
    "id": "N-009",
    "title": "K3 задачи: область, бюджет, TTL, отказы",
    "owner": "implementer",
-   "status": "pending",
+   "status": "done",
    "blocked_by": [
     "N-023",
     "N-024",
@@ -471,13 +471,13 @@
    ],
    "risk": "R2",
    "certification": {
-    "round": 2,
+    "round": 4,
     "tiers": {
      "unit": "pass",
-     "seam": "fail",
-     "product": "fail"
+     "seam": "pass",
+     "product": "pass"
     },
-    "at": "bc713cda9a3ba91e23585e32319987e606cb12b7",
+    "at": "7913bc3b93c3be402e776e25f73e42ff639742f5",
     "history": [
      {
       "unit": "pass",
@@ -488,14 +488,57 @@
       "unit": "pass",
       "seam": "fail",
       "product": "fail"
+     },
+     {
+      "unit": "pass",
+      "seam": "pass",
+      "product": "pass"
+     },
+     {
+      "unit": "pass",
+      "seam": "pass",
+      "product": "pass"
      }
     ],
     "kinds": [
      "blind",
+     "blind",
+     "blind",
      "blind"
     ],
-    "tree": "d3d8c587164dad88a3e115501b6623c79a4e009d"
-   }
+    "tree": "9bf777e225aebc70cface27f016fbab4a80c5bec"
+   },
+   "proof": {
+    "head": "7913bc3b93c3be402e776e25f73e42ff639742f5",
+    "tree": "9bf777e225aebc70cface27f016fbab4a80c5bec",
+    "graph_revision": "25"
+   },
+   "evidence": [
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-009 -s exec vitest run apps/agent/src/tasks -> 1 file, 70 passed (70)",
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-009 -s run typecheck -> exit 0, no output",
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-009 -s exec vitest run tools/reachable.test.ts -> 4 passed (the new EXEMPT row is accepted and not stale)",
+    "unit: scratch probe (vitest, outside the worktree) on Tasks.open: a goal of only U+FEFF -> invalid_scope text_empty field goal; U+2028 around 'Pay' -> trimmed and accepted as 'Pay'; e + three combining marks -> text_control; 2000 x plus U+3000 -> text_too_long; [] as scope -> invalid_scope field goal text_not_text; checkLanded after close -> no_such_task; close and closeAllOf results not frozen",
+    "unit: git diff 084228d..HEAD -- apps/agent/src/tasks tools/reachable.test.ts: two new files and one EXEMPT row, nothing else in the unit",
+    "seam: git -C /Users/sshlg/DATA/_worktrees/okolos-b1-n-009 diff 084228d..HEAD --stat: tasks.ts +348, tasks.test.ts +642, tools/reachable.test.ts +1, plus plan, packets, spec, ux, locales",
+    "seam: grep -rln over the worktree for the API symbols: no caller in code outside tasks.ts and its test (list in scope)",
+    "seam: pnpm -s exec vitest run apps/agent/src/tasks apps/agent/src/pairing/name.test.ts packages/contracts/src/bridge.test.ts: 3 files, 145 passed (tasks 70, name 34, bridge 41)",
+    "seam: pnpm -s exec vitest run tools/reachable.test.ts: 4 passed",
+    "seam: pnpm -s run typecheck: exit 0",
+    "seam: pnpm -s run i18n:sweep: exit 0, no sentence outside the catalogue",
+    "seam: pnpm -s exec eslint apps/agent/src/tasks: exit 0",
+    "seam: pnpm -s exec vitest run tools/agent-locales.test.ts tools/docs.test.ts tools/locales.test.ts: 85 passed",
+    "seam: python3 docs/ux/lint.py: exit 0",
+    "seam: apps/agent/src/pairing/pairing.ts:532-536 sweep uses 'if (now < endedAt) continue', same boundary as tasks.ts expired()",
+    "seam: docs/ux/screens.md:646 'tasks first, newest first'; tasks.test.ts:352 'oldest first'",
+    "product: git -C /Users/sshlg/DATA/_worktrees/okolos-b1-n-009 diff 084228d..HEAD --stat: tasks.ts (348 lines), tasks.test.ts, the taskTimeOver locale key in ru and en, and the spec, scenarios, flows, screens and terminology edits",
+    "product: read apps/agent/src/tasks/tasks.ts in full; read validateScope, SCOPE_LIMITS, verbAllowed, inScope in packages/contracts/src/bridge.ts:444-515, 737-745; checkFreeText and textFault in apps/agent/src/pairing/name.ts:40-104",
+    "product: read docs/ux/scenarios.md:968-1005, docs/ux/flows.md:725-757, docs/ux/screens.md:632-653, spec :40-111 and :157-173, brief :79",
+    "product: node printed every task*/refusal* key of apps/agent/_locales/{ru,en}/messages.json: taskGoal, taskSteps, taskTimeLeft, taskTimeOver present in both; refusal_* covers every BridgeRefusal plus bad_call and local_answer",
+    "product: grep docs/brand/terminology.md: задача/task :141, шаг/step :142, отказ/refusal :143, окно агента :134; the code's comments and refusal messages use these terms",
+    "product: pnpm -C /Users/sshlg/DATA/_worktrees/okolos-b1-n-009 exec vitest run apps/agent/src/tasks/tasks.test.ts: 1 file, 70 tests passed",
+    "product: tools/reachable.test.ts adds an EXEMPT row for tasks.ts naming N-011 and N-015 as its callers, with the condition that the branch does not merge to main until K3 removes it (spec §8 REQ-68 still requires removal)",
+    "proven at 7913bc3b93c3be402e776e25f73e42ff639742f5 (tree 9bf777e225aebc70cface27f016fbab4a80c5bec)"
+   ]
   },
   {
    "id": "N-010",
@@ -1250,6 +1293,21 @@
   },
   {
    "from": "N-023",
+   "to": "N-009",
+   "payload": "validateScope, inScope, verbAllowed, refuse"
+  },
+  {
+   "from": "N-024",
+   "to": "N-009",
+   "payload": "apps/agent: package.json, tsconfig"
+  },
+  {
+   "from": "N-007",
+   "to": "N-009",
+   "payload": "checkFreeText для цели задачи"
+  },
+  {
+   "from": "N-023",
    "to": "N-003",
    "payload": "toSnapshotFinding, SnapshotFinding, TaskScope"
   },
@@ -1297,21 +1355,6 @@
    "from": "N-014",
    "to": "N-008",
    "payload": "ключи каталога для CLI привязки и шима"
-  },
-  {
-   "from": "N-023",
-   "to": "N-009",
-   "payload": "validateScope, inScope, verbAllowed, refuse"
-  },
-  {
-   "from": "N-024",
-   "to": "N-009",
-   "payload": "apps/agent: package.json, tsconfig"
-  },
-  {
-   "from": "N-007",
-   "to": "N-009",
-   "payload": "checkFreeText для цели задачи"
   },
   {
    "from": "N-022",
@@ -1620,6 +1663,12 @@
    "verb": "park",
    "node": "N-013",
    "why": "certification ceiling: 20 failing round(s), ceiling 20; failing tier(s) product; stuck on product; first break apps/extension/_locales/ru/messages.json:1887 (storageResetNote, en twin), packages/ui/src/storage/storage-problem.ts:103, docs/ux/scenarios.md:747 SCN-032, docs/backlog.md B-156: A neighbouring extension string becomes false once Okolos Agent is installed, and nothing records it. The SCR-20 storage-problem screen says «Очистка удалит всё, что Okolos хранит на этом устройстве: находки, журнал, …» / 'Clearing removes everything Okolos kept on this device'. With Okolos Agent on the device, its access list, agents' journal, service events, logs, agent profile (with what sites keep from sign-ins) and clients/ keys all survive that clearing. N-013 handled the same collision for SCN-023 and SCN-024 (scope lines, B-156), and terminology.md cites SCR-20's «Очистить локальные данные», but SCN-032, storageResetNote, B-156 and every plan node leave this sentence out; check: grep -n 'storageResetNote\\|SCN-032' docs/backlog.md prints a row, and grep -n 'Okolos Agent' docs/ux/scenarios.md shows a hit inside SCN-032; then judgement: SCN-032 reads true for a device with Okolos Agent installed. Blocker row owed on the board"
+  },
+  {
+   "verb": "close",
+   "node": "N-009",
+   "why": "certified at all 3 tiers in round 4",
+   "precondition": "7913bc3b93c3be402e776e25f73e42ff639742f5"
   }
  ]
 }
