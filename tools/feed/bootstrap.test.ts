@@ -53,7 +53,7 @@ function plantCheckout(checkout: string) {
 type Options = { fetchFails?: boolean; addFails?: boolean; sourceIsRepo?: boolean; createsCheckout?: boolean }
 
 /** Git and pnpm as the bootstrap sees them. `worktree add` and `clone` create the folder, as git would. */
-function fakeTool(w: ReturnType<typeof world>, { fetchFails = false, addFails = false, sourceIsRepo = true, createsCheckout = true }: Options = {}) {
+function fakeTool({ fetchFails = false, addFails = false, sourceIsRepo = true, createsCheckout = true }: Options = {}) {
   const calls: string[][] = []
   const tool = async (command: string, args: string[]) => {
     calls.push([command, ...args])
@@ -82,7 +82,7 @@ function fakeTool(w: ReturnType<typeof world>, { fetchFails = false, addFails = 
 
 /** The job, as a double: records how it was started, writes its record the way feed-job does, exits. */
 function fakeJob(w: ReturnType<typeof world>, behaviour: 'publishes' | 'crashes' | 'lockHeld' | 'hangs' = 'publishes') {
-  const starts: Array<{ command: string; args: string[]; env: Record<string, string | undefined>; cwd?: string }> = []
+  const starts: Array<{ command: string; args: string[]; env: Record<string, string | undefined>; cwd?: string | undefined }> = []
   const run = async (command: string, args: string[], options: { env?: Record<string, string | undefined>; cwd?: string }) => {
     const env = options.env ?? {}
     starts.push({ command, args, env, cwd: options.cwd })
@@ -113,7 +113,7 @@ function agent(w: ReturnType<typeof world>, overrides: Record<string, unknown> =
   const promise = runAgent({
     paths: w.paths,
     env: { PATH: process.env.PATH ?? '', OKOLOS_SOURCE_REPO: w.source, OKOLOS_ORIGIN_URL: 'https://example.test/okolos.git', ...env },
-    tool: fakeTool(w).tool,
+    tool: fakeTool().tool,
     run: fakeJob(w).run,
     node: '/opt/node/bin/node',
     log: (line: string) => lines.push(line),
@@ -125,7 +125,7 @@ function agent(w: ReturnType<typeof world>, overrides: Record<string, unknown> =
 describe('a missing checkout is recreated, and the record says so (B-159)', () => {
   it('recreates it as a worktree of the source clone at origin/main, then runs the job from it', async () => {
     const w = world()
-    const git = fakeTool(w)
+    const git = fakeTool()
     const job = fakeJob(w)
     const { promise, lines } = agent(w, { tool: git.tool, run: job.run })
     const result = await promise
@@ -143,9 +143,9 @@ describe('a missing checkout is recreated, and the record says so (B-159)', () =
       `git -C ${w.paths.agentCheckout} rev-parse HEAD`,
     ])
     expect(job.starts).toHaveLength(1)
-    expect(job.starts[0].args).toEqual([path.join(w.paths.agentCheckout, 'tools/feed-job.mjs'), '--agent'])
-    expect(job.starts[0].cwd).toBe(w.paths.agentCheckout)
-    expect(job.starts[0].env.OKOLOS_RECOVERED_CHECKOUT).toBe('missing')
+    expect(job.starts[0]?.args).toEqual([path.join(w.paths.agentCheckout, 'tools/feed-job.mjs'), '--agent'])
+    expect(job.starts[0]?.cwd).toBe(w.paths.agentCheckout)
+    expect(job.starts[0]?.env.OKOLOS_RECOVERED_CHECKOUT).toBe('missing')
     expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'published', recoveredCheckout: true })
     expect(lines.join('\n')).toMatch(/is missing; recreating it/)
     expect(lines.join('\n')).toMatch(/recreated .* at ddddddd \(recoveredCheckout: true\)/)
@@ -153,8 +153,8 @@ describe('a missing checkout is recreated, and the record says so (B-159)', () =
 
   it('installs the publish tools inside the new checkout, with no Cloudflare token in reach', async () => {
     const w = world()
-    const seen: Array<{ command: string; cwd?: string; env?: Record<string, string | undefined> }> = []
-    const git = fakeTool(w)
+    const seen: Array<{ command: string; cwd?: string | undefined; env?: Record<string, string | undefined> | undefined }> = []
+    const git = fakeTool()
     await agent(
       w,
       {
@@ -176,7 +176,7 @@ describe('a missing checkout is recreated, and the record says so (B-159)', () =
   it('clones from origin when the source clone is gone too', async () => {
     const w = world()
     rmSync(w.source, { recursive: true })
-    const git = fakeTool(w)
+    const git = fakeTool()
     const result = await agent(w, { tool: git.tool }).promise
     expect(result.exit).toBe(0)
     const ran = git.calls.map((call) => call.join(' '))
@@ -195,18 +195,18 @@ describe('a missing checkout is recreated, and the record says so (B-159)', () =
     expect(result.exit).toBe(0)
     expect(readFileSync(path.join(`${w.paths.agentCheckout}.broken`, 'leftover.txt'), 'utf8')).toBe('what the cleaner left')
     expect(existsSync(path.join(w.paths.agentCheckout, 'tools/feed-job.mjs'))).toBe(true)
-    expect(job.starts[0].env.OKOLOS_RECOVERED_CHECKOUT).toMatch(/^broken: /)
+    expect(job.starts[0]?.env.OKOLOS_RECOVERED_CHECKOUT).toMatch(/^broken: /)
     expect(lines.join('\n')).toMatch(/is broken \(.*tools\/feed-job\.mjs.*\)/)
   })
 
   it('leaves a healthy checkout to the job, which fast-forwards it', async () => {
     const w = world()
     plantCheckout(w.paths.agentCheckout)
-    const git = fakeTool(w)
+    const git = fakeTool()
     const job = fakeJob(w)
     await agent(w, { tool: git.tool, run: job.run }).promise
     expect(git.calls.map((call) => call.join(' '))).toEqual([`git -C ${w.paths.agentCheckout} rev-parse --show-toplevel`])
-    expect(job.starts[0].env.OKOLOS_RECOVERED_CHECKOUT).toBeUndefined()
+    expect(job.starts[0]?.env.OKOLOS_RECOVERED_CHECKOUT).toBeUndefined()
     expect(readStatus(w.paths.status)).toMatchObject({ recoveredCheckout: false })
   })
 })
@@ -215,8 +215,8 @@ describe('no failure path is silent (B-159)', () => {
   it('records stage "checkout" when the checkout cannot be recreated, and counts it', async () => {
     const w = world()
     const job = fakeJob(w)
-    const first = await agent(w, { tool: fakeTool(w, { fetchFails: true }).tool, run: job.run }).promise
-    const { promise, lines } = agent(w, { tool: fakeTool(w, { fetchFails: true }).tool, run: job.run })
+    const first = await agent(w, { tool: fakeTool({ fetchFails: true }).tool, run: job.run }).promise
+    const { promise, lines } = agent(w, { tool: fakeTool({ fetchFails: true }).tool, run: job.run })
     const second = await promise
 
     expect(first.exit).toBe(1)
@@ -230,7 +230,7 @@ describe('no failure path is silent (B-159)', () => {
 
   it('records the failure when git refuses to add the worktree', async () => {
     const w = world()
-    const result = await agent(w, { tool: fakeTool(w, { addFails: true }).tool }).promise
+    const result = await agent(w, { tool: fakeTool({ addFails: true }).tool }).promise
     expect(result.exit).toBe(1)
     expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'failed', stage: 'checkout' })
     expect(readStatus(w.paths.status)?.reason).toMatch(/already registered/)
@@ -246,7 +246,7 @@ describe('no failure path is silent (B-159)', () => {
 
   it('records a recovery that reported success but left no job to run', async () => {
     const w = world()
-    const result = await agent(w, { tool: fakeTool(w, { createsCheckout: false }).tool }).promise
+    const result = await agent(w, { tool: fakeTool({ createsCheckout: false }).tool }).promise
     expect(result.exit).toBe(1)
     expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'failed', stage: 'checkout' })
   })
@@ -289,7 +289,7 @@ describe('no failure path is silent (B-159)', () => {
     const w = world()
     const held = acquireLock(w.paths.lock)
     try {
-      const git = fakeTool(w)
+      const git = fakeTool()
       const result = await agent(w, { tool: git.tool }).promise
       expect(result.exit).toBe(EXIT.lockHeld)
       expect(git.calls, 'no recovery under another run’s lock').toEqual([])
@@ -322,7 +322,7 @@ describe('no failure path is silent (B-159)', () => {
 
   it('writes its lines to the durable log when no log is injected', async () => {
     const w = world()
-    await agent(w, { log: undefined, tool: fakeTool(w, { fetchFails: true }).tool }).promise
+    await agent(w, { log: undefined, tool: fakeTool({ fetchFails: true }).tool }).promise
     expect(readFileSync(w.paths.log, 'utf8')).toMatch(/failed in checkout: /)
   })
 
@@ -352,7 +352,7 @@ describe('the files installed beside launchd', () => {
     for (const file of BOOTSTRAP_FILES) {
       const text = readFileSync(path.join(dir, file), 'utf8')
       for (const match of text.matchAll(/^import [^'"]*['"]([^'"]+)['"]/gm)) {
-        const specifier = match[1]
+        const specifier = match[1] ?? ''
         if (specifier.startsWith('node:')) continue
         expect(specifier, `${file} imports ${specifier}, which the installed copy would not find`).toMatch(/^\.\/[\w-]+\.mjs$/)
         imported.add(specifier.slice(2))
@@ -363,7 +363,7 @@ describe('the files installed beside launchd', () => {
 })
 
 describe('with real git (B-150: the folder deleted, git still listing it)', () => {
-  const env = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' }
+  const env: Record<string, string | undefined> = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' }
   for (const name of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE']) delete env[name]
   const git = (...args: string[]) => {
     const result = spawnSync('git', args, { env, encoding: 'utf8' })
