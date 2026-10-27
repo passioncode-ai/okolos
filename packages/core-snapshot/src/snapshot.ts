@@ -69,11 +69,11 @@ export interface SnapshotOptions {
   /** Take only the subtree under this ref. */
   readonly rootRef?: string
   /**
-   * The task's key (at least 16 bytes). With it, refs are `refOf(node, taskKey)`
-   * and `rootRef` is resolved only through `refMap`. Without it, refs are the
-   * plain `e<node>` form, which is guessable: the daemon always passes a key.
+   * The task's key (at least 16 bytes). Refs are `refOf(node, taskKey)` and
+   * `rootRef` is resolved only through `refMap`. Required (decided 2026-10-27):
+   * there is no keyless form, so no ref is ever the guessable `e<node>`.
    */
-  readonly taskKey?: Uint8Array
+  readonly taskKey: Uint8Array
   /** The `refMap` of an earlier snapshot of the same task. */
   readonly refMap?: ReadonlyMap<string, number>
   /**
@@ -146,8 +146,13 @@ function isField(node: AxNode): boolean {
 
 /**
  * Builds the snapshot of a tree, or of the subtree under `rootRef`.
+ * Throws a RangeError when `options.taskKey` is absent, not bytes or shorter
+ * than 16 bytes, as `refOf` does.
  */
-export function buildSnapshot(nodes: readonly AxNode[], options: SnapshotOptions = { hidden: new Set() }): Snapshot {
+export function buildSnapshot(nodes: readonly AxNode[], options: SnapshotOptions): Snapshot {
+  const key: unknown = (options as Partial<SnapshotOptions> | undefined)?.taskKey
+  // i18n-exempt: a programming error in the daemon's call, thrown to its caller; never shown to a person
+  if (!(key instanceof Uint8Array) || key.length < 16) throw new RangeError('taskKey must be at least 16 bytes')
   const byId = new Map(nodes.map((n) => [n.nodeId, n]))
   const roots = nodes.filter((n) => n.parentId === undefined || !byId.has(n.parentId))
   const values = fieldValues(nodes, byId, options.secretFields ?? new Set())
@@ -156,7 +161,7 @@ export function buildSnapshot(nodes: readonly AxNode[], options: SnapshotOptions
   const refFor = (backend: number): string => {
     let ref = refs.get(backend)
     if (ref === undefined) {
-      ref = taskKey === undefined ? `e${backend}` : refOf(backend, taskKey)
+      ref = refOf(backend, taskKey)
       refs.set(backend, ref)
     }
     return ref
@@ -235,8 +240,8 @@ export function buildSnapshot(nodes: readonly AxNode[], options: SnapshotOptions
  * or an ancestor was judged hidden; `null` when the ref names nothing this task
  * was given.
  *
- * With a task key the ref is looked up in the task's own `refMap` and then checked
- * against the key, so a ref of another task, a map of another task or a guessed
+ * The ref is looked up in the task's own `refMap` and then checked against the
+ * task key, so a ref of another task, a map of another task or a guessed
  * node number all find nothing. The ancestors are checked on every call: the page
  * may have changed since the ref was given out.
  */
@@ -246,15 +251,9 @@ function resolveRoot(
   options: SnapshotOptions,
 ): { node: AxNode; inField: boolean } | 'hidden' | null {
   const rootRef = options.rootRef ?? ''
-  let backend: number | undefined
-  if (options.taskKey !== undefined) {
-    backend = options.refMap?.get(rootRef)
-    if (backend === undefined || !Number.isSafeInteger(backend) || backend < 0) return null
-    if (refOf(backend, options.taskKey) !== rootRef) return null
-  } else {
-    const match = /^e(\d+)$/.exec(rootRef)
-    backend = match === null ? undefined : Number(match[1])
-  }
+  const backend = options.refMap?.get(rootRef)
+  if (backend === undefined || !Number.isSafeInteger(backend) || backend < 0) return null
+  if (refOf(backend, options.taskKey) !== rootRef) return null
   const node = nodes.find((n) => n.backendDOMNodeId === backend)
   if (node === undefined) return null
 

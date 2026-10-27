@@ -139,7 +139,8 @@ describe('a subtree taken by reference (review F2)', () => {
     expect(ref).not.toBe('')
     const after = buildSnapshot(shop, { hidden: new Set([3]), taskKey: KEY_A, rootRef: ref, refMap: before.refMap })
     expect(after.lines).toEqual([])
-    expect(buildSnapshot(shop, { hidden: new Set([3]), rootRef: 'e9' }).lines).toEqual([])
+    const stale = new Map([[refOf(9, KEY_A), 9]])
+    expect(buildSnapshot(shop, { hidden: new Set([3]), taskKey: KEY_A, rootRef: refOf(9, KEY_A), refMap: stale }).lines).toEqual([])
   })
 
   it('under a field gives none of the field text', () => {
@@ -149,8 +150,10 @@ describe('a subtree taken by reference (review F2)', () => {
       const s = buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_A, rootRef: ref, refMap })
       expect(text(s)).not.toContain('4111')
     }
-    expect(text(buildSnapshot(shop, { hidden: new Set(), rootRef: 'e6' }))).not.toContain('4111')
-    expect(text(buildSnapshot(shop, { hidden: new Set(), rootRef: 'e8' }))).not.toContain('4111')
+    for (const backend of [6, 8]) {
+      const ref = refOf(backend, KEY_B)
+      expect(text(buildSnapshot(shop, { hidden: new Set(), taskKey: KEY_B, rootRef: ref, refMap: new Map([[ref, backend]]) }))).not.toContain('4111')
+    }
   })
 })
 
@@ -184,7 +187,7 @@ describe('a secret field', () => {
     const secretFields = new Set([4])
     const first = buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A, secretFields })
     const sub = buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A, secretFields, rootRef: first.lines[0]?.ref ?? '', refMap: first.refMap })
-    for (const s of [first, sub, buildSnapshot(nodes, { hidden: new Set(), secretFields })]) {
+    for (const s of [first, sub, buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_B, secretFields })]) {
       expect(s.lines.length).toBeGreaterThan(0)
       for (const line of s.lines) expect(carries(line.name, '123')).toBe(false)
     }
@@ -198,7 +201,7 @@ describe('a secret field', () => {
         { id: '3', role: 'heading', name: 'Top 12 offers' },
       ],
     })
-    expect(text(buildSnapshot(nodes, { hidden: new Set(), secretFields: new Set([2]) }))).toContain('Top 12 offers')
+    expect(text(buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set([2]) }))).toContain('Top 12 offers')
   })
 
   it('is the only kind whose 3-character value is cleaned: an ordinary field keeps the floor of 4', () => {
@@ -327,7 +330,7 @@ describe('fuzz: nothing typed into a field comes out', () => {
         })
         for (const s of [
           buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A }),
-          buildSnapshot(nodes, { hidden: new Set() }),
+          buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_B }),
         ]) {
           const out = text(s)
           expect(out).not.toContain(value)
@@ -359,7 +362,7 @@ describe('fuzz: nothing typed into a field comes out', () => {
         })
         for (const s of [
           buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_A, secretFields: new Set([10]) }),
-          buildSnapshot(nodes, { hidden: new Set(), secretFields: new Set([10]) }),
+          buildSnapshot(nodes, { hidden: new Set(), taskKey: KEY_B, secretFields: new Set([10]) }),
         ]) {
           for (const line of s.lines) expect(carries(line.name, value)).toBe(false)
         }
