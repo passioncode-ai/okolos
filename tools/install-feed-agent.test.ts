@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 import { feedPaths } from './feed/paths.mjs'
 import { readStatus, writeStatus } from './feed/status.mjs'
 import { filesIn } from './tree.mjs'
-import { BOOTSTRAP_FILES } from './feed/bootstrap.mjs'
+import { BOOTSTRAP_FILES, BOOTSTRAP_SOURCES } from './feed/bootstrap.mjs'
 import {
   LABEL,
   agentStatus,
@@ -325,7 +325,7 @@ describe('the bootstrap launchd starts lives outside the checkout (B-159)', () =
     installBootstrap({ dir: h.paths.agentBin })
     for (const file of BOOTSTRAP_FILES) {
       const copy = path.join(h.paths.agentBin, file)
-      expect(readFileSync(copy, 'utf8'), file).toBe(readFileSync(path.join(repo, 'tools/feed', file), 'utf8'))
+      expect(readFileSync(copy, 'utf8'), file).toBe(readFileSync(path.join(repo, 'tools', BOOTSTRAP_SOURCES[file] ?? ''), 'utf8'))
     }
     expect(existsSync(h.paths.bootstrap)).toBe(true)
   })
@@ -541,9 +541,12 @@ describe('whether the installed bootstrap is the checkout’s', () => {
   function installed() {
     const h = home()
     installBootstrap({ dir: h.paths.agentBin })
-    const from = path.join(h.paths.agentCheckout, 'tools/feed')
-    mkdirSync(from, { recursive: true })
-    for (const file of BOOTSTRAP_FILES) writeFileSync(path.join(from, file), readFileSync(path.join(repo, 'tools/feed', file)))
+    const from = path.join(h.paths.agentCheckout, 'tools')
+    mkdirSync(path.join(from, 'feed'), { recursive: true })
+    for (const file of BOOTSTRAP_FILES) {
+      const source = BOOTSTRAP_SOURCES[file] ?? ''
+      writeFileSync(path.join(from, source), readFileSync(path.join(repo, 'tools', source)))
+    }
     return { h, from }
   }
 
@@ -554,8 +557,8 @@ describe('whether the installed bootstrap is the checkout’s', () => {
 
   it('names the modules that changed on main since the install', () => {
     const { h, from } = installed()
-    writeFileSync(path.join(from, 'status.mjs'), '// changed on main\n')
-    writeFileSync(path.join(from, 'newer.mjs'), '')
+    writeFileSync(path.join(from, 'feed/status.mjs'), '// changed on main\n')
+    writeFileSync(path.join(from, 'feed/newer.mjs'), '')
     writeFileSync(path.join(h.paths.agentBin, 'newer.mjs'), 'older')
     expect(bootstrapDrift({ bin: h.paths.agentBin, from })).toEqual({ matches: false, differs: ['newer.mjs', 'status.mjs'] })
   })
@@ -563,12 +566,12 @@ describe('whether the installed bootstrap is the checkout’s', () => {
   it('cannot say when there is no checkout to compare with', () => {
     const h = home()
     installBootstrap({ dir: h.paths.agentBin })
-    expect(bootstrapDrift({ bin: h.paths.agentBin, from: path.join(h.paths.agentCheckout, 'tools/feed') })).toEqual({ matches: null, differs: [] })
+    expect(bootstrapDrift({ bin: h.paths.agentBin, from: path.join(h.paths.agentCheckout, 'tools') })).toEqual({ matches: null, differs: [] })
   })
 
   it('reports drift, and whether the plist starts the bootstrap, in --status', async () => {
     const { h, from } = installed()
-    writeFileSync(path.join(from, 'log.mjs'), '// changed\n')
+    writeFileSync(path.join(from, 'feed/log.mjs'), '// changed\n')
     writeFileSync(h.target, rendered({ template: template(), runner: null, checkout: h.paths.agentCheckout, logDir: h.paths.logs, bootstrap: h.paths.bootstrap }))
     const status = await agentStatus({ ...base, target: h.target, launchctl: fakeLaunchd({ loaded: true }).launchctl, paths: h.paths })
     expect(status).toMatchObject({ bootstrap: true, plistStartsBootstrap: true, bootstrapMatchesCheckout: false, bootstrapDiffers: ['log.mjs'] })

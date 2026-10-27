@@ -14,8 +14,11 @@
  * a file that is gone), the answer is no: a module that runs its main on a guess is
  * worse than one that does nothing.
  *
- * `tools/feed/bootstrap.mjs` keeps its own copy of this check on purpose: it is copied
- * out of the checkout with only the modules it imports (BOOTSTRAP_FILES).
+ * This is the one implementation; the feed tools, the installer and the bootstrap all
+ * call `isMain(import.meta.filename)`. The bootstrap runs from a flat copy outside the
+ * checkout and may import only its siblings, so it imports `./is-main.mjs` from
+ * tools/feed (a re-export here in the repo), and the installer copies this file under
+ * that name (BOOTSTRAP_SOURCES in tools/feed/bootstrap.mjs).
  */
 import { realpathSync } from 'node:fs'
 

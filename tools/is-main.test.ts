@@ -1,6 +1,8 @@
-import { mkdtempSync, symlinkSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import { isMain } from './is-main.mjs'
@@ -28,6 +30,19 @@ describe('deciding whether a module is the program', () => {
     symlinkSync(dir, linked, 'junction')
     expect(path.join(linked, 'tool.mjs')).not.toBe(real)
     expect(isMain(real, path.join(linked, 'tool.mjs'))).toBe(true)
+  })
+
+  it('runs a module started through a linked checkout, as tools/feed-job.mjs is from the bootstrap', () => {
+    const base = mkdtempSync(path.join(os.tmpdir(), 'okolos-is-main-run-'))
+    mkdirSync(path.join(base, 'real', 'tools'), { recursive: true })
+    writeFileSync(
+      path.join(base, 'real', 'tools', 'job.mjs'),
+      `import { isMain } from ${JSON.stringify(pathToFileURL(path.join(import.meta.dirname, 'is-main.mjs')).href)}\n` +
+        `console.log(isMain(import.meta.filename) ? 'main' : 'imported')\n`,
+    )
+    symlinkSync(path.join(base, 'real'), path.join(base, 'linked'), 'junction')
+    const result = spawnSync(process.execPath, [path.join(base, 'linked', 'tools', 'job.mjs')], { encoding: 'utf8' })
+    expect(result.stdout.trim(), result.stderr).toBe('main')
   })
 
   it('says no for another file', () => {

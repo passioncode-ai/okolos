@@ -43,6 +43,7 @@ import { acquireLock } from './feed/lock.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { DEFAULT_WORKER, readServed, refuseBackwards } from './feed/served.mjs'
 import { hostOf, listingSql } from './listings.mjs'
+import { isMain } from './is-main.mjs'
 
 const REPO = path.resolve(import.meta.dirname, '..')
 
@@ -248,7 +249,7 @@ async function main() {
   }
 }
 
-if (import.meta.filename === process.argv[1]) {
+if (isMain(import.meta.filename)) {
   main().catch((cause) => {
     console.error(`publish-feed: ${cause instanceof Error ? cause.message : String(cause)}`)
     process.exit(1)

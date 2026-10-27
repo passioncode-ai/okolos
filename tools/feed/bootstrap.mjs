@@ -40,14 +40,23 @@ import { existsSync, mkdirSync, realpathSync, renameSync, rmSync } from 'node:fs
 import path from 'node:path'
 
 import { killAllGroups, runBounded } from './bounded.mjs'
-import { isEntry } from './entry.mjs'
+import { isMain } from './is-main.mjs'
 import { acquireLock, LockHeldError } from './lock.mjs'
 import { capFile, cleanLine, openLog } from './log.mjs'
 import { feedPaths } from './paths.mjs'
 import { readStatus, stampRunId, writeStatus } from './status.mjs'
 
 /** What the installer copies beside launchd: this file and every module it imports. */
-export const BOOTSTRAP_FILES = ['bootstrap.mjs', 'bounded.mjs', 'entry.mjs', 'lock.mjs', 'log.mjs', 'paths.mjs', 'status.mjs']
+export const BOOTSTRAP_FILES = ['bootstrap.mjs', 'bounded.mjs', 'is-main.mjs', 'lock.mjs', 'log.mjs', 'paths.mjs', 'status.mjs']
+
+/**
+ * Where each installed file comes from, relative to tools/. All from tools/feed,
+ * except the main-module check: tools/is-main.mjs is the one implementation, and
+ * tools/feed/is-main.mjs only re-exports it inside the repo.
+ */
+export const BOOTSTRAP_SOURCES = Object.fromEntries(
+  BOOTSTRAP_FILES.map((file) => [file, file === 'is-main.mjs' ? 'is-main.mjs' : `feed/${file}`]),
+)
 
 /** The same codes as tools/feed-job.mjs (a test holds them equal), so a host reads one table. */
 export const EXIT = { ok: 0, failed: 1, lockHeld: 75, watchdog: 124, signal: 143 }
@@ -424,7 +433,7 @@ async function main() {
   process.exit(exit)
 }
 
-if (isEntry(process.argv[1], import.meta.filename)) {
+if (isMain(import.meta.filename)) {
   main().catch((cause) => {
     console.error(`feed-agent: ${cause instanceof Error ? cause.stack : String(cause)}`)
     // Best effort: a crash here (an unwritable log folder, say) still counts.

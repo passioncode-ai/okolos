@@ -6,6 +6,8 @@ import type { StatusRecord } from './status.mjs'
 type Tool = (command: string, args: string[], options: BoundedOptions) => Promise<BoundedResult>
 
 export const BOOTSTRAP_FILES: readonly string[]
+/** Each installed file's source, relative to tools/. */
+export const BOOTSTRAP_SOURCES: Readonly<Record<string, string>>
 export const EXIT: { ok: number; failed: number; lockHeld: number; watchdog: number; signal: number }
 export const RECOVERY_DEADLINES: { git: number; worktree: number; clone: number; install: number }
 export const RUN_DEADLINE_MS: number

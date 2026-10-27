@@ -41,13 +41,13 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 import { killAllGroups, runBounded } from './feed/bounded.mjs'
-import { isEntry } from './feed/entry.mjs'
 import { acquireLock, LockHeldError } from './feed/lock.mjs'
 import { capFile, cleanLine, openLog } from './feed/log.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { DEFAULT_WORKER, readServed } from './feed/served.mjs'
 import { writeStatus } from './feed/status.mjs'
 import { directoriesIn } from './tree.mjs'
+import { isMain } from './is-main.mjs'
 
 const REPO = path.resolve(import.meta.dirname, '..')
 
@@ -436,7 +436,7 @@ async function main() {
   process.exit(record.exit)
 }
 
-if (isEntry(process.argv[1], import.meta.filename)) {
+if (isMain(import.meta.filename)) {
   main().catch((cause) => {
     console.error(`feed-job: ${cause instanceof Error ? cause.stack : String(cause)}`)
     process.exit(EXIT.failed)

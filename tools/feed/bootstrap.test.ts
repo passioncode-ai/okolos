@@ -8,6 +8,7 @@ import { EXIT as JOB_EXIT, WATCHDOG_MS } from '../feed-job.mjs'
 import { runBounded } from './bounded.mjs'
 import {
   BOOTSTRAP_FILES,
+  BOOTSTRAP_SOURCES,
   checkoutHealth,
   EXIT,
   JOB_GRACE_MS,
@@ -492,11 +493,14 @@ describe('the health check', () => {
 })
 
 describe('the files installed beside launchd', () => {
-  it('are every module the bootstrap imports, and nothing from outside tools/feed', () => {
-    const dir = path.join(import.meta.dirname)
+  it('are every module the bootstrap imports, each installed from its real source', () => {
+    // The installed folder is flat: each file may import only a sibling. tools/is-main.mjs
+    // is installed from tools/ itself; tools/feed/is-main.mjs only re-exports it in the repo.
+    const tools = path.join(import.meta.dirname, '..')
+    expect(BOOTSTRAP_SOURCES['is-main.mjs']).toBe('is-main.mjs')
     const imported = new Set<string>(['bootstrap.mjs'])
     for (const file of BOOTSTRAP_FILES) {
-      const text = readFileSync(path.join(dir, file), 'utf8')
+      const text = readFileSync(path.join(tools, BOOTSTRAP_SOURCES[file] ?? ''), 'utf8')
       for (const match of text.matchAll(/^import [^'"]*['"]([^'"]+)['"]/gm)) {
         const specifier = match[1] ?? ''
         if (specifier.startsWith('node:')) continue

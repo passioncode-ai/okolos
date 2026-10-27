@@ -16,13 +16,13 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { BOOTSTRAP_FILES } from './feed/bootstrap.mjs'
+import { BOOTSTRAP_FILES, BOOTSTRAP_SOURCES } from './feed/bootstrap.mjs'
 import { runBounded } from './feed/bounded.mjs'
-import { isEntry } from './feed/entry.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { readStatus } from './feed/status.mjs'
 import { discover, quote, runnerArgv, xml } from './feed-agent-credential.mjs'
 import { directoriesIn, filesIn } from './tree.mjs'
+import { isMain } from './is-main.mjs'
 
 /**
  * Installs the feed-refresh agent on this machine, or prints what it would do.
@@ -148,12 +148,12 @@ export async function ensureCheckout({ repo = root, checkout, tool = runBounded,
  * — so an update leaves no retired module behind and launchd never starts a half
  * copy.
  */
-export function installBootstrap({ dir, from = path.join(root, 'tools/feed'), files = BOOTSTRAP_FILES, log = () => {} }) {
+export function installBootstrap({ dir, from = path.join(root, 'tools'), files = BOOTSTRAP_FILES, log = () => {} }) {
   const staging = `${dir}.staging-${process.pid}`
   rmSync(staging, { recursive: true, force: true })
   mkdirSync(staging, { recursive: true, mode: 0o700 })
   for (const file of files) {
-    copyFileSync(path.join(from, file), path.join(staging, file))
+    copyFileSync(path.join(from, sourceOf(file)), path.join(staging, file))
     chmodSync(path.join(staging, file), 0o600)
   }
   chmodSync(staging, 0o700)
@@ -218,15 +218,20 @@ function digest(file) {
   }
 }
 
+/** An installed file's source under tools/: BOOTSTRAP_SOURCES, else tools/feed. */
+function sourceOf(file) {
+  return BOOTSTRAP_SOURCES[file] ?? `feed/${file}`
+}
+
 /**
  * Whether the bootstrap copy in `bin` is the one in `from` (the agent checkout's
- * tools/feed): `{ matches, differs }`, `matches` null when there is no checkout to
+ * tools/): `{ matches, differs }`, `matches` null when there is no checkout to
  * compare with. The copy changes only at install, the checkout at every run.
  */
 export function bootstrapDrift({ bin, from, files = BOOTSTRAP_FILES }) {
-  if (!existsSync(path.join(from, 'bootstrap.mjs'))) return { matches: null, differs: [] }
+  if (!existsSync(path.join(from, 'feed', 'bootstrap.mjs'))) return { matches: null, differs: [] }
   const names = new Set([...files, ...(existsSync(bin) ? filesIn(bin, '.mjs') : [])])
-  const differs = [...names].filter((name) => digest(path.join(bin, name)) !== digest(path.join(from, name))).sort()
+  const differs = [...names].filter((name) => digest(path.join(bin, name)) !== digest(path.join(from, sourceOf(name)))).sort()
   return { matches: differs.length === 0, differs }
 }
 
@@ -322,7 +327,7 @@ export async function agentStatus({ label = LABEL, domain, target, launchctl = r
   const plistText = existsSync(target) ? readFileSync(target, 'utf8') : ''
   const program = /<key>ProgramArguments<\/key>\s*<array>([\s\S]*?)<\/array>/.exec(plistText)?.[1] ?? ''
   const plistStartsBootstrap = program.includes('bootstrap.mjs')
-  const drift = bootstrapDrift({ bin: paths.agentBin, from: path.join(paths.agentCheckout, 'tools', 'feed') })
+  const drift = bootstrapDrift({ bin: paths.agentBin, from: path.join(paths.agentCheckout, 'tools') })
   const notes = []
   if (plistText && !plistStartsBootstrap) notes.push('the old plist (cd into the checkout) is installed; run pnpm feed:agent from the main clone')
   if (drift.matches === false) {
@@ -420,7 +425,7 @@ async function main() {
   }
 }
 
-if (isEntry(process.argv[1], import.meta.filename)) {
+if (isMain(import.meta.filename)) {
   main().catch((cause) => {
     console.error(`install-feed-agent: ${cause instanceof Error ? cause.message : String(cause)}`)
     process.exit(1)
