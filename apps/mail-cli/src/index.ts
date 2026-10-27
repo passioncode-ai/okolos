@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { readFileSync, realpathSync } from 'node:fs'
 import process from 'node:process'
 
@@ -73,10 +72,48 @@ export interface ScriptResult {
   readonly code: number
 }
 
-/* c8 ignore start -- the entry point; `main` is what the tests drive. */
+/** Where `run` writes and how it ends; the process by default, a fake in a test. */
+export interface RunIo {
+  readonly write: (text: string) => void
+  readonly fail: (error: unknown) => void
+  readonly exit: (code: number) => void
+}
+
+const processIo: RunIo = {
+  write: (text) => process.stdout.write(text),
+  fail: (error) => console.error(error),
+  exit: (code) => {
+    process.exitCode = code
+  },
+}
+
+/**
+ * The command, as `bin.ts` and a direct start both call it.
+ *
+ * A `main` that throws ends with `EXIT.unreadable` and the error on stderr. A
+ * throw left to node exits 1, which is `EXIT.signalsFound`: a crash would read
+ * as a finding to a script, and it is neither a finding nor a clean message.
+ */
+export function run(
+  argv: readonly string[],
+  env: NodeJS.ProcessEnv,
+  io: RunIo = processIo,
+  command: typeof main = main,
+): void {
+  let result: ScriptResult
+  try {
+    result = command(argv, env)
+  } catch (error) {
+    io.fail(error)
+    io.exit(EXIT.unreadable)
+    return
+  }
+  io.write(`${result.text}\n`)
+  io.exit(result.code)
+}
+
+/* c8 ignore start -- a direct `node index.js`; `bin.ts` is the command and `bin.test.ts` spawns both. */
 if (isEntry(import.meta.url, process.argv[1], { platform: process.platform, realpath: realpathSync, cwd: process.cwd })) {
-  const result = main(process.argv.slice(2), process.env)
-  process.stdout.write(`${result.text}\n`)
-  process.exitCode = result.code
+  run(process.argv.slice(2), process.env)
 }
 /* c8 ignore stop */
