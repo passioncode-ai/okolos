@@ -93,6 +93,43 @@ jobs:
       - name: release checks
         run: pnpm package:check
 
+  # B-164: the same gates on Windows. Nothing here ran on Windows before 2026-10-27, so a
+  # contributor on Windows met a hook that could not find python3, tests asserting POSIX file
+  # modes and a process-group kill Windows does not have (B-162, B-163), and `okolos-mail scan`
+  # exited 0 without scanning (B-161). e2e stays on Linux: the browsers' behaviour is the same,
+  # and the Playwright Firefox path is covered by tools/find-firefox.test.ts.
+  windows:
+    name: gates (windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      # Windows ships no python3; tools/python.mjs finds `py -3` or `python`.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pnpm install --frozen-lockfile
+      - name: lint
+        run: pnpm lint
+      - name: typecheck
+        run: pnpm typecheck
+      - name: build both browser targets
+        run: pnpm build
+      - name: unit tests and bundle gates
+        run: pnpm test
+      - name: ux lint
+        run: pnpm ux:lint
+      - name: brand pack
+        run: pnpm brand:lint
+      - name: sentences outside the catalogue
+        run: pnpm i18n:sweep
+      - name: release checks
+        run: pnpm package:check
+
   e2e:
     name: e2e (chromium)
     runs-on: ubuntu-latest
