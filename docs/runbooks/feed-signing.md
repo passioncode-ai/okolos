@@ -101,15 +101,27 @@ pnpm feed:snapshot                                         # перенести 
 ## Агент обновления
 
 ```bash
-pnpm feed:agent                                        # чекаут агента, plist, загрузка
-node tools/install-feed-agent.mjs --status             # plist, состояние launchd, последний прогон
-node tools/install-feed-agent.mjs --uninstall          # bootout, удалить plist, проверить launchctl print
+pnpm feed:agent                                        # чекаут агента, загрузчик, plist, загрузка
+node tools/install-feed-agent.mjs --status             # plist, загрузчик, состояние launchd, последний прогон
+node tools/install-feed-agent.mjs --uninstall          # bootout, удалить plist и загрузчик, проверить launchctl print
 node tools/install-feed-agent.mjs --uninstall --purge  # и чекаут, состояние, логи
 ```
 
+- **Что запускает launchd:** загрузчик `~/.okolos/bin/feed-agent/bootstrap.mjs` (копия
+  `tools/feed/bootstrap.mjs` и пяти модулей, которые он импортирует), а не `cd` в чекаут (B-159).
+  С 2026-10-09 по 2026-10-26 чекаута не было, каждый запуск падал в оболочке, статус не писался и
+  `consecutiveFailures` оставался 0 (B-149). Теперь загрузчик проверяет чекаут; отсутствующий
+  пересоздаёт на `origin/main` (worktree клона, из которого ставили агента, после
+  `git worktree prune`; если клона нет, `git clone` его origin), сломанный сначала переносит в
+  `~/.okolos/agent-checkout.broken`. Затем запускает `tools/feed-job.mjs --agent` из чекаута.
+  Не удалось пересоздать: статус `outcome: failed`, `stage: checkout`; задача умерла, не записав
+  статус: `stage: job`. Оба считаются в `consecutiveFailures`, и строка об этом есть и в
+  `feed.log`, и в `feed.launchd.log`.
 - **Где работает:** собственный чекаут `~/.okolos/agent-checkout` (detached worktree на
   `origin/main`); перед каждым прогоном агент перематывает его на `origin/main` и, если
-  сдвинулся lockfile, ставит только инструменты публикации. Ручной `pnpm feed:refresh` из
+  сдвинулся lockfile, ставит только инструменты публикации. Загрузчик обновляется только
+  переустановкой: после изменения `tools/feed/bootstrap.mjs` или его модулей на `main` снова
+  `pnpm feed:agent`. Ручной `pnpm feed:refresh` из
   клона не на `origin/main` отказывает; `--unpinned` — аварийный обход, он записывается в статус.
 - **Когда:** каждые 12 часов и при входе в систему; при входе прогон смотрит на возраст
   отданного фида и, если тот моложе 11 часов, записывает «skipped» и выходит.
@@ -118,8 +130,10 @@ node tools/install-feed-agent.mjs --uninstall --purge  # и чекаут, сос
   запуском); три попытки с паузами 30 с и 2 мин.
 - **Где смотреть:** лог `~/Library/Logs/Okolos/feed.log` (5 × 5 МБ, `0600`), статус
   `~/.okolos/state/feed-status.json` — `outcome`, `stage`, `exit`, `version`, `entries`,
-  `consecutiveFailures`, `lastPublished`. Две неудачи подряд или `lastPublished` старше 26 часов —
-  повод разбираться.
+  `consecutiveFailures`, `lastPublished`, `recoveredCheckout` (`true`, если перед прогоном
+  чекаут пришлось пересоздать; `recovery` говорит, что с ним было). Две неудачи подряд или
+  `lastPublished` старше 26 часов — повод разбираться. `recoveredCheckout: true` значит, что
+  чекаут кто-то удалил: ищите, кто (B-150).
 - **Токен** получает только стадия публикации: раннер секрета (`OKOLOS_SECRET_RUNNER` в plist,
   argv без значения) оборачивает её одну.
 
