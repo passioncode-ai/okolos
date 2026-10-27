@@ -581,31 +581,71 @@ describe('the brand pack states facts, and a fact is checkable', () => {
      * asks which system it is on, so nothing can behave differently there
      * (B-166). An absence is read from what ships, the built bundle, and not
      * from the sources, because a bundled dependency is invisible to a sweep of
-     * `src/`. The targets come from the manifests, so a third build cannot ship
-     * without the pack naming it.
+     * `src/`. So this test needs `pnpm build` first, and it judges the last
+     * build: `pnpm gates` and CI build before they test, a lone `vitest run`
+     * after a source change does not.
+     *
+     * The probe is a word list, not a parser, so it is wide on purpose: the
+     * word `platform` in any case catches `navigator.platform`, a bracketed or
+     * destructured read, an aliased `navigator` and `getPlatformInfo`, and today
+     * it has no innocent hit. A future hit that is not a probe is reviewed and
+     * the word list narrowed with a reason, not silenced. Native messaging is
+     * refused as a call: the extension names `chrome.runtime.connectNative`
+     * inside a detection pattern for other extensions, never followed by `(`.
+     *
+     * The targets come from the manifests and the promise is read from the
+     * "Где работает" section only, so a third build cannot ship without that
+     * section naming it, and the row cannot name a browser or a version floor
+     * the manifests do not carry.
      */
     const extension = path.join(root, 'apps/extension')
     const manifests = filesIn(extension, '.json').filter((name) => name.startsWith('manifest.'))
     expect(manifests.length, 'no manifest found to read the targets from').toBeGreaterThanOrEqual(2)
 
-    const probe = /process\.platform|getPlatformInfo|navigator\.(?:platform|userAgent|oscpu)|userAgentData/
+    const heading = '## Где работает\n'
+    expect(facts, 'facts.md has no "Где работает" section').toContain(heading)
+    const after = facts.slice(facts.indexOf(heading) + heading.length)
+    const section = after.slice(0, after.search(/^## /m) === -1 ? after.length : after.search(/^## /m))
+
+    const probe =
+      /platform|userAgent|appVersion|oscpu|connectNative\s*\(|sendNativeMessage\s*\(/i
+    const rebuild = 'run pnpm build first; this test reads the last build'
     for (const manifest of manifests) {
-      expect(facts, `${manifest} ships and the pack does not name it`).toContain(
+      expect(section, `${manifest} ships and "Где работает" does not name it`).toContain(
         `apps/extension/${manifest}`,
       )
       const dist = path.join(extension, 'dist', manifest.split('.')[1] as string)
-      expect(existsSync(dist), `${path.relative(root, dist)} is missing: run pnpm build first`).toBe(true)
+      expect(existsSync(dist), `${path.relative(root, dist)} is missing: ${rebuild}`).toBe(true)
       const bundles = filesUnder(dist, '.js', { skip: [] })
-      expect(bundles.length, `${path.relative(root, dist)} holds no script`).toBeGreaterThan(0)
+      expect(bundles.length, `${path.relative(root, dist)} holds no script: ${rebuild}`).toBeGreaterThan(0)
       for (const file of bundles) {
-        expect(readFileSync(file, 'utf8'), `${path.relative(root, file)} asks which OS it runs on`).not.toMatch(
-          probe,
-        )
+        const hit = probe.exec(readFileSync(file, 'utf8'))
+        expect(
+          hit?.[0],
+          `${path.relative(root, file)} asks which OS it runs on (${rebuild})`,
+        ).toBeUndefined()
       }
     }
 
-    const row = /^\| Расширение работает в ([^|]+?) на ([^|]+?) \|/m.exec(facts)
-    expect(row, 'facts.md has no row promising the extension an OS list').not.toBeNull()
+    // The browsers and their floors, as the two manifests set them.
+    const chrome = JSON.parse(
+      readFileSync(path.join(extension, 'manifest.chrome.json'), 'utf8'),
+    ) as { minimum_chrome_version?: string }
+    const firefox = JSON.parse(
+      readFileSync(path.join(extension, 'manifest.firefox.json'), 'utf8'),
+    ) as { browser_specific_settings?: { gecko?: { strict_min_version?: string } } }
+    const chromeFloor = chrome.minimum_chrome_version
+    const firefoxFloor = firefox.browser_specific_settings?.gecko?.strict_min_version?.split('.')[0]
+    expect(chromeFloor, 'manifest.chrome.json sets no minimum_chrome_version').toMatch(/^\d+$/)
+    expect(firefoxFloor, 'manifest.firefox.json sets no strict_min_version').toMatch(/^\d+$/)
+    expect(manifests.sort(), 'a build without a browser in the promise').toEqual([
+      'manifest.chrome.json',
+      'manifest.firefox.json',
+    ])
+
+    const row = /^\| Расширение работает в ([^|]+?) на ([^|]+?) \|/m.exec(section)
+    expect(row, '"Где работает" has no row promising the extension an OS list').not.toBeNull()
+    expect(row?.[1]).toBe(`Chrome ${chromeFloor}+, Edge ${chromeFloor}+ и Firefox ${firefoxFloor}+`)
     expect(row?.[2]).toBe('Windows, macOS и Linux')
   })
 })

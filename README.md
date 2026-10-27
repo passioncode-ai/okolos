@@ -78,14 +78,22 @@ Chrome: `chrome://extensions` → Developer mode → **Load unpacked** →
 Developer mode → **Load unpacked** → `apps/extension/dist/chrome`. Firefox: `about:debugging` →
 This Firefox → **Load Temporary Add-on** → `apps/extension/dist/firefox/manifest.json`.
 
-**Where it runs.** The extension supports Chrome, Edge and Firefox on Windows, macOS and Linux:
-the built extension asks no OS anything (`tools/docs.test.ts` reads the bundles), and the one
-path it sees, a download's file name, is split on both `/` and `\`
-(`packages/platform/src/adapter.ts:289`). Browser tests run on Linux in CI only; nobody has run
-it in Edge or on Windows yet. `okolos-mail scan` targets Windows, macOS and Linux once B-161
-lands; mail watching is Apple Mail on macOS only, and not built. Contributor tooling
-(`pnpm gates`, the pre-push hook, `pnpm package`, e2e) is meant for macOS, Linux and Windows:
-CI proves it on Linux, `pnpm gates` passes on macOS, and Windows needs B-162, B-163 and B-164. Each row with its proof: the
+**Where it runs.** The extension supports Chrome 137+, Edge 137+ and Firefox 129+ on Windows,
+macOS and Linux. The floor is the manifests' (`minimum_chrome_version` in
+`apps/extension/manifest.chrome.json`, `strict_min_version` in
+`apps/extension/manifest.firefox.json`), and
+[ADR-0011](docs/adr/0011-the-signature-primitive-decides-the-supported-range.md) says why. The
+built extension asks no OS anything (`tools/docs.test.ts` reads the bundles), and the one path it
+sees, a download's file name, is split on both `/` and `\` (`downloads.onCreated` in
+`packages/platform/src/adapter.ts`). That is read from the code, not run: browser tests run on
+Linux in CI only, and nobody has run the extension in Edge, on Windows or on macOS yet.
+`okolos-mail scan` targets Windows, macOS and Linux; its start fixes are in the tree and its test
+passes on Linux and Windows CI, and the promise holds once B-161 is closed. Mail watching is Apple
+Mail on macOS only, and not built. Contributor tooling (`pnpm gates`, the pre-push hook,
+`pnpm package`, e2e) is built for macOS, Linux and Windows (B-162, B-163 and B-164 are closed):
+CI runs the gates on Linux and on `windows-latest`, and `pnpm gates` passes on macOS. On Windows
+the full pre-push hook, an archive-writing `pnpm package` and e2e have not been run; e2e runs on
+Linux only. Each row with its proof: the
 [development runbook](docs/runbooks/development.md#на-каких-ос); what may be promised to a
 user: [docs/brand/facts.md](docs/brand/facts.md#где-работает).
 
