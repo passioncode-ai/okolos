@@ -8,8 +8,11 @@ import { feedPaths } from './paths.mjs'
  * The paths in the platform's spelling turned into `/`, so the same literals hold on
  * Windows, where `path.join('/home/example', …)` answers with backslashes (B-164).
  */
-function posixPaths(...args: Parameters<typeof feedPaths>): Record<string, string> {
-  return Object.fromEntries(Object.entries(feedPaths(...args)).map(([key, value]) => [key, toPosix(String(value))]))
+function posixPaths(...args: Parameters<typeof feedPaths>): { [K in keyof ReturnType<typeof feedPaths>]: string } {
+  const paths = feedPaths(...args)
+  return Object.fromEntries(Object.entries(paths).map(([key, value]) => [key, toPosix(String(value))])) as {
+    [K in keyof typeof paths]: string
+  }
 }
 
 /**

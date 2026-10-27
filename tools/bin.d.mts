@@ -13,7 +13,7 @@ export function binInvocation(
 export function shCandidates(platform?: string, gitExecPath?: string): string[]
 /** Ends `child` and its tree: `taskkill /PID <pid> /T /F` on win32, `child.kill(signal)` elsewhere. */
 export function endTree(
-  child: { pid?: number; kill: (signal?: NodeJS.Signals) => boolean },
+  child: { pid?: number | undefined; kill: (signal?: NodeJS.Signals) => boolean },
   options?: {
     platform?: string
     signal?: NodeJS.Signals
