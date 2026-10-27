@@ -36,13 +36,14 @@ import { existsSync, mkdirSync, realpathSync, renameSync, rmSync } from 'node:fs
 import path from 'node:path'
 
 import { killAllGroups, runBounded } from './bounded.mjs'
+import { isEntry } from './entry.mjs'
 import { acquireLock, LockHeldError } from './lock.mjs'
 import { capFile, cleanLine, openLog } from './log.mjs'
 import { feedPaths } from './paths.mjs'
 import { readStatus, writeStatus } from './status.mjs'
 
 /** What the installer copies beside launchd: this file and every module it imports. */
-export const BOOTSTRAP_FILES = ['bootstrap.mjs', 'bounded.mjs', 'lock.mjs', 'log.mjs', 'paths.mjs', 'status.mjs']
+export const BOOTSTRAP_FILES = ['bootstrap.mjs', 'bounded.mjs', 'entry.mjs', 'lock.mjs', 'log.mjs', 'paths.mjs', 'status.mjs']
 
 /** The same codes as tools/feed-job.mjs (a test holds them equal), so a host reads one table. */
 export const EXIT = { ok: 0, failed: 1, lockHeld: 75, watchdog: 124, signal: 143 }
@@ -341,15 +342,7 @@ async function main() {
   process.exit(exit)
 }
 
-function isMain() {
-  try {
-    return Boolean(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(import.meta.filename)
-  } catch {
-    return false
-  }
-}
-
-if (isMain()) {
+if (isEntry(process.argv[1], import.meta.filename)) {
   main().catch((cause) => {
     console.error(`feed-agent: ${cause instanceof Error ? cause.stack : String(cause)}`)
     // Best effort: a crash here (an unwritable log folder, say) still counts.

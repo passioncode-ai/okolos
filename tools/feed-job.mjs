@@ -41,6 +41,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 import { killAllGroups, runBounded } from './feed/bounded.mjs'
+import { isEntry } from './feed/entry.mjs'
 import { acquireLock, LockHeldError } from './feed/lock.mjs'
 import { capFile, cleanLine, openLog } from './feed/log.mjs'
 import { feedPaths } from './feed/paths.mjs'
@@ -424,7 +425,7 @@ async function main() {
   process.exit(record.exit)
 }
 
-if (import.meta.filename === process.argv[1]) {
+if (isEntry(process.argv[1], import.meta.filename)) {
   main().catch((cause) => {
     console.error(`feed-job: ${cause instanceof Error ? cause.stack : String(cause)}`)
     process.exit(EXIT.failed)

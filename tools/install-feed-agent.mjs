@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 
 import { BOOTSTRAP_FILES } from './feed/bootstrap.mjs'
 import { runBounded } from './feed/bounded.mjs'
+import { isEntry } from './feed/entry.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { readStatus } from './feed/status.mjs'
 import { discover, quote, runnerArgv, xml } from './feed-agent-credential.mjs'
@@ -338,7 +339,7 @@ async function main() {
   }
 }
 
-if (import.meta.filename === process.argv[1]) {
+if (isEntry(process.argv[1], import.meta.filename)) {
   main().catch((cause) => {
     console.error(`install-feed-agent: ${cause instanceof Error ? cause.message : String(cause)}`)
     process.exit(1)
