@@ -9,7 +9,8 @@
  * which kind of "no" it is and whether trying again could change it.
  */
 
-import type { Confidence, Evidence, VerdictCategory } from './verdict.js'
+import type { CarrierKind, ConcealmentTechnique } from './snapshot.js'
+import type { Confidence, EvidenceKind, Stage, Verdict, VerdictCategory } from './verdict.js'
 
 /**
  * Verbs of the read-only bridge (Б1), the ones a task names. Actions arrive in
@@ -152,9 +153,12 @@ export function refuse(code: BridgeRefusal, message: string): { success: false; 
   return { success: false, error: { code, message, retryable: REFUSAL_RETRYABLE[code] } }
 }
 
-/**
- * What the verbs answer (spec §2.2). Every text in them comes from the cleaned
- * snapshot, and every URL has lost its fragment, before it reaches these types.
+/*
+ * What the verbs answer (spec §2.2). Page text enters these types only through
+ * `text`, which the daemon fills from cleaned snapshot lines; a finding names
+ * how the removed text hid in closed sets and carries none of it; a URL is
+ * written without its fragment. The types hold the finding's shape; the other
+ * two are the daemon's duty, checked by its tests.
  */
 
 /**
@@ -171,11 +175,82 @@ export interface OpenResult {
   readonly url: string
 }
 
-/** One thing the engine cut from the snapshot, and why it believed so. */
+/**
+ * Evidence as the bridge sends it: closed sets only. `Evidence` itself cannot
+ * travel: its `snippet` holds up to 200 characters of the very instruction the
+ * cleaner removed, `locator` is a CSS path built from the page's own ids and
+ * classes, and `detail` is free-form. Handing any of them to the agent would
+ * deliver the injection inside the report that it was removed.
+ */
+export interface SnapshotEvidence {
+  readonly kind: EvidenceKind
+  readonly stage: Stage
+  readonly concealment: readonly ConcealmentTechnique[]
+  readonly carrier: CarrierKind | null
+}
+
+/** One thing the engine cut from the snapshot, and how it was hidden. Never what it said. */
 export interface SnapshotFinding {
   readonly kind: VerdictCategory
   readonly confidence: Confidence
-  readonly evidence: readonly Evidence[]
+  readonly evidence: readonly SnapshotEvidence[]
+}
+
+/*
+ * Records rather than arrays so that a technique or carrier added to its type
+ * without a line here is a compile error, not a value silently dropped.
+ */
+const CONCEALMENT_TECHNIQUES: Readonly<Record<ConcealmentTechnique, true>> = {
+  'color-on-color': true,
+  'display-none': true,
+  'visibility-hidden': true,
+  'opacity-zero': true,
+  clip: true,
+  offscreen: true,
+  'font-size-zero': true,
+  'aria-hidden': true,
+  'non-rendered': true,
+}
+const CARRIER_KINDS: Readonly<Record<CarrierKind, true>> = {
+  'text-node': true,
+  'html-comment': true,
+  meta: true,
+  alt: true,
+  title: true,
+  'aria-label': true,
+  'data-attr': true,
+  'json-ld': true,
+  template: true,
+}
+
+function isConcealment(value: string): value is ConcealmentTechnique {
+  return Object.hasOwn(CONCEALMENT_TECHNIQUES, value)
+}
+
+function isCarrier(value: unknown): value is CarrierKind {
+  return typeof value === 'string' && Object.hasOwn(CARRIER_KINDS, value)
+}
+
+/**
+ * The finding the agent may see for a verdict. Copies only the closed fields:
+ * the detectors write `concealment` and `carrier` into `detail` as strings, so
+ * each is kept only when it names a member of its set, and anything else in
+ * `detail`, with `snippet` and `locator`, stays in the daemon.
+ */
+export function toSnapshotFinding(verdict: Verdict): SnapshotFinding {
+  return {
+    kind: verdict.category,
+    confidence: verdict.confidence,
+    evidence: verdict.evidence.map((e) => {
+      const concealment = e.detail['concealment']
+      return {
+        kind: e.kind,
+        stage: e.stage,
+        concealment: typeof concealment === 'string' ? concealment.split(',').filter(isConcealment) : [],
+        carrier: isCarrier(e.detail['carrier']) ? e.detail['carrier'] : null,
+      }
+    }),
+  }
 }
 
 /**
