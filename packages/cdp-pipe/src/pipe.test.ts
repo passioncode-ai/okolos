@@ -126,3 +126,54 @@ describe('launching a browser on a pipe', () => {
     ).rejects.toThrow(/okolos-no-such-browser/)
   })
 })
+
+describe('closing ends the whole process group', () => {
+  it('asks first: a browser that leaves on Browser.close is not waited out to the grace', async () => {
+    const pipe = await fake()
+    const started = Date.now()
+    await pipe.close(5000)
+    expect(Date.now() - started).toBeLessThan(2500)
+    expect(alive(pipe.pid)).toBe(false)
+  })
+
+  it('leaves no process of the group when the browser exits on Browser.close but its child lingers', async () => {
+    const pipe = await fake()
+    const { pid: grandchild } = await pipe.send<{ pid: number }>('Fake.spawnGrandchild')
+    expect(alive(grandchild)).toBe(true)
+
+    await pipe.close(300)
+
+    expect(alive(pipe.pid)).toBe(false)
+    expect(alive(grandchild)).toBe(false)
+    expect(alive(-pipe.pid)).toBe(false)
+  })
+
+  it('escalates to SIGTERM and then SIGKILL when the browser ignores Browser.close and SIGTERM', async () => {
+    const pipe = await fake(['--ignore-close', '--ignore-term'])
+    const { pid: grandchild } = await pipe.send<{ pid: number }>('Fake.spawnGrandchild')
+    const started = Date.now()
+
+    await pipe.close(200)
+
+    // One grace for Browser.close, one for SIGTERM, then SIGKILL.
+    expect(Date.now() - started).toBeGreaterThanOrEqual(350)
+    expect(alive(pipe.pid)).toBe(false)
+    expect(alive(grandchild)).toBe(false)
+    expect(alive(-pipe.pid)).toBe(false)
+  })
+
+  it('rejects requests still waiting when the pipe closes, naming the method', async () => {
+    const pipe = await fake()
+    const waiting = expect(pipe.send('Fake.silence')).rejects.toThrow(/Fake\.silence/)
+    await pipe.close(300)
+    await waiting
+    await expect(pipe.send('Fake.echo')).rejects.toThrow(/Fake\.echo/)
+  })
+
+  it('is idempotent', async () => {
+    const pipe = await fake()
+    await Promise.all([pipe.close(300), pipe.close(300)])
+    await pipe.close(300)
+    expect(alive(-pipe.pid)).toBe(false)
+  })
+})

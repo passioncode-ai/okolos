@@ -26,7 +26,7 @@
  * 60 s. A failed test cannot leave a process running for longer than that.
  */
 import { spawn } from 'node:child_process'
-import { createReadStream, createWriteStream } from 'node:fs'
+import { Socket } from 'node:net'
 import process from 'node:process'
 import { setTimeout } from 'node:timers'
 
@@ -38,8 +38,13 @@ if (argv.includes('--ignore-term')) process.on('SIGTERM', () => {})
 
 setTimeout(() => process.exit(0), LIFETIME_MS).unref()
 
-const fromOwner = createReadStream('', { fd: 3, encoding: 'utf8' })
-const toOwner = createWriteStream('', { fd: 4 })
+// Pipe handles over the inherited fds, not network sockets: `Socket({ fd })` is
+// how Node reads a pipe without a blocking thread-pool read. An fs read stream
+// on fd 3 held a thread-pool thread in read(2), and process.exit then waited
+// for it forever (measured: the fake answered Browser.close and never exited).
+const fromOwner = new Socket({ fd: 3, readable: true, writable: false })
+fromOwner.setEncoding('utf8')
+const toOwner = new Socket({ fd: 4, readable: false, writable: true })
 
 const write = (message) => toOwner.write(`${JSON.stringify(message)}\0`)
 
