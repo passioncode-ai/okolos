@@ -2148,7 +2148,7 @@
     "message": "reading the link's address on this device"
   },
   "warnOutsideLinkStopped": {
-    "message": "The click was stopped, and nothing was opened."
+    "message": "The click on the link was stopped, and the link was not opened."
   },
   "warnOutsideLinkWhere": {
     "message": "The link leads to $HOST$.",
