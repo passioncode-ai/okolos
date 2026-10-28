@@ -114,13 +114,18 @@ function officeDocument(scheme: string, address: string): string | null {
   return /^(?:[a-z][a-z0-9+.-]*:|\\\\)/i.test(rest) ? rest : null
 }
 
-/** Percent-decoded where it can be; a malformed escape leaves the address as written. */
+/**
+ * Percent-decoded where it can be. Each run of valid escapes is decoded on its own, so one
+ * stray `%` (or a broken UTF-8 run) no longer leaves the whole address undecoded (round 4).
+ */
 function decoded(text: string): string {
-  try {
-    return decodeURIComponent(text)
-  } catch {
-    return text
-  }
+  return text.replace(/(?:%[0-9a-f]{2})+/gi, (run) => {
+    try {
+      return decodeURIComponent(run)
+    } catch {
+      return run
+    }
+  })
 }
 
 /**
@@ -131,8 +136,8 @@ function decoded(text: string): string {
 function remoteHost(text: string): string | null {
   const unc = /\\\\([^\\/@:%?&|"'\s]+)/.exec(text)
   // A user name before `@` is not the computer: `http://microsoft.com@evil.example/` fetches from evil.example.
-  const url = /\bhttps?:\/\/(?:[^\\/?#\s@]*@)?([^\\/@:?&|"'\s#]+)/i.exec(text)
-  const file = /\bfile:\/\/(?:[^\\/?#\s@]*@)?(?!localhost[\\/])([^\\/@:?&|"'\s#]+)/i.exec(text)
+  const url = /\bhttps?:\/\/(?:[^\\/?#\s]*@)?([^\\/@:?&|"'\s#]+)/i.exec(text)
+  const file = /\bfile:\/\/(?:[^\\/?#\s]*@)?(?!localhost[\\/])([^\\/@:?&|"'\s#]+)/i.exec(text)
   const first = [unc, url, file]
     .filter((match): match is RegExpExecArray => match !== null)
     .sort((a, b) => a.index - b.index)[0]

@@ -122,6 +122,10 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
       ) as Promise<RpcMap[T]['res']>
     case 'password/shown':
       return forgetHeldVerdict(from) as Promise<RpcMap[T]['res']>
+    case 'download/discard':
+      return platform.downloads
+        .discard((message.payload as { downloadId: number }).downloadId)
+        .then((ok) => ({ ok })) as Promise<RpcMap[T]['res']>
     case 'password/pending':
       return answerPendingVerdict(from) as Promise<RpcMap[T]['res']>
     case 'leaks/check':
@@ -1150,6 +1154,7 @@ platform.downloads.onCreated((item) => {
           shape: verdict.shape,
           reasons: verdict.reasons.join(' '),
           skipped: verdict.skipped.map((entry) => `${entry.check}: ${entry.why}`).join('; '),
+          downloadId: item.id,
         })
         .catch(() => false)
 

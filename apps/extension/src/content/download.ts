@@ -31,6 +31,8 @@ export interface DownloadVerdictMessage {
   /** Words, resolved by whoever ran the checks. */
   readonly reasons: string
   readonly skipped: string
+  /** The browser's id of the download; absent from an older background. */
+  readonly downloadId?: number
 }
 
 /**
@@ -78,6 +80,12 @@ export interface DownloadNoticeDeps {
   /** Opens the journal, where the full record of the download lives. */
   openJournal: () => void
   /**
+   * Asks the browser to cancel the download and delete its file; true when it did.
+   * "Discard the file" used to only close the panel and leave the file on disk (B-165,
+   * round 4 of the certification).
+   */
+  discard?: (downloadId: number) => Promise<boolean>
+  /**
    * How a warning reaches the screen.
    *
    * Injected rather than imported so every source passes through the same slot. Six
@@ -113,6 +121,14 @@ export function showDownloadVerdict(
     banner?.destroy()
     banner = null
   }
+  const discard = () => {
+    const id = message.downloadId
+    const ask = deps.discard && typeof id === 'number' ? deps.discard(id).catch(() => false) : Promise.resolve(false)
+    void ask.then((ok) => {
+      if (ok) dismiss()
+      else banner?.showError(t('warnDownloadDiscardFailed'))
+    })
+  }
 
   banner = mount(
     {
@@ -135,7 +151,7 @@ export function showDownloadVerdict(
       primaryLabel: blocked ? t('warnDownloadShowRecord') : t('bannerActionDownload'),
     },
     {
-      onPrimary: blocked ? deps.openJournal : dismiss,
+      onPrimary: blocked ? deps.openJournal : discard,
       onRetry: deps.openJournal,
       onDispute: dismiss,
       onDismiss: dismiss,

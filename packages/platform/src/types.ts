@@ -68,6 +68,11 @@ export interface Downloads {
     }) => void,
   ): void
   cancel(id: number): Promise<void>
+  /**
+   * Cancels the download if it is still running, deletes its file and drops it from the
+   * browser's list. True when the file is gone; false when it could not be deleted.
+   */
+  discard(id: number): Promise<boolean>
   /** True when this browser exposes the API at all. */
   available(): boolean
 }
@@ -300,6 +305,8 @@ export interface WebExtensionApi {
       ): void
     }
     cancel(id: number): Promise<void>
+    removeFile?(id: number): Promise<void>
+    erase?(query: { id: number }): Promise<number[]>
   }
   management?: {
     getAll(): Promise<

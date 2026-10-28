@@ -295,6 +295,20 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
       async cancel(id: number): Promise<void> {
         await api.downloads?.cancel(id)
       },
+
+      async discard(id: number): Promise<boolean> {
+        const downloads = api.downloads
+        if (!downloads?.removeFile) return false
+        // A finished download refuses cancel; that is not a failure to discard it.
+        await downloads.cancel(id).catch(() => undefined)
+        try {
+          await downloads.removeFile(id)
+        } catch {
+          return false
+        }
+        await downloads.erase?.({ id }).catch(() => undefined)
+        return true
+      },
     },
 
     blocking: {

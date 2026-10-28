@@ -390,6 +390,7 @@ const DOWNLOAD_VERDICT = {
   shape: [{ code: 'double-extension', filename: 'invoice.pdf.exe' }],
   reasons: 'listed by URLhaus on 2026-08-04',
   skipped: 'hash: the file has not been written yet',
+  downloadId: 7,
 }
 
 describe('reaching the content script', () => {
@@ -806,5 +807,33 @@ describe('the navigation listener wakes the worker for web pages only', () => {
     }))
     platform.blocking.onBlocked(() => undefined)
     expect(filter).toEqual({ url: [{ schemes: ['http', 'https'] }] })
+  })
+})
+
+describe('discarding a download (B-165, round 4)', () => {
+  it('cancels it, deletes the file and drops it from the list, and says it did', async () => {
+    const calls: string[] = []
+    const platform = createPlatform('chrome', fakeApi({
+      downloads: {
+        onCreated: { addListener: () => undefined },
+        cancel: async (id: number) => { calls.push(`cancel ${id}`) },
+        removeFile: async (id: number) => { calls.push(`remove ${id}`) },
+        erase: async (query: { id: number }) => { calls.push(`erase ${query.id}`); return [query.id] },
+      },
+    }))
+    expect(await platform.downloads.discard(7)).toBe(true)
+    expect(calls).toEqual(['cancel 7', 'remove 7', 'erase 7'])
+  })
+
+  it('says it did not when the file could not be deleted', async () => {
+    const platform = createPlatform('chrome', fakeApi({
+      downloads: {
+        onCreated: { addListener: () => undefined },
+        cancel: async () => { throw new Error('already complete') },
+        removeFile: async () => { throw new Error('file not found') },
+        erase: async () => [],
+      },
+    }))
+    expect(await platform.downloads.discard(7)).toBe(false)
   })
 })

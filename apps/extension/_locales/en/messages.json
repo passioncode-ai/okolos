@@ -2025,6 +2025,9 @@
   "warnDownloadCancelled": {
     "message": "The file was cancelled, so nothing reached your disk."
   },
+  "warnDownloadDiscardFailed": {
+    "message": "The file could not be deleted. Delete it from the browser's downloads."
+  },
   "warnDownloadShowRecord": {
     "message": "Show the record"
   },

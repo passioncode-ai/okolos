@@ -185,3 +185,24 @@ describe('a download panel closed by the person, through the real slot (B-165, r
     slot.release()
   })
 })
+
+describe('a doubted download, discarded from its panel (B-165, round 4)', () => {
+  it('asks the browser to delete the file, and closes once it did', async () => {
+    const discard = vi.fn(async () => true)
+    const handle = showDownloadVerdict(message({ action: 'warn', headline: 'doubted', downloadId: 42 } as never), { ...deps(), discard })
+    handle?.root.querySelector<HTMLElement>('[data-role=primary]')?.click()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(discard).toHaveBeenCalledWith(42)
+    expect(banner()).toBeNull()
+  })
+
+  it('stays up and says so when the file could not be deleted', async () => {
+    const discard = vi.fn(async () => false)
+    const handle = showDownloadVerdict(message({ action: 'warn', headline: 'doubted', downloadId: 42 } as never), { ...deps(), discard })
+    handle?.root.querySelector<HTMLElement>('[data-role=primary]')?.click()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(banner()).not.toBeNull()
+  })
+})

@@ -207,3 +207,13 @@ describe('the computer a link names, past a user name (B-165, round 3)', () => {
     })
   })
 })
+
+describe('a percent-encoded link with a stray percent sign (B-165, round 4)', () => {
+  it('is still decoded where it can be, and named', () => {
+    expect(classifyOutsideLink('ms-word:ofe%7Cu%7Chttp://evil.example/a.docx?%')).toMatchObject({ host: 'evil.example' })
+  })
+
+  it('names the host after the last user name, however many @ come before it', () => {
+    expect(classifyOutsideLink('ms-word:ofe|u|http://a@b@evil.example/a.docx')).toMatchObject({ host: 'evil.example' })
+  })
+})

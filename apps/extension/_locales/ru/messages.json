@@ -2025,6 +2025,9 @@
   "warnDownloadCancelled": {
     "message": "Загрузка отменена, на диск ничего не попало."
   },
+  "warnDownloadDiscardFailed": {
+    "message": "Файл удалить не удалось. Удалите его в загрузках браузера."
+  },
   "warnDownloadShowRecord": {
     "message": "Показать запись"
   },

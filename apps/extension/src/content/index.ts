@@ -1230,6 +1230,11 @@ if (isTopFrame) {
         openJournal: () => {
           void platform.runtime.send('recovery/open', { kind: 'journal' }).catch(() => undefined)
         },
+        discard: (downloadId) =>
+          platform.runtime
+            .send('download/discard', { downloadId })
+            .then((answer) => answer.ok)
+            .catch(() => false),
       })
       return Promise.resolve({ ok: true }) as never
     }
