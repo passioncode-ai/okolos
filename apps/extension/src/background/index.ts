@@ -27,7 +27,7 @@ import type {
   Verdict,
 } from '@okolos/contracts'
 
-import { handleDownload, judgeItem } from './downloads.js'
+import { discardDownload, handleDownload } from './downloads.js'
 import {
   acceptInventoryChange,
   compareInventory,
@@ -103,14 +103,6 @@ const INVENTORY_ALARM = INVENTORY.name
  * finds it doubted: a page cannot delete a clean or unknown download, and nothing has to be
  * remembered across the service worker's restarts (round 6 of the B-165 certification).
  */
-async function discardIfDoubted(downloadId: number): Promise<boolean> {
-  const item = await platform.downloads.find(downloadId).catch(() => null)
-  if (item === null) return false
-  const feed = await currentFeed().catch(() => null)
-  if (judgeItem(item, feed).action !== 'warn') return false
-  return platform.downloads.discard(downloadId)
-}
-
 platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSender) => {
   switch (message.type) {
     case 'page/candidates':
@@ -136,15 +128,10 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
       ) as Promise<RpcMap[T]['res']>
     case 'password/shown':
       return forgetHeldVerdict(from) as Promise<RpcMap[T]['res']>
-    case 'download/discard': {
-      // Only a top frame, and only a download judged doubted again now (discardIfDoubted): the
-      // handler deletes a file from the person's disk.
-      const { downloadId } = message.payload as { downloadId: number }
-      if (from.frameId !== 0 || typeof downloadId !== 'number') {
-        return Promise.resolve({ ok: false }) as Promise<RpcMap[T]['res']>
-      }
-      return discardIfDoubted(downloadId).then((ok) => ({ ok })) as Promise<RpcMap[T]['res']>
-    }
+    case 'download/discard':
+      return discardDownload(message.payload, from, (id) => platform.downloads.discard(id)) as Promise<
+        RpcMap[T]['res']
+      >
     case 'password/pending':
       return answerPendingVerdict(from) as Promise<RpcMap[T]['res']>
     case 'leaks/check':

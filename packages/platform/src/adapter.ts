@@ -276,7 +276,15 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
       available: () => Boolean(api.downloads),
 
       onCreated(handler): void {
-        api.downloads?.onCreated.addListener((item) => {
+        /**
+         * Chrome reports a download before it has decided the file name, so `onCreated` carries
+         * an empty one and the type checks judged every download as nameless (measured in
+         * Chromium 151, round 7 of the B-165 certification). A nameless download waits for the
+         * name `onChanged` brings, up to five seconds, and is reported once, with it or without.
+         */
+        const NAME_WAIT_MS = 5_000
+        const waiting = new Map<number, { item: Parameters<typeof report>[0]; timer: ReturnType<typeof setTimeout> }>()
+        const report = (item: { id: number; url: string; finalUrl?: string; filename?: string; mime?: string }) => {
           handler({
             id: item.id,
             url: item.url,
@@ -289,6 +297,25 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
             filename: (item.filename ?? '').split(/[\\/]/).pop() ?? '',
             mime: item.mime ?? null,
           })
+        }
+        api.downloads?.onChanged?.addListener((delta) => {
+          const pending = waiting.get(delta.id)
+          const name = delta.filename?.current
+          if (pending === undefined || !name) return
+          clearTimeout(pending.timer)
+          waiting.delete(delta.id)
+          report({ ...pending.item, filename: name })
+        })
+        api.downloads?.onCreated.addListener((item) => {
+          if (item.filename || !api.downloads?.onChanged) {
+            report(item)
+            return
+          }
+          const timer = setTimeout(() => {
+            waiting.delete(item.id)
+            report(item)
+          }, NAME_WAIT_MS)
+          waiting.set(item.id, { item, timer })
         })
       },
 
@@ -312,23 +339,28 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
 
       async discard(id: number): Promise<boolean> {
         const downloads = api.downloads
-        const [item] = (await downloads?.search?.({ id }).catch(() => [])) ?? []
+        const look = async () => (await downloads?.search?.({ id }).catch(() => []))?.[0]
+        let item = await look()
         if (!downloads || item === undefined) return false
-        // By the state the browser reports (round 6 of the B-165 certification): Chrome's
-        // cancel resolves for a finished download too and leaves its file on disk, and
-        // removeFile refuses one still running.
-        if (item.state === 'complete') {
-          if (!downloads.removeFile) return false
-          try {
-            await downloads.removeFile(id)
-          } catch {
-            return false
-          }
-        } else if (item.state !== 'interrupted') {
+        // By the state the browser reports (round 6): Chrome's cancel resolves for a finished
+        // download too and leaves its file on disk, and removeFile refuses one still running.
+        if (item.state !== 'complete' && item.state !== 'interrupted') {
           try {
             await downloads.cancel(id)
           } catch {
             return false
+          }
+          // It may have finished between the look and the cancel (round 7): look again.
+          item = (await look()) ?? item
+        }
+        // A finished file already moved or deleted is gone; nothing is left to remove.
+        if (item.state === 'complete' && item.exists !== false) {
+          if (!downloads.removeFile) return false
+          try {
+            await downloads.removeFile(id)
+          } catch {
+            const after = await look()
+            if (after?.exists !== false) return false
           }
         }
         await downloads.erase?.({ id }).catch(() => undefined)

@@ -855,3 +855,81 @@ describe('discarding a download, by the state the browser reports (B-165, round 
     expect(found).toMatchObject({ id: 7, url: 'https://x.test/a.exe', filename: 'a.exe', mime: 'application/x-msdownload', state: 'complete' })
   })
 })
+
+describe('a download whose name Chrome reports later (B-165, round 7)', () => {
+  it('waits for the name onChanged brings, then reports the download once with it', () => {
+    vi.useFakeTimers()
+    const held: {
+      created?: (item: { id: number; url: string; filename?: string }) => void
+      changed?: (delta: { id: number; filename?: { current?: string } }) => void
+    } = {}
+    const platform = createPlatform('chrome', fakeApi({
+      downloads: {
+        onCreated: { addListener: (cb) => { held.created = cb } },
+        onChanged: { addListener: (cb) => { held.changed = cb } },
+        cancel: async () => undefined,
+      },
+    }))
+    const seen: string[] = []
+    platform.downloads.onCreated((item) => seen.push(item.filename))
+    held.created?.({ id: 4, url: 'https://x.test/a', filename: '' })
+    expect(seen).toEqual([])
+    held.changed?.({ id: 4, filename: { current: 'C:\\Users\\a\\Downloads\\setup.exe' } })
+    expect(seen).toEqual(['setup.exe'])
+    held.changed?.({ id: 4, filename: { current: 'C:\\Users\\a\\Downloads\\setup.exe' } })
+    vi.advanceTimersByTime(10_000)
+    expect(seen).toEqual(['setup.exe'])
+    vi.useRealTimers()
+  })
+
+  it('reports it with no name when none comes within five seconds', () => {
+    vi.useFakeTimers()
+    const held: { created?: (item: { id: number; url: string; filename?: string }) => void } = {}
+    const platform = createPlatform('chrome', fakeApi({
+      downloads: {
+        onCreated: { addListener: (cb) => { held.created = cb } },
+        onChanged: { addListener: () => undefined },
+        cancel: async () => undefined,
+      },
+    }))
+    const seen: string[] = []
+    platform.downloads.onCreated((item) => seen.push(item.filename))
+    held.created?.({ id: 5, url: 'https://x.test/b', filename: '' })
+    vi.advanceTimersByTime(5_000)
+    expect(seen).toEqual([''])
+    vi.useRealTimers()
+  })
+})
+
+describe('discard edge cases (B-165, round 7)', () => {
+  it('deletes the file when the download finished between the state check and the cancel', async () => {
+    const calls: string[] = []
+    let state = 'in_progress'
+    const platform = createPlatform('chrome', fakeApi({
+      downloads: {
+        onCreated: { addListener: () => undefined },
+        search: async (query: { id: number }) => [{ id: query.id, url: 'https://x.test/a', filename: '/d/a.exe', state, exists: true }],
+        cancel: async (id: number) => { calls.push(`cancel ${id}`); state = 'complete' },
+        removeFile: async (id: number) => { calls.push(`remove ${id}`) },
+        erase: async (query: { id: number }) => { calls.push(`erase ${query.id}`); return [query.id] },
+      },
+    }))
+    expect(await platform.downloads.discard(3)).toBe(true)
+    expect(calls).toEqual(['cancel 3', 'remove 3', 'erase 3'])
+  })
+
+  it('counts a finished download whose file is already gone as discarded', async () => {
+    const calls: string[] = []
+    const platform = createPlatform('chrome', fakeApi({
+      downloads: {
+        onCreated: { addListener: () => undefined },
+        search: async (query: { id: number }) => [{ id: query.id, url: 'https://x.test/a', filename: '/d/a.exe', state: 'complete', exists: false }],
+        cancel: async () => undefined,
+        removeFile: async () => { throw new Error('file not found') },
+        erase: async (query: { id: number }) => { calls.push(`erase ${query.id}`); return [query.id] },
+      },
+    }))
+    expect(await platform.downloads.discard(3)).toBe(true)
+    expect(calls).toEqual(['erase 3'])
+  })
+})

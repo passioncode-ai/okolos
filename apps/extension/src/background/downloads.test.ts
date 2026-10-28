@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { FeedSnapshot } from '@okolos/core-feeds'
 
-import { handleDownload, type DownloadDeps, type DownloadItem } from './downloads.js'
+import { discardDownload, handleDownload, type DownloadDeps, type DownloadItem } from './downloads.js'
 
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -171,3 +171,38 @@ describe('a redirect, which is how a malicious file is usually served', () => {
   })
 })
 
+
+describe('discardDownload (B-165, round 7)', () => {
+  it('deletes the download the top frame names, without judging it again', async () => {
+    const asked: number[] = []
+    const result = await discardDownload({ downloadId: 7 }, { frameId: 0 }, async (id) => {
+      asked.push(id)
+      return true
+    })
+    expect(result).toEqual({ ok: true })
+    expect(asked).toEqual([7])
+  })
+
+  it('refuses a frame inside the page and a malformed id, touching nothing', async () => {
+    const asked: number[] = []
+    const discard = async (id: number) => {
+      asked.push(id)
+      return true
+    }
+    expect(await discardDownload({ downloadId: 7 }, { frameId: 3 }, discard)).toEqual({ ok: false })
+    expect(await discardDownload({ downloadId: 7 }, {}, discard)).toEqual({ ok: false })
+    expect(await discardDownload({ downloadId: '7' }, { frameId: 0 }, discard)).toEqual({ ok: false })
+    expect(await discardDownload({ downloadId: 1.5 }, { frameId: 0 }, discard)).toEqual({ ok: false })
+    expect(await discardDownload(null, { frameId: 0 }, discard)).toEqual({ ok: false })
+    expect(asked).toEqual([])
+  })
+
+  it('reports a failed deletion as not done', async () => {
+    expect(await discardDownload({ downloadId: 7 }, { frameId: 0 }, async () => false)).toEqual({ ok: false })
+    expect(
+      await discardDownload({ downloadId: 7 }, { frameId: 0 }, async () => {
+        throw new Error('gone')
+      }),
+    ).toEqual({ ok: false })
+  })
+})

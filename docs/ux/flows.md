@@ -219,7 +219,7 @@ flowchart TD
 - **Traces:** ST-009 (JTBD-02)
 - **Goal:** a dangerous file is stopped before it is saved, and the user is told exactly which checks applied
 - **Entry points:** download started
-- **Success exit:** file kept after a clean check, or discarded after a warning
+- **Success exit:** a file whose address is in a feed is cancelled before it lands; a doubted file is kept or deleted at the person's word
 - **Task analysis:**
   1. See the verdict before the file lands
   2. Keep or discard
@@ -227,20 +227,19 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  A[Download started] --> B{Source in feeds?}
-  B -->|yes| W[Screen: In-page banner - download variant, blocking]
-  B -->|no| C{Hash obtainable?}
-  C -->|yes| D{Known-bad hash?}
-  C -->|no| E[Verdict: partial - URL checks only, stated in UI]
-  D -->|yes| W
-  D -->|no| F[Verdict: clean by the checks that ran]
-  E --> G[Screen: In-page banner - download variant, informational]
-  F --> G
-  W -->|discard file| H[Download cancelled, journalled]
-  W -->|keep anyway| I[Download kept; exception journalled]
-  G -->|keep| I
-  B -->|feeds unavailable| B_err[Inline: feeds stale - checks limited]
-  B_err --> C
+  A[Download started] --> N[Name reported, or 5 s waited for it]
+  N --> B{Address or redirect in feeds?}
+  B -->|yes| X[Download cancelled before it lands, journalled]
+  X --> W[Screen: In-page banner - download variant, critical]
+  B -->|no| T{Program, hidden type or check not run?}
+  T -->|yes| D[Screen: In-page banner - download variant, major]
+  T -->|no| G[No banner: clean by the checks that ran, no hash check; journalled]
+  W -->|show the record| J[Journal]
+  D -->|discard the file| H[Cancelled if running, file deleted, dropped from the list]
+  D -->|delete failed| E[Inline: delete it from the browser's downloads]
+  D -->|this is wrong or dismiss| I[File stays where the browser put it]
+  B -->|feeds unavailable| B_err[Feed check not run, stated in the verdict]
+  B_err --> T
 ```
 
 - **Screens traversed:**

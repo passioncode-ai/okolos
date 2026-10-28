@@ -38,9 +38,7 @@ export interface DownloadDeps {
 
 /**
  * The verdict on one download, from its addresses, name, type and the feed. Pure: the same
- * item and feed give the same verdict, so the background can judge a download again when a
- * page asks to discard it, instead of remembering what it offered (round 6 of the B-165
- * certification: an offer kept in the service worker's memory died with the worker).
+ * item and feed give the same verdict.
  */
 export function judgeItem(item: DownloadItem, feed: FeedSnapshot | null): DownloadVerdict {
 
@@ -106,4 +104,24 @@ export async function handleDownload(item: DownloadItem, deps: DownloadDeps): Pr
 
   await deps.announce(verdict, item).catch(() => undefined)
   return verdict
+}
+
+/**
+ * The person asked to delete a doubted download from its warning ("Delete file").
+ *
+ * Only the top frame's content script may ask: a frame inside the page is not where the warning
+ * stands, and a page cannot message the extension at all. The download is not judged again here
+ * (round 7): the warning the person answered is the judgement, and a second one could disagree
+ * with it (a feed refreshed since, a name the browser reported late) and leave the button dead.
+ */
+export async function discardDownload(
+  payload: unknown,
+  from: { frameId?: number },
+  discard: (id: number) => Promise<boolean>,
+): Promise<{ ok: boolean }> {
+  const downloadId = (payload as { downloadId?: unknown } | null)?.downloadId
+  if (from.frameId !== 0 || typeof downloadId !== 'number' || !Number.isInteger(downloadId)) {
+    return { ok: false }
+  }
+  return { ok: await discard(downloadId).catch(() => false) }
 }

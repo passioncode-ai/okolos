@@ -315,11 +315,15 @@ export interface WebExtensionApi {
         }) => void,
       ): void
     }
+    /** Where Chrome reports the file name it decided after `onCreated`, which carries none. */
+    onChanged?: {
+      addListener(cb: (delta: { id: number; filename?: { current?: string } }) => void): void
+    }
     cancel(id: number): Promise<void>
     removeFile?(id: number): Promise<void>
     erase?(query: { id: number }): Promise<number[]>
     search?(query: { id: number }): Promise<
-      Array<{ id: number; url: string; finalUrl?: string; filename?: string; mime?: string; state?: string }>
+      Array<{ id: number; url: string; finalUrl?: string; filename?: string; mime?: string; state?: string; exists?: boolean }>
     >
   }
   management?: {
