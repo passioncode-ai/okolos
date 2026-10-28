@@ -97,7 +97,9 @@ at origin/main (a worktree of the clone `pnpm feed:agent` ran from, or a clone o
 when the clone is gone; recreated by the bootstrap when it is missing; a broken one is moved to
 `~/.okolos/agent-checkout.broken`, one kept, removed by `--purge`); in the clone `pnpm feed:agent`
 ran from, the installer's and the bootstrap's `git worktree prune`, `git fetch origin main` and
-`git worktree add` (its `.git/worktrees/` entry and remote refs, nothing in its working tree);
+`git worktree add`, and every run's own `git fetch origin main` in the agent checkout, which shares
+that clone's `.git` (its objects, its `.git/worktrees/` entry and `refs/remotes/origin/main`, twice a
+day; nothing in its working tree);
 private `$TMPDIR/okolos-feed-*` directories removed in `finally`, older ones swept at the next
 start.
 
@@ -110,9 +112,9 @@ What a failed run leaves, and where (B-159):
 | the job dies without writing its own record: a crash | `stage: job`, `reason` as `runAgent` in `tools/feed/bootstrap.mjs` builds it: "the job exited <code or signal>", a dash, the first of the job's last 50 output lines (stdout and stderr) that reads as an error, else the last of them (`reasonFrom`), then "without writing its record"; with no output, "the job exited <code or signal> without writing its record" | its output and a line | its output and a line |
 | the job is killed at the run's deadline without writing its own record | `stage: job`, exit 124, `reason` = the fixed sentence "the run's deadline (2700 s) passed during the job; its process group was killed" | a line | a line |
 | the job fails in its own stages (config, pin, ingest, publish, its watchdog, a signal) | the job's stage; a stop by SIGTERM or SIGINT is recorded as the stop (exit 143, `reason: stopped by <signal>`), also when it killed a stage's child, once | yes | one line |
-| the bootstrap is stopped by SIGTERM or SIGINT (launchd signals the launch line's `/bin/sh`, its main pid, which passes the signal on to the bootstrap and waits for it) and the job wrote no record of this run | the stage it was in, exit 143, `reason: stopped by <signal>`; a repair or job the stop killed is not recorded as a crash | one line, `stopped by <signal> in <stage>`, also when the job recorded the stop itself | one line, also when the job recorded the stop itself (`onSignal` in `tools/feed/bootstrap.mjs`) |
+| the bootstrap is stopped by SIGTERM or SIGINT (launchd signals the launch line's `/bin/sh`, its main pid, which passes the signal on to the bootstrap and waits for it) and the job wrote no record of this run | the stage it was in, exit 143, `reason: stopped by <signal>`; a repair or job the stop killed is not recorded as a crash | one line, `stopped by <signal> in <stage>`: the job's when a stage it ran answered the signal, else the bootstrap's (`loggedSince` in `tools/feed/bootstrap.mjs`) | one line, also when the job recorded the stop itself (`onSignal` in `tools/feed/bootstrap.mjs`) |
 | the bootstrap itself crashes | `stage: bootstrap` | no | its stack |
-| another run holds the lock (exit 75) | nothing: the record is the running one's | two lines: the stage marker (`── checkout`) and `refused: …` | no |
+| another run holds the lock (exit 75) | nothing: the record is the running one's | two lines, the stage marker (`── checkout`) and `refused: …`; four when another run takes the lock in the moment between the bootstrap and the job (`── job`, the job's and the bootstrap's `refused`) | no |
 
 Not recorded anywhere: launchd not running the agent at all (no plist, unloaded or disabled), or
 `/bin/sh` itself failing; `node tools/install-feed-agent.mjs --status` and `launchctl print` show

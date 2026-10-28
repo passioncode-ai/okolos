@@ -558,6 +558,32 @@ describe('an install made off origin/main is in every record the bootstrap write
     expect(readFileSync(w.paths.log, 'utf8').match(/stopped by SIGTERM/g)).toHaveLength(1)
     expect(stderr.match(/^feed-agent: .*stopped by SIGTERM/gm)).toHaveLength(1)
   })
+
+  it.skipIf(process.platform === 'win32')('names a stop in feed.log once when the job also wrote the line itself', async () => {
+    const marker = (w: ReturnType<typeof world>) => path.join(w.base, 'job-started')
+    // A job that answers SIGTERM as the real one does: its own record for this run, exit 143.
+    const { w, env } = installed((at) => [
+      `import { appendFileSync, writeFileSync } from 'node:fs'`,
+      `process.on('SIGTERM', () => {`,
+      `  writeFileSync(${JSON.stringify(at.paths.status)}, JSON.stringify({ startedAt: 'x', at: 'x', outcome: 'failed', stage: 'pin', exit: 143, reason: 'stopped by SIGTERM', runId: process.env.OKOLOS_LAUNCH_ID, consecutiveFailures: 1, lastPublished: null }))`,
+      `  appendFileSync(${JSON.stringify(at.paths.log)}, new Date().toISOString() + ' stopped by SIGTERM in pin\\n')`,
+      `  process.exit(143)`,
+      `})`,
+      `writeFileSync(${JSON.stringify(marker(at))}, '')`,
+      `setInterval(() => {}, 1000)`,
+    ].join('\n') + '\n')
+    const child = spawn(process.execPath, [path.join(w.paths.agentBin, 'bootstrap.mjs')], { env, stdio: ['ignore', 'ignore', 'pipe'] })
+    let stderr = ''
+    child.stderr?.on('data', (chunk: Buffer) => (stderr += chunk.toString('utf8')))
+    const exited = new Promise<number | null>((resolve) => child.on('exit', (code) => resolve(code)))
+    for (let waited = 0; !existsSync(marker(w)) && waited < 20_000; waited += 50) await new Promise((r) => setTimeout(r, 50))
+    expect(existsSync(marker(w))).toBe(true)
+    child.kill('SIGTERM')
+    expect(await exited).toBe(EXIT.signal)
+    expect(readStatus(w.paths.status)).toMatchObject({ stage: 'pin', runId: 'launch-9-9', exit: 143 })
+    expect(readFileSync(w.paths.log, 'utf8').match(/stopped by SIGTERM/g)).toHaveLength(1)
+    expect(stderr.match(/^feed-agent: .*stopped by SIGTERM/gm)).toHaveLength(1)
+  })
 })
 
 describe('a stop by signal', () => {

@@ -62,7 +62,7 @@ pnpm exec playwright install chromium firefox
 | Что | macOS, Linux | Windows | Проверка |
 |---|---|---|---|
 | Python | `python3`, затем `python` | `py -3`, `python`, `python3` | `tools/python.test.ts` |
-| `pnpm`, `npx` из инструментов разработки (гейты, `pnpm package`, e2e, `deploy-worker`) | без оболочки | через cmd.exe одной строкой команды; аргумент со спецсимволом cmd отклоняется. Инструменты фида (`feed:refresh`, `feed:agent`, публикация) на Windows не работают: они для машины с ключом подписи на macOS или Linux (ADR-0002, ADR-0017) | `tools/bin.test.ts` |
+| `pnpm`, `npx` из инструментов разработки (гейты, `pnpm package`, e2e, `deploy-worker`) | без оболочки | через cmd.exe одной строкой команды; аргумент со спецсимволом cmd отклоняется. Инструменты фида на Windows не работают: `feed:refresh` и публикация для машины с ключом подписи на macOS или Linux (ADR-0002), агент фида `feed:agent` только для macOS (launchd, ADR-0017) | `tools/bin.test.ts` |
 | архив `pnpm package` | `zip -q -r -X` | `%SystemRoot%\System32\tar.exe -a` | `tools/archive.test.ts` |
 | дерево процессов фида | сигнал группе | `taskkill /T`, через паузу `/T /F` | `tools/feed/bounded.test.ts` |
 | geckodriver в e2e Firefox, сборка в `pnpm package` по сроку | `child.kill()` | `taskkill /PID <pid> /T /F`: иначе кончается только cmd.exe | `tools/bin.test.ts` |

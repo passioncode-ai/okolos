@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 import { FAILED, launch, runsFromSources } from './launch.mjs'
@@ -10,6 +11,15 @@ import { EXIT } from './scan.js'
 describe('the failure code', () => {
   it('is the unread code of scan.ts, never 0 or 1', () => {
     expect(FAILED).toBe(EXIT.unreadable)
+  })
+})
+
+describe('the floors and the root engines', () => {
+  it('say the same versions, so a node engines allows can run the command', () => {
+    const engines = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')).engines.node
+    expect(engines).toBe('^22.18.0 || >=23.6.0')
+    for (const node of ['22.18.0', '23.6.0', '24.0.0']) expect(runsFromSources(node, 'strip'), node).toBe(true)
+    for (const node of ['22.17.9', '23.5.0']) expect(runsFromSources(node, 'strip'), node).toBe(false)
   })
 })
 

@@ -36,7 +36,7 @@
  * rule.
  */
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, realpathSync, renameSync, rmSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, openSync, readSync, realpathSync, renameSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 import { killAllGroups, runBounded, withoutSecrets } from './bounded.mjs'
@@ -420,6 +420,29 @@ export function crashRecord(cause, at = new Date().toISOString(), env = process.
 }
 
 /**
+ * Whether feed.log already has `text` on a line stamped at or after `since` (this run's start).
+ * Reads only the last 64 KB: a run writes a few dozen lines.
+ */
+function loggedSince(file, since, text) {
+  let tail
+  try {
+    const size = statSync(file).size
+    const fd = openSync(file, 'r')
+    try {
+      const length = Math.min(size, 64 * 1024)
+      const buffer = Buffer.alloc(length)
+      readSync(fd, buffer, 0, length, size - length)
+      tail = buffer.toString('utf8')
+    } finally {
+      closeSync(fd)
+    }
+  } catch {
+    return false
+  }
+  return tail.split(/\r?\n/).some((line) => line.slice(0, 24) >= since && line.includes(text))
+}
+
+/**
  * On SIGTERM/SIGINT: mark the run as stopping (runAgent then records what the stop
  * broke as the stop), stop the job's group, record the stop unless this run's
  * record is already written, and exit 143. Returns the promise main waits on, so
@@ -438,7 +461,11 @@ function onSignal(signal, current) {
       // One line in feed.log and the same one line in launchd's own log as any failed run,
       // whichever of the job or the bootstrap recorded the stop (AGENTS.md, the failure table).
       try {
-        openLog(paths.log).write(`stopped by ${signal} in ${record.stage}`)
+        // The job names its own stops in feed.log when a stage it was running answers the
+        // signal; the bootstrap adds the line only when this run's tail does not have it.
+        if (!loggedSince(paths.log, current.startedAt, `stopped by ${signal}`)) {
+          openLog(paths.log).write(`stopped by ${signal} in ${record.stage}`)
+        }
       } catch {
         // feed.log unwritable: the record and launchd's line below still say it.
       }
