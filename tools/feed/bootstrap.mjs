@@ -432,9 +432,12 @@ function onSignal(signal, current) {
     await killAllGroups(5000)
     try {
       const paths = feedPaths()
-      if (readStatus(paths.status)?.runId !== current.runId) {
-        writeStatus(paths.status, signalRecord(current, signal, new Date().toISOString()))
-      }
+      const own = readStatus(paths.status)
+      const record = own?.runId === current.runId ? own : signalRecord(current, signal, new Date().toISOString())
+      if (record !== own) writeStatus(paths.status, record)
+      // The same one line in launchd's own log as any failed run, whichever of the job or the
+      // bootstrap recorded the stop (AGENTS.md, the failure table).
+      console.error(`feed-agent: ${record.outcome} in ${record.stage}: ${record.reason ?? `stopped by ${signal}`} (see ${paths.log})`)
     } finally {
       process.exit(EXIT.signal)
     }

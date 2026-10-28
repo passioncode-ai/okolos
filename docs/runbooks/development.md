@@ -22,9 +22,9 @@
 | Что | Обещано | Чем подтверждено |
 |---|---|---|
 | Расширение | Chrome 137+, Edge 137+ и Firefox 129+ на Windows, macOS и Linux | пороги версий из манифестов и [ADR-0011](../adr/0011-the-signature-primitive-decides-the-supported-range.md); кода, зависящего от ОС, в сборке нет (`tools/docs.test.ts`); Edge получает сборку Chrome; браузерный прогон есть в CI только на Linux, в Chromium и Firefox из Playwright; прогона в Edge, на Windows или на macOS с записанным коммитом нет |
-| `okolos-mail scan` | Windows, macOS и Linux, когда закрыт B-161 | исправления запуска в этом дереве; тест, который запускает саму команду, проходит в CI на Linux и Windows (прогон 40572549603 на `3276f2c`); строка B-161 открыта ([facts.md](../brand/facts.md#где-работает)) |
+| `okolos-mail scan` | Windows, macOS и Linux (B-161 закрыт) | исправления запуска в этом дереве; тест, который запускает саму команду, проходит в CI на Linux и Windows (прогон 40572549603 на `3276f2c`); строка B-161 открыта ([facts.md](../brand/facts.md#где-работает)) |
 | Наблюдение за почтой (SCN-042) | только Apple Mail на macOS | не построено, `docs/ux/scenarios.md` |
-| `pnpm gates` и хук pre-push | macOS, Linux и Windows | Linux и Windows: задачи `gates` и `gates (windows)` в `.github/workflows/ci.yml`, прогон 40572549603 на `3276f2c` зелёный; что гоняет задача Windows и чего она не проверяет (полный прогон хука в том числе), в разделе [«Windows»](#windows). macOS: все гейты хука pre-push прошли 2026-10-27 на Mac с macOS 26 (Darwin 25.6) при отправке `3276f2c` (lint, typecheck, build, unit, ux, brand, i18n, package) |
+| `pnpm gates` и хук pre-push | macOS, Linux и Windows | Linux и Windows: задачи `gates` и `gates (windows)` в `.github/workflows/ci.yml`, прогон 40572549603 на `3276f2c` зелёный; что гоняет задача Windows и чего она не проверяет (полный прогон хука в том числе), в разделе [«Windows»](#windows). macOS: задачи в CI нет; гейты на macOS гоняет хук pre-push при каждой отправке, но сохранённой записи такого прогона нет |
 | `pnpm package` | macOS, Linux и Windows | прогона с записью архива и с записанным коммитом нет ни на одной ОС; на Windows архив пишет `tar.exe` (раздел [«Windows»](#windows), `tools/archive.test.ts`). CI гоняет `pnpm package:check`, те же проверки без записи архива; сам `pnpm package` в CI не идёт ни на одной ОС |
 | `pnpm test:e2e`, `pnpm test:e2e:firefox` | macOS, Linux и Windows | задачи `e2e (chromium)` и `e2e (firefox)` только на `ubuntu-latest`; на macOS и Windows e2e в CI нет (раздел [«Windows»](#windows)) |
 | Агент фида (`pnpm feed:agent`) | только macOS | launchd, [ADR-0017](../adr/0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md) |
@@ -61,11 +61,14 @@ pnpm exec playwright install chromium firefox
 - **Git for Windows.** Хук запускает его `sh`; `tools/ci.test.ts` находит этот `sh`
   рядом с `git` (`git --exec-path`), даже когда в PATH его нет, как в PowerShell и cmd.
 - **Оболочка: Git Bash или PowerShell 7** (`pwsh`). Команды этого раннбука идут в обеих,
-  кроме двух, которым нужен Git Bash (или macOS и Linux): запись доступа
+  кроме четырёх, которым нужен Git Bash (или macOS и Linux): запись доступа
   `printf %s "$VALUE" | node tools/access.mjs set …` в разделе «Доступы» (в PowerShell нет
-  `printf`) и замер окна агента `node tools/agent-window-spike.mjs` в разделе «Прочее»
-  (он работает только на macOS и Linux: путь `/tmp` и сигнал группе процессов Chrome). В
-  `cmd.exe` и Windows PowerShell 5.1 часть команд читается иначе.
+  `printf`); проверка `git ls-files --eol | grep w/crlf` в рецепте для старого клона (в
+  PowerShell нет `grep`; там `git ls-files --eol | Select-String w/crlf`); обход хука
+  `OKOLOS_SKIP_GATES=1 git push` (в PowerShell: `$env:OKOLOS_SKIP_GATES=1; git push`, затем
+  `Remove-Item Env:OKOLOS_SKIP_GATES`); замер окна агента `node tools/agent-window-spike.mjs`
+  в разделе «Прочее» (он работает только на macOS и Linux: путь `/tmp` и сигнал группе
+  процессов Chrome). В `cmd.exe` и Windows PowerShell 5.1 часть команд читается иначе.
 - **Node и pnpm.** На Node 22–24 pnpm включает corepack, как выше. С Node 25 corepack
   в Node не входит: pnpm ставится `npm i -g pnpm` или автономным установщиком с
   pnpm.io (`iwr https://get.pnpm.io/install.ps1 -useb | iex` в PowerShell); версию
@@ -108,14 +111,18 @@ Firefox для e2e на Windows лежит в `%LOCALAPPDATA%\ms-playwright`; п
 
 `pnpm package` сверяет архив со сборкой по списку файлов из центрального каталога zip,
 а не по байтам: `zip` и `tar` пишут разные байты. Концы строк держит `.gitattributes`
-(`* text=auto eol=lf`): чекаут получает LF при любом `core.autocrlf`, и это проверяет
-`tools/ci.test.ts` («line endings are LF on every checkout»).
+(`* text=auto eol=lf`): чекаут получает LF при любом `core.autocrlf`. `tools/ci.test.ts`
+проверяет это дважды: «line endings are LF on every checkout» читает `.gitattributes` и
+индекс, а тест рецепта для старого клона прогоняет его во временном репозитории с
+`core.autocrlf=true` и смотрит файлы на диске.
 
 На Windows гейты гоняет задача CI `gates (windows)` на `windows-latest`
 (`.github/workflows/ci.yml`, B-164; первый зелёный прогон
 [40517607494](https://github.com/passioncode-ai/okolos/actions/runs/40517607494) на
-`714e336`, последний на ветке `sw/sw-05`
-[40572549603](https://github.com/passioncode-ai/okolos/actions/runs/40572549603) на `3276f2c`
+`714e336`; дерево с исправлениями B-162 и B-163 проверил прогон
+[40572549603](https://github.com/passioncode-ai/okolos/actions/runs/40572549603) на `3276f2c`,
+зелёный во всех четырёх задачах; дерево с последними документами по Windows проверил
+[40625746452](https://github.com/passioncode-ai/okolos/actions/runs/40625746452) на `46a5752`,
 тоже зелёный). Её шаги: `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`,
 `pnpm build`, `pnpm test` (в нём архив через `tar.exe` из System32 и решение хука под `sh`
 из Git for Windows), `pnpm ux:lint`, `pnpm brand:lint`, `pnpm i18n:sweep` и

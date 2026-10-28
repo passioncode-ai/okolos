@@ -69,9 +69,11 @@ pnpm build                          # apps/extension/dist/chrome and apps/extens
 pnpm package                        # the store zips, checked, in apps/extension/dist/release/
 ```
 
-Corepack ships with Node 22 to 24 only. On Node 25 and later, and on Windows, install pnpm and
-run `pnpm install` as the [development runbook](docs/runbooks/development.md#windows) says
-(`npm i -g pnpm` or the pnpm.io installer; `packageManager` still pins the version).
+Corepack ships with Node 22 to 24 only, on every OS, Windows included. On Node 25 and later,
+install pnpm as the [development runbook](docs/runbooks/development.md#windows) says (`npm i -g
+pnpm` or the pnpm.io installer; `packageManager` still pins the version). On Windows,
+`pnpm package` writes the zips with `tar.exe` from System32; no store has yet been sent a zip
+built on Windows, so build release archives on macOS or Linux.
 
 Chrome: `chrome://extensions` → Developer mode → **Load unpacked** →
 `apps/extension/dist/chrome`. Edge takes the same Chrome build: `edge://extensions` →
@@ -89,11 +91,11 @@ sees, a download's file name, is split on both `/` and `\` (`downloads.onCreated
 Linux only, in Playwright's Chromium and Firefox, and no run in Edge, on Windows or on macOS has a
 recorded commit yet.
 `okolos-mail scan` targets Windows, macOS and Linux with Node 22.18 or later in the 22 line or 23.6 or later, and reads `.eml` and `.emlx`; its start fixes are in the tree and its test
-passes on Linux and Windows CI (run 40572549603 on `3276f2c`), and the promise holds once B-161 is closed. Mail watching is Apple
+passes on Linux and Windows CI (run 40625746452 on `46a5752`); B-161 is closed. Mail watching is Apple
 Mail on macOS only, and not built. Contributor tooling (`pnpm gates`, the pre-push hook,
 `pnpm package`, e2e) is written to run on macOS, Linux and Windows (B-162, B-163 and B-164 are closed):
-CI runs the gates on Linux and on `windows-latest`, and every pre-push gate passed on a macOS 26 (Darwin 25.6) Mac when `3276f2c` was pushed on
-2026-10-27. No archive-writing `pnpm package`
+CI runs the gates on Linux and on `windows-latest`, and on macOS the gates run locally only: there is no macOS job in CI, and no stored record of a
+local run. No archive-writing `pnpm package`
 run with a recorded commit exists on any OS. On Windows
 the full pre-push hook, an archive-writing `pnpm package` and e2e have not been run; e2e runs on
 Linux only. Each row with its proof: the
