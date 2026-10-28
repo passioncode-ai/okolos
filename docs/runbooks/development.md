@@ -13,8 +13,8 @@
 
 | Что | Версия | Зачем |
 |---|---|---|
-| Node | `>=22` (проверено на 26.4.0) | всё остальное |
-| pnpm | `11.10.0` — задан в `packageManager` | воркспейс из 21 пакета |
+| Node | `^22.18.0 \|\| >=23.6.0` (`engines` в `package.json`; проверено на 26.4.0 и 26.10.0): ниже `okolos-mail` не запускается, и его тест в `pnpm test` краснеет | всё остальное |
+| pnpm | `11.10.0` — задан в `packageManager` | воркспейс из 23 пакетов (`apps/*` и `packages/*`) |
 | Python 3 | любой 3.x (проверено на 3.14.6), под именем `python3`, `python` или `py -3` | `docs/ux/lint.py`, `docs/brand/lint.py`, `tools/model/evaluate.py` |
 | Браузеры Playwright | ставятся командой ниже | e2e в Chromium и Firefox |
 
@@ -40,15 +40,15 @@ pnpm exec playwright install chromium firefox
 - **Git for Windows.** Хук запускает его `sh`; `tools/ci.test.ts` находит этот `sh`
   рядом с `git` (`git --exec-path`), даже когда в PATH его нет, как в PowerShell и cmd.
 - **Оболочка: Git Bash или PowerShell 7** (`pwsh`). Команды этого раннбука идут в обеих,
-  кроме четырёх, которым нужен Git Bash (или macOS и Linux): запись доступа
+  кроме трёх, которым нужен Git Bash (или macOS и Linux), и одной, которая работает только на macOS и Linux: запись доступа
   `printf %s "$VALUE" | node tools/access.mjs set …` в разделе «Доступы» (в PowerShell нет
   `printf`); проверка `git ls-files --eol | grep w/crlf` в рецепте для старого клона (в
   PowerShell нет `grep`; там `git ls-files --eol | Select-String w/crlf`); обход хука
   `OKOLOS_SKIP_GATES=1 git push` (в PowerShell: `$env:OKOLOS_SKIP_GATES=1; git push`, затем
-  `Remove-Item Env:OKOLOS_SKIP_GATES`); замер окна агента `node tools/agent-window-spike.mjs`
+  `Remove-Item Env:OKOLOS_SKIP_GATES`). Только на macOS и Linux: замер окна агента `node tools/agent-window-spike.mjs`
   в разделе «Прочее» (он работает только на macOS и Linux: путь `/tmp` и сигнал группе
   процессов Chrome). В `cmd.exe` и Windows PowerShell 5.1 часть команд читается иначе.
-- **Node и pnpm.** На Node 22–24 pnpm включает corepack, как выше. С Node 25 corepack
+- **Node и pnpm.** На Node 22–24 corepack включает pnpm, как выше. С Node 25 corepack
   в Node не входит: pnpm ставится `npm i -g pnpm` или автономным установщиком с
   pnpm.io (`iwr https://get.pnpm.io/install.ps1 -useb | iex` в PowerShell); версию
   всё равно задаёт `packageManager`.
@@ -62,7 +62,7 @@ pnpm exec playwright install chromium firefox
 | Что | macOS, Linux | Windows | Проверка |
 |---|---|---|---|
 | Python | `python3`, затем `python` | `py -3`, `python`, `python3` | `tools/python.test.ts` |
-| `pnpm`, `npx` из инструментов | без оболочки | через cmd.exe одной строкой команды; аргумент со спецсимволом cmd отклоняется | `tools/bin.test.ts` |
+| `pnpm`, `npx` из инструментов разработки (гейты, `pnpm package`, e2e, `deploy-worker`) | без оболочки | через cmd.exe одной строкой команды; аргумент со спецсимволом cmd отклоняется. Инструменты фида (`feed:refresh`, `feed:agent`, публикация) на Windows не работают: они для машины с ключом подписи на macOS или Linux (ADR-0002, ADR-0017) | `tools/bin.test.ts` |
 | архив `pnpm package` | `zip -q -r -X` | `%SystemRoot%\System32\tar.exe -a` | `tools/archive.test.ts` |
 | дерево процессов фида | сигнал группе | `taskkill /T`, через паузу `/T /F` | `tools/feed/bounded.test.ts` |
 | geckodriver в e2e Firefox, сборка в `pnpm package` по сроку | `child.kill()` | `taskkill /PID <pid> /T /F`: иначе кончается только cmd.exe | `tools/bin.test.ts` |
