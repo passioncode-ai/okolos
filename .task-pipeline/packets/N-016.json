@@ -44,6 +44,7 @@
   "okolos-agent doctor на списке доступов, который не записывается (нет прав на файл или каталог, нет места), называет проблему с путём и причиной: это обещают pairingStoreUnwritable и agentRevokeFailed (проверки N-013 круг 10)",
   "okolos-agent doctor называет и сбой выгрузки журнала (права на каталог журнала, место на диске), который обещает journalExportFailed (проверки N-013 круг 11)",
   "--uninstall --purge удаляет и папку clients/ с ключами агентов; без --purge она остаётся (SCN-023, SCN-024) (проверки N-013 круг 12)",
+  "doctor проверяет журнал без второго Journal на папке: права папки и последний день файла читаются, а записывающая проверка идёт через работающий демон (/.well-known или событие), не через Journal.open (риск N-006 r7 seam #6)",
   "проверка узла: pnpm -s exec vitest run tools/install-agent.test.ts tools/runbook.test.ts"
  ],
  "guards": [
