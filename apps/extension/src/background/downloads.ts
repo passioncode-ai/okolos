@@ -36,8 +36,13 @@ export interface DownloadDeps {
   announce(verdict: DownloadVerdict, item: DownloadItem): Promise<void>
 }
 
-export async function handleDownload(item: DownloadItem, deps: DownloadDeps): Promise<DownloadVerdict> {
-  const feed = await deps.feed().catch(() => null)
+/**
+ * The verdict on one download, from its addresses, name, type and the feed. Pure: the same
+ * item and feed give the same verdict, so the background can judge a download again when a
+ * page asks to discard it, instead of remembering what it offered (round 6 of the B-165
+ * certification: an offer kept in the service worker's memory died with the worker).
+ */
+export function judgeItem(item: DownloadItem, feed: FeedSnapshot | null): DownloadVerdict {
 
   /**
    * Both addresses are checked, and either one listed is enough.
@@ -79,6 +84,12 @@ export async function handleDownload(item: DownloadItem, deps: DownloadDeps): Pr
       },
     },
   })
+  return verdict
+}
+
+export async function handleDownload(item: DownloadItem, deps: DownloadDeps): Promise<DownloadVerdict> {
+  const feed = await deps.feed().catch(() => null)
+  const verdict = judgeItem(item, feed)
 
   if (verdict.action === 'block') {
     // Cancelled first, explained second. The order matters: the file must not

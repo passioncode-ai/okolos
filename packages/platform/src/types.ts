@@ -69,10 +69,21 @@ export interface Downloads {
   ): void
   cancel(id: number): Promise<void>
   /**
-   * Cancels the download if it is still running, deletes its file and drops it from the
-   * browser's list. True when the file is gone; false when it could not be deleted.
+   * Discards a download by the state the browser reports: a running one is cancelled (the
+   * browser drops the partial file), a finished one has its file deleted, an interrupted one
+   * has nothing on disk; each is then dropped from the browser's list. True when no file of it
+   * is left; false when the file could not be deleted or the download is unknown.
    */
   discard(id: number): Promise<boolean>
+  /** One download by id, as `onCreated` reports it plus its state, or null when unknown. */
+  find(id: number): Promise<{
+    id: number
+    url: string
+    finalUrl?: string
+    filename: string
+    mime: string | null
+    state: 'in_progress' | 'interrupted' | 'complete'
+  } | null>
   /** True when this browser exposes the API at all. */
   available(): boolean
 }
@@ -307,6 +318,9 @@ export interface WebExtensionApi {
     cancel(id: number): Promise<void>
     removeFile?(id: number): Promise<void>
     erase?(query: { id: number }): Promise<number[]>
+    search?(query: { id: number }): Promise<
+      Array<{ id: number; url: string; finalUrl?: string; filename?: string; mime?: string; state?: string }>
+    >
   }
   management?: {
     getAll(): Promise<

@@ -2,7 +2,6 @@ import { standingFindings } from '@okolos/core-extensions'
 import { classifyUndecided, detectHidden } from '@okolos/core-injection'
 import { detectPlatform, type RpcSender } from '@okolos/platform'
 
-import { createDownloadOffers } from './download-offers.js'
 import { buildRules, matchUrl, type FeedSnapshot,
 } from '@okolos/core-feeds'
 import { createOnnxRuntime, MODEL } from '@okolos/model'
@@ -28,7 +27,7 @@ import type {
   Verdict,
 } from '@okolos/contracts'
 
-import { handleDownload } from './downloads.js'
+import { handleDownload, judgeItem } from './downloads.js'
 import {
   acceptInventoryChange,
   compareInventory,
@@ -99,8 +98,18 @@ const FEED_ALARM = FEED.name
 const RETENTION_ALARM = RETENTION.name
 const INVENTORY_ALARM = INVENTORY.name
 
-/** The downloads a page may ask to discard (round 5 of the B-165 certification). */
-const downloadOffers = createDownloadOffers()
+/**
+ * Discards a download a page asked to discard, only when the background, judging it again now,
+ * finds it doubted: a page cannot delete a clean or unknown download, and nothing has to be
+ * remembered across the service worker's restarts (round 6 of the B-165 certification).
+ */
+async function discardIfDoubted(downloadId: number): Promise<boolean> {
+  const item = await platform.downloads.find(downloadId).catch(() => null)
+  if (item === null) return false
+  const feed = await currentFeed().catch(() => null)
+  if (judgeItem(item, feed).action !== 'warn') return false
+  return platform.downloads.discard(downloadId)
+}
 
 platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSender) => {
   switch (message.type) {
@@ -128,13 +137,13 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
     case 'password/shown':
       return forgetHeldVerdict(from) as Promise<RpcMap[T]['res']>
     case 'download/discard': {
-      // Only a download this background offered for discarding, asked for once by a top
-      // frame (download-offers.ts): the handler deletes a file from the person's disk.
+      // Only a top frame, and only a download judged doubted again now (discardIfDoubted): the
+      // handler deletes a file from the person's disk.
       const { downloadId } = message.payload as { downloadId: number }
-      if (from.frameId !== 0 || !downloadOffers.take(downloadId, from.tabId)) {
+      if (from.frameId !== 0 || typeof downloadId !== 'number') {
         return Promise.resolve({ ok: false }) as Promise<RpcMap[T]['res']>
       }
-      return platform.downloads.discard(downloadId).then((ok) => ({ ok })) as Promise<RpcMap[T]['res']>
+      return discardIfDoubted(downloadId).then((ok) => ({ ok })) as Promise<RpcMap[T]['res']>
     }
     case 'password/pending':
       return answerPendingVerdict(from) as Promise<RpcMap[T]['res']>
@@ -1167,9 +1176,6 @@ platform.downloads.onCreated((item) => {
           downloadId: item.id,
         })
         .catch(() => false)
-
-      // A doubted download the person may discard from its panel; a blocked one is gone.
-      if (told && verdict.action !== 'block') downloadOffers.offer(item.id, null)
 
       if (!told) {
         // Recorded, because "the banner did not show" and "the check did not run"

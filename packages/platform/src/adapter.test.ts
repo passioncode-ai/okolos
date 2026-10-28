@@ -810,47 +810,48 @@ describe('the navigation listener wakes the worker for web pages only', () => {
   })
 })
 
-describe('discarding a download (B-165, round 4)', () => {
-  it('cancels it, deletes the file and drops it from the list, and says it did', async () => {
-    const calls: string[] = []
-    const platform = createPlatform('chrome', fakeApi({
+describe('discarding a download, by the state the browser reports (B-165, round 6)', () => {
+  function api(state: string | null, calls: string[], removeFails = false) {
+    return fakeApi({
       downloads: {
         onCreated: { addListener: () => undefined },
-        cancel: async () => { throw new Error('Download must be in progress') },
-        removeFile: async (id: number) => { calls.push(`remove ${id}`) },
+        search: async (query: { id: number }) =>
+          state === null ? [] : [{ id: query.id, url: 'https://x.test/a.exe', filename: '/d/a.exe', mime: 'application/x-msdownload', state, exists: true }],
+        cancel: async (id: number) => { calls.push(`cancel ${id}`) },
+        removeFile: async (id: number) => {
+          if (removeFails) throw new Error('file not found')
+          calls.push(`remove ${id}`)
+        },
         erase: async (query: { id: number }) => { calls.push(`erase ${query.id}`); return [query.id] },
       },
-    }))
-    // A finished download: cancel refuses, the file is removed.
-    expect(await platform.downloads.discard(7)).toBe(true)
+    })
+  }
+
+  it('cancels one still running: the browser drops the partial file', async () => {
+    const calls: string[] = []
+    expect(await createPlatform('chrome', api('in_progress', calls)).downloads.discard(7)).toBe(true)
+    expect(calls).toEqual(['cancel 7', 'erase 7'])
+  })
+
+  it('deletes the file of a finished one, which cancel would leave on disk in Chrome', async () => {
+    const calls: string[] = []
+    expect(await createPlatform('chrome', api('complete', calls)).downloads.discard(7)).toBe(true)
     expect(calls).toEqual(['remove 7', 'erase 7'])
   })
 
-  it('says it did not when the file could not be deleted', async () => {
-    const platform = createPlatform('chrome', fakeApi({
-      downloads: {
-        onCreated: { addListener: () => undefined },
-        cancel: async () => { throw new Error('already complete') },
-        removeFile: async () => { throw new Error('file not found') },
-        erase: async () => [],
-      },
-    }))
-    expect(await platform.downloads.discard(7)).toBe(false)
-  })
-})
-
-describe('discarding a download that is still running (B-165, round 5)', () => {
-  it('counts the cancel as the discard: the browser drops the partial file, and removeFile refuses a running one', async () => {
+  it('only drops an interrupted one from the list: nothing of it is on disk', async () => {
     const calls: string[] = []
-    const platform = createPlatform('chrome', fakeApi({
-      downloads: {
-        onCreated: { addListener: () => undefined },
-        cancel: async (id: number) => { calls.push(`cancel ${id}`) },
-        removeFile: async () => { throw new Error('Download must be complete') },
-        erase: async (query: { id: number }) => { calls.push(`erase ${query.id}`); return [query.id] },
-      },
-    }))
-    expect(await platform.downloads.discard(9)).toBe(true)
-    expect(calls).toEqual(['cancel 9', 'erase 9'])
+    expect(await createPlatform('chrome', api('interrupted', calls)).downloads.discard(7)).toBe(true)
+    expect(calls).toEqual(['erase 7'])
+  })
+
+  it('says it did not when the file could not be deleted, or the download is unknown', async () => {
+    expect(await createPlatform('chrome', api('complete', [], true)).downloads.discard(7)).toBe(false)
+    expect(await createPlatform('chrome', api(null, [])).downloads.discard(7)).toBe(false)
+  })
+
+  it('finds a download by id with its addresses, bare name, type and state', async () => {
+    const found = await createPlatform('chrome', api('complete', [])).downloads.find(7)
+    expect(found).toMatchObject({ id: 7, url: 'https://x.test/a.exe', filename: 'a.exe', mime: 'application/x-msdownload', state: 'complete' })
   })
 })

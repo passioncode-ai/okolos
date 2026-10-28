@@ -296,20 +296,37 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
         await api.downloads?.cancel(id)
       },
 
+      async find(id: number) {
+        const [item] = (await api.downloads?.search?.({ id }).catch(() => [])) ?? []
+        if (item === undefined) return null
+        const state = item.state === 'complete' || item.state === 'interrupted' ? item.state : 'in_progress'
+        return {
+          id: item.id,
+          url: item.url,
+          ...(item.finalUrl !== undefined && item.finalUrl !== item.url ? { finalUrl: item.finalUrl } : {}),
+          filename: (item.filename ?? '').split(/[\\/]/).pop() ?? '',
+          mime: item.mime ?? null,
+          state,
+        } as const
+      },
+
       async discard(id: number): Promise<boolean> {
         const downloads = api.downloads
-        if (!downloads) return false
-        // A running download is discarded by cancelling it: the browser drops the partial
-        // file, and removeFile refuses anything not complete (round 5 of the B-165
-        // certification). A finished one refuses cancel, and its file is removed instead.
-        const cancelled = await downloads.cancel(id).then(
-          () => true,
-          () => false,
-        )
-        if (!cancelled) {
+        const [item] = (await downloads?.search?.({ id }).catch(() => [])) ?? []
+        if (!downloads || item === undefined) return false
+        // By the state the browser reports (round 6 of the B-165 certification): Chrome's
+        // cancel resolves for a finished download too and leaves its file on disk, and
+        // removeFile refuses one still running.
+        if (item.state === 'complete') {
           if (!downloads.removeFile) return false
           try {
             await downloads.removeFile(id)
+          } catch {
+            return false
+          }
+        } else if (item.state !== 'interrupted') {
+          try {
+            await downloads.cancel(id)
           } catch {
             return false
           }

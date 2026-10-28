@@ -234,3 +234,23 @@ describe('the computer a link names, read where the program reads it (B-165, rou
     expect(classifyOutsideLink('search-ms:crumb=location:\\\\?\\UNC\\evil.example\\share')).toMatchObject({ host: 'evil.example' })
   })
 })
+
+describe('search-ms: read the way Explorer splits it (B-165, round 6)', () => {
+  it('splits on & before decoding, so an encoded & stays inside displayname', () => {
+    expect(
+      classifyOutsideLink('search-ms:displayname=a%26crumb=location:\\\\decoy.example\\s&crumb=location:\\\\evil.example\\share'),
+    ).toMatchObject({ host: 'evil.example' })
+  })
+
+  it('takes only a parameter named exactly crumb', () => {
+    expect(
+      classifyOutsideLink('search-ms:displayname=x:crumb=location:\\\\decoy.example\\s&crumb=location:\\\\evil.example\\share'),
+    ).toMatchObject({ host: 'evil.example' })
+  })
+
+  it('names no computer when two crumbs disagree, and still stops the link', () => {
+    expect(
+      classifyOutsideLink('search-ms:crumb=location:\\\\decoy.example\\s&crumb=location:\\\\evil.example\\share'),
+    ).toMatchObject({ scheme: 'search-ms', host: null })
+  })
+})

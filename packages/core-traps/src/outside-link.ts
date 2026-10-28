@@ -154,6 +154,18 @@ function remoteHost(text: string): string | null {
  * alone so a page cannot put a decoy address in `displayname` or `query` before it (round 5).
  */
 function searchLocation(address: string): string | null {
-  const crumb = /(?:^|[?&:])crumb=location:([^&]*)/i.exec(decoded(address))?.[1]
-  return crumb === undefined ? null : remoteHost(crumb)
+  // Split as Explorer does, then decode each value: an encoded `&` stays inside its value, and
+  // only a parameter named exactly `crumb` counts (round 6). Two crumbs naming different
+  // computers name none: the link is still stopped, the warning just cannot say where.
+  const params = address.slice(address.indexOf(':') + 1).split('&')
+  const hosts = new Set<string>()
+  for (const param of params) {
+    const eq = param.indexOf('=')
+    if (eq < 0 || param.slice(0, eq).toLowerCase() !== 'crumb') continue
+    const value = decoded(param.slice(eq + 1))
+    if (!/^location:/i.test(value)) continue
+    const host = remoteHost(value.slice('location:'.length))
+    if (host !== null) hosts.add(host)
+  }
+  return hosts.size === 1 ? [...hosts][0] ?? null : null
 }
