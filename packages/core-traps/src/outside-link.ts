@@ -125,13 +125,14 @@ function decoded(text: string): string {
 
 /**
  * The first other computer an address names: a `\\host\share` path, an http(s) URL or a
- * `file://host/` address, whichever comes first. `@SSL` and a port end the name, as they
- * do for Windows; `file:///` (a local path) and `file://localhost/` name no other computer.
+ * `file://host/` address, whichever comes first. A user name before `@` is skipped; `@SSL`
+ * and a port end the name, as they do for Windows; `file:///` (a local path) and `file://localhost/` name no other computer.
  */
 function remoteHost(text: string): string | null {
   const unc = /\\\\([^\\/@:%?&|"'\s]+)/.exec(text)
-  const url = /\bhttps?:\/\/([^\\/@:?&|"'\s#]+)/i.exec(text)
-  const file = /\bfile:\/\/(?!localhost[\\/])([^\\/@:?&|"'\s#]+)/i.exec(text)
+  // A user name before `@` is not the computer: `http://microsoft.com@evil.example/` fetches from evil.example.
+  const url = /\bhttps?:\/\/(?:[^\\/?#\s@]*@)?([^\\/@:?&|"'\s#]+)/i.exec(text)
+  const file = /\bfile:\/\/(?:[^\\/?#\s@]*@)?(?!localhost[\\/])([^\\/@:?&|"'\s#]+)/i.exec(text)
   const first = [unc, url, file]
     .filter((match): match is RegExpExecArray => match !== null)
     .sort((a, b) => a.index - b.index)[0]

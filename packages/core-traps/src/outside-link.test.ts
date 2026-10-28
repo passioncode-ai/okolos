@@ -197,3 +197,13 @@ describe('what it does not look at', () => {
     }
   })
 })
+
+describe('the computer a link names, past a user name (B-165, round 3)', () => {
+  it('is the host after the @, not the user part before it', () => {
+    expect(classifyOutsideLink('ms-word:ofe|u|http://microsoft.com@evil.example/a.docx')).toMatchObject({ host: 'evil.example' })
+    expect(classifyOutsideLink('ms-excel:http://user:pass@files.attacker.test/a.xlsx')).toMatchObject({ host: 'files.attacker.test' })
+    expect(classifyOutsideLink('ms-appinstaller:?source=https://trusted.example@cdn.attacker.test/app.msix')).toMatchObject({
+      host: 'cdn.attacker.test',
+    })
+  })
+})
