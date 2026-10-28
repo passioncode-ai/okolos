@@ -173,9 +173,9 @@ flowchart TD
   A[Screen: Page - fake CAPTCHA] -->|script writes command to clipboard| B[Screen: In-page banner - clickfix variant, blocking]
   B -->|what is this| C[State: plain-language explanation + the copied text shown verbatim]
   C -->|leave page| D[Back to previous page]
-  C -->|I already ran it| E[Screen: Recovery checklist]
-  B -->|dismiss - deliberate action required| F[Warning collapses to a persistent marker]
+  B -->|This is wrong| F[Warning closes for this page]
   F --> A
+  P[Screen: Popup - recovery entry] -->|I already ran it| E[Screen: Recovery checklist]
   G[Screen: Page with a link to a program] -->|click, the click is stopped| H[Screen: In-page banner, clickfix variant, blocking: what would open and where]
   H -->|leave page| D
   H -->|this is wrong| I[Warning closes; that link goes through on the next click]
@@ -203,8 +203,8 @@ flowchart TD
   A[Screen: Page - fake lock] -->|forced fullscreen or dialog loop| B[Trap broken: fullscreen exited, dialogs suppressed]
   B --> C[Screen: In-page banner - techsupport variant]
   C -->|close this page| D[Tab closed or previous page]
-  C -->|I already called them| E[Screen: Recovery checklist]
-  C -->|dismiss| A2[Page remains, suppression stays active]
+  C -->|This is wrong| A2[Warning closes for this page, suppression stays active]
+  P[Screen: Popup - recovery entry] -->|I already called them| E[Screen: Recovery checklist]
   B -->|suppression not possible in this context| B_err[Inline: cannot fully block dialogs here - close the tab]
   B_err --> D
 ```
@@ -478,7 +478,7 @@ flowchart TD
 ### FLW-16: Recovery — "I already fell for it"
 - **Traces:** ST-015 (JTBD-06, JRN-03/#5)
 - **Goal:** turn panic into an ordered checklist matched to what actually happened
-- **Entry points:** "I already ran it / already entered it" from any banner; SCR-02 popup; SCR-07 queue
+- **Entry points:** the recovery entry in the SCR-02 popup; SCR-07 queue (the banners have no "I already ran it" button)
 - **Success exit:** the checklist for that incident type is completed or explicitly deferred
 - **Task analysis:**
   1. Say what happened

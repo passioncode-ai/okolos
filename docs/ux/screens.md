@@ -150,6 +150,11 @@ includes a redirect from `*.workers.dev`, not just a CNAME.
   the same ClickFix or tech-support warning does not come back on that page
   and writes no second journal line, and that one link goes through. The
   link warning also obeys Trusted sites: on a trusted site it is not raised.
+  On the download panel "This is wrong" closes that panel and remembers
+  nothing. On the injection and leaked-password panels it clears the page's
+  findings and takes every panel down (`resolveEverything` in
+  `apps/extension/src/content/index.ts`); nothing outlives the page, and a
+  new finding later on the same page raises a new panel.
 - No counters of "threats blocked", no protection score, no streaks.
 - In-page surfaces render inside a closed Shadow DOM so page CSS cannot
   restyle or hide them.
