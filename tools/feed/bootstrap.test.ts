@@ -518,7 +518,9 @@ describe('an install made off origin/main is in every record the bootstrap write
   it.skipIf(process.platform === 'win32')('in the record of a stop by SIGTERM, through the installed copy', async () => {
     const marker = (w: ReturnType<typeof world>) => path.join(w.base, 'job-started')
     const { w, env } = installed((at) => `import { writeFileSync } from 'node:fs'\nwriteFileSync(${JSON.stringify(marker(at))}, '')\nsetInterval(() => {}, 1000)\n`)
-    const child = spawn(process.execPath, [path.join(w.paths.agentBin, 'bootstrap.mjs')], { env, stdio: 'ignore' })
+    const child = spawn(process.execPath, [path.join(w.paths.agentBin, 'bootstrap.mjs')], { env, stdio: ['ignore', 'ignore', 'pipe'] })
+    let stderr = ''
+    child.stderr?.on('data', (chunk: Buffer) => (stderr += chunk.toString('utf8')))
     const exited = new Promise<number | null>((resolve) => child.on('exit', (code) => resolve(code)))
     for (let waited = 0; !existsSync(marker(w)) && waited < 20_000; waited += 50) await new Promise((r) => setTimeout(r, 50))
     expect(existsSync(marker(w))).toBe(true)
@@ -526,6 +528,8 @@ describe('an install made off origin/main is in every record the bootstrap write
     const code = await exited
     expect(readStatus(w.paths.status)).toMatchObject({ stage: 'job', exit: EXIT.signal, runId: 'launch-9-9', installedOffMain: OFF })
     expect(code).toBe(EXIT.signal)
+    // launchd's own log gets its one line for a stop too (AGENTS.md, the failure table).
+    expect(stderr.match(/^feed-agent: .*stopped by SIGTERM/gm)).toHaveLength(1)
   })
 })
 
