@@ -164,7 +164,7 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 | 4 | Reading | — (the agent reads pages) | the agent's window | 3 | Pages carry instructions written for the agent; the agent reads them as orders | What the agent reads is cleaned first, and the page's verdict travels with it |
 | 5 | Decision | Is asked about something that matters | the bridge's panel | 2 | Either asked about everything, or about nothing | Asked only for money, sending, deleting, signing in, sharing — in a panel a page cannot draw |
 | 6 | Hand-off | Logs in, solves a CAPTCHA, takes over | the agent's window | 3 | The agent fights the CAPTCHA, or asks for the password in chat | The task pauses, the person does that one step, the task resumes; the agent never sees the secret |
-| 7 | After | Wants to know what happened, and wants the machine back | journal, machine | 4 | No record of what the agent did as me; leftover browser processes eat the memory | Every answer to a tool call and every refusal recorded in the agents' journal before it is sent (protocol handshake messages excepted, spec §3); the task's windows and processes gone when it ends |
+| 7 | After | Wants to know what happened, and wants the machine back | journal, machine | 4 | No record of what the agent did as me; leftover browser processes eat the memory | Every answer to a tool call and every refusal recorded in the agents' journal before it is sent (protocol handshake messages excepted, spec §3), and past the day's 5000 agent entries no answer at all until 00:00 UTC rather than an answer with no record; the task's windows and processes gone when it ends |
 
 ## User stories
 
@@ -420,7 +420,7 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 - **Acceptance criteria:**
   - Given a task with its sites named, when the agent asks for a site outside them, then it is refused with a reason it can act on.
   - Given a page with hidden instructions from the corpus, when the agent takes a snapshot, then none of them is in what it receives and the finding is attached.
-  - Given a page with a password, card or one-time-code field, when the agent reads it, then it sees the field and never its value; the value of any input field is also removed from other elements' names, from 4 characters and from 3 in password, card and one-time-code fields (spec §3 R4, §11 S4), so a 1- or 2-character value can still show in a label that repeats it.
+  - Given a page with a password, card or one-time-code field, when the agent reads it, then it sees the field and never its value; the value of any input field is also removed from other elements' names, from 4 characters and from 3 in password, card and one-time-code fields (spec §3 R4, §11 S4), so a shorter value (1 or 2 characters, or 3 in an ordinary field) can still show in a label that repeats it; an editable area arrives without its content, and a select without its chosen option marked.
   - Given the person working in another app, when the agent opens, navigates and reads, then the person's app stays in front.
   - Given a very large page, when the agent asks for a snapshot, then it receives it in parts it can page through, never a single answer too large to use.
 - **Priority:** must

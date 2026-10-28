@@ -26,7 +26,7 @@
   ]
  },
  "outputs": [
-  "`snapshotVerdict(probe: {verdicts: readonly Verdict[], truncated: boolean, unresolved: number}): SnapshotVerdict | {refused: 'cleaning_incomplete'}` — `{level: 'clean'|'finding', findings: SnapshotFinding[]}`, каждая находка строится только через `toSnapshotFinding` из N-023 (без текста, локатора и detail страницы); неполная очистка означает отказ без текста; `refOf(backendId, taskKey)` HMAC; `buildSnapshot` вычищает значения полей из имён"
+  "`snapshotVerdict(probe: {verdicts, truncated, unresolved}, snapshot: Pick<Snapshot,'incomplete'>): SnapshotVerdict | {refused: 'cleaning_incomplete'}` (incomplete или неполный пробник означает отказ без текста); находки только через `toSnapshotFinding` из N-023; `buildSnapshot(nodes, {hidden, taskKey /* обязателен, 16+ байт */, secretFields /* обязателен, пустое множество = нет секретных */, rootRef?, refMap?}): Snapshot {lines, refMap, hiddenUnmatched, incomplete}`; внутри поля ничего не даёт имени и текста; значения полей вычищаются из имён (4 знака, 3 у секретных; NFKD, свёртка регистра, цифры любых письменностей; значение, разбитое по узлам); бюджеты очистки дают incomplete; `refOf(backendId, taskKey)` HMAC-SHA-256; `resolveRef(refs, ref, taskKey, nodes, {hidden, secretFields}): {found:true, backendDOMNodeId, inField} | {found:false, reason:'unknown'|'hidden'}`; `secretFieldIds(DOM.getDocument roots)`; `isSecretInput`; `sha256(bytes)`; `clampMaxBytes(n)`, `MIN_PAGE_BYTES`, `MAX_PAGE_BYTES`"
  ],
  "acceptance": [
   "buildSnapshot с rootRef под скрытым предком возвращает пусто; с rootRef под полем ввода текст поля не выдаётся (ревью F2)",

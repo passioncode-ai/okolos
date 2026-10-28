@@ -19,7 +19,7 @@
   ]
  },
  "outputs": [
-  "`DEFAULT_MAX_BYTES = 32 * 1024`; `encodeCursor({from, digest}) / decodeCursor(c): {from, digest} | null`; `paginate(lines, {cursor?, maxBytes?}): {text, cursor?, partial}` — курсор несёт дайджест снимка, курсор от другого снимка отвергается"
+  "`encodeCursor({from, digest}) / decodeCursor(c): {from, digest} | null`; `paginate(lines, {cursor?, maxBytes?}): {text, cursor?, partial}` зажимает maxBytes через clampMaxBytes из @okolos/core-snapshot (MIN_PAGE_BYTES..MAX_PAGE_BYTES, своего DEFAULT_MAX_BYTES нет); дайджест курсора строится экспортированным sha256; курсор от другого снимка отвергается"
  ],
  "acceptance": [
   "дерево формы Википедии (29 714 узлов, детерминированное): каждая страница ≤ 32 КБ UTF-8, страниц ≥ 8, конкатенация страниц равна полному тексту",
