@@ -657,14 +657,25 @@ export class Journal {
    * checked again on the way out and written with the journal's members only, so a line edited
    * on disk to carry page text is not exported; such lines are left out, as `recent` counts them.
    * Reads only, so its reasons are a read's: throws JournalError (no_permission, unreadable,
-   * other), operation `export`, for `journalExportFailed`.
+   * other), operation `export`, for `journalExportFailed`. With `day` (YYYY-MM-DD) only that day:
+   * the whole journal can be longer than the longest string node allows (round 6), so the page
+   * exports by day (`exportDays`).
    */
-  export(): string {
+  export(only?: string): string {
+    if (only !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(only)) {
+      throw new TypeError(`Journal.export: day must be YYYY-MM-DD, got ${String(only)}`)
+    }
     let out = ''
-    for (const day of this.reading(() => this.days(), 'export')) {
+    const days = this.reading(() => this.days(), 'export').filter((name) => only === undefined || name === only)
+    for (const day of days) {
       for (const entry of this.reading(() => this.read(day), 'export').entries) out += `${JSON.stringify(entry)}\n`
     }
     return out
+  }
+
+  /** The days the journal holds, oldest first, for an export one day at a time. */
+  exportDays(): string[] {
+    return this.reading(() => this.days(), 'export')
   }
 
   /** Runs a read of the journal, turning a failure into a JournalError with its reason. */
@@ -832,7 +843,9 @@ export class Journal {
     const today = await this.dayOf(line.at.slice(0, 10))
     if (line.outcome === 'answered' || line.outcome === 'refused') {
       await this.writeCounts(today, at)
-      if (today.agentLines >= AGENT_LINES_PER_DAY) {
+      // `close` is always written: the agent may always close its task, and past the cap no
+      // task opens, so closes are bounded by the tasks already open (round 6).
+      if (today.agentLines >= AGENT_LINES_PER_DAY && line.verb !== 'close') {
         if (!today.full) {
           await this.append({ at: line.at, outcome: DAY_FULL })
           today.full = true

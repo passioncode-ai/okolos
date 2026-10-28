@@ -1569,6 +1569,16 @@ describe('agent entries: at most AGENT_LINES_PER_DAY lines a UTC day, then day_f
     expect(after(dir, AGENT_LINES_PER_DAY - 1)).toEqual([call(0), full(1), door, tomorrow])
   })
 
+  it('still writes close past the cap: the agent may always close its task, and no task opens past it (round 6)', async () => {
+    const dir = temp()
+    seedAgents(dir, AGENT_LINES_PER_DAY)
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    await expect(journal.record(call(0))).rejects.toMatchObject({ code: 'day_full' })
+    const close: JournalEntry = { ...answered, at: journalTime(t0 + 1), verb: 'close' }
+    await journal.record(close)
+    expect(after(dir, AGENT_LINES_PER_DAY)).toEqual([full(0), close])
+  })
+
   it('a restart at the cap keeps refusing and writes no second day_full line; one that finds the cap reached without it writes it', async () => {
     const dir = temp()
     seedAgents(dir, AGENT_LINES_PER_DAY - 1)
@@ -1807,5 +1817,21 @@ describe('one writer is the service shell\'s: the journal has no lock of its own
     const second = Journal.open(dir, { retentionDays: 90 })
     await second.record(next)
     expect(onDisk(dir)).toEqual([answered, next])
+  })
+})
+
+describe('export by day (round 6: the whole journal can pass the longest string node allows)', () => {
+  it('lists its days and exports one day at a time, the whole when no day is named', async () => {
+    const dir = temp()
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const a: JournalEntry = { ...answered, at: '2026-10-26T10:00:00.000Z' }
+    const b: JournalEntry = { ...answered, at: '2026-10-27T10:00:00.000Z' }
+    await journal.record(a)
+    await journal.record(b)
+    expect(journal.exportDays()).toEqual(['2026-10-26', '2026-10-27'])
+    expect(journal.export('2026-10-27')).toBe(`${JSON.stringify(b)}\n`)
+    expect(journal.export()).toBe(`${JSON.stringify(a)}\n${JSON.stringify(b)}\n`)
+    expect(journal.export('2026-10-25')).toBe('')
+    expect(() => journal.export('../etc')).toThrow(TypeError)
   })
 })
