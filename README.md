@@ -69,7 +69,8 @@ pnpm build                          # apps/extension/dist/chrome and apps/extens
 pnpm package                        # the store zips, checked, in apps/extension/dist/release/
 ```
 
-Corepack ships with Node 22 to 24 only, on every OS, Windows included. On Node 25 and later,
+Corepack ships with Node 22 to 24 only, on every OS, Windows included (where `corepack enable` usually
+needs an administrator shell when Node is under Program Files). On Node 25 and later,
 install pnpm as the [development runbook](docs/runbooks/development.md#windows) says (`npm i -g
 pnpm` or the pnpm.io installer; `packageManager` still pins the version). On Windows,
 `pnpm package` writes the zips with `tar.exe` from System32; no store has yet been sent a zip

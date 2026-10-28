@@ -15,7 +15,7 @@
 |---|---|---|
 | Node | `^22.18.0 \|\| >=23.6.0` (`engines` в `package.json`; проверено на 26.4.0 и 26.10.0): ниже `okolos-mail` не запускается, и его тест в `pnpm test` краснеет | всё остальное |
 | pnpm | `11.10.0`, задан в `packageManager` | воркспейс из 23 пакетов (`apps/*` и `packages/*`) |
-| Python 3 | 3.7 и новее (проверено на 3.14.6), под именем `python3`, `python` или `py -3` | `docs/ux/lint.py`, `docs/brand/lint.py`, `tools/model/evaluate.py` |
+| Python 3 | 3.7 и новее для линтеров (`tools/python.mjs` берёт первый такой), 3.9 и новее для `tools/model/evaluate.py` (проверено на 3.14.6), под именем `python3`, `python` или `py -3` | `docs/ux/lint.py`, `docs/brand/lint.py`, `tools/model/evaluate.py` |
 | Браузеры Playwright | ставятся командой ниже | e2e в Chromium и Firefox |
 
 Corepack включит нужный pnpm сам (Node 22–24; с Node 25 corepack в поставку Node не
@@ -363,6 +363,7 @@ pnpm suffix:gap      # таблица суффиксов против насто
 каждый процесс перед выходом. Окно может на секунду появиться на экране:
 
 ```bash
+# только на macOS: Chrome из /Applications, фокус читается через osascript
 node tools/agent-window-spike.mjs --out /tmp/b0.json   # инфобар, CDP, размер снимка, фокус
 ```
 

@@ -26,6 +26,8 @@ describe('which names are tried', () => {
   })
 
   it('makes each candidate prove it is Python 3 rather than trusting its name', () => {
+    // 3.7 and later: the linters use syntax older 3.x cannot parse (round 8 of the B-162 certification).
+    expect(PYTHON3_CHECK).toContain('sys.version_info[:2] >= (3, 7)')
     expect(PYTHON3_CHECK).toContain('sys.version_info[0] == 3')
   })
 })
