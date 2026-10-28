@@ -667,8 +667,15 @@ export class Journal {
     }
     let out = ''
     const days = this.reading(() => this.days(), 'export').filter((name) => only === undefined || name === only)
-    for (const day of days) {
-      for (const entry of this.reading(() => this.read(day), 'export').entries) out += `${JSON.stringify(entry)}\n`
+    try {
+      for (const day of days) {
+        for (const entry of this.reading(() => this.read(day), 'export').entries) out += `${JSON.stringify(entry)}\n`
+      }
+    } catch (error) {
+      if (error instanceof JournalError) throw error
+      // The whole journal can be longer than the longest string node allows (RangeError):
+      // a coded failure the page can name, and the reason to export by day (round 7).
+      throw new JournalError('other', 'export', { cause: error })
     }
     return out
   }
@@ -843,9 +850,12 @@ export class Journal {
     const today = await this.dayOf(line.at.slice(0, 10))
     if (line.outcome === 'answered' || line.outcome === 'refused') {
       await this.writeCounts(today, at)
-      // `close` is always written: the agent may always close its task, and past the cap no
-      // task opens, so closes are bounded by the tasks already open (round 6).
-      if (today.agentLines >= AGENT_LINES_PER_DAY && line.verb !== 'close') {
+      // A successful `close` is always written: the agent may always close its task, and past
+      // the cap no task opens, so successful closes are bounded by the tasks already open
+      // (round 6). A refused close costs no step and could be sent without end: it is capped
+      // like any other entry (round 7).
+      const closes = line.outcome === 'answered' && line.verb === 'close'
+      if (today.agentLines >= AGENT_LINES_PER_DAY && !closes) {
         if (!today.full) {
           await this.append({ at: line.at, outcome: DAY_FULL })
           today.full = true

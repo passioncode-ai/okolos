@@ -1579,6 +1579,16 @@ describe('agent entries: at most AGENT_LINES_PER_DAY lines a UTC day, then day_f
     expect(after(dir, AGENT_LINES_PER_DAY)).toEqual([full(0), close])
   })
 
+  it('refuses a refused close past the cap like any other entry: only a successful close passes (round 7)', async () => {
+    const dir = temp()
+    seedAgents(dir, AGENT_LINES_PER_DAY)
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const refusedClose: JournalEntry = { ...answered, at: journalTime(t0 + 1), verb: 'close', outcome: 'refused', code: 'no_such_task' }
+    await expect(journal.record(refusedClose)).rejects.toMatchObject({ code: 'day_full' })
+    const badClose: JournalEntry = { ...answered, at: journalTime(t0 + 2), verb: 'close', outcome: 'refused', code: 'bad_call' }
+    await expect(journal.record(badClose)).rejects.toMatchObject({ code: 'day_full' })
+  })
+
   it('a restart at the cap keeps refusing and writes no second day_full line; one that finds the cap reached without it writes it', async () => {
     const dir = temp()
     seedAgents(dir, AGENT_LINES_PER_DAY - 1)
