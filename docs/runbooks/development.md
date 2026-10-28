@@ -46,8 +46,8 @@ pnpm exec playwright install chromium firefox
   PowerShell нет `grep`; там `git ls-files --eol | Select-String w/crlf`); обход хука
   `OKOLOS_SKIP_GATES=1 git push` (в PowerShell: `$env:OKOLOS_SKIP_GATES=1; git push`, затем
   `Remove-Item Env:OKOLOS_SKIP_GATES`). Только на macOS и Linux: замер окна агента `node tools/agent-window-spike.mjs`
-  в разделе «Прочее» (он работает только на macOS и Linux: путь `/tmp` и сигнал группе
-  процессов Chrome). В `cmd.exe` и Windows PowerShell 5.1 часть команд читается иначе.
+  в разделе «Прочее» (путь `/tmp` и сигнал группе процессов Chrome; по умолчанию он берёт
+  Chrome из `/Applications`, поэтому на Linux ему нужен `--chrome <путь к chrome>`). В `cmd.exe` и Windows PowerShell 5.1 часть команд читается иначе.
 - **Node и pnpm.** На Node 22–24 corepack включает pnpm, как выше. С Node 25 corepack
   в Node не входит: pnpm ставится `npm i -g pnpm` или автономным установщиком с
   pnpm.io (`iwr https://get.pnpm.io/install.ps1 -useb | iex` в PowerShell); версию
@@ -361,6 +361,7 @@ pnpm suffix:gap      # таблица суффиксов против насто
 
 ```bash
 node tools/agent-window-spike.mjs --out /tmp/b0.json   # инфобар, CDP, размер снимка, фокус
+# на Linux: node tools/agent-window-spike.mjs --chrome /usr/bin/google-chrome --out /tmp/b0.json
 ```
 
 Как читать результат и что он не покрывает —
