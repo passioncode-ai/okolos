@@ -104,6 +104,7 @@
   "демон раз в минуту вызывает Journal.flushCounts(now) своими часами (N-006 круг 4); журнал открывается в setup оболочки после service.lock и закрывается на каждом пути остановки",
   "снимок поддерева по rootRef возвращает refMap только своих ссылок: N-011 сливает его с сохранённой картой документа, а не заменяет (N-003 круг 2)",
   "отклонённый Journal.close() пишется событием, повторно не вызывается; причина day_full записывается отдельно от сбоев диска, страница показывает «журнал за сутки заполнен», а не journalError; все записи штампуются одними часами демона (N-006 круг 4)",
+  "hiddenInputIds(корни DOM.getDocument) из @okolos/core-snapshot добавляется к hidden каждого buildSnapshot: значение input type=hidden ничего на странице не маскирует (N-003 круг 2)",
   "проверка узла: pnpm -s exec vitest run apps/agent/src/agent.test.ts apps/agent/src/verbs && pnpm -s run typecheck"
  ],
  "guards": [
