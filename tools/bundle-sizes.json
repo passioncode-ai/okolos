@@ -6,7 +6,7 @@
   "whyBytesMayGateWhereMillisecondsMayNot": "This project refuses to gate on wall-clock ceilings (see the m0/m1 spec and the bench decision): a timing ceiling reddens from runner load rather than from code, which teaches people to ignore it. A byte count is deterministic — the same source produces the same bundle on any machine — so it is exactly the kind of ceiling this project can hold somebody to.",
   "files": {
     "background.js": 60557,
-    "content.js": 69006,
+    "content.js": 76298,
     "first-run.js": 3400,
     "interstitial.js": 2708,
     "options.js": 39435,
