@@ -88,13 +88,13 @@
         "docs/runbooks/development.md"
       ],
       "certification": {
-        "round": 2,
+        "round": 4,
         "tiers": {
-          "unit": "fail",
-          "seam": "fail",
+          "unit": "pass",
+          "seam": "pass",
           "product": "fail"
         },
-        "at": "4b94d069be98f93e479164b07a53c429e8a95876",
+        "at": "46a5752b732ba5280d542ab0b9f09585d87f5aa8",
         "history": [
           {
             "unit": "fail",
@@ -105,13 +105,25 @@
             "unit": "fail",
             "seam": "fail",
             "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
           }
         ],
         "kinds": [
           "blind",
+          "blind",
+          "blind",
           "blind"
         ],
-        "tree": "8dd085d63b7c97d014dd0c94db187693338c3fc1"
+        "tree": "7b61f0f7a0aea0b258a1a9e19edad3320cfdaba2"
       }
     },
     {
@@ -132,13 +144,13 @@
         "AGENTS.md"
       ],
       "certification": {
-        "round": 4,
+        "round": 6,
         "tiers": {
-          "unit": "fail",
-          "seam": "fail",
+          "unit": "pass",
+          "seam": "pass",
           "product": "fail"
         },
-        "at": "4b94d069be98f93e479164b07a53c429e8a95876",
+        "at": "46a5752b732ba5280d542ab0b9f09585d87f5aa8",
         "history": [
           {
             "unit": "pass",
@@ -159,15 +171,27 @@
             "unit": "fail",
             "seam": "fail",
             "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
           }
         ],
         "kinds": [
           "blind",
           "blind",
           "blind",
+          "blind",
+          "blind",
           "blind"
         ],
-        "tree": "8dd085d63b7c97d014dd0c94db187693338c3fc1"
+        "tree": "7b61f0f7a0aea0b258a1a9e19edad3320cfdaba2"
       }
     },
     {
@@ -223,24 +247,36 @@
         "packages/i18n/**"
       ],
       "certification": {
-        "round": 1,
+        "round": 3,
         "tiers": {
           "unit": "fail",
-          "seam": "fail",
+          "seam": "pass",
           "product": "fail"
         },
-        "at": "20537817ea2077d0d76d5ed3110d759192bf690e",
+        "at": "4830096db0df2112a7fa590548dc21ef29a3549a",
         "history": [
           {
             "unit": "fail",
             "seam": "fail",
             "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "pass",
+            "product": "fail"
           }
         ],
         "kinds": [
+          "blind",
+          "blind",
           "blind"
         ],
-        "tree": "8938cb75394f392aa9a39eb17d63cf73a337e817"
+        "tree": "96c08fb2eef88b07a9ae2729d0281d232c5a429d"
       }
     },
     {
@@ -261,24 +297,34 @@
         "docs/store/**"
       ],
       "certification": {
-        "round": 1,
+        "round": 4,
         "tiers": {
-          "unit": "pass",
-          "seam": "fail",
           "product": "fail"
         },
-        "at": "6998f97e1b4859a3384664cca8a6e77adb19c5a0",
+        "at": "8b27409410058c83d99de871628ca85c61de08cb",
         "history": [
           {
             "unit": "pass",
             "seam": "fail",
             "product": "fail"
+          },
+          {
+            "product": "fail"
+          },
+          {
+            "product": "fail"
+          },
+          {
+            "product": "fail"
           }
         ],
         "kinds": [
+          "blind",
+          "blind",
+          "blind",
           "blind"
         ],
-        "tree": "dceac32fcb5fdda4f59add122027de5a0f700886"
+        "tree": "8af95191c3b776cb8abe079a962b5649a0de2280"
       }
     },
     {
