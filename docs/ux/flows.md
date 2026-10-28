@@ -726,7 +726,7 @@ flowchart TD
 - **Traces:** ST-028, ST-029, ST-030 (JTBD-10, JRN-05/#2–#6)
 - **Goal:** the agent finishes the task in the person's browser; anything that matters passed through the person
 - **Entry points:** a paired agent opens a task naming its sites, verbs, time limit and step budget
-- **Success exit:** the task is closed, every answer to a tool call and every refusal recorded in the agents' journal before it was sent (the protocol's own handshake messages are not journaled: spec §3; past the day's 5000 agent entries every call ends in an Okolos Agent failure until 00:00 UTC, so nothing is answered unrecorded), its window and processes gone
+- **Success exit:** the task is closed, every answer to a tool call and every refusal recorded in the agents' journal before it was sent (the protocol's own handshake messages are not journaled: spec §3; past the day's 5000 agent entries every tool call but `close` ends in an Okolos Agent failure until 00:00 UTC, so nothing is answered unrecorded), its window and processes gone
 - **Task analysis:**
   1. The agent opens a task with its reach
   2. The agent reads and acts inside it
