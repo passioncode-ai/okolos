@@ -36,6 +36,7 @@ import { showDownloadVerdict } from './download.js'
 import { lentShadowRoot, watchForTraps } from './traps.js'
 import { Sanitiser } from './sanitize.js'
 import { createSurfaceSlot } from './surface-slot.js'
+import { claimWithReceipt } from './password-receipt.js'
 import { failOpen } from './fail-open.js'
 import { createJournalOnce } from './journal-once.js'
 
@@ -569,33 +570,31 @@ function claimPasswordBanner(finding: {
    * replaced does not survive `RECEIPT_DWELL_MS`; one a person is looking at does. Pressing
    * any control sends it at once — that is a person having read it, which is what the
    * receipt is actually about.
-   */
-  let sent = false
-  const receipt = () => {
-    if (sent) return
-    sent = true
-    void platform.runtime.send('password/shown', {}).catch(() => undefined)
-  }
-  const dwell = setTimeout(receipt, RECEIPT_DWELL_MS)
-  /**
-   * The document saying it is going away, which is the one signal that settles this
-   * without a race. A timer alone cannot tell a navigation that commits in 200 ms from one
-   * that commits in three seconds, and the second kind sent the receipt from a document
-   * about to disappear — measured, and it is why the landing page showed nothing.
    *
-   * `pagehide` rather than `beforeunload`: the latter is ignored without user interaction
-   * in Chrome and blocks the back-forward cache.
+   * And it is sent only for a panel that was drawn, which `claimWithReceipt` holds and
+   * `password-receipt.test.ts` pins through the real slot (round 2 of the B-165
+   * certification: a refused claim sent it too, and the held copy was lost).
    */
-  addEventListener('pagehide', () => clearTimeout(dwell), { once: true })
-  const read = () => {
-    clearTimeout(dwell)
-    receipt()
-  }
-
-  slot.claim({
-    kind: 'password',
-    severity: 'major',
-    props: {
+  claimWithReceipt(
+    {
+      mount: slot.mountFor('password', 'major'),
+      send: () => {
+        void platform.runtime.send('password/shown', {}).catch(() => undefined)
+      },
+      dwellMs: RECEIPT_DWELL_MS,
+      /**
+       * The document saying it is going away, which is the one signal that settles this
+       * without a race. A timer alone cannot tell a navigation that commits in 200 ms from
+       * one that commits in three seconds, and the second kind sent the receipt from a
+       * document about to disappear — measured, and it is why the landing page showed
+       * nothing.
+       *
+       * `pagehide` rather than `beforeunload`: the latter is ignored without user
+       * interaction in Chrome and blocks the back-forward cache.
+       */
+      onPageHide: (stop) => addEventListener('pagehide', stop, { once: true }),
+    },
+    {
       variant: 'password',
       severity: 'major',
       headline: finding.headline,
@@ -612,9 +611,8 @@ function claimPasswordBanner(finding: {
        */
       ...(finding.host === null ? { primaryLabel: t('warnFrameJournal') } : {}),
     },
-    handlers: {
+    {
       onPrimary: () => {
-        read()
         if (finding.host === null) {
           openFrameJournal()
           return
@@ -627,16 +625,10 @@ function claimPasswordBanner(finding: {
           .catch(() => undefined)
       },
       onRetry: () => undefined,
-      onDispute: () => {
-        read()
-        resolveEverything()
-      },
-      onDismiss: () => {
-        read()
-        resolveEverything()
-      },
+      onDispute: resolveEverything,
+      onDismiss: resolveEverything,
     },
-  })
+  )
 }
 
 /**
