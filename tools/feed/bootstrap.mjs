@@ -240,7 +240,7 @@ export async function runAgent({
   const fail = (stage, exit, reason) => {
     const signal = stopped()
     if (signal) {
-      write(`stopped by ${signal} in ${stage}`)
+      // The feed.log line for a stop is onSignal's, written once whoever records the stop.
       return { exit: EXIT.signal, record: writeStatus(paths.status, signalRecord({ stage, runId, startedAt, recovered }, signal, iso(), env)) }
     }
     write(`failed in ${stage}: ${reason}`)
@@ -435,8 +435,13 @@ function onSignal(signal, current) {
       const own = readStatus(paths.status)
       const record = own?.runId === current.runId ? own : signalRecord(current, signal, new Date().toISOString())
       if (record !== own) writeStatus(paths.status, record)
-      // The same one line in launchd's own log as any failed run, whichever of the job or the
-      // bootstrap recorded the stop (AGENTS.md, the failure table).
+      // One line in feed.log and the same one line in launchd's own log as any failed run,
+      // whichever of the job or the bootstrap recorded the stop (AGENTS.md, the failure table).
+      try {
+        openLog(paths.log).write(`stopped by ${signal} in ${record.stage}`)
+      } catch {
+        // feed.log unwritable: the record and launchd's line below still say it.
+      }
       console.error(`feed-agent: ${record.outcome} in ${record.stage}: ${record.reason ?? `stopped by ${signal}`} (see ${paths.log})`)
     } finally {
       process.exit(EXIT.signal)
