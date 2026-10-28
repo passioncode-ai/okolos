@@ -295,13 +295,13 @@
    ],
    "risk": "R3",
    "certification": {
-    "round": 6,
+    "round": 7,
     "tiers": {
-     "unit": "pass",
+     "unit": "fail",
      "seam": "fail",
      "product": "fail"
     },
-    "at": "727d28732e5540b56d170d1c3215b1b64aac87bb",
+    "at": "d4ddfcacf3847af19c65bd1d59176d7d81ade09c",
     "history": [
      {
       "unit": "fail",
@@ -332,6 +332,11 @@
       "unit": "pass",
       "seam": "fail",
       "product": "fail"
+     },
+     {
+      "unit": "fail",
+      "seam": "fail",
+      "product": "fail"
      }
     ],
     "kinds": [
@@ -340,9 +345,10 @@
      "adversarial",
      "adversarial",
      "blind",
+     "blind",
      "blind"
     ],
-    "tree": "51e0bbfd187f79d13a5e277ee76824eb2a9aa0f4"
+    "tree": "79b2a52d37de8f87aba11d714ff435c95dc4ec7c"
    }
   },
   {
