@@ -40,11 +40,14 @@ pnpm exec playwright install chromium firefox
 - **Git for Windows.** Хук запускает его `sh`; `tools/ci.test.ts` находит этот `sh`
   рядом с `git` (`git --exec-path`), даже когда в PATH его нет, как в PowerShell и cmd.
 - **Оболочка: Git Bash или PowerShell 7** (`pwsh`). Команды этого раннбука идут в обеих,
-  кроме двух, которым нужен Git Bash (или macOS и Linux): запись доступа
+  кроме четырёх, которым нужен Git Bash (или macOS и Linux): запись доступа
   `printf %s "$VALUE" | node tools/access.mjs set …` в разделе «Доступы» (в PowerShell нет
-  `printf`) и замер окна агента `node tools/agent-window-spike.mjs` в разделе «Прочее»
-  (он работает только на macOS и Linux: путь `/tmp` и сигнал группе процессов Chrome). В
-  `cmd.exe` и Windows PowerShell 5.1 часть команд читается иначе.
+  `printf`); проверка `git ls-files --eol | grep w/crlf` в рецепте для старого клона (в
+  PowerShell нет `grep`; там `git ls-files --eol | Select-String w/crlf`); обход хука
+  `OKOLOS_SKIP_GATES=1 git push` (в PowerShell: `$env:OKOLOS_SKIP_GATES=1; git push`, затем
+  `Remove-Item Env:OKOLOS_SKIP_GATES`); замер окна агента `node tools/agent-window-spike.mjs`
+  в разделе «Прочее» (он работает только на macOS и Linux: путь `/tmp` и сигнал группе
+  процессов Chrome). В `cmd.exe` и Windows PowerShell 5.1 часть команд читается иначе.
 - **Node и pnpm.** На Node 22–24 pnpm включает corepack, как выше. С Node 25 corepack
   в Node не входит: pnpm ставится `npm i -g pnpm` или автономным установщиком с
   pnpm.io (`iwr https://get.pnpm.io/install.ps1 -useb | iex` в PowerShell); версию
@@ -87,13 +90,17 @@ Firefox для e2e на Windows лежит в `%LOCALAPPDATA%\ms-playwright`; п
 
 `pnpm package` сверяет архив со сборкой по списку файлов из центрального каталога zip,
 а не по байтам: `zip` и `tar` пишут разные байты. Концы строк держит `.gitattributes`
-(`* text=auto eol=lf`): чекаут получает LF при любом `core.autocrlf`, и это проверяет
-`tools/ci.test.ts` («line endings are LF on every checkout»).
+(`* text=auto eol=lf`): чекаут получает LF при любом `core.autocrlf`. `tools/ci.test.ts`
+проверяет это дважды: «line endings are LF on every checkout» читает `.gitattributes` и
+индекс, а тест рецепта для старого клона прогоняет его во временном репозитории с
+`core.autocrlf=true` и смотрит файлы на диске.
 
 На Windows гейты гоняет задача CI `gates (windows)` на `windows-latest`
 (`.github/workflows/ci.yml`, B-164; первый зелёный прогон
 [40517607494](https://github.com/passioncode-ai/okolos/actions/runs/40517607494) на
-`714e336`). Её шаги: `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`,
+`714e336`; дерево с исправлениями B-162 и B-163 проверил прогон
+[40572549603](https://github.com/passioncode-ai/okolos/actions/runs/40572549603) на `3276f2c`,
+зелёный во всех четырёх задачах). Её шаги: `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`,
 `pnpm build`, `pnpm test` (в нём архив через `tar.exe` из System32 и решение хука под `sh`
 из Git for Windows), `pnpm ux:lint`, `pnpm brand:lint`, `pnpm i18n:sweep` и
 `pnpm package:check` (проверки архива без записи). На Windows не проверены: e2e в Chromium и
