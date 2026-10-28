@@ -15,7 +15,7 @@
 |---|---|---|
 | Node | `^22.18.0 \|\| >=23.6.0` (`engines` в `package.json`; проверено на 26.4.0 и 26.10.0): ниже `okolos-mail` не запускается, и его тест в `pnpm test` краснеет | всё остальное |
 | pnpm | `11.10.0`, задан в `packageManager` | воркспейс из 23 пакетов (`apps/*` и `packages/*`) |
-| Python 3 | любой 3.x (проверено на 3.14.6), под именем `python3`, `python` или `py -3` | `docs/ux/lint.py`, `docs/brand/lint.py`, `tools/model/evaluate.py` |
+| Python 3 | 3.7 и новее (проверено на 3.14.6), под именем `python3`, `python` или `py -3` | `docs/ux/lint.py`, `docs/brand/lint.py`, `tools/model/evaluate.py` |
 | Браузеры Playwright | ставятся командой ниже | e2e в Chromium и Firefox |
 
 Corepack включит нужный pnpm сам (Node 22–24; с Node 25 corepack в поставку Node не
@@ -40,15 +40,17 @@ pnpm exec playwright install chromium firefox
 - **Git for Windows.** Хук запускает его `sh`; `tools/ci.test.ts` находит этот `sh`
   рядом с `git` (`git --exec-path`), даже когда в PATH его нет, как в PowerShell и cmd.
 - **Оболочка: Git Bash или PowerShell 7** (`pwsh`). Команды этого раннбука идут в обеих,
-  кроме трёх, которым нужен Git Bash (или macOS и Linux), замера окна агента, который работает только на macOS и Linux, и инструментов фида, которые на Windows не работают вовсе (таблица ниже): запись доступа
+  кроме трёх, которым нужен Git Bash (или macOS и Linux), замера окна агента, который работает только на macOS, и инструментов фида, которые на Windows не работают вовсе (таблица ниже): запись доступа
   `printf %s "$VALUE" | node tools/access.mjs set …` в разделе «Доступы» (в PowerShell нет
   `printf`); проверка `git ls-files --eol | grep w/crlf` в рецепте для старого клона (в
   PowerShell нет `grep`; там `git ls-files --eol | Select-String w/crlf`); обход хука
   `OKOLOS_SKIP_GATES=1 git push` (в PowerShell: `$env:OKOLOS_SKIP_GATES=1; git push`, затем
-  `Remove-Item Env:OKOLOS_SKIP_GATES`). Только на macOS и Linux: замер окна агента `node tools/agent-window-spike.mjs`
-  в разделе «Прочее» (путь `/tmp` и сигнал группе процессов Chrome; по умолчанию он берёт
-  Chrome из `/Applications`, поэтому на Linux ему нужен `--chrome <путь к chrome>`). В `cmd.exe` и Windows PowerShell 5.1 часть команд читается иначе.
-- **Node и pnpm.** На Node 22–24 corepack включает pnpm, как выше. С Node 25 corepack
+  `Remove-Item Env:OKOLOS_SKIP_GATES`). Только на macOS: замер окна агента `node tools/agent-window-spike.mjs`
+  в разделе «Прочее» (Chrome из `/Applications`, сравнение с Chrome for Testing из его места на
+  Mac и чтение переднего приложения через `osascript`: на Linux фокус не читается). В `cmd.exe` и Windows PowerShell 5.1 часть команд читается иначе.
+- **Node и pnpm.** На Node 22–24 corepack включает pnpm, как выше; на Windows, где Node стоит в
+  Program Files, `corepack enable` обычно требует оболочку администратора, иначе ставьте pnpm
+  как для Node 25 ниже (CI на Windows ставит его `pnpm/action-setup`). С Node 25 corepack
   в Node не входит: pnpm ставится `npm i -g pnpm` или автономным установщиком с
   pnpm.io (`iwr https://get.pnpm.io/install.ps1 -useb | iex` в PowerShell); версию
   всё равно задаёт `packageManager`.
@@ -223,8 +225,9 @@ Firefox-прогон берёт бинарник так (`tools/find-firefox.mjs
 `%LOCALAPPDATA%\ms-playwright`). Нет ни одного: прогон отказывает с командой
 `pnpm exec playwright install firefox`. Это касается только первого шага
 `pnpm test:e2e:firefox`; второй шаг, `gecko-layout`, берёт Firefox и Chromium Playwright сам, и
-`FIREFOX_BINARY` его не меняет: нужен `pnpm exec playwright install firefox chromium`. Он поднимает geckodriver на порту 4444; занятый порт
-бывает самой частой причиной непонятного падения.
+`FIREFOX_BINARY` его не меняет: нужен `pnpm exec playwright install firefox chromium`. Первый шаг
+(`tools/firefox-e2e.mjs`) поднимает geckodriver на порту 4444; занятый порт бывает самой частой
+причиной непонятного падения.
 
 ## Генерируемое — руками не править
 
@@ -361,7 +364,6 @@ pnpm suffix:gap      # таблица суффиксов против насто
 
 ```bash
 node tools/agent-window-spike.mjs --out /tmp/b0.json   # инфобар, CDP, размер снимка, фокус
-# на Linux: node tools/agent-window-spike.mjs --chrome /usr/bin/google-chrome --out /tmp/b0.json
 ```
 
 Как читать результат и что он не покрывает —
