@@ -152,7 +152,7 @@ export function showDownloadVerdict(
     },
     {
       onPrimary: blocked ? deps.openJournal : discard,
-      onRetry: deps.openJournal,
+      onRetry: blocked ? deps.openJournal : discard,
       onDispute: dismiss,
       onDismiss: dismiss,
     },

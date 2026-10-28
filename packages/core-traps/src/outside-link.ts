@@ -78,7 +78,8 @@ export function classifyOutsideLink(href: string): OutsideLinkVerdict | null {
   if (scheme === undefined) return null
 
   if (PROGRAM_SCHEMES.has(scheme)) {
-    return { scheme, host: remoteHost(decoded(address)), signals: [scheme, 'opens-a-program'] }
+    const host = scheme === 'search-ms' || scheme === 'search' ? searchLocation(address) : remoteHost(decoded(address))
+    return { scheme, host, signals: [scheme, 'opens-a-program'] }
   }
 
   if (OFFICE_SCHEMES.has(scheme)) {
@@ -129,17 +130,30 @@ function decoded(text: string): string {
 }
 
 /**
- * The first other computer an address names: a `\\host\share` path, an http(s) URL or a
- * `file://host/` address, whichever comes first. A user name before `@` is skipped; `@SSL`
- * and a port end the name, as they do for Windows; `file:///` (a local path) and `file://localhost/` name no other computer.
+ * The first other computer an address names: a `\\host\share` path (also `\\?\UNC\host\`
+ * and `//host/`), an http(s) URL or a `file://host/` address (also `file:////host/`), whichever
+ * comes first. A user name before `@` is skipped; `@SSL` and a port end the name, as they do
+ * for Windows; an IPv6 literal is named whole, brackets included; `file:///` (a local path)
+ * and `file://localhost/` name no other computer.
  */
 function remoteHost(text: string): string | null {
-  const unc = /\\\\([^\\/@:%?&|"'\s]+)/.exec(text)
+  const HOST = String.raw`(\[[0-9a-f:.]+\]|[^\\/@:%?&|"'\s#\[\]]+)`
+  const longUnc = new RegExp(String.raw`\\\\\?\\UNC\\` + HOST, 'i').exec(text)
+  const unc = new RegExp(String.raw`(?:\\\\|(?<![:/])//)(?!\?\\)` + HOST, 'i').exec(text)
   // A user name before `@` is not the computer: `http://microsoft.com@evil.example/` fetches from evil.example.
-  const url = /\bhttps?:\/\/(?:[^\\/?#\s]*@)?([^\\/@:?&|"'\s#]+)/i.exec(text)
-  const file = /\bfile:\/\/(?:[^\\/?#\s]*@)?(?!localhost[\\/])([^\\/@:?&|"'\s#]+)/i.exec(text)
-  const first = [unc, url, file]
+  const url = new RegExp(String.raw`\bhttps?://(?:[^\\/?#\s]*@)?` + HOST, 'i').exec(text)
+  const file = new RegExp(String.raw`\bfile://(?:/{2})?(?:[^\\/?#\s]*@)?(?!localhost[\\/])(?!/)` + HOST, 'i').exec(text)
+  const first = [longUnc, unc, url, file]
     .filter((match): match is RegExpExecArray => match !== null)
     .sort((a, b) => a.index - b.index)[0]
   return first?.[1]?.toLowerCase() ?? null
+}
+
+/**
+ * Where a `search-ms:` or `search:` link sends Explorer: its `crumb=location:` parameter, read
+ * alone so a page cannot put a decoy address in `displayname` or `query` before it (round 5).
+ */
+function searchLocation(address: string): string | null {
+  const crumb = /(?:^|[?&:])crumb=location:([^&]*)/i.exec(decoded(address))?.[1]
+  return crumb === undefined ? null : remoteHost(crumb)
 }

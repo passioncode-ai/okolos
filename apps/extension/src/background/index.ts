@@ -1,6 +1,8 @@
 import { standingFindings } from '@okolos/core-extensions'
 import { classifyUndecided, detectHidden } from '@okolos/core-injection'
 import { detectPlatform, type RpcSender } from '@okolos/platform'
+
+import { createDownloadOffers } from './download-offers.js'
 import { buildRules, matchUrl, type FeedSnapshot,
 } from '@okolos/core-feeds'
 import { createOnnxRuntime, MODEL } from '@okolos/model'
@@ -97,6 +99,9 @@ const FEED_ALARM = FEED.name
 const RETENTION_ALARM = RETENTION.name
 const INVENTORY_ALARM = INVENTORY.name
 
+/** The downloads a page may ask to discard (round 5 of the B-165 certification). */
+const downloadOffers = createDownloadOffers()
+
 platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSender) => {
   switch (message.type) {
     case 'page/candidates':
@@ -122,10 +127,15 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
       ) as Promise<RpcMap[T]['res']>
     case 'password/shown':
       return forgetHeldVerdict(from) as Promise<RpcMap[T]['res']>
-    case 'download/discard':
-      return platform.downloads
-        .discard((message.payload as { downloadId: number }).downloadId)
-        .then((ok) => ({ ok })) as Promise<RpcMap[T]['res']>
+    case 'download/discard': {
+      // Only a download this background offered for discarding, asked for once by a top
+      // frame (download-offers.ts): the handler deletes a file from the person's disk.
+      const { downloadId } = message.payload as { downloadId: number }
+      if (from.frameId !== 0 || !downloadOffers.take(downloadId, from.tabId)) {
+        return Promise.resolve({ ok: false }) as Promise<RpcMap[T]['res']>
+      }
+      return platform.downloads.discard(downloadId).then((ok) => ({ ok })) as Promise<RpcMap[T]['res']>
+    }
     case 'password/pending':
       return answerPendingVerdict(from) as Promise<RpcMap[T]['res']>
     case 'leaks/check':
@@ -1157,6 +1167,9 @@ platform.downloads.onCreated((item) => {
           downloadId: item.id,
         })
         .catch(() => false)
+
+      // A doubted download the person may discard from its panel; a blocked one is gone.
+      if (told && verdict.action !== 'block') downloadOffers.offer(item.id, null)
 
       if (!told) {
         // Recorded, because "the banner did not show" and "the check did not run"

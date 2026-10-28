@@ -217,3 +217,20 @@ describe('a percent-encoded link with a stray percent sign (B-165, round 4)', ()
     expect(classifyOutsideLink('ms-word:ofe|u|http://a@b@evil.example/a.docx')).toMatchObject({ host: 'evil.example' })
   })
 })
+
+describe('the computer a link names, read where the program reads it (B-165, round 5)', () => {
+  it('takes search-ms: from crumb=location:, not from text the page put before it', () => {
+    expect(
+      classifyOutsideLink('search-ms:displayname=http://microsoft.com&crumb=location:\\\\evil.example\\share'),
+    ).toMatchObject({ host: 'evil.example' })
+    expect(
+      classifyOutsideLink('search-ms:query=https://microsoft.com/x&crumb=location:%5C%5Cevil.example%5Cshare'),
+    ).toMatchObject({ host: 'evil.example' })
+  })
+
+  it('names an IPv6 host whole, and the UNC forms Windows reads as a share', () => {
+    expect(classifyOutsideLink('ms-word:http://[2001:db8::1]/a.docx')).toMatchObject({ host: '[2001:db8::1]' })
+    expect(classifyOutsideLink('search-ms:crumb=location:file:////evil.example/share')).toMatchObject({ host: 'evil.example' })
+    expect(classifyOutsideLink('search-ms:crumb=location:\\\\?\\UNC\\evil.example\\share')).toMatchObject({ host: 'evil.example' })
+  })
+})

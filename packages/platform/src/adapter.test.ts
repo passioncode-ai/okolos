@@ -816,13 +816,14 @@ describe('discarding a download (B-165, round 4)', () => {
     const platform = createPlatform('chrome', fakeApi({
       downloads: {
         onCreated: { addListener: () => undefined },
-        cancel: async (id: number) => { calls.push(`cancel ${id}`) },
+        cancel: async () => { throw new Error('Download must be in progress') },
         removeFile: async (id: number) => { calls.push(`remove ${id}`) },
         erase: async (query: { id: number }) => { calls.push(`erase ${query.id}`); return [query.id] },
       },
     }))
+    // A finished download: cancel refuses, the file is removed.
     expect(await platform.downloads.discard(7)).toBe(true)
-    expect(calls).toEqual(['cancel 7', 'remove 7', 'erase 7'])
+    expect(calls).toEqual(['remove 7', 'erase 7'])
   })
 
   it('says it did not when the file could not be deleted', async () => {
@@ -835,5 +836,21 @@ describe('discarding a download (B-165, round 4)', () => {
       },
     }))
     expect(await platform.downloads.discard(7)).toBe(false)
+  })
+})
+
+describe('discarding a download that is still running (B-165, round 5)', () => {
+  it('counts the cancel as the discard: the browser drops the partial file, and removeFile refuses a running one', async () => {
+    const calls: string[] = []
+    const platform = createPlatform('chrome', fakeApi({
+      downloads: {
+        onCreated: { addListener: () => undefined },
+        cancel: async (id: number) => { calls.push(`cancel ${id}`) },
+        removeFile: async () => { throw new Error('Download must be complete') },
+        erase: async (query: { id: number }) => { calls.push(`erase ${query.id}`); return [query.id] },
+      },
+    }))
+    expect(await platform.downloads.discard(9)).toBe(true)
+    expect(calls).toEqual(['cancel 9', 'erase 9'])
   })
 })

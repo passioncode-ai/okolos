@@ -298,13 +298,21 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
 
       async discard(id: number): Promise<boolean> {
         const downloads = api.downloads
-        if (!downloads?.removeFile) return false
-        // A finished download refuses cancel; that is not a failure to discard it.
-        await downloads.cancel(id).catch(() => undefined)
-        try {
-          await downloads.removeFile(id)
-        } catch {
-          return false
+        if (!downloads) return false
+        // A running download is discarded by cancelling it: the browser drops the partial
+        // file, and removeFile refuses anything not complete (round 5 of the B-165
+        // certification). A finished one refuses cancel, and its file is removed instead.
+        const cancelled = await downloads.cancel(id).then(
+          () => true,
+          () => false,
+        )
+        if (!cancelled) {
+          if (!downloads.removeFile) return false
+          try {
+            await downloads.removeFile(id)
+          } catch {
+            return false
+          }
         }
         await downloads.erase?.({ id }).catch(() => undefined)
         return true
