@@ -18,8 +18,8 @@
 import { spawnSync } from 'node:child_process'
 import { isMain } from './is-main.mjs'
 
-/** Exits 0 only under Python 3; what each candidate is asked to run. */
-export const PYTHON3_CHECK = 'import sys; sys.exit(0 if sys.version_info[0] == 3 else 1)'
+/** Exits 0 only under Python 3.7 or later (the linters' syntax); what each candidate is asked to run. */
+export const PYTHON3_CHECK = 'import sys; sys.exit(0 if sys.version_info[0] == 3 and sys.version_info[:2] >= (3, 7) else 1)'
 
 /**
  * The names to try, in order, as `[command, ...args]`.
@@ -81,7 +81,7 @@ export function noPythonMessage(platform = process.platform) {
   const tried = pythonCandidates(platform)
     .map((candidate) => candidate.join(' '))
     .join(', ')
-  return `no Python 3 found (tried ${tried}). Install Python 3 so one of those names runs it.`
+  return `no Python 3.7 or later found (tried ${tried}). Install Python 3 so one of those names runs it.`
 }
 
 // Real paths, so a run through a symlink or a junction still runs (tools/is-main.mjs).

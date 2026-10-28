@@ -3,7 +3,8 @@
  *
  * B-161 was a command that could end with 0, "nothing found", without having
  * scanned anything. The first fix made the command a TypeScript file; on node
- * 22.0 to 22.17, which the root `engines` (`>=22`) allows, node rejects a `.ts`
+ * 22.0 to 22.17, which the root `engines` allowed until it became
+ * `^22.18.0 || >=23.6.0` (the FLOORS below, kept equal by a test), node rejects a `.ts`
  * entry before a line of it runs (ERR_UNKNOWN_FILE_EXTENSION) and exits 1, which
  * this command uses for "signals found". So the file node is handed is
  * JavaScript, does no TypeScript itself, and every way it can fail before a

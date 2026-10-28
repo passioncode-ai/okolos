@@ -472,7 +472,7 @@ async function main() {
   process.exit(record.exit)
 }
 
-if (isMain(import.meta.filename)) {
+if (isMain(import.meta.url)) {
   main().catch((cause) => {
     console.error(`feed-job: ${cause instanceof Error ? cause.stack : String(cause)}`)
     process.exit(EXIT.failed)

@@ -67,3 +67,18 @@ describe('deciding whether a module is the program', () => {
     expect(seen).toEqual(['/b/tool.mjs', '/a/tool.mjs'])
   })
 })
+
+describe('a module URL as well as a path (B-159, round 9)', () => {
+  it('reads import.meta.url, which every node has, the same as import.meta.filename', () => {
+    const same = (file: string) => file
+    // A real absolute path of this platform, so the URL round-trips on Windows (drive letter) too.
+    const file = path.resolve(os.tmpdir(), 'okolos', 'bootstrap.mjs')
+    const other = path.resolve(os.tmpdir(), 'okolos', 'other.mjs')
+    expect(isMain(pathToFileURL(file).href, file, same)).toBe(true)
+    expect(isMain(pathToFileURL(file).href, other, same)).toBe(false)
+  })
+
+  it('says no to a missing filename instead of throwing', () => {
+    expect(isMain(undefined as unknown as string, '/x', (f) => f)).toBe(false)
+  })
+})

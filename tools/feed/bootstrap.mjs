@@ -36,7 +36,7 @@
  * rule.
  */
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, realpathSync, renameSync, rmSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, openSync, readSync, realpathSync, renameSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 import { killAllGroups, runBounded, withoutSecrets } from './bounded.mjs'
@@ -240,7 +240,7 @@ export async function runAgent({
   const fail = (stage, exit, reason) => {
     const signal = stopped()
     if (signal) {
-      write(`stopped by ${signal} in ${stage}`)
+      // The feed.log line for a stop is onSignal's, written once whoever records the stop.
       return { exit: EXIT.signal, record: writeStatus(paths.status, signalRecord({ stage, runId, startedAt, recovered }, signal, iso(), env)) }
     }
     write(`failed in ${stage}: ${reason}`)
@@ -361,9 +361,12 @@ export async function runAgent({
   })
 
   const after = readStatus(paths.status)
+  // A job refused by the lock wrote nothing: a record that appeared meanwhile is the run
+  // that holds the lock (a manual feed:refresh), not this one, unless it carries our id.
+  const refused = result.code === EXIT.lockHeld && after?.runId !== runId
   // A job from before this change writes no runId; its record is still its own
   // when it was written after the job started.
-  const own = after && (after.runId === runId || (!after.runId && typeof after.at === 'string' && after.at >= spawnedAt))
+  const own = !refused && after && (after.runId === runId || (!after.runId && typeof after.at === 'string' && after.at >= spawnedAt))
   // One rule for "this run wrote a record": it carries this run's id. A record
   // adopted from such a job is stamped with it, or the launch line would find no
   // record of its id, write its own and count the one failure twice. Such a job
@@ -420,6 +423,29 @@ export function crashRecord(cause, at = new Date().toISOString(), env = process.
 }
 
 /**
+ * Whether feed.log already has `text` on a line stamped at or after `since` (this run's start).
+ * Reads only the last 64 KB: a run writes a few dozen lines.
+ */
+function loggedSince(file, since, text) {
+  let tail
+  try {
+    const size = statSync(file).size
+    const fd = openSync(file, 'r')
+    try {
+      const length = Math.min(size, 64 * 1024)
+      const buffer = Buffer.alloc(length)
+      readSync(fd, buffer, 0, length, size - length)
+      tail = buffer.toString('utf8')
+    } finally {
+      closeSync(fd)
+    }
+  } catch {
+    return false
+  }
+  return tail.split(/\r?\n/).some((line) => line.slice(0, 24) >= since && line.includes(text))
+}
+
+/**
  * On SIGTERM/SIGINT: mark the run as stopping (runAgent then records what the stop
  * broke as the stop), stop the job's group, record the stop unless this run's
  * record is already written, and exit 143. Returns the promise main waits on, so
@@ -435,8 +461,17 @@ function onSignal(signal, current) {
       const own = readStatus(paths.status)
       const record = own?.runId === current.runId ? own : signalRecord(current, signal, new Date().toISOString())
       if (record !== own) writeStatus(paths.status, record)
-      // The same one line in launchd's own log as any failed run, whichever of the job or the
-      // bootstrap recorded the stop (AGENTS.md, the failure table).
+      // One line in feed.log and the same one line in launchd's own log as any failed run,
+      // whichever of the job or the bootstrap recorded the stop (AGENTS.md, the failure table).
+      try {
+        // The job names its own stops in feed.log when a stage it was running answers the
+        // signal; the bootstrap adds the line only when this run's tail does not have it.
+        if (!loggedSince(paths.log, current.startedAt, `stopped by ${signal}`)) {
+          openLog(paths.log).write(`stopped by ${signal} in ${record.stage}`)
+        }
+      } catch {
+        // feed.log unwritable: the record and launchd's line below still say it.
+      }
       console.error(`feed-agent: ${record.outcome} in ${record.stage}: ${record.reason ?? `stopped by ${signal}`} (see ${paths.log})`)
     } finally {
       process.exit(EXIT.signal)
@@ -475,7 +510,7 @@ async function main() {
   process.exit(exit)
 }
 
-if (isMain(import.meta.filename)) {
+if (isMain(import.meta.url)) {
   main().catch((cause) => {
     console.error(`feed-agent: ${cause instanceof Error ? cause.stack : String(cause)}`)
     // Best effort: a crash here (an unwritable log folder, say) still counts.

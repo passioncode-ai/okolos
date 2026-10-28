@@ -15,7 +15,7 @@
 | Тесты | `pnpm test` (unit + гейты), `pnpm test:e2e` (Chromium), `pnpm test:e2e:firefox` — счётчики намеренно не выписаны здесь: они устаревают следующим коммитом |
 | Код | 20 пакетов, 3 приложения — карта ниже |
 | Репозиторий | `passioncode-ai/okolos` (публичный, GNU AGPL-3.0 или коммерческая лицензия — ADR-0016; перенесён из `ssheleg/okolos` 2026-09-29, старый адрес редиректит) |
-| Ждёт человека | 3 шага: аккаунты Chrome Web Store и Firefox Add-ons для публикации и отдельное «да» на карточку в Edge Add-ons ([B-137](backlog.md)) и, после слияния B-159, переустановка агента фида: `pnpm feed:agent` из основного клона на origin/main, затем `node tools/install-feed-agent.mjs --status` показывает `"bootstrap": true` и `"plistStartsBootstrap": true` (до этого Mac запускает старый plist; порядок и проверка в [AGENTS.md](../AGENTS.md), «After this lands»). Сам агент стоит: поставлен 2026-10-04 (B-138), переустановлен 2026-10-26 (B-149) |
+| Ждёт человека | 3 шага: аккаунты Chrome Web Store и Firefox Add-ons для публикации и отдельное «да» на карточку в Edge Add-ons ([B-137](backlog.md)) и, после слияния B-159, переустановка агента фида: `pnpm feed:agent` из основного клона на origin/main, затем `node tools/install-feed-agent.mjs --status` показывает `"bootstrap": true` и `"loaded": true` и `"plistStartsBootstrap": true` (до этого Mac запускает старый plist; порядок и проверка в [AGENTS.md](../AGENTS.md), «After this lands»). Сам агент стоит: поставлен 2026-10-04 (B-138), переустановлен 2026-10-26 (B-149) |
 
 **REQ-37 закрыт решением, а не отложен.** Политика по весам принята и записана
 в [licences.md](licences.md): проект несёт только те веса, которые можно

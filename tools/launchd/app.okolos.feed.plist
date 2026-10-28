@@ -156,7 +156,8 @@ exit "$c"</string>
     Not `KeepAlive`: this is a task that finishes, and keeping it alive would
     restart it in a loop. The job writes its own rotated, owner-only log and a
     status record next to its state. launchd's streams catch the launch line's
-    one line when node or the bootstrap cannot start, one summary line per failed
+    one line when node or the bootstrap cannot start (after node's own error output when
+    the installed bootstrap cannot load), one summary line per failed
     run, and the job's own stderr, which the bootstrap passes through as it
     arrives (a crash's error and stack; feed.log gets them too). The bootstrap and
     the job cap that file at start.
