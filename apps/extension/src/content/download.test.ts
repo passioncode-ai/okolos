@@ -1,7 +1,10 @@
 /** @vitest-environment happy-dom */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { BannerHandlers } from '@okolos/ui'
+
 import { showDownloadVerdict, type DownloadVerdictMessage } from './download.js'
+import { createSurfaceSlot } from './surface-slot.js'
 
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -147,5 +150,38 @@ describe('the words for a code', () => {
       const missing = values.filter((value) => !detail.includes(value))
       expect(missing, `${shape.code} dropped its values from the sentence`).toEqual([])
     }
+  })
+})
+
+describe('a download panel closed by the person, through the real slot (B-165, round 2)', () => {
+  /**
+   * The download module closes its panel with the handle the slot gave it. Before the slot
+   * released on a handle's close, the slot's watch read the closed panel as the page
+   * removing a warning and drew it again a quarter-second later.
+   */
+  it('stays closed after Dismiss, and the slot is free again', async () => {
+    const slot = createSurfaceSlot({
+      doc: document,
+      noteRefused: () => undefined,
+      escalate: async () => undefined,
+      alsoLine: (kinds) => `also here: ${kinds.join(', ')}`,
+      wait: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+    })
+    let handlers: BannerHandlers | null = null
+    showDownloadVerdict(message(), {
+      ...deps(),
+      mountWarning: (props, given) => {
+        handlers = given
+        return slot.claim({ kind: 'download', severity: props.severity, props, handlers: given })
+      },
+    })
+    expect(banner()).not.toBeNull()
+
+    ;(handlers as BannerHandlers | null)?.onDismiss()
+    await new Promise<void>((resolve) => setTimeout(resolve, 1000))
+
+    expect(banner()).toBeNull()
+    expect(slot.current()).toBeNull()
+    slot.release()
   })
 })
