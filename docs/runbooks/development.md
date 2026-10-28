@@ -14,7 +14,7 @@
 | Что | Версия | Зачем |
 |---|---|---|
 | Node | `^22.18.0 \|\| >=23.6.0` (`engines` в `package.json`; проверено на 26.4.0 и 26.10.0): ниже `okolos-mail` не запускается, и его тест в `pnpm test` краснеет | всё остальное |
-| pnpm | `11.10.0` — задан в `packageManager` | воркспейс из 23 пакетов (`apps/*` и `packages/*`) |
+| pnpm | `11.10.0`, задан в `packageManager` | воркспейс из 23 пакетов (`apps/*` и `packages/*`) |
 | Python 3 | любой 3.x (проверено на 3.14.6), под именем `python3`, `python` или `py -3` | `docs/ux/lint.py`, `docs/brand/lint.py`, `tools/model/evaluate.py` |
 | Браузеры Playwright | ставятся командой ниже | e2e в Chromium и Firefox |
 
