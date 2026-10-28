@@ -447,7 +447,7 @@ async function main() {
 
   if (process.platform !== 'darwin') {
     console.error(
-      'The feed agent is macOS-only (ADR-0017): launchd starts its bootstrap, which keeps\n' +
+      'The feed agent installs on macOS only: launchd starts its bootstrap, which keeps\n' +
         'the checkout and the status record. On Linux, publish by hand from a clean clone at\n' +
         'origin/main on a machine that holds the signing key: pnpm feed:refresh. The feed\n' +
         'tools do not run on Windows.',

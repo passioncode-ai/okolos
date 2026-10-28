@@ -64,7 +64,7 @@ Full vector coverage: [docs/coverage-matrix.md](docs/coverage-matrix.md).
 GitHub release. Build it and load the unpacked extension:
 
 ```bash
-corepack enable && pnpm install     # Node 22.18+ to 24; also installs the pre-push hook
+corepack enable && pnpm install     # Node 22.18+ or 23.6 to 24; also installs the pre-push hook
 pnpm build                          # apps/extension/dist/chrome and apps/extension/dist/firefox
 pnpm package                        # the store zips, checked, in apps/extension/dist/release/
 ```

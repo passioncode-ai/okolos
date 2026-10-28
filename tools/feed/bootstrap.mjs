@@ -361,9 +361,12 @@ export async function runAgent({
   })
 
   const after = readStatus(paths.status)
+  // A job refused by the lock wrote nothing: a record that appeared meanwhile is the run
+  // that holds the lock (a manual feed:refresh), not this one, unless it carries our id.
+  const refused = result.code === EXIT.lockHeld && after?.runId !== runId
   // A job from before this change writes no runId; its record is still its own
   // when it was written after the job started.
-  const own = after && (after.runId === runId || (!after.runId && typeof after.at === 'string' && after.at >= spawnedAt))
+  const own = !refused && after && (after.runId === runId || (!after.runId && typeof after.at === 'string' && after.at >= spawnedAt))
   // One rule for "this run wrote a record": it carries this run's id. A record
   // adopted from such a job is stamped with it, or the launch line would find no
   // record of its id, write its own and count the one failure twice. Such a job

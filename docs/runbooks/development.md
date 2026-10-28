@@ -40,7 +40,7 @@ pnpm exec playwright install chromium firefox
 - **Git for Windows.** Хук запускает его `sh`; `tools/ci.test.ts` находит этот `sh`
   рядом с `git` (`git --exec-path`), даже когда в PATH его нет, как в PowerShell и cmd.
 - **Оболочка: Git Bash или PowerShell 7** (`pwsh`). Команды этого раннбука идут в обеих,
-  кроме трёх, которым нужен Git Bash (или macOS и Linux), и одной, которая работает только на macOS и Linux: запись доступа
+  кроме трёх, которым нужен Git Bash (или macOS и Linux), замера окна агента, который работает только на macOS и Linux, и инструментов фида, которые на Windows не работают вовсе (таблица ниже): запись доступа
   `printf %s "$VALUE" | node tools/access.mjs set …` в разделе «Доступы» (в PowerShell нет
   `printf`); проверка `git ls-files --eol | grep w/crlf` в рецепте для старого клона (в
   PowerShell нет `grep`; там `git ls-files --eol | Select-String w/crlf`); обход хука
@@ -217,11 +217,13 @@ elements» и больше ничего, а между навигацией и �
 
 Firefox-прогон берёт бинарник так (`tools/find-firefox.mjs`, тест
 `tools/find-firefox.test.ts`, «lets FIREFOX_BINARY win»): `FIREFOX_BINARY`, когда переменная
-задана, на любой платформе; иначе самый новый Firefox из кэшей Playwright:
-`PLAYWRIGHT_BROWSERS_PATH`, затем на macOS и Linux `~/Library/Caches/ms-playwright`,
+задана, на любой платформе; иначе самый новый Firefox из всех кэшей Playwright
+(`PLAYWRIGHT_BROWSERS_PATH`, на macOS и Linux `~/Library/Caches/ms-playwright`,
 `~/.cache/ms-playwright` и `/root/.cache/ms-playwright`, на Windows
-`%LOCALAPPDATA%\ms-playwright`. Нет ни одного: прогон отказывает с командой
-`pnpm exec playwright install firefox`. Он поднимает geckodriver на порту 4444; занятый порт
+`%LOCALAPPDATA%\ms-playwright`). Нет ни одного: прогон отказывает с командой
+`pnpm exec playwright install firefox`. Это касается только первого шага
+`pnpm test:e2e:firefox`; второй шаг, `gecko-layout`, берёт Firefox и Chromium Playwright сам, и
+`FIREFOX_BINARY` его не меняет: нужен `pnpm exec playwright install firefox chromium`. Он поднимает geckodriver на порту 4444; занятый порт
 бывает самой частой причиной непонятного падения.
 
 ## Генерируемое — руками не править

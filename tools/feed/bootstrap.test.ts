@@ -500,6 +500,20 @@ describe('an install made off origin/main is in every record the bootstrap write
     return { w, env }
   }
 
+  it('leaves alone a record another run wrote while this job was refused by the lock', () => {
+    // A manual run finishing while the agent's job is refused: its record is not this run's.
+    const { w, env } = installed((at) => [
+      `import { writeFileSync } from 'node:fs'`,
+      `writeFileSync(${JSON.stringify(at.paths.status)}, JSON.stringify({ startedAt: 'm', at: new Date().toISOString(), outcome: 'published', stage: 'done', exit: 0, consecutiveFailures: 0, lastPublished: null }))`,
+      `process.exit(75)`,
+    ].join('\n') + '\n')
+    const result = spawnSync(process.execPath, [path.join(w.paths.agentBin, 'bootstrap.mjs')], { env, encoding: 'utf8', timeout: 20_000 })
+    expect(result.status, result.stderr).toBe(EXIT.lockHeld)
+    const status = readStatus(w.paths.status)
+    expect(status?.runId).toBeUndefined()
+    expect(status).toMatchObject({ outcome: 'published', startedAt: 'm' })
+  })
+
   it('in the record of its own crash (stage bootstrap)', () => {
     const { w, env } = installed(() => 'process.exit(0)\n')
     // A log folder that is a file: the bootstrap cannot open feed.log and crashes.
