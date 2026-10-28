@@ -111,3 +111,19 @@ describe('the leak receipt', () => {
     expect(send).not.toHaveBeenCalled()
   })
 })
+
+describe('the leak receipt, when the panel goes before the dwell (B-165, round 3)', () => {
+  it('is not sent when a critical warning displaces the leak panel within the dwell', () => {
+    const send = vi.fn()
+    const handle = claimWithReceipt(
+      { mount: slot.mountFor('password', 'major'), send, dwellMs: DWELL, onPageHide: () => undefined },
+      props,
+      handlers(),
+    )
+    expect(handle).not.toBeNull()
+    vi.advanceTimersByTime(DWELL / 2)
+    trapHolds()
+    vi.advanceTimersByTime(DWELL * 2)
+    expect(send).not.toHaveBeenCalled()
+  })
+})

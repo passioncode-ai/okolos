@@ -18,8 +18,11 @@ import type { BannerHandle, BannerHandlers, BannerProps } from '@okolos/ui'
  */
 
 export interface ReceiptDeps {
-  /** The slot's `mountFor('password', …)`: null when another warning holds the panel. */
-  mount(props: BannerProps, handlers: BannerHandlers): BannerHandle | null
+  /**
+   * The slot's `mountFor('password', …)`: null when another warning holds the panel. The
+   * third argument is called when the panel goes by another hand (displaced or released).
+   */
+  mount(props: BannerProps, handlers: BannerHandlers, onReleased?: () => void): BannerHandle | null
   /** Tells the background the verdict was shown. */
   send(): void
   readonly dwellMs: number
@@ -45,6 +48,8 @@ export function claimWithReceipt(
     receipt()
   }
 
+  /** Gone before the dwell, by a worse finding or a release: it was not read, so no receipt. */
+  let gone = false
   const handle = deps.mount(props, {
     onPrimary: () => {
       read()
@@ -59,8 +64,11 @@ export function claimWithReceipt(
       read()
       handlers.onDismiss()
     },
+  }, () => {
+    gone = true
+    if (dwell !== null) clearTimeout(dwell)
   })
-  if (handle === null) return null
+  if (handle === null || gone) return null
 
   dwell = setTimeout(receipt, deps.dwellMs)
   deps.onPageHide(() => {
