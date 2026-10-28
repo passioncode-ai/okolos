@@ -107,7 +107,7 @@ What a failed run leaves, and where (B-159):
 
 | Failure | `feed-status.json` (`outcome: failed`, counted in `consecutiveFailures`) | `feed.log` | `feed.launchd.log` |
 |---|---|---|---|
-| `node` cannot be found, the installed bootstrap copy is gone, or `node` exits non-zero and no record carries this launch's `runId` | `stage: launch`, written by the plist's `/bin/sh` line (`lastPublished` kept, its own `runId` only) | one line | one line |
+| `node` cannot be found, the installed bootstrap copy is gone, or `node` exits non-zero and no record carries this launch's `runId` | `stage: launch`, written by the plist's `/bin/sh` line (`lastPublished` kept, its own `runId` only) | one line | one line; when node starts but the installed bootstrap cannot load, node's own error output comes before it (the only place the cause shows) |
 | the checkout is missing or broken and cannot be recreated, or its repair outlives the run's deadline | `stage: checkout` | yes | one line |
 | the job dies without writing its own record: a crash | `stage: job`, `reason` as `runAgent` in `tools/feed/bootstrap.mjs` builds it: "the job exited <code or signal>", a dash, the first of the job's last 50 output lines (stdout and stderr) that reads as an error, else the last of them (`reasonFrom`), then "without writing its record"; with no output, "the job exited <code or signal> without writing its record" | its output and a line | its output and a line |
 | the job is killed at the run's deadline without writing its own record | `stage: job`, exit 124, `reason` = the fixed sentence "the run's deadline (2700 s) passed during the job; its process group was killed" | a line | a line |

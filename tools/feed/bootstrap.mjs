@@ -510,7 +510,7 @@ async function main() {
   process.exit(exit)
 }
 
-if (isMain(import.meta.filename)) {
+if (isMain(import.meta.url)) {
   main().catch((cause) => {
     console.error(`feed-agent: ${cause instanceof Error ? cause.stack : String(cause)}`)
     // Best effort: a crash here (an unwritable log folder, say) still counts.

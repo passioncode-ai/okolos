@@ -21,17 +21,22 @@
  * that name (BOOTSTRAP_SOURCES in tools/feed/bootstrap.mjs).
  */
 import { realpathSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 /**
- * @param {string} filename `import.meta.filename` of the module asking
+ * @param {string} filename `import.meta.filename` or `import.meta.url` of the module asking.
+ *   The URL is what the bootstrap passes: `import.meta.filename` arrived in node 20.11, and
+ *   on an older node in launchd's shell it was undefined, so the bootstrap skipped its main
+ *   and exited 0 with no record (round 9 of the B-159 certification).
  * @param {string | undefined} [argv1] what the process was started with
  * @param {(file: string) => string} [realpath]
  * @returns {boolean}
  */
 export function isMain(filename, argv1 = process.argv[1], realpath = realpathSync) {
-  if (!argv1) return false
+  if (!argv1 || typeof filename !== 'string') return false
   try {
-    return realpath(argv1) === realpath(filename)
+    const own = filename.startsWith('file:') ? fileURLToPath(filename) : filename
+    return realpath(argv1) === realpath(own)
   } catch {
     return false
   }
