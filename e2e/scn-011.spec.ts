@@ -1,5 +1,5 @@
 import { expect, serve, test } from './hooks.js'
-import { expectBanner, expectSurface } from './surfaces.js'
+import { expectBanner, expectScriptReady, expectSettled, expectSurface, SETTLED } from './surfaces.js'
 
 /**
  * SCN-011 — a pause before a password on a site this device does not know.
@@ -22,6 +22,8 @@ test('focusing the password field explains what is and is not known', async ({ c
   await serve(context, LOGIN)
   const page = await context.newPage()
   await page.goto('https://fixture.test/login')
+  // Listening before the focus, or the focus reaches nobody and is never asked again (B-78).
+  await expectScriptReady(page)
 
   await page.locator('#pass').focus()
   await expectBanner(page, context)
@@ -40,11 +42,13 @@ test('the second visit counts from the first, which is what makes the fact real'
   await serve(context, LOGIN)
   const first = await context.newPage()
   await first.goto('https://fixture.test/login')
+  await expectScriptReady(first)
   await first.locator('#pass').focus()
   await expectSurface(first, 'okolos-banner', context)
 
   const second = await context.newPage()
   await second.goto('https://fixture.test/login')
+  await expectScriptReady(second)
   await second.locator('#pass').focus()
   await expect(second.locator('okolos-banner [data-role=detail]')).toContainText('first day')
 })
@@ -62,8 +66,11 @@ test('an ordinary text field is not a password field', async ({ context }) => {
   await serve(context, LOGIN)
   const page = await context.newPage()
   await page.goto('https://fixture.test/login')
+  await expectScriptReady(page)
 
   await page.locator('#user').focus()
-  await page.waitForTimeout(1000)
+  // Until the pause says it judged this focus (a test-hook mark), not for a time: a fixed
+  // wait ran out first under load and passed on a judgement not yet made (B-169).
+  await expectSettled(page, SETTLED.focus)
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 })

@@ -1,7 +1,8 @@
 import { expect, test } from './hooks.js'
 import { serveHosts } from './serve.js'
 import { SURFACE_MOUNT_MS } from './budgets.js'
-import { expectJournalLine } from './surfaces.js'
+import { extensionWorker } from './ready.js'
+import { expectJournalLine, expectSettled, SETTLED } from './surfaces.js'
 
 /**
  * A password submitted by a form that **navigates**, and a verdict that survives the
@@ -109,6 +110,7 @@ test('the verdict reaches the page the login landed on', async ({ context, exten
   await workerAwake(context, extensionId)
   const page = await context.newPage()
   await page.goto('https://bank.test/')
+  await contentScriptReady(page)
 
   await page.locator('input[type=password]').fill('password')
   await page.locator('button[type=submit]').click()
@@ -202,7 +204,9 @@ test('the verdict is not delivered twice', async ({ context, extensionId }) => {
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 
   await page.goto('https://bank.test/welcome')
-  await page.waitForTimeout(3_000)
+  // Until this document's question for a held verdict is answered, not for a time: three
+  // seconds ran out first under load and passed on a question not yet asked (B-169).
+  await expectSettled(page, SETTLED.pending)
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 })
 
@@ -221,6 +225,10 @@ test('a password that is not in a breach leaves the landing page alone', async (
   await page.locator('button[type=submit]').click()
   await expect.poll(() => page.url(), { timeout: SURFACE_MOUNT_MS }).toContain('/welcome')
 
-  await page.waitForTimeout(3_000)
+  // Two facts, because the check runs after the submission and races the navigation: the
+  // worker has judged the password and offered a verdict to the tab, and the landing page
+  // has asked for one. After both, a verdict that was going to arrive has arrived (B-169).
+  await expectSettled(await extensionWorker(context), SETTLED.password)
+  await expectSettled(page, SETTLED.pending)
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 })

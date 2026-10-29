@@ -1,6 +1,8 @@
 import { expect, test } from './hooks.js'
 import { serveHosts } from './serve.js'
 import { SURFACE_MOUNT_MS } from './budgets.js'
+import { extensionWorker } from './ready.js'
+import { expectScriptReady, expectSettled, frameAt, SETTLED } from './surfaces.js'
 
 /**
  * A password submitted from a form inside an embedded frame is checked, and the verdict
@@ -62,17 +64,15 @@ const LOGIN_FRAME = `<!doctype html>
  *
  * Without it a spec can submit before the frame's script exists, and then nothing happens
  * at all — a failure that reads exactly like a broken product (the lesson of scn-036).
- * `okolos:collect` is the product's own measure, set at the end of every scan, and the
- * frame runs its own.
+ *
+ * It looked for a frame whose address contains `g00gle`, and this file's frame is
+ * `sso.partner.test`, so it fell back to the top document and waited on the wrong script:
+ * the submit could still beat the frame's listener. Seen 2026-10-29, one run in ten under
+ * four workers: no banner for 35 s (B-78). The frame is now named by the host it is served
+ * from.
  */
 async function frameScriptReady(page: import('@playwright/test').Page): Promise<void> {
-  const frame = page.frames().find((f) => f.url().includes('g00gle')) ?? page.mainFrame()
-  await expect
-    .poll(
-      () => frame.evaluate(() => performance.getEntriesByName('okolos:collect').length),
-      { timeout: SURFACE_MOUNT_MS },
-    )
-    .toBeGreaterThan(0)
+  await expectScriptReady(await frameAt(page, 'https://sso.partner.test'))
 }
 
 /** The panel's variant, once it settles on one. */
@@ -208,7 +208,9 @@ test('stays silent when the password submitted from the frame is not in a breach
   })
   await frame.locator('button[type=submit]').click()
 
-  await page.waitForTimeout(3_000)
+  // Until the worker says it judged the password and offered whatever it found to the tab,
+  // not for a time: three seconds ran out first under load (B-169).
+  await expectSettled(await extensionWorker(context), SETTLED.password)
   const variant = await page.evaluate(
     () =>
       document
