@@ -52,7 +52,21 @@ export interface CredentialDeps {
    * and a shadow root for something it never mounts. A seam that has to lie about its
    * return value is the wrong seam.
    */
-  report?: (finding: { severity: CredentialWarning['severity']; lines: FrameLine[] }) => void
+  report?: (finding: {
+    severity: CredentialWarning['severity']
+    lines: FrameLine[]
+  }) => void | Promise<unknown>
+  /**
+   * Told when a focus has been judged: at once for a field that asks for nothing
+   * sensitive, and after the warning is drawn (or handed to the embedding page, or decided
+   * against) for one that does. Not told when the facts could not be read, because that is
+   * a judgement that was not made.
+   *
+   * It exists for the end-to-end tests, which used to assert "no warning" after a fixed
+   * wait and passed under load on a check that had not run yet (B-169). The entry point
+   * wires it to a mark only in the build with test hooks.
+   */
+  judged?: () => void
 }
 
 export interface CredentialWatcher {
@@ -83,19 +97,35 @@ export function watchCredentialFields(deps: CredentialDeps): CredentialWatcher {
   const mount = mounting(deps)
   let banner: BannerHandle | null = null
   let asked = false
+  /** The first decision, so a later focus is called judged only once it is made. */
+  let decided: Promise<boolean> = Promise.resolve(false)
 
   const onFocus = (event: Event) => {
     const target = event.target
-    if (!(target instanceof Element) || !isSensitive(target)) return
+    if (!(target instanceof Element) || !isSensitive(target)) {
+      deps.judged?.()
+      return
+    }
     // Once per page: focus moves in and out of a password field constantly
     // while someone types, and a warning that reappears is a warning that gets
     // clicked away without reading.
-    if (asked) return
+    if (asked) {
+      // Not before the first decision: a second focus while the facts are still being
+      // read has not been judged yet, it is waiting on the same answer.
+      void decided.then((made) => {
+        if (made) deps.judged?.()
+      })
+      return
+    }
     asked = true
-    void warn(target)
+    decided = warn(target)
+    void decided.then((made) => {
+      if (made) deps.judged?.()
+    })
   }
 
-  async function warn(field: Element): Promise<void> {
+  /** Resolves to whether a decision was reached, which a failed read of the facts is not. */
+  async function warn(field: Element): Promise<boolean> {
     const host = deps.host()
     let context: CredentialContext
     try {
@@ -103,11 +133,11 @@ export function watchCredentialFields(deps: CredentialDeps): CredentialWatcher {
     } catch {
       // Unable to read what we know about this site. Staying silent is right:
       // a warning built from nothing would say nothing useful.
-      return
+      return false
     }
 
     const warning = guardCredentialEntry({ ...context, postsTo: postsTo(field, host) })
-    if (!warning) return
+    if (!warning) return true
 
     const lines = credentialLines(warning)
 
@@ -116,8 +146,10 @@ export function watchCredentialFields(deps: CredentialDeps): CredentialWatcher {
     // drawn a dozen times across ad frames. The relay is the surface here, and it
     // gets facts — the page that embeds this one words them.
     if (deps.report) {
-      deps.report({ severity: warning.severity, lines })
-      return
+      // Judged once the embedding page has it (or the report was given up), not when it
+      // left: until then the warning is on nobody's screen.
+      await Promise.resolve(deps.report({ severity: warning.severity, lines })).catch(() => undefined)
+      return true
     }
 
     banner = mount(
@@ -138,6 +170,7 @@ export function watchCredentialFields(deps: CredentialDeps): CredentialWatcher {
         onDismiss: dismiss,
       },
     )
+    return true
   }
 
   function dismiss(): void {
