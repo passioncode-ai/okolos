@@ -59,6 +59,33 @@ function published(version = 66, updatedAt = new Date(NOW - 60_000).toISOString(
 
 type Call = { command: string; args: string[]; options: BoundedOptions }
 
+type ListedPr = {
+  number: number
+  url: string
+  autoMergeRequest: unknown
+  isCrossRepository: boolean
+  headRepositoryOwner: { login: string }
+  headRefOid: string
+}
+/** An open pull request from this repository's own branch, its head at `oid`. */
+const own = (number = 42, oid = COMMIT, autoMergeRequest: unknown = null): ListedPr => ({
+  number,
+  url: `https://github.com/passioncode-ai/okolos/pull/${number}`,
+  autoMergeRequest,
+  isCrossRepository: false,
+  headRepositoryOwner: { login: 'passioncode-ai' },
+  headRefOid: oid,
+})
+/** The same branch name, pushed in someone's fork. */
+const fork = (number = 5): ListedPr => ({
+  number,
+  url: `https://github.com/passioncode-ai/okolos/pull/${number}`,
+  autoMergeRequest: null,
+  isCrossRepository: true,
+  headRepositoryOwner: { login: 'outsider' },
+  headRefOid: '9'.repeat(40),
+})
+
 interface FakeOptions {
   committed?: { version: number; ageDays: number | null } | 'missing'
   tip?: string
@@ -68,7 +95,9 @@ interface FakeOptions {
   tipBlob?: string
   push?: 'ok' | 'rejected'
   gh?: 'ok' | 'missing' | 'logged-out'
-  open?: Array<{ number: number; url: string; autoMergeRequest: unknown }>
+  open?: ListedPr[] | (() => ListedPr[])
+  /** What `gh pr view <n> --json state` answers for an earlier pull request. */
+  viewState?: 'OPEN' | 'MERGED' | 'CLOSED' | 'error'
   allowAutoMerge?: string
   requiredChecks?: string
   merge?: 'ok' | 'not-allowed' | 'fail'
@@ -85,7 +114,9 @@ function fake(o: FakeOptions = {}) {
       const [sub, verb] = args
       if (o.gh === 'missing') return { code: null, signal: null, stdout: '', stderr: '', timedOut: false, error: 'Error: spawn gh ENOENT' }
       if (sub === 'auth') return o.gh === 'logged-out' ? no('You are not logged into any GitHub hosts. To log in, run: gh auth login') : ok('Logged in')
-      if (sub === 'pr' && verb === 'list') return ok(JSON.stringify(o.open ?? []))
+      if (sub === 'pr' && verb === 'list') return ok(JSON.stringify(typeof o.open === 'function' ? o.open() : (o.open ?? [])))
+      if (sub === 'pr' && verb === 'view') return o.viewState === 'error' ? no('GraphQL: Could not resolve') : ok(`${o.viewState ?? 'OPEN'}\n`)
+      if (sub === 'repo' && verb === 'view') return ok('passioncode-ai\n')
       if (sub === 'pr' && verb === 'create') return ok(`${PR_URL}\n`)
       if (sub === 'pr' && verb === 'edit') return ok(`${PR_URL}\n`)
       if (sub === 'api' && args[1] === 'repos/{owner}/{repo}') return ok(`${o.allowAutoMerge ?? 'true'}\n`)
@@ -139,6 +170,7 @@ async function propose(o: FakeOptions = {}, extra: Record<string, unknown> = {},
     env: { PATH: '/usr/bin', CLOUDFLARE_API_TOKEN: 'cf-secret', GH_TOKEN: 'gh-secret', GITHUB_TOKEN: 'gh-secret-2' },
     now: () => NOW,
     tmp: feed.dir,
+    sleep: async () => {},
     ...extra,
   })
   return { record, ...f, feed }
@@ -188,7 +220,7 @@ describe('the outcomes the record can hold', () => {
       { gh: 'missing' as const },
       {},
       { allowAutoMerge: 'false' },
-      { tip: TIP, mainInTip: true, open: [{ number: 42, url: PR_URL, autoMergeRequest: { mergeMethod: 'MERGE' } }] },
+      { tip: TIP, mainInTip: true, open: [own(42, COMMIT, { mergeMethod: 'MERGE' })] },
     ]) {
       produced.add((await propose(o)).record.outcome)
     }
@@ -208,8 +240,10 @@ describe('the last snapshot step outlives later runs (B-158: a waiting PR stays 
     expect(again).toMatchObject({ at: '2026-11-03T21:00:00.000Z', since: '2026-11-03T09:00:00.000Z' })
     const other = withSince(again, { ...opened, pr: { ...opened.pr, number: 43 } }, '2026-11-10T09:00:00.000Z')
     expect(other.since).toBe('2026-11-10T09:00:00.000Z')
-    const none = withSince(other, { outcome: 'skipped-fresh', branch: SNAPSHOT_BRANCH }, '2026-11-11T09:00:00.000Z')
+    // Dropped only when main took the version (or the step saw the pull request gone).
+    const none = withSince(other, { outcome: 'skipped-fresh', branch: SNAPSHOT_BRANCH, mainCarries: true }, '2026-11-11T09:00:00.000Z')
     expect(none.since).toBeUndefined()
+    expect(none.pr).toBeUndefined()
   })
 
   it('keeps the last step in its own owner-only file beside the record', () => {
@@ -300,7 +334,7 @@ describe('a new pull request on one reused branch, never forced (B-158)', () => 
     const { record, ran } = await propose({
       tip: TIP,
       mainInTip: true,
-      open: [{ number: 42, url: PR_URL, autoMergeRequest: null }],
+      open: [own(42)],
     })
     expect(record).toMatchObject({ outcome: 'auto-merge-requested', pr: { number: 42, action: 'updated' } })
     expect(ran()).toContainEqual(`git commit-tree ${TREE} -p ${TIP} -F -`)
@@ -319,7 +353,7 @@ describe('a new pull request on one reused branch, never forced (B-158)', () => 
   })
 
   it('does not commit or push again when the branch already carries this snapshot', async () => {
-    const { record, ran } = await propose({ tip: TIP, mainInTip: true, tipBlob: BLOB, open: [{ number: 42, url: PR_URL, autoMergeRequest: null }] })
+    const { record, ran } = await propose({ tip: TIP, mainInTip: true, tipBlob: BLOB, open: [own(42, TIP)] })
     expect(record).toMatchObject({ outcome: 'auto-merge-requested', commit: TIP })
     expect(ran().filter((line) => line.includes('commit-tree') || line.includes('push'))).toEqual([])
   })
@@ -328,7 +362,7 @@ describe('a new pull request on one reused branch, never forced (B-158)', () => 
     const { record, ran } = await propose({
       tip: TIP,
       mainInTip: true,
-      open: [{ number: 42, url: PR_URL, autoMergeRequest: { mergeMethod: 'MERGE' } }],
+      open: [own(42, COMMIT, { mergeMethod: 'MERGE' })],
     })
     expect(record).toMatchObject({ outcome: 'updated', pr: { action: 'updated' } })
     expect(ran().filter((line) => line.startsWith('gh pr merge'))).toEqual([])
@@ -428,6 +462,132 @@ describe('bounded, and holding no secret', () => {
   })
 })
 
+describe('only the agent’s own pull request is touched (a public repository takes PRs from forks)', () => {
+  it('ignores a fork’s pull request with the same branch name: never edits it, never records it, opens its own', async () => {
+    const { record, ran } = await propose({ open: [fork(5)] })
+    expect(ran().filter((line) => line.startsWith('gh pr edit'))).toEqual([])
+    expect(ran().filter((line) => line.startsWith('gh pr create'))).toHaveLength(1)
+    expect(record).toMatchObject({ outcome: 'auto-merge-requested', pr: { number: 42, action: 'opened' } })
+    expect(record.reason).toMatch(/ignored #5 .*another repository/)
+    expect(JSON.stringify(record)).not.toMatch(/outsider/)
+  })
+
+  it('asks gh for where each pull request’s head lives, and does not stop at the first one', async () => {
+    const { ran } = await propose({ open: [fork(5), own(42)] })
+    const list = ran().find((line) => line.startsWith('gh pr list')) ?? ''
+    expect(list).toMatch(/--json number,url,autoMergeRequest,isCrossRepository,headRepositoryOwner,headRefOid/)
+    expect(list).not.toMatch(/--limit 1\b/)
+    expect(ran()).toContainEqual(expect.stringMatching(/^gh pr edit 42 /))
+    expect(ran().filter((line) => / 5 /.test(` ${line} `) && line.startsWith('gh pr'))).toEqual([])
+  })
+
+  it('ignores a same-repository pull request whose owner is not this repository’s', async () => {
+    const strange = { ...own(6), headRepositoryOwner: { login: 'someone-else' } }
+    const { ran, record } = await propose({ open: [strange] })
+    expect(ran().filter((line) => line.startsWith('gh pr edit'))).toEqual([])
+    expect(record.pr?.number).toBe(42)
+  })
+
+  it('touches its own pull request only once its head is the commit just pushed', async () => {
+    const { record, ran } = await propose({ open: [own(42, 'c0ffee'.padEnd(40, '0'))] })
+    expect(record.outcome).toBe('failed')
+    expect(record.reason).toMatch(/head .* is not the commit just pushed/)
+    expect(ran().filter((line) => line.startsWith('gh pr edit') || line.startsWith('gh pr merge') || line.startsWith('gh pr create'))).toEqual([])
+  })
+
+  it('waits for GitHub to show the pushed head before deciding it moved', async () => {
+    let lists = 0
+    const sleeps: number[] = []
+    const open = () => [own(42, (lists += 1) < 3 ? 'e'.repeat(40) : COMMIT)]
+    const { record } = await propose({ open }, { sleep: async (ms: number) => void sleeps.push(ms) })
+    expect(record).toMatchObject({ outcome: 'auto-merge-requested', pr: { number: 42, action: 'updated' } })
+    expect(sleeps.length).toBe(2)
+  })
+})
+
+describe('a waiting pull request is not forgotten by a step that never reached it (B-158)', () => {
+  const waiting = withSince(
+    null,
+    { outcome: 'auto-merge-unavailable', branch: SNAPSHOT_BRANCH, version: 66, pr: { number: 7, url: 'https://github.com/passioncode-ai/okolos/pull/7', action: 'opened' } },
+    '2026-11-03T09:00:00.000Z',
+  )
+  const later = '2026-11-03T21:00:00.000Z'
+
+  for (const [name, o, extra] of [
+    ['gh logged out', { gh: 'logged-out' }, {}],
+    ['a rejected push', { push: 'rejected' }, {}],
+    ['the worker read failing', {}, { readServedFeed: async () => { throw new Error('worker answered HTTP 503') } }],
+    ['out of time', {}, { deadline: NOW + 500 }],
+  ] as Array<[string, FakeOptions, Record<string, unknown>]>) {
+    it(`keeps the pull request and its date through ${name}`, async () => {
+      const { record } = await propose(o, { previous: waiting, ...extra })
+      expect(record.outcome).toBe('failed')
+      const kept = withSince(waiting, record, later)
+      expect(kept).toMatchObject({ outcome: 'failed', at: later, since: '2026-11-03T09:00:00.000Z', pr: { number: 7 }, prAt: '2026-11-03T09:00:00.000Z', prOutcome: 'auto-merge-unavailable' })
+    })
+  }
+
+  it('drops it when main already carries the published version', async () => {
+    const { record } = await propose({ committed: { version: 66, ageDays: 10 } }, { previous: waiting })
+    const next = withSince(waiting, record, later)
+    expect(next.pr).toBeUndefined()
+    expect(next.since).toBeUndefined()
+  })
+
+  it('looks at it when main’s snapshot is fresh again, and drops it once merged, recording that', async () => {
+    const { record, ran } = await propose({ committed: { version: 65, ageDays: 1 }, viewState: 'MERGED' }, { previous: waiting })
+    expect(ran()).toContainEqual('gh pr view 7 --json state --jq .state')
+    expect(record).toMatchObject({ outcome: 'skipped-fresh', previousPr: { number: 7, state: 'MERGED' } })
+    const next = withSince(waiting, record, later)
+    expect(next.pr).toBeUndefined()
+    expect(next.previousPr).toMatchObject({ number: 7, state: 'MERGED' })
+  })
+
+  it('drops it once closed', async () => {
+    const { record } = await propose({ committed: { version: 65, ageDays: 1 }, viewState: 'CLOSED' }, { previous: waiting })
+    expect(withSince(waiting, record, later).pr).toBeUndefined()
+  })
+
+  it('keeps it while it is still open, or when gh cannot say', async () => {
+    for (const viewState of ['OPEN', 'error'] as const) {
+      const { record } = await propose({ committed: { version: 65, ageDays: 1 }, viewState }, { previous: waiting })
+      expect(record.outcome).toBe('skipped-fresh')
+      expect(withSince(waiting, record, later)).toMatchObject({ pr: { number: 7 }, since: '2026-11-03T09:00:00.000Z' })
+    }
+  })
+
+  it('starts a new date when a step opens a different pull request', async () => {
+    const { record } = await propose({}, { previous: waiting })
+    expect(withSince(waiting, record, later)).toMatchObject({ pr: { number: 42 }, since: later, prAt: later })
+  })
+})
+
+describe('the pull request’s text says what will happen to it', () => {
+  const bodyOf = (calls: Call[]) => calls.find((call) => call.command === 'gh' && (call.args[1] === 'create' || call.args[1] === 'edit'))?.options.input ?? ''
+
+  it('says it waits for a person when auto-merge cannot be asked, and never that it merges by itself', async () => {
+    const { calls } = await propose({ allowAutoMerge: 'false' })
+    const body = bodyOf(calls)
+    expect(body).toMatch(/Ждёт человека/)
+    expect(body).toMatch(/Create a merge commit/)
+    expect(body).not.toMatch(/автоматически/)
+  })
+
+  it('says GitHub merges it once checks pass when auto-merge is asked, and still names the merge method', async () => {
+    const { calls } = await propose()
+    const body = bodyOf(calls)
+    expect(body).toMatch(/сольёт его сам/)
+    expect(body).toMatch(/Create a merge commit/)
+  })
+
+  it('rewrites the text to "waits for a person" when GitHub refuses auto-merge after all', async () => {
+    const { calls, record } = await propose({ merge: 'not-allowed' })
+    expect(record.outcome).toBe('auto-merge-unavailable')
+    const edits = calls.filter((call) => call.command === 'gh' && call.args[1] === 'edit')
+    expect(edits.at(-1)?.options.input).toMatch(/Ждёт человека/)
+  })
+})
+
 describe('with real git: a bare origin, the agent’s checkout, gh as a double', () => {
   const env: Record<string, string | undefined> = {
     ...process.env,
@@ -476,7 +636,7 @@ describe('with real git: a bare origin, the agent’s checkout, gh as a double',
   }
 
   /** Real git, bounded; gh answers as a logged-in client on a repository with auto-merge. */
-  function tools(open: () => Array<{ number: number; url: string; autoMergeRequest: unknown }>) {
+  function tools(open: () => ListedPr[]) {
     const gh: string[][] = []
     const tool = async (command: string, args: string[], options: BoundedOptions): Promise<BoundedResult> => {
       if (command === 'gh') {
@@ -485,6 +645,7 @@ describe('with real git: a bare origin, the agent’s checkout, gh as a double',
         if (args[0] === 'pr' && args[1] === 'list') return out(JSON.stringify(open()))
         if (args[0] === 'pr' && args[1] === 'create') return out(`${PR_URL}\n`)
         if (args[0] === 'api' && args[1] === 'repos/{owner}/{repo}') return out('true\n')
+        if (args[0] === 'repo' && args[1] === 'view') return out('passioncode-ai\n')
         if (args[0] === 'api') return out('1\n')
         return out('')
       }
@@ -493,7 +654,7 @@ describe('with real git: a bare origin, the agent’s checkout, gh as a double',
     return { tool, gh }
   }
 
-  async function run(r: ReturnType<typeof repos>, version: number, open: () => Array<{ number: number; url: string; autoMergeRequest: unknown }> = () => []) {
+  async function run(r: ReturnType<typeof repos>, version: number, open: () => ListedPr[] = () => []) {
     const feed = published(version)
     const t = tools(open)
     // The run's own log writer, into a feed.log in the fixture.
@@ -546,7 +707,8 @@ describe('with real git: a bare origin, the agent’s checkout, gh as a double',
     // The run's pin stage fetches origin/main before anything is published.
     git('-C', r.checkout, 'fetch', '--quiet', 'origin', 'main')
 
-    const { record, feed, gh } = await run(r, 67, () => [{ number: 42, url: PR_URL, autoMergeRequest: null }])
+    // The open pull request is the agent's own, its head the commit just pushed.
+    const { record, feed, gh } = await run(r, 67, () => [own(42, branchTip(r))])
     expect(record).toMatchObject({ outcome: 'auto-merge-requested', pr: { action: 'updated' } })
     const second = branchTip(r)
     // Fast-forward: the old tip is an ancestor, so the push needed no force.

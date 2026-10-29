@@ -40,6 +40,14 @@ export interface SnapshotPrRecord {
   readonly at?: string
   /** When the pull request in `pr` was first recorded. */
   readonly since?: string
+  /** When the pull request in `pr` was last seen; older than `at` when this step never reached it. */
+  readonly prAt?: string
+  /** What the step that last saw the pull request made of it. */
+  readonly prOutcome?: SnapshotPrRecord['outcome']
+  /** The earlier pull request as this step saw it: gone unless OPEN (NOT_OPEN: no longer among the open ones). */
+  readonly previousPr?: { readonly number: number; readonly url: string; readonly state: 'OPEN' | 'MERGED' | 'CLOSED' | 'NOT_OPEN' }
+  /** origin/main already carries the published version. */
+  readonly mainCarries?: boolean
 }
 
 export interface StatusRecord extends RunRecord {

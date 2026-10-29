@@ -22,11 +22,15 @@ export function proposeSnapshot(options: {
   log?: (line: string) => void
   /** The signal stopping the run, or null: once set, no further child starts. */
   stopped?: () => string | null
+  /** The last step kept, so this one can say whether its pull request is gone. */
+  previous?: SnapshotPrRecord | null
+  /** Waits between reads of the open pull request until its head shows the push. */
+  sleep?: (ms: number) => Promise<void>
 }): Promise<SnapshotPrRecord>
 
 /** `~/.okolos/state/snapshot-pr.json`: the last snapshot step, beside the run record. */
 export function snapshotPrFile(paths: { state: string }): string
 export function readSnapshotPr(file: string): SnapshotPrRecord | null
 export function writeSnapshotPr(file: string, record: SnapshotPrRecord): SnapshotPrRecord
-/** `next` with `at`, and `since` (first sight of the same pull request) when it names one. */
+/** The step to keep: `next` with `at`; its pull request dated, or the previous one carried unless seen gone. */
 export function withSince(previous: SnapshotPrRecord | null | undefined, next: SnapshotPrRecord, at: string): SnapshotPrRecord

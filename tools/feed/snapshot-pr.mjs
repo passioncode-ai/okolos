@@ -38,7 +38,11 @@ import { withoutSecrets } from './bounded.mjs'
  *      checks pass (`gh pr merge --auto --merge --match-head-commit`). It does not ask
  *      when the repository does not allow auto-merge, or when main requires no status
  *      check (auto-merge would then merge before CI); the pull request stays open for a
- *      person and the record says why. It never merges by hand or as an administrator.
+ *      person, its text says so, and the record says why. It never merges by hand or as
+ *      an administrator. Only its own pull request counts: the repository is public, a
+ *      fork may open one from a branch of the same name, and gh's --head matches the name
+ *      only; a pull request whose head is in another repository is never edited or
+ *      recorded, and its own is touched only once its head is the commit just pushed.
  *
  * The push sets OKOLOS_SKIP_GATES=1: `.githooks/pre-push` would run all eight gates,
  * and the agent's checkout has only the publish tools installed. That variable is the
@@ -99,17 +103,40 @@ export function writeSnapshotPr(file, record) {
 }
 
 /**
- * `next` stamped with `at`, and, when it names a pull request, `since`: when that pull
- * request was first recorded (kept from `previous` while the number is the same).
+ * The step to keep: `next` stamped with `at`, and the pull request it waits on.
+ *
+ * A step that names a pull request dates it: `since` is when that number was first
+ * recorded (kept from `previous` while the number is the same), `prAt` when it was
+ * last seen (now), `prOutcome` what that step made of it. A step that names none
+ * carries `previous`'s pull request, its dates and `prOutcome` forward: a step that
+ * failed before it reached the pull request (gh logged out, a rejected push, the worker
+ * unreachable, out of time) says nothing about it, and dropping it would hide a pull
+ * request that still waits for a person. It is dropped only when the step saw it gone
+ * (`previousPr.state` not OPEN: merged, closed, or no longer among the open ones) or saw
+ * main already carry the published version (`mainCarries`).
  */
 export function withSince(previous, next, at) {
   const fields = { ...next }
-  delete fields.since
-  delete fields.at
-  if (!fields.pr) return { ...fields, at }
-  const same = previous?.pr?.number === fields.pr.number
-  return { ...fields, at, since: same ? (previous.since ?? previous.at ?? at) : at }
+  for (const name of ['since', 'at', 'prAt', 'prOutcome']) delete fields[name]
+  if (fields.pr) {
+    const same = previous?.pr?.number === fields.pr.number
+    return { ...fields, at, since: same ? (previous.since ?? previous.at ?? at) : at, prAt: at, prOutcome: fields.outcome }
+  }
+  const gone = fields.mainCarries === true || (fields.previousPr !== undefined && fields.previousPr.state !== 'OPEN')
+  if (gone || !previous?.pr) return { ...fields, at }
+  return {
+    ...fields,
+    at,
+    pr: previous.pr,
+    since: previous.since ?? previous.at ?? at,
+    prAt: previous.prAt ?? previous.at ?? at,
+    prOutcome: previous.prOutcome ?? previous.outcome,
+  }
 }
+
+/** How often, and how far apart, the open pull request is read until its head shows the push. */
+const HEAD_TRIES = 3
+const HEAD_WAIT_MS = 3000
 
 const GITHUB_TOKENS = ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']
 
@@ -153,13 +180,21 @@ function ageWords(ageDays) {
   return ageDays === null ? 'возраст неизвестен (нет читаемого body.updatedAt)' : `ему ${ageDays} дн.`
 }
 
-function body({ version, entries, updatedAt, committed }) {
+const MERGE_HOW = 'Сливать кнопкой «Create a merge commit», не squash и не rebase: ветка одна на все PR, и только коммит слияния делает её коммиты частью main.'
+
+/**
+ * The pull request's text, by what the agent could ask: `waits` is null when auto-merge
+ * is asked, else why a person merges it (Russian, for the person who reads it).
+ */
+function body({ version, entries, updatedAt, committed, waits }) {
   return [
     `Агент фида опубликовал v${version} (${entries} записей, собран ${updatedAt}).`,
     `Снимок \`${FEED_PATH}\` на main: v${committed.version}, ${ageWords(committed.ageDays)}; гейт выпуска отказывает после ${FEED_MAX_AGE_DAYS} дн.`,
     '',
     `Меняется только \`${FEED_PATH}\`: опубликованный с этой машины фид без подписи (\`{kind, body}\`), как его записал бы \`pnpm feed:snapshot\`; перед коммитом сверено, что его \`body\` равен тому, что отдаёт воркер в \`update\` (ADR-0017).`,
-    'Слияние коммитом слияния, автоматически, когда обязательные проверки main зелёные. Если автослияние в репозитории выключено, PR ждёт человека.',
+    waits === null
+      ? `Автослияние запрошено: GitHub сольёт его сам коммитом слияния, когда обязательные проверки main зелёные. ${MERGE_HOW}`
+      : `Ждёт человека: ${waits} (решение B-186). Слить, когда CI зелёный. ${MERGE_HOW}`,
     '',
     `Открыт и обновляется агентом фида (\`tools/feed/snapshot-pr.mjs\`), ветка \`${SNAPSHOT_BRANCH}\`.`,
     '',
@@ -182,8 +217,13 @@ export async function proposeSnapshot({
   tmp = tmpdir(),
   log = () => {},
   stopped = () => null,
+  // The last step kept (`withSince`), so this one can say whether its pull request is gone.
+  previous = null,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 } = {}) {
   const facts = { branch: SNAPSHOT_BRANCH }
+  // Said beside the outcome's own reason (a fork's pull request ignored, for one).
+  const notes = []
   let work
   try {
     const clean = withoutSecrets(env)
@@ -237,9 +277,22 @@ export async function proposeSnapshot({
     const ageDays = exactDays === null ? null : Math.round(exactDays * 10) / 10
     facts.committed = { version: onMain.version, ageDays }
     if (onMain.version >= local.body.version) {
+      facts.mainCarries = true
       throw new Stop('skipped-fresh', `origin/main already carries v${onMain.version}`)
     }
     if (exactDays !== null && exactDays < SNAPSHOT_PR_AFTER_DAYS) {
+      // main's snapshot is fresh again: merged, or committed by hand. Ask what became of the
+      // pull request the last step left waiting, so --status stops saying it waits once it is
+      // merged or closed. A question gh cannot answer changes nothing.
+      if (previous?.pr) {
+        try {
+          const viewed = await gh(['pr', 'view', String(previous.pr.number), '--json', 'state', '--jq', '.state'])
+          const state = viewed.code === 0 ? viewed.stdout.trim() : ''
+          if (['OPEN', 'MERGED', 'CLOSED'].includes(state)) facts.previousPr = { number: previous.pr.number, url: previous.pr.url, state }
+        } catch {
+          // out of time or stopped: the pull request is carried as it was
+        }
+      }
       throw new Stop('skipped-fresh', `the snapshot on origin/main is ${ageDays} days old, under ${SNAPSHOT_PR_AFTER_DAYS}`)
     }
 
@@ -313,56 +366,99 @@ export async function proposeSnapshot({
     }
     facts.commit = commit
 
-    // 6. The pull request.
-    const open = JSON.parse(
-      await must(
-        'gh pr list',
-        gh(['pr', 'list', '--head', SNAPSHOT_BRANCH, '--base', 'main', '--state', 'open', '--json', 'number,url,autoMergeRequest', '--limit', '1']),
-      ) || '[]',
-    )
-    const text2 = body({ version: local.body.version, entries: local.body.entries?.length ?? 0, updatedAt: local.body.updatedAt, committed: facts.committed })
-    if (open.length > 0) {
-      const { number, url, autoMergeRequest } = open[0]
-      facts.pr = { number, url, action: 'updated' }
-      await must('gh pr edit', gh(['pr', 'edit', String(number), '--title', title(local.body.version), '--body-file', '-'], { input: text2 }))
-      if (autoMergeRequest) throw new Stop('updated', 'auto-merge is already on for this pull request')
+    // 6. Can auto-merge be asked here? Read first, so the pull request's text says what
+    // will happen to it.
+    let waits = null
+    let waitsWhy = null
+    const allowed = await must('gh api repos/{owner}/{repo}', gh(['api', 'repos/{owner}/{repo}', '--jq', '.allow_auto_merge']))
+    if (allowed === 'false') {
+      waitsWhy = 'the repository does not allow auto-merge (allow_auto_merge is false); the pull request stays open for a person'
+      waits = 'автослияние в репозитории выключено'
+    } else {
+      const required = await must(
+        'gh api rules/branches/main',
+        gh(['api', 'repos/{owner}/{repo}/rules/branches/main', '--jq', '[.[] | select(.type == "required_status_checks")] | length']),
+      )
+      if (!(Number(required) > 0)) {
+        waitsWhy =
+          "main's rulesets require no status checks (classic branch protection is not read), so auto-merge would merge before CI; the pull request stays open for a person"
+        waits = 'main не требует ни одной проверки статуса, и автослияние слило бы до CI'
+      }
+    }
+    const textFor = (why) =>
+      body({ version: local.body.version, entries: local.body.entries?.length ?? 0, updatedAt: local.body.updatedAt, committed: facts.committed, waits: why })
+
+    // 7. The pull request: only the agent's own. The repository is public, and a fork may
+    // open one from a branch of the same name; gh's --head matches the name only. Own means
+    // the head is in this repository (isCrossRepository false, the head's owner this
+    // repository's), and it is touched only once its head is the commit just pushed.
+    const owner = await must('gh repo view', gh(['repo', 'view', '--json', 'owner', '--jq', '.owner.login']))
+    let mine = null
+    let ignored = []
+    for (let attempt = 1; ; attempt += 1) {
+      const listed = JSON.parse(
+        (await must(
+          'gh pr list',
+          gh([
+            'pr', 'list', '--head', SNAPSHOT_BRANCH, '--base', 'main', '--state', 'open',
+            '--json', 'number,url,autoMergeRequest,isCrossRepository,headRepositoryOwner,headRefOid', '--limit', '20',
+          ]),
+        )) || '[]',
+      )
+      const own = listed.filter((pr) => pr.isCrossRepository === false && pr.headRepositoryOwner?.login === owner)
+      ignored = listed.filter((pr) => !own.includes(pr)).map((pr) => pr.number)
+      mine = own[0] ?? null
+      // GitHub may show the pushed head a moment late.
+      if (!mine || mine.headRefOid === commit || attempt >= HEAD_TRIES) break
+      await sleep(HEAD_WAIT_MS)
+    }
+    if (ignored.length > 0) {
+      notes.push(`ignored #${ignored.join(', #')} (its head is in another repository, not this one's ${SNAPSHOT_BRANCH}); never edited`)
+    }
+    if (previous?.pr && previous.pr.number !== mine?.number) {
+      facts.previousPr = { number: previous.pr.number, url: previous.pr.url, state: 'NOT_OPEN' }
+    }
+    if (mine && mine.headRefOid !== commit) {
+      throw new Stop(
+        'failed',
+        `pull request #${mine.number}'s head ${String(mine.headRefOid).slice(0, 7)} is not the commit just pushed ${commit.slice(0, 7)}; left alone`,
+      )
+    }
+    if (mine) {
+      facts.pr = { number: mine.number, url: mine.url, action: 'updated' }
+      await must('gh pr edit', gh(['pr', 'edit', String(mine.number), '--title', title(local.body.version), '--body-file', '-'], { input: textFor(waits) }))
+      if (mine.autoMergeRequest) throw new Stop('updated', 'auto-merge is already on for this pull request')
     } else {
       const url = await must(
         'gh pr create',
-        gh(['pr', 'create', '--base', 'main', '--head', SNAPSHOT_BRANCH, '--title', title(local.body.version), '--body-file', '-'], { input: text2 }),
+        gh(['pr', 'create', '--base', 'main', '--head', SNAPSHOT_BRANCH, '--title', title(local.body.version), '--body-file', '-'], {
+          input: textFor(waits),
+        }),
       )
       const number = Number(/\/pull\/(\d+)/.exec(url)?.[1])
       if (!Number.isSafeInteger(number)) throw new Stop('failed', `gh pr create printed no pull request URL: ${url}`)
       facts.pr = { number, url, action: 'opened' }
     }
 
-    // 7. Auto-merge, only where the repository allows it and checks gate it.
-    const allowed = await must('gh api repos/{owner}/{repo}', gh(['api', 'repos/{owner}/{repo}', '--jq', '.allow_auto_merge']))
-    if (allowed === 'false') {
-      throw new Stop('auto-merge-unavailable', 'the repository does not allow auto-merge (allow_auto_merge is false); the pull request stays open for a person')
-    }
-    const required = await must(
-      'gh api rules/branches/main',
-      gh(['api', 'repos/{owner}/{repo}/rules/branches/main', '--jq', '[.[] | select(.type == "required_status_checks")] | length']),
-    )
-    if (!(Number(required) > 0)) {
-      throw new Stop(
-        'auto-merge-unavailable',
-        'main requires no status checks, so auto-merge would merge before CI; the pull request stays open for a person',
-      )
-    }
+    // 8. Auto-merge, only where the repository allows it and checks gate it.
+    if (waitsWhy) throw new Stop('auto-merge-unavailable', waitsWhy)
     const merged = await gh(['pr', 'merge', String(facts.pr.number), '--auto', '--merge', '--match-head-commit', commit])
     if (merged.code !== 0) {
       const said = lastLine(merged)
       if (/auto.?merge/i.test(said) && /not allowed|not enabled|disabled/i.test(said)) {
+        // The text said GitHub would merge it; it will not.
+        const edited = await gh(['pr', 'edit', String(facts.pr.number), '--body-file', '-'], { input: textFor('GitHub отказал в автослиянии') })
+        if (edited.code !== 0) notes.push(`its text still says auto-merge: ${describe('gh pr edit', edited)}`)
         throw new Stop('auto-merge-unavailable', `GitHub refused auto-merge: ${said}; the pull request stays open for a person`)
       }
       throw new Stop('failed', describe('gh pr merge', merged))
     }
-    return { outcome: 'auto-merge-requested', ...facts }
+    return { outcome: 'auto-merge-requested', ...(notes.length ? { reason: notes.join('; ') } : {}), ...facts }
   } catch (cause) {
-    if (cause instanceof Stop) return { outcome: cause.outcome, reason: cause.message, ...facts }
-    return { outcome: 'failed', reason: cause instanceof Error ? cause.message : String(cause), ...facts }
+    const said = cause instanceof Error ? cause.message : String(cause)
+    const reason = [said, ...notes].join('; ')
+    if (cause instanceof Stop) return { outcome: cause.outcome, reason, ...facts }
+    return { outcome: 'failed', reason, ...facts }
   } finally {
     if (work) rmSync(work, { recursive: true, force: true })
   }
