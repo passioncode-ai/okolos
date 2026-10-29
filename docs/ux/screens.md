@@ -301,7 +301,7 @@ generator, and the sheet declares no colour of its own.
   |-------|---------|-------------|----------|
   | loading | check running | - | per-source progress, partial results shown as they arrive |
   | empty | no sources monitored | - | prompt to add an email or phone, naming what is sent — the address itself, not a hash |
-  | idle, by key state | before a check | - | the sentence names every recipient: no key saved, Hudson Rock Cavalier only and Have I Been Pwned not asked (`leaksIdleNoKey`); a key saved, both, with the key in the request header (`leaksIdleWithKey`); unreadable, Cavalier and Have I Been Pwned only if a key is saved (`leaksIdle`) |
+  | idle, by key state | before a check | - | the sentence names every recipient: no key saved, Hudson Rock Cavalier only and the address not sent to Have I Been Pwned (`leaksIdleNoKey`); a key saved, both, with the key in the request header (`leaksIdleWithKey`); unreadable, Cavalier and Have I Been Pwned only if a key is saved (`leaksIdle`) |
   | key unreadable | a check ran and the saved key could not be read | - | the key line says Have I Been Pwned was not checked because the saved key could not be read, with no link |
   | refused | Check now pressed with no usable address | - | states why nothing was sent (`[data-role=needs]`) and keeps the control, so the press is never silent |
   | error | a source failed | - | that row states unavailable + retry; other results stand |
@@ -409,9 +409,9 @@ generator, and the sheet declares no colour of its own.
   |-------|---------|-------------|----------|
   | success | default | - | grouped settings |
   | error | export or wipe failed | - | inline failure with retry; state left unchanged |
-  | no key | no Have I Been Pwned key saved, the state every install starts in | - | the status line says no key is saved, so Have I Been Pwned is not checked; an empty field and "Сохранить ключ" |
+  | no key | no Have I Been Pwned key saved, the state every install starts in | - | the status line says no key is saved, so the address does not go to Have I Been Pwned (the password check, a separate one, needs no key); an empty field and "Сохранить ключ" |
   | key saved | a key is stored | - | the status line says a key is saved and is not shown; the field is empty; "Заменить ключ" and "Удалить ключ" |
-  | refused | "Сохранить ключ" pressed with an empty field, a key holding a space or a non-printing character, or one holding a letter outside the Latin alphabet | - | nothing is saved and the block says which of the three it was (`leak-key-needs`: `leakKeyEmpty`, `leakKeyShape`, `leakKeyLatin`); the field keeps what was typed so it can be corrected |
+  | refused | "Сохранить ключ" pressed after trimming (spaces around a key are dropped silently) with an empty field (only spaces counts), a space or a non-printing character inside the key, a character outside the Latin layout, or more than 256 characters | - | nothing is saved and the block says which of the four it was (`leak-key-needs`: `leakKeyEmpty`, `leakKeyShape`, `leakKeyLatin`, `leakKeyLong`); the field keeps what was typed so it can be corrected |
   | key write failed | saving or removing the key failed | - | the page's failure slot says the action did not go through; the block shows what is actually stored |
 - **Behavior notes (the key field):** the key is never put back on screen. The field is `type=password`, is emptied the moment a key is accepted, and is never filled from storage: the renderer is told only whether a key exists. Showing even its last characters would put part of a paid credential into every screenshot of this page, and nothing a person does here needs it: replacing pastes a new key over the old, removing needs none
 - **Wireframe:** wireframes/SCR-12.md
