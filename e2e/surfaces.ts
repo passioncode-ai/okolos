@@ -1,4 +1,4 @@
-import { expect, type BrowserContext, type Page } from '@playwright/test'
+import { expect, type BrowserContext, type Frame, type Page, type Worker } from '@playwright/test'
 
 import { RECORD_VISIBLE_MS, SURFACE_MOUNT_MS } from './budgets.js'
 
@@ -171,6 +171,24 @@ async function diagnose(page: Page, context?: BrowserContext): Promise<string> {
        * between "the budget is too tight for this machine" and "the mount is broken".
        */
       bannerMs: performance.getEntriesByName('okolos:banner')[0]?.duration ?? null,
+      /**
+       * Did the latest scan settle, and had it asked anything?
+       *
+       * The product writes `okolos:scan` once the verdict came back and the warning was
+       * drawn, or once it found there was nothing to ask, and says which in `detail.asked`.
+       * A scan that asked and settled, with no host on the page, means the reply arrived
+       * and was acted on, so the loss is in the mount (B-78).
+       */
+      settled: (() => {
+        // The product keeps one entry, the latest scan's; `detail.asked` says whether that
+        // scan put a question to the worker at all.
+        const entry = performance.getEntriesByName('okolos:scan').at(-1) as
+          | (PerformanceEntry & { detail?: { asked?: boolean } | null })
+          | undefined
+        return entry === undefined
+          ? null
+          : { ms: entry.duration, asked: entry.detail?.asked === true }
+      })(),
     }))
     lines.push(`  - page ${page_.url} (${page_.ready}), ${page_.nodes} nodes`)
     lines.push(
@@ -202,6 +220,20 @@ async function diagnose(page: Page, context?: BrowserContext): Promise<string> {
           ? '  - the scan asked, so the verdict is what did not arrive'
           : '  - the scan asked and the worker answered, so what is missing is downstream of' +
               ' both — the reply, or the mount',
+      )
+    }
+    if (page_.settled !== null) {
+      /**
+       * Worded by what the scan did. "Its answer came back" is true only of a scan that
+       * asked, on a page that was not blinded, with a worker that says it answered; the
+       * same measure is written for a scan that had nothing to ask.
+       */
+      lines.push(
+        page_.settled.asked && !page_.blinded && answered !== null && answered > 0
+          ? `  - the last scan SETTLED in ${page_.settled.ms.toFixed(1)} ms: it asked, the answer` +
+              ' came back and was handled in this page'
+          : `  - the last scan settled in ${page_.settled.ms.toFixed(1)} ms without an answer` +
+              ' to hand: it asked nothing, or the worker does not say it answered',
       )
     }
     if (page_.gaveUp) {
@@ -286,3 +318,163 @@ export async function expectJournalLine(
     .toContain(text)
 }
 
+
+/**
+ * The product's own word that a check has finished, one name per check.
+ *
+ * A test that asserts something is **absent** has to know when the thing could have
+ * appeared, and these specs used to guess with a fixed wait: two seconds, three, one and a
+ * half. On a loaded machine the wait ran out before the check did, and the assertion passed
+ * on a check that had not run yet: green exactly when it should have been red (B-169). Each
+ * name below is written by the product at the moment its check has settled, after the
+ * warning (if any) is drawn:
+ *
+ * - `okolos:scan`: a page scan, and the frame report or verdict it set in motion;
+ * - `okolos:lookalike`: the address check, top frame only;
+ * - `okolos:pending`: the question "does this tab hold a leak verdict nobody was shown?";
+ * - `okolos:password` (in the **worker**): a submitted password judged, and a compromised
+ *   verdict held and offered to the tab;
+ * - `okolos:focus-judged`, `okolos:trap-judged`, `okolos:password-handled`: a focus judged
+ *   by the password pause (after the first decision, and in a frame after the report has
+ *   arrived), a look at the page by the trap watcher, and the asking document having
+ *   handled its password answer. Per event, so they exist only in the build with test hooks
+ *   (`e2e/hooks.ts`); the shipped bundle does not carry them. Count before acting and wait
+ *   for one more: an earlier event satisfies "at least one".
+ *
+ * `okolos:scan` keeps one entry per document, the latest, so it answers "has a scan
+ * settled", not "how many".
+ *
+ * None of them is written for a check that failed, so a check that did not finish makes the
+ * wait run out with a sentence saying so, rather than an absence that proves nothing.
+ */
+export const SETTLED = {
+  scan: 'okolos:scan',
+  lookalike: 'okolos:lookalike',
+  pending: 'okolos:pending',
+  password: 'okolos:password',
+  focus: 'okolos:focus-judged',
+  trap: 'okolos:trap-judged',
+  passwordHandled: 'okolos:password-handled',
+} as const
+
+export type Settled = (typeof SETTLED)[keyof typeof SETTLED]
+
+/** A page, a frame or the worker: anything with its own performance timeline. */
+type Timeline = Pick<Worker, 'evaluate'>
+
+/** How many times the product has said this check settled, in this timeline. */
+export async function settledCount(where: Timeline, name: Settled): Promise<number> {
+  return where.evaluate((entry) => performance.getEntriesByName(entry).length, name)
+}
+
+/**
+ * Waits until the product says a check has settled, at least `atLeast` times.
+ *
+ * The scan has a third outcome, giving up (`okolos:scan-failed`, B-78), and the wait stops
+ * on it at once: an absence asserted after a scan that gave up proves nothing, and saying so
+ * is worth more than thirty-five seconds of waiting for a measure that cannot come.
+ */
+export async function expectSettled(where: Timeline, name: Settled, atLeast = 1): Promise<void> {
+  const deadline = Date.now() + SURFACE_MOUNT_MS
+  for (;;) {
+    // A document mid-navigation cannot be read; that is "not yet", not an answer.
+    const seen = await where
+      .evaluate(
+        (entry) => ({
+          count: performance.getEntriesByName(entry).length,
+          gaveUp: performance.getEntriesByName('okolos:scan-failed').length > 0,
+        }),
+        name,
+      )
+      .catch(() => ({ count: 0, gaveUp: false }))
+    if (seen.count >= atLeast) return
+    if (name === SETTLED.scan && seen.gaveUp) {
+      throw new Error(
+        'the scan GAVE UP (okolos:scan-failed) before it settled: an absence asserted ' +
+          'after it would prove nothing, because the check did not finish',
+      )
+    }
+    if (Date.now() > deadline) {
+      throw new Error(
+        `${name} was written ${seen.count} time(s), waited for ${atLeast}, within ` +
+          `${SURFACE_MOUNT_MS / 1000}s: the check did not finish, so an absence asserted ` +
+          'now would prove nothing',
+      )
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+}
+
+/**
+ * Waits until a page and every frame in it have scanned, and the top frame has checked its
+ * address: the point after which a page that stays silent has been heard out.
+ */
+export async function expectPageSettled(page: Page): Promise<void> {
+  await expectSettled(page, SETTLED.lookalike)
+  for (const frame of page.frames()) await expectSettled(frame, SETTLED.scan)
+}
+
+/**
+ * Waits for at least one row matching `selector` on the journal screen, reloading it.
+ *
+ * The journal screen is a snapshot taken when it opens (see `expectJournalLine`), so
+ * waiting for its container and then reading a row at once measured whatever had been
+ * written before the screen opened: `panel-shape.spec.ts` failed on CI with "no journal row
+ * to measure" on a fresh profile whose first row (the feed download) landed a moment later.
+ */
+export async function expectJournalRows(
+  journal: Page,
+  selector: string,
+  timeoutMs = RECORD_VISIBLE_MS,
+): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        await journal.reload()
+        await journal.locator('[data-role=journal]').waitFor()
+        return journal.locator(selector).count()
+      },
+      { timeout: timeoutMs },
+    )
+    .toBeGreaterThan(0)
+}
+
+/**
+ * Waits until this document's content script has run, before a spec acts on the page.
+ *
+ * Content scripts run at `document_idle`, which Chrome may place after the load event that
+ * `page.goto` waits for. A focus or a click before that reaches no listener, and the pause
+ * it should raise never comes, because it is asked once per page and the question was
+ * missed. Seen 2026-10-29 on `scn-034`, one run in twenty-two under four workers: both
+ * scans settled, the worker answered both verdict requests, and no banner for 35 s. That
+ * is what a click arriving before the frame's listener looks like; the report cannot prove
+ * it was that, and this wait closes it either way (B-78). `okolos:collect` is set at the end
+ * of the first scan, after every listener is registered, so its presence means the script
+ * is listening.
+ */
+export async function expectScriptReady(where: Pick<Worker, 'evaluate'>): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        where
+          .evaluate(() => performance.getEntriesByName('okolos:collect').length)
+          .catch(() => 0),
+      { timeout: SURFACE_MOUNT_MS, message: 'the content script never ran in this document' },
+    )
+    .toBeGreaterThan(0)
+}
+
+/** The frame of `page` whose address starts with `origin`, once it is attached. */
+export async function frameAt(page: Page, origin: string): Promise<Frame> {
+  let found: Frame | undefined
+  await expect
+    .poll(
+      () => {
+        found = page.frames().find((frame) => frame.url().startsWith(origin))
+        return found !== undefined
+      },
+      { timeout: SURFACE_MOUNT_MS, message: `no frame at ${origin}` },
+    )
+    .toBe(true)
+  return found as Frame
+}

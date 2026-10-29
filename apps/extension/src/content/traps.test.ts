@@ -157,3 +157,62 @@ describe('what the banner claims', () => {
     expect(signals).not.toContain('copy-not-made-by-you')
   })
 })
+
+/**
+ * The end of a look at the page, said out loud.
+ *
+ * "An ordinary page that copies for you is not accused" was asserted after a fixed wait,
+ * and under load the wait ran out before the check did: the assertion passed on a check
+ * that had not run (B-169). `judged` is the signal a test waits for instead. It fires after
+ * every check, once the warning (if any) is on screen, and for a copy the user made
+ * themselves, which is judged by being ignored.
+ */
+describe('saying that the page has been judged', () => {
+  it('says so after the first look, with nothing to warn about', async () => {
+    document.body.textContent = 'An ordinary page.'
+    const judged = vi.fn()
+    watch({ judged })
+    expect(judged).not.toHaveBeenCalled()
+    await settle()
+
+    expect(judged).toHaveBeenCalledTimes(1)
+    expect(banner()).toBeNull()
+  })
+
+  it('says so only once the warning is on screen', async () => {
+    document.body.textContent = SCARE_TEXT
+    let drawn: Element | null = null
+    const judged = vi.fn(() => {
+      drawn = banner()
+    })
+    watch({ judged })
+    await settle()
+
+    expect(judged).toHaveBeenCalledTimes(1)
+    expect(drawn, 'judged fired before the warning was drawn').not.toBeNull()
+  })
+
+  it('says so again after a copy the page made', async () => {
+    document.body.textContent = 'An ordinary page.'
+    const judged = vi.fn()
+    watch({ judged })
+    await settle()
+    document.dispatchEvent(new Event('copy', { bubbles: true }))
+    expect(judged).toHaveBeenCalledTimes(1)
+    await settle()
+
+    expect(judged).toHaveBeenCalledTimes(2)
+  })
+
+  it('says so at once for a copy the user made, which is not looked into', async () => {
+    document.body.textContent = 'An ordinary page.'
+    const judged = vi.fn()
+    watch({ judged })
+    await settle()
+    const trusted = new Event('copy', { bubbles: true })
+    Object.defineProperty(trusted, 'isTrusted', { value: true })
+    document.dispatchEvent(trusted)
+
+    expect(judged).toHaveBeenCalledTimes(2)
+  })
+})

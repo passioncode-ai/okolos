@@ -1,5 +1,5 @@
 import { expect, serve, test } from './hooks.js'
-import { expectBanner } from './surfaces.js'
+import { expectBanner, expectSettled, settledCount, SETTLED } from './surfaces.js'
 
 /**
  * SCN-008 and SCN-009 — the two traps that work on the person rather than the
@@ -75,8 +75,13 @@ test('SCN-008 — an ordinary page that copies for you is not accused', async ({
   )
   const page = await context.newPage()
   await page.goto('https://fixture.test/share')
+  // The first look at the page, then one more after the copy: the watcher judges every
+  // copy, so "no warning" is asserted after that judgement rather than after a fixed wait
+  // that under load ran out first (B-169).
+  await expectSettled(page, SETTLED.trap)
+  const looked = await settledCount(page, SETTLED.trap)
   await page.locator('#c').click()
-  await page.waitForTimeout(1200)
+  await expectSettled(page, SETTLED.trap, looked + 1)
 
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 })

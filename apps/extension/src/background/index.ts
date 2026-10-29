@@ -87,6 +87,18 @@ export const MARK_VERDICT_IN = 'okolos:verdict:start'
 export const MARK_VERDICT_OUT = 'okolos:verdict:end'
 export const MEASURE_VERDICT = 'okolos:verdict'
 
+/**
+ * A submitted password has been judged, and what the judgement set in motion has settled:
+ * a compromised verdict is journalled, held for the tab and offered to the document there
+ * (drawn, or refused because nobody was listening). Measured from the question's arrival.
+ *
+ * In the worker because only the worker knows: the asking document may be gone, taken by
+ * the navigation its own form caused (B-82). A test asserting "a clean password leaves the
+ * landing page alone" waits for this instead of a fixed time, which under load ran out
+ * before the check did and passed on a check that had not run (B-169).
+ */
+export const MEASURE_PASSWORD = 'okolos:password'
+
 // One list of alarms, shared with the wake budget test (wake.ts, wake.test.ts).
 const [FEED, RETENTION, INVENTORY] = WAKE_ALARMS
 const FEED_ALARM = FEED.name
@@ -586,6 +598,7 @@ async function handlePasswordCheck(
   payload: { sha1: string; host: string },
   from: RpcSender,
 ): Promise<PasswordAnswer> {
+  const asked = performance.now()
   const verdict = await checkSubmittedPassword(payload.sha1, await auditDeps())
 
   let reusedOn: string[] = []
@@ -619,6 +632,9 @@ async function handlePasswordCheck(
     reuseUnknown,
   }
 
+  /** What was set in motion, so the measure below waits for it rather than for the return. */
+  let offered: Promise<unknown> = Promise.resolve()
+
   if (answer.compromised) {
     /**
      * Recorded here, not by whoever shows it, and that is the point.
@@ -649,16 +665,22 @@ async function handlePasswordCheck(
        * is torn down when the browser decides — measured as a warning that arrived most of
        * the time. Whoever this misses asks for it themselves as they start.
        */
-      void platform.tabs
+      offered = platform.tabs
         .sendToFrame(
           'password/verdict',
           { host: payload.host, verdict: answer },
           { tabId: from.tabId, frameId: 0 },
         )
         .catch(() => false)
-
     }
   }
+
+  // Not awaited, for the reason the offer is not: the asking document must not wait on a
+  // delivery to its own replacement. The measure waits instead.
+  void offered.then(() => {
+    const settled = performance.now()
+    performance.measure(MEASURE_PASSWORD, { start: asked, end: settled })
+  })
 
   return answer
 }
