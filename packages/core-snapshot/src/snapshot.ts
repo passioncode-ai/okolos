@@ -715,8 +715,12 @@ function fieldValues(
     while (stack.length > 0) {
       const id = stack.pop()
       if (id === undefined || inside.has(id)) continue
-      inside.add(id)
       const child = byId.get(id)
+      // A box people type into inside a select (the ARIA 1.1 combobox: a wrapper holding a
+      // textbox and its list) is a field of its own: its text is read by its own walk, never as
+      // the select's, whichever of the two comes first (round 4 of the N-003 certification).
+      if (fromSelect && child !== undefined && (isField(child) || isSecret(child, secretFields))) continue
+      inside.add(id)
       if (child === undefined || underCut.has(id) || str(child.role?.value) === 'option') continue
       add(child.value?.value)
       add(child.name?.value)

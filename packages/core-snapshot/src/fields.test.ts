@@ -433,6 +433,25 @@ describe('an editable combobox is a text box, not a select (round 3)', () => {
   })
 })
 
+describe('a select wrapper holding the box people type into (ARIA 1.1 combobox, round 4)', () => {
+  const box = { id: '3', role: 'textbox', name: '', editable: true, children: [{ id: '4', role: 'StaticText', name: 'divorce lawyer' }] }
+  const list = { id: '5', role: 'listbox', children: [
+    { id: '6', role: 'option', name: 'divorce lawyer near me' },
+    { id: '7', role: 'option', name: 'tax advice' },
+  ] }
+  const page = (children: readonly Spec[]) => tree({
+    id: '1', role: 'RootWebArea', children: [{ id: '2', role: 'combobox', name: 'Search', children }],
+  })
+
+  it('gives out no line holding the typed text, whichever node comes first', () => {
+    for (const nodes of [page([box, list]), page([list, box]), [...page([box, list])].reverse()]) {
+      for (const s of everyAnswer(nodes)) {
+        for (const l of s.lines) expect(l.name.toLowerCase()).not.toContain('divorce lawyer')
+      }
+    }
+  })
+})
+
 describe('an ordinary select (round 2, product decision 2026-10-27)', () => {
   const country = tree({
     id: '1', role: 'RootWebArea', children: [
