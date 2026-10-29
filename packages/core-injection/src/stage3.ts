@@ -20,7 +20,10 @@ import type { DetectContext } from './stage1.js'
  * never act.
  */
 
-/** Supplied by the host context: offscreen in Chrome, background page in Firefox. */
+/**
+ * Supplied by whatever context runs a model. None ships today (ADR-0006, B-131); the
+ * library host is `createInferenceHost` in `@okolos/model`, and nothing wires it.
+ */
 export interface InferenceHost {
   /** False when the model is absent or the device cannot run it. */
   available(): boolean

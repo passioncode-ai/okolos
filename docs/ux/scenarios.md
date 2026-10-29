@@ -24,7 +24,7 @@ are specified once in [screens.md](screens.md).
 | SCN-012 | Download stopped by feed or hash | web-guard | P-01 | ST-009, FLW-08 | implemented | 2026-08-05 unit |
 | SCN-013 | Download partially checked — hash unavailable | web-guard | P-01 | ST-009, FLW-08 | implemented | 2026-08-05 unit |
 | SCN-014 | Submitted password is compromised | credentials | P-01 | ST-011, FLW-10 | implemented | 2026-08-05 unit |
-| SCN-015 | Leak inventory with one source unavailable | credentials | P-01 | ST-012, FLW-11 | implemented | 2026-08-05 PASS |
+| SCN-015 | Leak inventory, with and without a HIBP key | credentials | P-01 | ST-012, FLW-11 | implemented | 2026-10-29 PASS |
 | SCN-016 | Repair a leak and mark it resolved | credentials | P-01 | ST-015, ST-012, FLW-11 | implemented | 2026-08-05 unit |
 | SCN-017 | Extension gained permissions — disable it | extensions | P-01 | ST-013, ST-014, FLW-12 | implemented | 2026-08-05 PASS |
 | SCN-018 | Extension changed publisher, package unavailable | extensions | P-01 | ST-013, FLW-12 | implemented | 2026-08-05 PASS |
@@ -447,30 +447,34 @@ See [foundation.md](foundation.md) → Personas.
 - **Status:** implemented
 - **Coverage:** apps/extension/src/background/index.ts:handlePasswordCheck (journal + hold + push), apps/extension/src/background/pending-password.ts:holdVerdict/takeVerdict/releaseVerdict, apps/extension/src/content/index.ts:showPasswordVerdict and the `password/pending` question, packages/contracts/src/rpc.ts:PasswordAnswer, e2e/scn-036.spec.ts (four checks, including the journal row read through the screen a person uses), apps/extension/src/background/pending-password.test.ts (nine)
 
-### SCN-015: Leak inventory with one source unavailable
+### SCN-015: Leak inventory, with and without a HIBP key
 - **Persona:** P-01
 - **Feature:** credentials
 - **Traces:** ST-012, FLW-11 (JTBD-04, JRN-02/#2-3)
 - **Entry point:** the leaks screen, with at least one monitored email or phone
-- **Preconditions:** at least one source configured
+- **Preconditions:** an address to check. Have I Been Pwned answers only with the person's own paid key, so there are two states, and the first is where every install starts: **no key saved** (Hudson Rock Cavalier is asked, Have I Been Pwned is not) and **a key saved** in "Ваши данные" (SCR-12; both sources are asked)
 - **Steps:**
-  1. User opens the leaks screen -> system queries each source and shows partial results as they arrive
+  1. User opens the leaks screen -> before anything is sent, the system names every source the address will go to in the current key state: with no key saved, Hudson Rock Cavalier only, and it says the address does not go to Have I Been Pwned until a key is saved (the password check is a separate one: it reaches Have I Been Pwned's range service with no key, SCN-036); with a key saved, both sources, and it says the key goes along in the request header. When whether a key is saved cannot be read, it names Cavalier and says Have I Been Pwned is asked only if a key is saved. User presses "Проверить" -> system asks every source in one request, shows "Запрос к источникам…" meanwhile, and draws the whole result once each source has answered or reached its 10-second limit (no partial results are drawn)
   2. User sees results split into fresh infostealer hits and historical breaches -> system shows data classes, dates, and the source for each entry
-  3. User reads the coverage line -> system names every source checked, every source that failed, and when each was last updated
-- **Expected result:** the user knows what is exposed and, equally, what was not checked
-- **Alt paths:** pressing Check now with an empty or malformed address -> the panel **states the refusal** and keeps the control, rather than redrawing identically; no sources configured -> the empty state prompts to add an email or phone and states exactly what will and will not be sent — **and what is sent is the address itself**: Hudson Rock's Cavalier and HIBP's breached-account endpoint answer to nothing less, so the leak check is not k-anonymous and the empty state may not imply that it is (the password check is a separate, k-anonymous one)
-- **UI elements:** monitored sources list, results grouped fresh/historical, per-entry data classes, coverage line, per-source retry
-- **States covered:** loading, empty, error, success
-- **Errors & recovery:** a source is unreachable or rate-limited -> that row states unavailable with a retry; results from other sources stand and the summary never implies full coverage
+  3. User reads the coverage line -> system names every source checked and every source not checked, so a total never reads as full coverage
+  4. With no key saved -> under the coverage line the system says Have I Been Pwned was not checked because no key is saved, and offers "Добавить ключ", a link to the key field in "Ваши данные"
+  5. User pastes their key there and presses "Сохранить ключ" -> the field empties, the block says a key is saved on this device and does not show it, and the next check asks Have I Been Pwned too
+  6. User goes back to the leaks screen (browser Back, or the "Утечки" row of the overview) -> the result that said no key is saved is gone: saving or removing a key, erasing all data (SCN-023) and resetting the local store (SCN-032) each return the leaks screen to its state before a check, whose sentence names the recipients for the key as it now is; the erase and the reset also empty the address field. The same happens in every other open tab of this page (they are told through a `BroadcastChannel`), and a check still running when the key changes has its answer dropped rather than drawn over the reset. A result computed under one key state is not shown under another
+- **Expected result:** the user knows what is exposed and, equally, what was not checked, and how to have the missing source checked
+- **Alt paths:** **a key is saved** -> Have I Been Pwned is asked with the rest, and the key leaves the device only in the `hibp-api-key` header of that one request to haveibeenpwned.com; **the key is refused** (Have I Been Pwned answers 401) -> the line under the coverage line says so and offers "Заменить ключ", a link to the same field, and the other sources' results stand; **Have I Been Pwned answers another error** (429, 5xx) -> the coverage line names it as not checked, never as "no breaches"; **replacing the key** -> a new key pasted over the saved one and "Заменить ключ" pressed; **removing it** -> "Удалить ключ", after which the block and the next check are back in the no-key state; **what is pasted is trimmed first**, so spaces and line breaks around a key are dropped without a word; then **a field that is empty after trimming** (only spaces counts), **a space or a non-printing character inside the key**, **a character outside the Latin layout** (a Cyrillic letter typed in the Russian layout), or **more than 256 characters** -> "Сохранить ключ" saves nothing and says which of the four it was, in the block (`[data-role=leak-key-needs]`); pressing Check now with an empty or malformed address -> the panel **states the refusal** and keeps the control, rather than redrawing identically; no sources configured -> the empty state prompts to add an email or phone and states exactly what will and will not be sent — **and what is sent is the address itself**: Hudson Rock's Cavalier and HIBP's breached-account endpoint answer to nothing less, so the leak check is not k-anonymous and the empty state may not imply that it is (the password check is a separate, k-anonymous one)
+- **UI elements:** monitored sources list, results grouped fresh/historical, per-entry data classes, coverage line, the key line under it (`[data-role=source-key]`) with "Добавить ключ" or "Заменить ключ"; on SCR-12 the key block: a masked field that is never filled back, "Сохранить ключ" (or "Заменить ключ" once a key is saved), "Удалить ключ"
+- **States covered:** loading, empty, error, success; no key saved, key saved, key refused
+- **Errors & recovery:** a source is unreachable or rate-limited -> it is named as not checked; results from other sources stand and the summary never implies full coverage. **The saved key cannot be read** (the local store failed on that read) -> Have I Been Pwned is named as not checked because the saved key could not be read, with no "Добавить ключ": "no key is saved" would be a false statement about a key that may be there, and the field it links to cannot be drawn either. Saving or removing the key fails -> the page's failure slot says the action did not go through, and the block still shows the state that is stored
+- **Behaviour notes:** **the key is the person's paid credential, and it is shown to nobody, the person included.** It is stored in `settings` under `hibp:apiKey`, read by the background only when a check is pressed, and sent only as the request header Have I Been Pwned requires. It is held out of the export (`WITHHELD_SETTINGS`), the outbound log records the request without its headers (its "что ушло" line names the header, `header:hibp-api-key`, never the value), and nothing writes it to the journal or to a console. **The Have I Been Pwned credit line is drawn only when Have I Been Pwned answered:** it credits data shown on the screen, and under a check it took no part in it read as a claim that it had. After saving, the field is emptied and the block says only that a key is saved: a field that echoed the key back would put it on screen for anyone behind the person and into every screenshot. Until 2026-10-29 nothing in the product wrote this setting at all, so the no-key state was the only state there was (B-125)
 - **Status:** implemented
-- **Coverage:** apps/extension/src/options/keep-focus.ts:keepingFocus (typing survives a repaint — focus and caret, not only the value), packages/core-leaks/src/merge.ts:mergeLeaks, packages/core-leaks/src/group.ts:groupLeaks, packages/ui/src/leaks/leaks.ts:renderLeaks, e2e/scn-015.spec.ts
+- **Coverage:** apps/extension/src/options/keep-focus.ts:keepingFocus (typing survives a repaint — focus and caret, not only the value), packages/core-leaks/src/merge.ts:mergeLeaks, packages/core-leaks/src/group.ts:groupLeaks, packages/ui/src/leaks/leaks.ts:renderLeaks, apps/extension/src/background/leaks.ts:hibp (refused key, other errors), packages/ui/src/settings/data-controls.ts:renderDataControls (the key block), apps/extension/src/options/leak-key.ts, e2e/scn-015.spec.ts (both states: no key, and a key saved, sent in the header, never shown back, then removed)
 
 ### SCN-016: Repair a leak and mark it resolved
 - **Persona:** P-01
 - **Feature:** credentials
 - **Traces:** ST-015, ST-012, FLW-11 (JTBD-04, JRN-02/#4-6)
 - **Entry point:** a leak entry in the queue or the leaks screen
-- **Preconditions:** at least one unresolved leak
+- **Preconditions:** at least one unresolved leak. **The main path needs an entry that names its site, and today only Have I Been Pwned entries do** (Hudson Rock Cavalier reports an infection, not a site), so with no key saved, where every install starts, every entry takes the no-domain path below and "Change password" is not offered
 - **Steps:**
   1. User opens the entry -> system shows what leaked, when, from where, and at most three next steps
   2. User clicks "Change password" -> system opens the site's change-password endpoint in a new tab
@@ -556,9 +560,9 @@ See [foundation.md](foundation.md) → Personas.
 - **Entry point:** settings screen
 - **Preconditions:** local data exists
 - **Steps:**
-  1. User clicks "Wipe all data" -> system asks for confirmation and lists exactly what will be deleted — **one kind per store, nine of them.** The word "exactly" was here before the list was: the confirmation named five while `wipeAll` cleared nine, so `models`, `feeds`, `snapshots` and the password-reuse index went unmentioned and the user agreed to five while nine went. Safe in direction, and still a confirmation that had not asked. Completeness now lives in `DATA_KIND_KEY: Record<StoreName, string>`, so a new store fails the build until the dialog has words for it
+  1. User clicks "Wipe all data" -> system asks for confirmation and lists exactly what will be deleted (the settings kind names the saved Have I Been Pwned key, which goes with the rest and has to be pasted again after the wipe) — **one kind per store, nine of them.** The word "exactly" was here before the list was: the confirmation named five while `wipeAll` cleared nine, so `models`, `feeds`, `snapshots` and the password-reuse index went unmentioned and the user agreed to five while nine went. Safe in direction, and still a confirmation that had not asked. Completeness now lives in `DATA_KIND_KEY: Record<StoreName, string>`, so a new store fails the build until the dialog has words for it
   2. User confirms -> system deletes all local data
-  3. User sees the result -> system returns the extension to its first-run state
+  3. User sees the result -> system returns the extension to its first-run state, including the leaks screen: its last result, the credit line and the typed address go with the data, so nothing on it speaks about a Have I Been Pwned key that was just erased (SCN-015)
 - **Expected result:** nothing of the user's remains locally, in one confirmed step
 - **Alt paths:** user cancels -> nothing changes
 - **UI elements:** "Wipe all data" (destructive), confirmation listing data categories, cancel
@@ -577,6 +581,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Steps:**
   1. User clicks "Export all data" -> system produces a JSON file containing findings, journal, settings, and the outbound log
   2. User saves the file -> system confirms and states what the file contains
+  3. User reads the file -> every value left out of it is marked where it would be, **each with its own reason**: the password-reuse index key because exported beside the tags it would make them reversible; the person's Have I Been Pwned key because it is their own paid credential and stays out of any file they hand on; the model weights by size, because they are a download. The closing note gives only the reasons for what this file actually left out
 - **Expected result:** the user holds a complete, readable copy of everything the product stored
 - **Alt paths:** none
 - **UI elements:** "Export all data" (primary), completion confirmation with contents list

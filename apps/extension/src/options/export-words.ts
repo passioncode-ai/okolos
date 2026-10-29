@@ -1,5 +1,7 @@
-import { WITHHELD_MARKER, type ExportWords } from '@okolos/storage'
+import { WITHHELD_MARKER, type ExportWords, type Withheld } from '@okolos/storage'
 import { t } from '@okolos/i18n'
+
+import { HIBP_KEY_SETTING } from './leak-key.js'
 
 /**
  * The words inside the file the user downloads.
@@ -28,10 +30,7 @@ export const EXPORT_WORDS: ExportWords = {
    * a test. The sentence after it says which of the two kinds of omission this is: a
    * value whose export would make the rest reversible, or a buffer named by its size.
    */
-  marker: (item) =>
-    item.bytes === undefined
-      ? `${WITHHELD_MARKER} ${t('exportWithheldSecret')}`
-      : `${WITHHELD_MARKER} ${t('exportWithheldBytes', String(item.bytes))}`,
+  marker: (item) => `${WITHHELD_MARKER} ${reasonFor(item)}`,
 
   /**
    * Paths, joined here rather than in the package: a comma between two of them is
@@ -42,5 +41,41 @@ export const EXPORT_WORDS: ExportWords = {
   note: (withheld) =>
     withheld.length === 0
       ? t('exportNothingWithheld')
-      : t('exportWithheldNote', withheld.map((item) => item.path).join(', ')),
+      : [
+          t('exportWithheldNote', withheld.map((item) => item.path).join(', ')),
+          ...[...new Set(withheld.map(kindOf))].map((kind) => WHY[kind]()),
+        ].join(' '),
+}
+
+/**
+ * Three kinds of omission, each with its own reason (B-125 round 2).
+ *
+ * There was one sentence for every value that was not a size, written for the
+ * password-reuse key: "this value is what makes the rest reversible". Once a person could
+ * save their Have I Been Pwned key, the file said that about it too, and it is false: that
+ * key reverses nothing in the file. It is left out because it is theirs, which is the
+ * reason the privacy page gives. The note likewise names only the reasons that apply to
+ * what this file actually left out.
+ */
+type OmissionKind = 'own-key' | 'reversible' | 'size'
+
+/** From the constant the settings screen writes with, so the path cannot drift from the key. */
+const OWN_KEY_PATHS: ReadonlySet<string> = new Set([`settings/${HIBP_KEY_SETTING}`])
+
+function kindOf(item: Withheld): OmissionKind {
+  if (item.bytes !== undefined) return 'size'
+  return OWN_KEY_PATHS.has(item.path) ? 'own-key' : 'reversible'
+}
+
+function reasonFor(item: Withheld): string {
+  const kind = kindOf(item)
+  if (kind === 'size') return t('exportWithheldBytes', String(item.bytes))
+  return kind === 'own-key' ? t('exportWithheldOwnKey') : t('exportWithheldSecret')
+}
+
+/** Spelled out per kind: the locale gate reads keys from `t('…')`, not from a table of strings. */
+const WHY: Readonly<Record<OmissionKind, () => string>> = {
+  'own-key': () => t('exportWhyOwnKey'),
+  reversible: () => t('exportWhyReuseKey'),
+  size: () => t('exportWhyBytes'),
 }

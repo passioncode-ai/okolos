@@ -4,8 +4,8 @@ import type { Envelope, RpcMap, RpcType } from '@okolos/contracts'
  * The surface the rest of the product is allowed to see.
  *
  * Everything that differs between Chrome and Firefox is absorbed here: Chrome
- * runs a service worker with no DOM and needs an offscreen document to run
- * inference, Firefox keeps a background page and a blocking webRequest. A
+ * runs a service worker with no DOM, Firefox keeps a background page and a
+ * blocking webRequest. A
  * detector that knew any of that would have to be rewritten per browser; one
  * that takes candidates and returns verdicts does not.
  */
@@ -15,7 +15,6 @@ export interface Platform {
   readonly alarms: Alarms
   readonly runtime: Runtime
   readonly tabs: Tabs
-  readonly inference: Inference
   readonly blocking: Blocking
   readonly downloads: Downloads
   readonly extensions: Extensions
@@ -135,21 +134,6 @@ export interface Runtime {
   /** Absolute URL of a file inside the extension package. */
   getUrl(path: string): string
   openOptionsPage(): Promise<void>
-}
-
-/** Where a model is allowed to run in this browser. */
-export type InferenceHostKind = 'offscreen' | 'background' | 'none'
-
-export interface Inference {
-  /**
-   * Makes sure a context exists that can run a model, and says which one it is.
-   *
-   * Chrome's service worker has no DOM and no WebGPU, so inference needs an
-   * offscreen document; Firefox keeps a background page and can run it there.
-   * `none` is a real answer — a browser that offers neither must be told apart
-   * from one where the model simply has not been fetched yet.
-   */
-  ensureHost(): Promise<InferenceHostKind>
 }
 
 export interface Tabs {
@@ -324,14 +308,5 @@ export interface WebExtensionApi {
         filter?: unknown,
       ): void
     }
-  }
-  /** Chrome only. Absent in Firefox, which runs the model on its background page. */
-  offscreen?: {
-    hasDocument(): Promise<boolean>
-    createDocument(info: {
-      url: string
-      reasons: string[]
-      justification: string
-    }): Promise<void>
   }
 }

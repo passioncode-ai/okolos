@@ -25,6 +25,10 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 
 - **success** — a finding is raised
 - **error** — detail view or action failed
+- **removed by the page** — the page deletes the host from the document
+- **more than one kind of finding** — a second detector finds something on the same page
+- **the verdict outlived the page that asked for it** — a form navigated away while the leak check was in flight (FLW-10, SCN-036)
+- **the finding is in an embedded frame** — a frame reports upward — an injection (FLW-02), a login form (FLW-09) or a leak verdict on a password it received (FLW-10)
 
 **Source of truth:** `packages/ui/src/banner/banner.ts`. This file is derived from it; if the two
 disagree, the renderer is right and this file is stale.
