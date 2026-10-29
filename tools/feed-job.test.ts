@@ -426,6 +426,85 @@ describe('production publishes run from origin/main (F2)', () => {
   })
 })
 
+describe('after a publish the agent proposes the committed snapshot (B-158)', () => {
+  /** Git as the pin stage sees it; the snapshot step's git and gh as `snapshot` says. */
+  function withSnapshot(snapshot: (command: string, args: string[]) => { code: number; stdout?: string; stderr?: string; error?: string } | null) {
+    const base = fakeTool().tool
+    const seen: Array<{ command: string; args: string[]; timeoutMs: number | undefined; env: Record<string, string> | undefined }> = []
+    const tool = async (command: string, args: string[], options: { timeoutMs?: number; env?: Record<string, string> } = {}) => {
+      seen.push({ command, args, timeoutMs: options.timeoutMs, env: options.env })
+      const answer = snapshot(command, args)
+      if (answer) return { signal: null, stdout: '', stderr: '', timedOut: false, ...answer }
+      return base(command, args)
+    }
+    return { tool, seen }
+  }
+  const ghMissing = (command: string) => (command === 'gh' ? { code: null as unknown as number, error: 'Error: spawn gh ENOENT' } : null)
+  const oldSnapshot = (command: string, args: string[]) =>
+    command === 'git' && args.includes('show')
+      ? { code: 0, stdout: JSON.stringify({ kind: 'snapshot', body: { name: 'phishing', version: 51, updatedAt: new Date(Date.now() - 9 * 86_400_000).toISOString(), entries: [] } }) }
+      : null
+
+  it('records a failed snapshot step beside a successful publish, which stays published', async () => {
+    const w = world()
+    const t = withSnapshot((command, args) => ghMissing(command) ?? oldSnapshot(command, args))
+    const { promise, lines } = job(w, { tool: t.tool, flags: { snapshotPr: true } })
+    const record = await promise
+    expect(record).toMatchObject({ outcome: 'published', stage: 'done', exit: 0 })
+    const status = readStatus(w.paths.status)
+    expect(status).toMatchObject({ outcome: 'published', consecutiveFailures: 0, snapshotPr: { outcome: 'failed' } })
+    expect(status?.snapshotPr?.reason).toMatch(/^gh unavailable/)
+    expect(status?.lastPublished).toMatchObject({ version: 52 })
+    // Visible once in the log, not once per retry or per child.
+    expect(lines.filter((line) => line.includes('snapshot PR'))).toEqual([expect.stringMatching(/snapshot PR: failed: gh unavailable/)])
+  })
+
+  it('records skipped-fresh when main’s snapshot is young, and asks gh nothing', async () => {
+    const w = world()
+    const young = (command: string, args: string[]) =>
+      command === 'git' && args.includes('show')
+        ? { code: 0, stdout: JSON.stringify({ kind: 'snapshot', body: { name: 'phishing', version: 51, updatedAt: new Date().toISOString(), entries: [] } }) }
+        : null
+    const t = withSnapshot(young)
+    await job(w, { tool: t.tool, flags: { snapshotPr: true } }).promise
+    expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'published', snapshotPr: { outcome: 'skipped-fresh', version: 52 } })
+    expect(t.seen.filter((call) => call.command === 'gh')).toEqual([])
+  })
+
+  it('runs only when asked (the agent asks), so a manual refresh stays as it was', async () => {
+    const w = world()
+    const t = withSnapshot(oldSnapshot)
+    await job(w, { tool: t.tool }).promise
+    expect(readStatus(w.paths.status)?.snapshotPr).toBeUndefined()
+    expect(t.seen.filter((call) => call.args.includes('show') || call.command === 'gh')).toEqual([])
+  })
+
+  it('does nothing after a run that did not publish', async () => {
+    const w = world()
+    const t = withSnapshot(oldSnapshot)
+    const fresh = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    await job(w, { tool: t.tool, flags: { snapshotPr: true, ifStale: true }, fetchImpl: servedAt(fresh) }).promise
+    expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'skipped' })
+    expect(readStatus(w.paths.status)?.snapshotPr).toBeUndefined()
+    const failed = world()
+    await job(failed, { tool: t.tool, flags: { snapshotPr: true } }, { FAKE_PUBLISH: 'fail' }).promise
+    expect(readStatus(failed.paths.status)?.snapshotPr).toBeUndefined()
+    expect(t.seen.filter((call) => call.command === 'gh')).toEqual([])
+  })
+
+  it('bounds the step inside the run’s watchdog, so it cannot turn a publish into a watchdog failure', async () => {
+    const w = world()
+    const t = withSnapshot((command, args) => ghMissing(command) ?? oldSnapshot(command, args))
+    const watchdogMs = 120_000
+    const record = await job(w, { tool: t.tool, flags: { snapshotPr: true }, watchdogMs }).promise
+    expect(record.outcome).toBe('published')
+    const step = t.seen.filter((call) => call.command === 'gh' || call.args.includes('show'))
+    expect(step.length).toBeGreaterThan(0)
+    for (const call of step) expect(call.timeoutMs).toBeLessThan(watchdogMs)
+    for (const call of step) expect(call.env?.CLOUDFLARE_API_TOKEN).toBeUndefined()
+  })
+})
+
 describe('leftovers from older runs are swept at start (LC-12, F8)', () => {
   it('removes the fixed-name temp files and dead runs’ directories, and keeps a live one', () => {
     const tmp = mkdtempSync(path.join(os.tmpdir(), 'okolos-sweep-'))

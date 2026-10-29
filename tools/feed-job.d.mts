@@ -27,7 +27,7 @@ export function runJob(options?: {
   root?: string
   paths?: FeedPaths
   env?: Record<string, string | undefined>
-  flags?: { ifStale?: boolean; follow?: boolean; unpinned?: boolean }
+  flags?: { ifStale?: boolean; follow?: boolean; unpinned?: boolean; snapshotPr?: boolean }
   run?: Runner
   tool?: Runner
   fetchImpl?: typeof fetch

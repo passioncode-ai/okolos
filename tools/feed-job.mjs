@@ -4,10 +4,11 @@
  * exclusive, observable and pinned.
  *
  *   node tools/feed-job.mjs              # a manual refresh: publish now, from origin/main
- *   node tools/feed-job.mjs --agent      # what launchd runs: --if-stale --follow
+ *   node tools/feed-job.mjs --agent      # what launchd runs: --if-stale --follow --snapshot-pr
  *   node tools/feed-job.mjs --if-stale   # publish only when the served feed is older than its interval
  *   node tools/feed-job.mjs --follow     # fast-forward this (agent-owned) checkout to origin/main first
  *   node tools/feed-job.mjs --unpinned   # emergency: publish from a checkout not at origin/main (recorded)
+ *   node tools/feed-job.mjs --snapshot-pr  # after a publish, propose feeds/phishing.json as a pull request
  *
  * What each property answers (the lifecycle audit, raw/okolos.md):
  *
@@ -35,6 +36,12 @@
  *   - a login is not a publish: with --if-stale a run whose served feed is younger
  *     than its interval records "skipped" and ends. RunAtLoad used to publish a new
  *     version at every login.
+ *   - the committed snapshot follows the agent (B-158): with --snapshot-pr a run that
+ *     published opens or updates one pull request with feeds/phishing.json when the
+ *     snapshot on origin/main is a week old, and asks GitHub to merge it once the
+ *     checks pass (tools/feed/snapshot-pr.mjs). Its outcome is `snapshotPr` in the
+ *     record and one line in the log; it never turns a publish into a failed run,
+ *     and it runs inside what the watchdog leaves.
  */
 import { existsSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -45,6 +52,7 @@ import { acquireLock, LockHeldError } from './feed/lock.mjs'
 import { capFile, cleanLine, openLog } from './feed/log.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { DEFAULT_WORKER, readServed } from './feed/served.mjs'
+import { proposeSnapshot, SNAPSHOT_BUDGET_MS } from './feed/snapshot-pr.mjs'
 import { offMainFacts, writeStatus } from './feed/status.mjs'
 import { directoriesIn } from './tree.mjs'
 import { isMain } from './is-main.mjs'
@@ -188,6 +196,7 @@ export async function runJob({
 } = {}) {
   const iso = () => new Date(now()).toISOString()
   const startedAt = iso()
+  const begun = now()
 
   // The log first, so even a refused lock leaves a line.
   let write = log
@@ -373,6 +382,29 @@ export async function runJob({
     )
     if (published?.code !== 0) throw new StageFailure('publish', describeFailure(published ?? {}))
 
+    if (flags.snapshotPr) {
+      setStage('snapshot')
+      // Inside what the watchdog leaves, with room for its grace: this step must never
+      // be what turns a publish into a watchdog failure. It never throws.
+      const deadline = Math.min(now() + SNAPSHOT_BUDGET_MS, begun + watchdogMs - graceMs - 30_000)
+      try {
+        facts.snapshotPr = await proposeSnapshot({
+          root,
+          feedFile: paths.feed,
+          readServedFeed: () => readServed({ base: env.OKOLOS_WORKER_URL ?? DEFAULT_WORKER, fetchImpl }),
+          tool,
+          env,
+          now,
+          deadline,
+          tmp,
+        })
+      } catch (cause) {
+        facts.snapshotPr = { outcome: 'failed', reason: cause instanceof Error ? cause.message : String(cause) }
+      }
+      const pr = facts.snapshotPr
+      write(`snapshot PR: ${pr.outcome}${pr.reason ? `: ${pr.reason}` : ''}${pr.pr ? ` (${pr.pr.url})` : ''}`)
+    }
+
     return { outcome: 'published', stage: 'done', exit: EXIT.ok }
   }
 
@@ -458,6 +490,7 @@ async function main() {
       ifStale: agent || argv.includes('--if-stale'),
       follow: agent || argv.includes('--follow'),
       unpinned: argv.includes('--unpinned'),
+      snapshotPr: agent || argv.includes('--snapshot-pr'),
     },
     onStage: (stage) => {
       current.stage = stage
