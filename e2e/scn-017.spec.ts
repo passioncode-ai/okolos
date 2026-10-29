@@ -34,8 +34,10 @@ test('the screen reports the state of this browser rather than an empty list', a
    * what CI saw once (run 36563089100, 2026-09-29: `ready`, no `unsupported`, no
    * `no-changes` for five seconds), and the report said "element(s) not found" and nothing
    * about which change a fresh profile could have. 150 runs of this test under load did
-   * not reproduce it (B-168), so the next firing has to name it: the change rows on the
-   * screen, and what the browser lists now.
+   * not reproduce it (B-168). A unit test did name a cause: the first baseline was written
+   * one extension at a time, and a second first comparison reading in between reported the
+   * rest as installed (`extensions.test.ts`, fixed with one transaction). Should it fire
+   * again, it names itself: the change rows on the screen, and what the browser lists now.
    */
   try {
     await expect(panel.locator('[data-role=no-changes]')).toBeVisible()
