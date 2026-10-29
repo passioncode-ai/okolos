@@ -45,6 +45,16 @@ function specs(): string[] {
   return globSync('e2e/*.spec.ts', { cwd: root })
 }
 
+/** The Gecko harness has its own spelling of the same wait. */
+const GECKO = 'tools/firefox-e2e.mjs'
+const GECKO_SLEEP = new RegExp('driver\\.' + 'sleep\\(', 'g')
+
+/** Its remaining site, with why. */
+const GECKO_KNOWN = {
+  sites: 1,
+  why: 'the pause before asserting that a scripted submit raised the gate: a wait before a presence check, which can only fail late, never pass early',
+}
+
 describe('fixed waits in e2e specs', () => {
   it('appear only where they are named, and no more often', () => {
     const found: Record<string, number> = {}
@@ -57,6 +67,14 @@ describe('fixed waits in e2e specs', () => {
       found,
       'wait for the product to say the check settled (e2e/surfaces.ts: expectSettled), not for a time',
     ).toEqual(allowed)
+  })
+
+  it('appear in the Gecko harness only where they are named', () => {
+    const text = readFileSync(path.join(root, GECKO), 'utf8')
+    expect(
+      text.match(GECKO_SLEEP)?.length ?? 0,
+      `${GECKO}: wait for okolos:scan or another settle mark, not for a time (${GECKO_KNOWN.why})`,
+    ).toBe(GECKO_KNOWN.sites)
   })
 
   it('is looking at real specs, so an empty walk cannot pass', () => {
