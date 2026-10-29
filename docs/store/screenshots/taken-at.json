@@ -4,12 +4,12 @@
     "apps/extension/src/options",
     "apps/extension/src/pages.css"
   ],
-  "surfacesDigest": "f6ad6031bdacbe3255984d4807789d01",
+  "surfacesDigest": "76d3225807d0d058a3f1db8a15ba892d",
   "images": {
     "01-interstitial.png": "8ff0de8221729c00",
     "02-first-run.png": "38c38d6d68907d06",
-    "03-self-audit.png": "9db5583dc4ba37c1",
-    "04-popup.png": "72bbcd5861082fa0"
+    "03-self-audit.png": "bb7921ad08c6e10b",
+    "04-popup.png": "77f0352b5955b9d8"
   },
   "shown": {
     "01-interstitial.png": "interstitial",
