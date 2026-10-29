@@ -1,6 +1,7 @@
 import { isEnvelope, type Envelope, type RpcMap, type RpcType } from '@okolos/contracts'
 
 import type {
+  CreatedDownload,
   Platform,
   RpcHandler,
   RpcSender,
@@ -283,39 +284,43 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
          * name `onChanged` brings, up to five seconds, and is reported once, with it or without.
          */
         const NAME_WAIT_MS = 5_000
-        const waiting = new Map<number, { item: Parameters<typeof report>[0]; timer: ReturnType<typeof setTimeout> }>()
-        const report = (item: { id: number; url: string; finalUrl?: string; filename?: string; mime?: string }) => {
-          handler({
-            id: item.id,
-            url: item.url,
-            // Both addresses travel: the link the page carried and where it landed.
-            // A short link to a malicious host is innocent at the first and not at
-            // the second, and the check used to see only the first (B-57).
-            ...(item.finalUrl !== undefined && item.finalUrl !== item.url
-              ? { finalUrl: item.finalUrl }
-              : {}),
-            filename: (item.filename ?? '').split(/[\\/]/).pop() ?? '',
-            mime: item.mime ?? null,
-          })
-        }
+        const waiting = new Map<number, { item: CreatedDownload; done: (item: CreatedDownload) => void; timer: ReturnType<typeof setTimeout> }>()
+        const shape = (item: { id: number; url: string; finalUrl?: string; filename?: string; mime?: string }): CreatedDownload => ({
+          id: item.id,
+          url: item.url,
+          // Both addresses travel: the link the page carried and where it landed.
+          // A short link to a malicious host is innocent at the first and not at
+          // the second, and the check used to see only the first (B-57).
+          ...(item.finalUrl !== undefined && item.finalUrl !== item.url
+            ? { finalUrl: item.finalUrl }
+            : {}),
+          filename: (item.filename ?? '').split(/[\\/]/).pop() ?? '',
+          mime: item.mime ?? null,
+        })
         api.downloads?.onChanged?.addListener((delta) => {
           const pending = waiting.get(delta.id)
           const name = delta.filename?.current
           if (pending === undefined || !name) return
           clearTimeout(pending.timer)
           waiting.delete(delta.id)
-          report({ ...pending.item, filename: name })
+          pending.done({ ...pending.item, filename: name.split(/[\\/]/).pop() ?? '' })
         })
-        api.downloads?.onCreated.addListener((item) => {
+        api.downloads?.onCreated.addListener((raw) => {
+          const item = shape(raw)
           if (item.filename || !api.downloads?.onChanged) {
-            report(item)
+            handler(item, Promise.resolve(item))
             return
           }
-          const timer = setTimeout(() => {
-            waiting.delete(item.id)
-            report(item)
-          }, NAME_WAIT_MS)
-          waiting.set(item.id, { item, timer })
+          // The item goes to the handler now, before Chrome names it, so a check by address
+          // runs while the download can still be stopped; the name follows (round 8).
+          const named = new Promise<CreatedDownload>((done) => {
+            const timer = setTimeout(() => {
+              waiting.delete(item.id)
+              done(item)
+            }, NAME_WAIT_MS)
+            waiting.set(item.id, { item, done, timer })
+          })
+          handler(item, named)
         })
       },
 

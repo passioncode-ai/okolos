@@ -227,11 +227,11 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  A[Download started] --> N[Name reported, or 5 s waited for it]
-  N --> B{Address or redirect in feeds?}
-  B -->|yes| X[Download cancelled before it lands, journalled]
+  A[Download started] --> B{Address or redirect in feeds?}
+  B -->|yes| X[Download cancelled at once, before it lands, journalled]
   X --> W[Screen: In-page banner - download variant, critical]
-  B -->|no| T{Program, hidden type or check not run?}
+  B -->|no| N[Name reported, or 5 s waited for it]
+  N --> T{Program, hidden type or check not run?}
   T -->|yes| D[Screen: In-page banner - download variant, major]
   T -->|no| G[No banner: clean by the checks that ran, no hash check; journalled]
   W -->|show the record| J[Journal]
@@ -239,7 +239,7 @@ flowchart TD
   D -->|delete failed| E[Inline: delete it from the browser's downloads]
   D -->|this is wrong or dismiss| I[File stays where the browser put it]
   B -->|feeds unavailable| B_err[Feed check not run, stated in the verdict]
-  B_err --> T
+  B_err --> N
 ```
 
 - **Screens traversed:**

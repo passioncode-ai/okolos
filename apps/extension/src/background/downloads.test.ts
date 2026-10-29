@@ -206,3 +206,44 @@ describe('discardDownload (B-165, round 7)', () => {
     ).toEqual({ ok: false })
   })
 })
+
+describe('a download Chrome names after creating it (B-165, round 8)', () => {
+  it('cancels a listed download at once, before the name arrives', async () => {
+    const d = deps()
+    let name: (named: DownloadItem) => void = () => undefined
+    const named = new Promise<DownloadItem>((done) => {
+      name = done
+    })
+    const verdict = await handleDownload(item({ url: 'https://malware.test/x', filename: '' }), d, named)
+    expect(verdict.action).toBe('block')
+    expect(d.cancel).toHaveBeenCalledWith(1)
+    // The name never came, and nothing waited for it.
+    name(item({ url: 'https://malware.test/x', filename: 'x.exe' }))
+  })
+
+  it('judges an unlisted download by the name, once the browser gives it', async () => {
+    const d = deps()
+    const announce = vi.fn(async () => undefined)
+    const verdict = await handleDownload(
+      item({ url: 'https://files.test/get', filename: '', mime: null }),
+      { ...d, announce },
+      Promise.resolve(item({ url: 'https://files.test/get', filename: 'invoice.pdf.exe', mime: null })),
+    )
+    expect(verdict.action).toBe('warn')
+    expect(verdict.shape.map((s) => s.code)).toContain('double-extension')
+    expect(d.cancel).not.toHaveBeenCalled()
+    expect(d.journal).toHaveBeenCalledWith(expect.objectContaining({ explain: expect.stringContaining('invoice.pdf.exe') }))
+    expect(announce).toHaveBeenCalledWith(verdict, expect.objectContaining({ filename: 'invoice.pdf.exe' }))
+  })
+
+  it('judges by what it has when the name never resolves', async () => {
+    const d = deps()
+    const verdict = await handleDownload(
+      item({ url: 'https://files.test/get', filename: '', mime: null }),
+      d,
+      Promise.reject(new Error('gone')),
+    )
+    expect(verdict.action).not.toBe('block')
+    expect(d.cancel).not.toHaveBeenCalled()
+  })
+})

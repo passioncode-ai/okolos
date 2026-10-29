@@ -85,14 +85,30 @@ export function judgeItem(item: DownloadItem, feed: FeedSnapshot | null): Downlo
   return verdict
 }
 
-export async function handleDownload(item: DownloadItem, deps: DownloadDeps): Promise<DownloadVerdict> {
+/**
+ * `named` is the same download once the browser has named the file (Chrome names it after
+ * creating it). The feed check needs only the addresses, so it runs on the item as created and
+ * a listed download is cancelled at once; only the checks that read the name wait for it
+ * (round 8 of the B-165 certification: waiting for the name first let a listed file finish
+ * before its cancel, under a panel saying nothing reached the disk).
+ */
+export async function handleDownload(
+  created: DownloadItem,
+  deps: DownloadDeps,
+  named: Promise<DownloadItem> = Promise.resolve(created),
+): Promise<DownloadVerdict> {
   const feed = await deps.feed().catch(() => null)
-  const verdict = judgeItem(item, feed)
+  const byAddress = judgeItem(created, feed)
 
-  if (verdict.action === 'block') {
+  let item = created
+  let verdict = byAddress
+  if (byAddress.action === 'block') {
     // Cancelled first, explained second. The order matters: the file must not
     // reach the disk while a banner is being drawn.
-    await deps.cancel(item.id).catch(() => undefined)
+    await deps.cancel(created.id).catch(() => undefined)
+  } else {
+    item = await named.catch(() => created)
+    verdict = item === created ? byAddress : judgeItem(item, feed)
   }
 
   await deps

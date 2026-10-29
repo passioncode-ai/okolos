@@ -5,6 +5,7 @@ export { createPlatform, toSafeUrl, withDeadline }
 export type {
   Alarms,
   Blocking,
+  CreatedDownload,
   Downloads,
   Extensions,
   Inference,

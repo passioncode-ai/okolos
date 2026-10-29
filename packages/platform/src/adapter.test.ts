@@ -856,8 +856,8 @@ describe('discarding a download, by the state the browser reports (B-165, round 
   })
 })
 
-describe('a download whose name Chrome reports later (B-165, round 7)', () => {
-  it('waits for the name onChanged brings, then reports the download once with it', () => {
+describe('a download whose name Chrome reports later (B-165, rounds 7 and 8)', () => {
+  it('hands the download over at once, and the name onChanged brings through `named`', async () => {
     vi.useFakeTimers()
     const held: {
       created?: (item: { id: number; url: string; filename?: string }) => void
@@ -871,18 +871,24 @@ describe('a download whose name Chrome reports later (B-165, round 7)', () => {
       },
     }))
     const seen: string[] = []
-    platform.downloads.onCreated((item) => seen.push(item.filename))
+    const later: Array<Promise<{ filename: string }>> = []
+    platform.downloads.onCreated((item, named) => {
+      seen.push(item.filename)
+      later.push(named)
+    })
     held.created?.({ id: 4, url: 'https://x.test/a', filename: '' })
-    expect(seen).toEqual([])
+    // At once, nameless: a check by address can still stop it (round 8).
+    expect(seen).toEqual([''])
     held.changed?.({ id: 4, filename: { current: 'C:\\Users\\a\\Downloads\\setup.exe' } })
-    expect(seen).toEqual(['setup.exe'])
-    held.changed?.({ id: 4, filename: { current: 'C:\\Users\\a\\Downloads\\setup.exe' } })
+    expect((await later[0])?.filename).toBe('setup.exe')
+    held.changed?.({ id: 4, filename: { current: 'C:\\Users\\a\\Downloads\\other.exe' } })
     vi.advanceTimersByTime(10_000)
-    expect(seen).toEqual(['setup.exe'])
+    expect(seen).toEqual([''])
+    expect((await later[0])?.filename).toBe('setup.exe')
     vi.useRealTimers()
   })
 
-  it('reports it with no name when none comes within five seconds', () => {
+  it('resolves `named` with no name when none comes within five seconds', async () => {
     vi.useFakeTimers()
     const held: { created?: (item: { id: number; url: string; filename?: string }) => void } = {}
     const platform = createPlatform('chrome', fakeApi({
@@ -892,12 +898,30 @@ describe('a download whose name Chrome reports later (B-165, round 7)', () => {
         cancel: async () => undefined,
       },
     }))
-    const seen: string[] = []
-    platform.downloads.onCreated((item) => seen.push(item.filename))
+    const later: Array<Promise<{ filename: string }>> = []
+    platform.downloads.onCreated((_item, named) => later.push(named))
     held.created?.({ id: 5, url: 'https://x.test/b', filename: '' })
+    let settled = false
+    void later[0]?.then(() => { settled = true })
+    await Promise.resolve()
+    expect(settled).toBe(false)
     vi.advanceTimersByTime(5_000)
-    expect(seen).toEqual([''])
+    expect((await later[0])?.filename).toBe('')
     vi.useRealTimers()
+  })
+
+  it('resolves `named` at once for a download that already has its name (Firefox)', async () => {
+    const held: { created?: (item: { id: number; url: string; filename?: string }) => void } = {}
+    const platform = createPlatform('firefox', fakeApi({
+      downloads: {
+        onCreated: { addListener: (cb) => { held.created = cb } },
+        cancel: async () => undefined,
+      },
+    }))
+    const later: Array<Promise<{ filename: string }>> = []
+    platform.downloads.onCreated((_item, named) => later.push(named))
+    held.created?.({ id: 6, url: 'https://x.test/c', filename: '/home/a/c.msi' })
+    expect((await later[0])?.filename).toBe('c.msi')
   })
 })
 

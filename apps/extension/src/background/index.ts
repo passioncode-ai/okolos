@@ -99,9 +99,9 @@ const RETENTION_ALARM = RETENTION.name
 const INVENTORY_ALARM = INVENTORY.name
 
 /**
- * Discards a download a page asked to discard, only when the background, judging it again now,
- * finds it doubted: a page cannot delete a clean or unknown download, and nothing has to be
- * remembered across the service worker's restarts (round 6 of the B-165 certification).
+ * A discard is taken only from a top frame's content script, by the download's id, and the
+ * download is not judged again (`discardDownload`, round 7 of the B-165 certification): the
+ * warning the person answered is the judgement. A page cannot message the extension at all.
  */
 platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSender) => {
   switch (message.type) {
@@ -1119,7 +1119,7 @@ platform.runtime.onBrowserStart(() => {
  * Downloads are judged as they are created — the only moment the bytes have not
  * landed yet. Nothing here waits on the page: a direct link has no page.
  */
-platform.downloads.onCreated((item) => {
+platform.downloads.onCreated((item, named) => {
   void handleDownload(item, {
     feed: currentFeed,
     cancel: (id) => platform.downloads.cancel(id),
@@ -1182,7 +1182,7 @@ platform.downloads.onCreated((item) => {
         }
       }
     },
-  })
+  }, named)
 })
 
 /**
