@@ -80,7 +80,7 @@ server; `apps/mail-cli` is an on-demand CLI and `apps/proxy` is a remote Cloudfl
 | What | Who starts it | Cadence | With no window | Who stops it | Idle budget |
 |---|---|---|---|---|---|
 | launchd agent **`app.okolos.feed`** (`gui/<uid>`, plist from `tools/launchd/app.okolos.feed.plist`); its command is a `/bin/sh` launch line that starts `node ~/.okolos/bin/feed-agent/bootstrap.mjs`, a copy of `tools/feed/bootstrap.mjs` outside the checkout, never a `cd` into it (B-159) | a person, once: `pnpm feed:agent` from a clone whose HEAD is a freshly fetched origin/main and whose installed files (the bootstrap's seven sources and the plist template) carry no uncommitted change (machine holding the signing key, ADR-0002; any other HEAD, or such a change, is refused in one line naming the files; `--allow-branch` overrides and is recorded in `feed.log` and as `installedOffMain` in every record of a run: the launch line's, the bootstrap's and the job's, a stop by signal and a record adopted from an older job included) | `StartInterval` 43200 s + `RunAtLoad`; a login run ends as "skipped" when the served feed is under 11 h old | the whole job is background: `Nice 5`, `ProcessType Background`, no `KeepAlive` | its own exit; one deadline over the run, 45 min from the bootstrap's start, checkout repair included: a repair still going is killed and recorded, the job's watchdog is what is left minus 2 min (at most its own 30 min), and the bootstrap kills the job's group at the deadline; worst case 45 min plus a 5 s kill grace; removed by `node tools/install-feed-agent.mjs --uninstall [--purge]` (deletes the plist, `~/.okolos/bin/feed-agent/` and an emptied `~/.okolos/bin`, verifies with `launchctl print`) | 0 processes and 0 RSS between runs; a run is about a minute, twice a day |
-| a run's children: when the checkout is missing or broken, the bootstrap's `git worktree prune`/`fetch`/`worktree add` in the installing clone (or `git clone` of its origin when that clone is gone) and `pnpm install --filter @okolos/proxy`; then `node tools/feed-job.mjs --agent`, and its `git fetch`/`checkout`, `pnpm install --filter @okolos/proxy` (only when the lockfile moved), `node tools/ingest.mjs`, the secret runner → `node tools/publish-feed.mjs` → `pnpm exec wrangler`; after a publish, when the snapshot on origin/main is 7 days old or older (B-158, `tools/feed/snapshot-pr.mjs`), `git show`/`ls-remote`/`fetch`/`hash-object`/`commit-tree` through a private index, `git push origin <commit>:refs/heads/chore/feed-snapshot-auto` (never forced, `OKOLOS_SKIP_GATES=1`) and `gh auth status`/`pr list`/`pr create` or `pr edit`/`api`/`pr merge --auto --merge` on gh's own login | `tools/feed/bootstrap.mjs`, then `tools/feed-job.mjs`; each child in its own process group | per run | — | deadline per child (git 90 s, worktree add 2 min, clone 5 min, install 10 min, ingest 3 min, publish 6 min, gh 60 s; the snapshot step 5 min in all and never past what the run's watchdog leaves), then SIGTERM → SIGKILL to the group; a repair takes at most 21 min on the clone path | none left after the run (`tools/feed/bounded.test.ts`) |
+| a run's children: when the checkout is missing or broken, the bootstrap's `git worktree prune`/`fetch`/`worktree add` in the installing clone (or `git clone` of its origin when that clone is gone) and `pnpm install --filter @okolos/proxy`; then `node tools/feed-job.mjs --agent`, and its `git fetch`/`checkout`, `pnpm install --filter @okolos/proxy` (only when the lockfile moved), `node tools/ingest.mjs`, the secret runner → `node tools/publish-feed.mjs` → `pnpm exec wrangler`; after a publish (B-158, `tools/feed/snapshot-pr.mjs`), `git show origin/main:feeds/phishing.json`, and when that snapshot is 7 days old or older `git ls-remote`/`fetch`/`hash-object`/`read-tree`/`update-index`/`write-tree`/`commit-tree` through a private index, `git push origin <commit>:refs/heads/chore/feed-snapshot-auto` (never forced, `OKOLOS_SKIP_GATES=1`, its output into `feed.log`) and `gh auth status`/`pr list`/`pr create` or `pr edit`/`api`/`pr merge --auto --merge` on gh's own login | `tools/feed/bootstrap.mjs`, then `tools/feed-job.mjs`; each child in its own process group | per run | — | deadline per child (git 90 s, worktree add 2 min, clone 5 min, install 10 min, ingest 3 min, publish 6 min, gh 60 s; the snapshot step 5 min in all and never past what the run's watchdog leaves), then SIGTERM → SIGKILL to the group; a repair takes at most 21 min on the clone path | none left after the run (`tools/feed/bounded.test.ts`) |
 | MV3 service worker (Chrome) / event page (Firefox) | the browser, on a listened event | alarms `okolos:feeds` 6 h, `okolos:retention` 24 h, `okolos:inventory` 24 h — created only when missing | wakes on messages, alarms, downloads and top-level http(s) navigations (memory write only) | the browser, after ~30 s idle; no timer outlives a wake | per wake: three alarm checks and timestamp reads; per day: ≤ 4 feed pulls, 2 sweeps, 1 extension review, 0 rule rebuilds without a change (`apps/extension/src/background/wake.test.ts`) |
 | content script and MAIN-world page watcher | the browser, per http(s) page and frame | event-driven, paced rescans | — | the page's lifetime | no work while the page is unchanged |
 
@@ -99,9 +99,11 @@ when the clone is gone; recreated by the bootstrap when it is missing; a broken 
 ran from, the installer's and the bootstrap's `git worktree prune`, `git fetch origin main` and
 `git worktree add`, and every run's own `git fetch origin main` in the agent checkout, which shares
 that clone's `.git` (its objects, its `.git/worktrees/` entry and `refs/remotes/origin/main`, twice a
-day; nothing in its working tree), and, from a run that proposes the snapshot (B-158), one blob and
-one commit object and `refs/remotes/origin/chore/feed-snapshot-auto` there, built through a private
-index in `$TMPDIR/okolos-feed-*`, so the checkout's HEAD, index and files stay as they were;
+day; nothing in its working tree), and, from a run that proposes the snapshot (B-158), one blob,
+its trees (the root's and `feeds/`) and one commit object and
+`refs/remotes/origin/chore/feed-snapshot-auto` there, built through a private index in
+`$TMPDIR/okolos-feed-*`, so the checkout's HEAD, index and files stay as they were; the last
+snapshot step in `~/.okolos/state/snapshot-pr.json` (mode 0600, one record, replaced by the next step);
 private `$TMPDIR/okolos-feed-*` directories removed in `finally`, older ones swept at the next
 start.
 
@@ -126,7 +128,7 @@ one failure is counted once. `recoveredCheckout: true` (with `recovery`) marks a
 had to be recreated (B-150's evidence). `installedOffMain` marks every record of an agent installed
 with `--allow-branch`, whichever writer wrote it. The record (`outcome`, `stage`, `exit`, `version`,
 `entries`, `consecutiveFailures`, `lastPublished`, `recoveredCheckout`, `installedOffMain`,
-`snapshotPr`) is meant
+`snapshotPr` when the job wrote it) is meant
 for a host to alert on (two
 failures in a row, or `lastPublished.at` older than 26 h), but **nothing reads it yet**: that alarm
 is OBS-32 in `passioncode-ai/project-observatory-dashboard` (B-135 is done: it filed that row), and
@@ -134,14 +136,29 @@ it does not read `feed-status.json` yet. Until it does, a person reads `--status
 
 **The committed snapshot follows the agent (B-158).** After a publish, when `feeds/phishing.json`
 on origin/main is 7 days old or older (the release gate refuses it past 14), the run opens or
-updates one pull request from `chore/feed-snapshot-auto` carrying only that file, the bytes of
-the feed the worker serves, and asks GitHub to merge it with a merge commit once main's required
-checks pass. Its outcome is `snapshotPr` in the record (`skipped-fresh`, `opened`, `updated`,
-`auto-merge-requested`, `auto-merge-unavailable`, `failed` with a reason) and one `snapshot PR:`
-line in `feed.log`; a failure there leaves the run `published` and the failure count alone. On
-2026-10-29 the repository does not allow auto-merge and main's ruleset requires no status check,
-so the agent records `auto-merge-unavailable` and the pull request waits for a person; the steps
-that change that are in [docs/runbooks/feed-signing.md](docs/runbooks/feed-signing.md).
+updates one pull request from `chore/feed-snapshot-auto` carrying only that file: the feed published
+from this machine as the unsigned `{kind, body}` that `pnpm feed:snapshot` writes, checked first to
+equal the `update` the worker serves (the worker serves it signed, `{update, signature}`). It asks
+GitHub to merge it with a merge commit once main's required checks pass. Its outcome is `snapshotPr`
+(`skipped-fresh`, `updated`, `auto-merge-requested`, `auto-merge-unavailable`, `failed` with a
+reason; whether the pull request was opened or updated is `snapshotPr.pr.action`), with `at` and,
+for a pull request, `since`, the run that first recorded it. One `snapshot PR:` line goes to
+`feed.log`, beside the push's own output (the pre-push hook's `SKIPPED by OKOLOS_SKIP_GATES` notice).
+A failure there, or a stop by signal during it, leaves the run `published` with `lastPublished`
+moved and the failure count not raised. The last step is kept in `~/.okolos/state/snapshot-pr.json`
+and in every record the job writes after it, until a newer step replaces it, and
+`node tools/install-feed-agent.mjs --status` prints it (`snapshotPr`, and a note naming the pull
+request, its link and since when it waits).
+
+**Until the operator decides B-186, every one of these pull requests waits for a person.** On
+2026-10-29 the repository does not allow auto-merge and main's ruleset `protect-default-branch`
+requires no status check, so the agent records `auto-merge-unavailable`; GitHub does not notify the
+author of their own pull request and nothing reads the record, so `--status` is where it shows. With
+v65 (`body.updatedAt` 2026-10-26T21:08Z) on main, the first pull request comes at the first publish
+after 2026-11-02T21:08Z (once this change is on origin/main), and main turns red at
+2026-11-09T21:08Z unless it is merged. The steps (merge method, the side effect of a required check,
+a snapshot committed by hand while the agent's pull request is open) are in
+[docs/runbooks/feed-signing.md](docs/runbooks/feed-signing.md).
 
 **After this lands (B-159), once, by a person:** the Mac keeps running the old plist (`cd` into the
 checkout) until the agent is reinstalled. From the main clone, at origin/main: `pnpm feed:agent`,
