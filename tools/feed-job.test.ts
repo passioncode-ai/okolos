@@ -508,6 +508,7 @@ describe('after a publish the agent proposes the committed snapshot (B-158)', ()
         if (args[0] === 'pr' && args[1] === 'list') return ok(JSON.stringify(open()))
         if (args[0] === 'pr' && args[1] === 'create') return ok('https://github.com/passioncode-ai/okolos/pull/7\n')
         if (args[0] === 'api' && args[1] === 'repos/{owner}/{repo}') return ok('false\n')
+        if (args[0] === 'repo' && args[1] === 'view') return ok('passioncode-ai\n')
         return ok()
       }
       const verb = args[2]
@@ -522,6 +523,41 @@ describe('after a publish the agent proposes the committed snapshot (B-158)', ()
     return tool
   }
 
+  /** The agent's own open pull request #7, its head the commit the double "pushed". */
+  const ownPr = () => ({
+    number: 7,
+    url: 'https://github.com/passioncode-ai/okolos/pull/7',
+    autoMergeRequest: null,
+    isCrossRepository: false,
+    headRepositoryOwner: { login: 'passioncode-ai' },
+    headRefOid: 'f'.repeat(40),
+  })
+
+  it('keeps a waiting pull request in the record through a later step that fails before reaching it', async () => {
+    const w = world()
+    let clock = Date.parse('2026-11-03T09:00:00.000Z')
+    const now = () => clock
+    await job(w, { tool: fullStep(), fetchImpl: serving, flags: { snapshotPr: true }, now }).promise
+    clock += 12 * 60 * 60 * 1000
+    const t = withSnapshot((command, args) => ghMissing(command) ?? oldSnapshot(command, args))
+    await job(w, { tool: t.tool, fetchImpl: serving, flags: { snapshotPr: true }, now }).promise
+    const kept = readStatus(w.paths.status)?.snapshotPr
+    expect(kept).toMatchObject({ outcome: 'failed', pr: { number: 7 }, since: '2026-11-03T09:00:00.000Z', prOutcome: 'auto-merge-unavailable' })
+    expect(kept?.reason).toMatch(/^gh unavailable/)
+    expect(readSnapshotPr(snapshotPrFile(w.paths))).toEqual(kept)
+  })
+
+  it('keeps a step that finished before the stop came, and keeps it on file', async () => {
+    const w = world()
+    let signal: string | null = null
+    const tool = fullStep(() => [], (command, args) => {
+      if (command === 'gh' && args[0] === 'pr' && args[1] === 'create') signal = 'SIGTERM'
+    })
+    const record = await job(w, { tool, fetchImpl: serving, flags: { snapshotPr: true }, stopped: () => signal }).promise
+    expect(record).toMatchObject({ outcome: 'published', snapshotPr: { outcome: 'auto-merge-unavailable', pr: { number: 7, action: 'opened' } } })
+    expect(readSnapshotPr(snapshotPrFile(w.paths))).toMatchObject({ pr: { number: 7 } })
+  })
+
   it('writes the pre-push hook’s skip notice of the agent’s push into feed.log', async () => {
     const w = world()
     await job(w, { tool: fullStep(), fetchImpl: serving, flags: { snapshotPr: true }, log: undefined }).promise
@@ -533,7 +569,7 @@ describe('after a publish the agent proposes the committed snapshot (B-158)', ()
     const w = world()
     let clock = Date.parse('2026-11-03T09:00:00.000Z')
     const now = () => clock
-    const pr = { number: 7, url: 'https://github.com/passioncode-ai/okolos/pull/7', autoMergeRequest: null }
+    const pr = ownPr()
     await job(w, { tool: fullStep(), fetchImpl: serving, flags: { snapshotPr: true }, now }).promise
     const first = readStatus(w.paths.status)?.snapshotPr
     expect(first).toMatchObject({ outcome: 'auto-merge-unavailable', pr: { number: 7, action: 'opened' }, since: '2026-11-03T09:00:00.000Z' })

@@ -423,13 +423,18 @@ export async function agentStatus({ label = LABEL, domain, target, launchctl = r
   // The last snapshot step (B-158). Nothing else tells anyone that its pull request waits:
   // GitHub does not notify the author of their own pull request, and no alarm reads the record.
   const snapshotPr = readSnapshotPr(snapshotPrFile(paths))
+  // A pull request is named until a step saw it merged or closed, or saw main carry the
+  // version; a step that failed before reaching it carries it (`prAt`: when last seen).
   if (snapshotPr?.pr) {
     const { number, url } = snapshotPr.pr
     const since = snapshotPr.since ?? snapshotPr.at
+    const asOf = snapshotPr.prAt ?? snapshotPr.at
+    const prOutcome = snapshotPr.prOutcome ?? snapshotPr.outcome
+    const last = `last step ${snapshotPr.at}: ${snapshotPr.outcome}${snapshotPr.reason ? `: ${snapshotPr.reason}` : ''}`
     notes.push(
-      snapshotPr.outcome === 'auto-merge-requested' || snapshotPr.outcome === 'updated'
-        ? `snapshot pull request #${number} (${url}): ${snapshotPr.outcome} since ${since}`
-        : `snapshot pull request #${number} (${url}) waits for a person since ${since} (${snapshotPr.outcome}${snapshotPr.reason ? `: ${snapshotPr.reason}` : ''}); merge it with a merge commit once CI is green`,
+      prOutcome === 'auto-merge-requested' || prOutcome === 'updated'
+        ? `snapshot pull request #${number} (${url}): ${prOutcome} since ${since}, as of ${asOf} (${last})`
+        : `snapshot pull request #${number} (${url}) waits for a person since ${since}, as of ${asOf} (${last}); merge it with "Create a merge commit" once CI is green`,
     )
   }
   return {

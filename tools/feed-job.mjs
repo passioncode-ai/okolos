@@ -418,20 +418,24 @@ export async function runJob({
           tmp,
           log: write,
           stopped,
+          previous: lastSnapshot,
+          sleep,
         })
       } catch (cause) {
         step = { outcome: 'failed', reason: cause instanceof Error ? cause.message : String(cause), branch: SNAPSHOT_BRANCH }
       }
       const signal = stopped()
-      // A stop cut the step short: recorded as such, and the last finished step stays on file.
-      if (signal) step = { outcome: 'failed', reason: `stopped by ${signal}`, branch: SNAPSHOT_BRANCH }
+      // A step the stop cut short (a child killed under it) is recorded as the stop; one that
+      // finished before the stop came is kept as it finished, its pull request included.
+      if (signal && step.outcome === 'failed' && !String(step.reason).startsWith('stopped by')) {
+        step = { ...step, reason: `stopped by ${signal}` }
+      }
+      // withSince carries a waiting pull request through a step that never reached it.
       facts.snapshotPr = withSince(lastSnapshot, step, iso())
-      if (!signal) {
-        try {
-          writeSnapshotPr(snapshotFile, facts.snapshotPr)
-        } catch (cause) {
-          write(`   could not keep the snapshot step in ${snapshotFile}: ${cause.message}`)
-        }
+      try {
+        writeSnapshotPr(snapshotFile, facts.snapshotPr)
+      } catch (cause) {
+        write(`   could not keep the snapshot step in ${snapshotFile}: ${cause.message}`)
       }
       const pr = facts.snapshotPr
       write(`snapshot PR: ${pr.outcome}${pr.reason ? `: ${pr.reason}` : ''}${pr.pr ? ` (${pr.pr.url})` : ''}`)

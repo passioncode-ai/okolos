@@ -794,6 +794,37 @@ describe('whether the installed bootstrap is the checkout’s', () => {
     expect(status.note).toMatch(/merge commit/)
   })
 
+  it('keeps naming a waiting pull request after a step that failed before reaching it, with how old that sight is', async () => {
+    const h = home()
+    writeSnapshotPr(snapshotPrFile(h.paths), {
+      outcome: 'failed',
+      reason: 'gh unavailable: not logged in to github.com',
+      branch: 'chore/feed-snapshot-auto',
+      pr: { number: 7, url: 'https://github.com/passioncode-ai/okolos/pull/7', action: 'opened' },
+      prOutcome: 'auto-merge-unavailable',
+      prAt: '2026-11-03T09:00:00.000Z',
+      since: '2026-11-03T09:00:00.000Z',
+      at: '2026-11-03T21:00:00.000Z',
+    })
+    const status = await agentStatus({ ...base, target: h.target, launchctl: fakeLaunchd({ loaded: true }).launchctl, paths: h.paths })
+    expect(status.note).toContain('snapshot pull request #7 (https://github.com/passioncode-ai/okolos/pull/7) waits for a person since 2026-11-03T09:00:00.000Z, as of 2026-11-03T09:00:00.000Z')
+    expect(status.note).toContain('last step 2026-11-03T21:00:00.000Z: failed: gh unavailable: not logged in to github.com')
+  })
+
+  it('stops saying a pull request waits once a step saw it merged', async () => {
+    const h = home()
+    writeSnapshotPr(snapshotPrFile(h.paths), {
+      outcome: 'skipped-fresh',
+      reason: 'the snapshot on origin/main is 0.5 days old, under 7',
+      branch: 'chore/feed-snapshot-auto',
+      previousPr: { number: 7, url: 'https://github.com/passioncode-ai/okolos/pull/7', state: 'MERGED' },
+      at: '2026-11-04T09:00:00.000Z',
+    })
+    const status = await agentStatus({ ...base, target: h.target, launchctl: fakeLaunchd({ loaded: true }).launchctl, paths: h.paths })
+    expect(status.note ?? '').not.toMatch(/waits for a person/)
+    expect(status.snapshotPr).toMatchObject({ previousPr: { state: 'MERGED' } })
+  })
+
   it('shows no snapshot pull request when no step has run, and says nothing about one', async () => {
     const h = home()
     const status = await agentStatus({ ...base, target: h.target, launchctl: fakeLaunchd({ loaded: true }).launchctl, paths: h.paths })
