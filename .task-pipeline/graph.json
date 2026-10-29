@@ -74,7 +74,7 @@
       "id": "N-102",
       "title": "инструменты и гейты на Windows (закрывает B-162, B-163)",
       "owner": "implementer",
-      "status": "pending",
+      "status": "done",
       "blocked_by": [],
       "serves": "B-162",
       "check": "pnpm gates && pnpm package:check",
@@ -88,13 +88,13 @@
         "docs/runbooks/development.md"
       ],
       "certification": {
-        "round": 4,
+        "round": 8,
         "tiers": {
           "unit": "pass",
           "seam": "pass",
-          "product": "fail"
+          "product": "pass"
         },
-        "at": "46a5752b732ba5280d542ab0b9f09585d87f5aa8",
+        "at": "c71855aa18bfdcceef0f6beecc498f401cfa7244",
         "history": [
           {
             "unit": "fail",
@@ -115,22 +115,90 @@
             "unit": "pass",
             "seam": "pass",
             "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "pass"
           }
         ],
         "kinds": [
           "blind",
           "blind",
           "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
           "blind"
         ],
-        "tree": "7b61f0f7a0aea0b258a1a9e19edad3320cfdaba2"
-      }
+        "tree": "185a0986f38f95ed4b330b886f2edd8982853ee4"
+      },
+      "proof": {
+        "head": "c71855aa18bfdcceef0f6beecc498f401cfa7244",
+        "tree": "185a0986f38f95ed4b330b886f2edd8982853ee4",
+        "graph_revision": "3"
+      },
+      "evidence": [
+        "unit: cd /Users/sshlg/DATA/_worktrees/okolos-sw-05 && pnpm gates && pnpm package:check -> exit 0 (Test Files 197 passed, Tests 3074 passed | 1 skipped in tools/feed-key.test.ts; 'node tools/python.mjs docs/ux/lint.py' -> OK docs/ux is consistent; 'brand pack is clean'; package --check: every check passed for chrome and firefox, 22 files each)",
+        "unit: unit files in that run: tools/python.test.ts 13 passed, tools/bin.test.ts 14 passed, tools/archive.test.ts 7 passed (bsdtar test ran, macOS tar is bsdtar), tools/find-firefox.test.ts 9 passed, tools/is-main.test.ts 8 passed, tools/vitest-git-env.test.ts 3 passed",
+        "unit: python3.8.20 -B docs/ux/lint.py -> exit 0; python3.8.20 -B docs/brand/lint.py docs/brand -> exit 0; /usr/bin/python3 (3.9.6) both -> exit 0; grep for 3.8-only syntax in both linters -> no match",
+        "unit: scratch probe: archivePlan(platform darwin|win32) + execFileSync + compareEntries(zipEntries(...)) over the real dist/chrome and dist/firefox -> {missing:[],extra:[]} for all four, win32 argv 479/480 chars",
+        "unit: git ls-files --eol: 13 -text entries, all png; git ls-files | grep -iE '\\.(bat|cmd|ps1)$' -> none",
+        "unit: git diff 5d664c5..c71855a over every file listed in scope",
+        "unit: cleanup: the 418 okolos-* temp directories created during my gates run window removed; worktree git status clean before and after",
+        "seam: git diff --stat 5d664c5..c71855a: 120 files, +6670 -315",
+        "seam: git grep python.mjs / bin.mjs / archive.mjs / find-firefox / is-main / vitest-git-env / python3: the callers listed in scope",
+        "seam: git grep -nE \"(spawn|spawnSync|execFile|execFileSync)\\(\" in tools, apps and scripts (non-test): every spawn site read. The pnpm spawns left without binInvocation are only the feed tools'",
+        "seam: pnpm exec vitest run tools/{python,bin,archive,is-main,find-firefox,vitest-git-env,ci,script-names,tree,runbook,docs}.test.ts tools/feed/bounded.test.ts apps/mail-cli/src: exit 0, 18 files, 230 tests passed (node v26.10.0, darwin)",
+        "seam: GIT_DIR=<worktree git dir> GIT_WORK_TREE=<worktree> pnpm exec vitest run tools/ci.test.ts tools/vitest-git-env.test.ts: 2 files, 35 passed; core.bare before=false after=false",
+        "seam: node tools/python.mjs docs/ux/lint.py: 'OK - docs/ux is consistent', exit 0. node tools/brand-gate.mjs: 'brand pack is clean', exit 0. node tools/package.mjs --check: 'every check passed; no archive written (--check)', exit 0",
+        "seam: python3 -I -c ast.parse(..., feature_version=(3,6|3,7|3,8)) on docs/ux/lint.py and docs/brand/lint.py: all six parse. /usr/bin/python3 (3.9.6) -I docs/ux/lint.py: exit 0; docs/brand/lint.py docs/brand: clean",
+        "seam: node -e path.resolve(undefined,'..'): throws ERR_INVALID_ARG_TYPE. isMain(undefined, ...) returns false",
+        "seam: git ls-files --eol on c71855a: 690 i/lf, 13 i/-text, 2 i/none, 0 i/crlf or i/mixed",
+        "seam: gh run view 40665996073: head c71855aa18bf, event pull_request, 4/4 jobs success. Windows job log: node v22.23.4, CPython 3.12.10, 197 test files / 3043 passed / 30 skipped, ux, brand, i18n and package:check green",
+        "seam: gh run view --job 122740502084 --log (e2e firefox, branch) and --job 121852068192 (main 40402594155): both end with 'Terminate orphan process ... geckodriver-0.37.1'",
+        "seam: git status --porcelain in /Users/sshlg/DATA/_worktrees/okolos-sw-05: empty before and after every run",
+        "product: git diff --stat 5d664c5..c71855a: 120 files; contributor docs touched: README.md, AGENTS.md, CLAUDE.md, docs/README.md, docs/runbooks/development.md, docs/ux/README.md, docs/brand/README.md, docs/brand/facts.md, PR template, docs/backlog.md",
+        "product: read docs/runbooks/development.md 1-430 in full",
+        "product: gh run view 40665996073: headSha c71855aa18bf..., success; jobs gates, gates (windows), e2e (chromium), e2e (firefox) all success; Windows job checked out the PR merge 290ccf4 of c71855a into 5d664c5",
+        "product: Windows job log: node v22.23.4, pnpm 11.10.0, CPython 3.12.10; Test Files 197 passed, Tests 3043 passed | 30 skipped; 'OK — docs/ux is consistent'; 'brand pack is clean'; 'every check passed; no archive written (--check)'",
+        "product: gh run view: 40517607494 714e336 success; 40570813947 3f2cb5e failure in gates (windows); 40572549603 3276f2c success; 40634027046 ba846d2 success, all as the receipts state",
+        "product: python3 ast.parse(feature_version=(3,7)) on docs/ux/lint.py, docs/brand/lint.py, tools/model/evaluate.py: syntax ok",
+        "product: uv Python 3.8.20: docs/ux/lint.py exit 0, docs/brand/lint.py docs/brand exit 0",
+        "product: node tools/python.mjs docs/ux/lint.py on macOS: OK, exit 0; a missing script exits 2 (the interpreter's code passed through); node tools/brand-gate.mjs: brand pack is clean",
+        "product: tools/model/evaluate.py:36 'def corpus() -> list[tuple[str, str, bool]]' with no __future__ import: needs 3.9",
+        "product: apps/mail-cli/src/launch.test.ts:17-20 pins engines to '^22.18.0 || >=23.6.0'",
+        "product: zip -q -r -X of a nested tree read back with tools/archive.mjs zipEntries/compareEntries: missing [], extra []",
+        "product: node -e key count and python3 json count of apps/extension/_locales/ru/messages.json: 552 and 552",
+        "product: ls packages/*/package.json apps/*/package.json: 23 (20 packages)",
+        "product: git grep 'python3 ' in contributor docs: only dated handoffs, a dated UX plan and the linters' own docstrings",
+        "product: .githooks/pre-push:74-88: eight run lines matching the SKIPPED message",
+        "product: tools/install-feed-agent.mjs:448-455: non-darwin refusal text",
+        "product: tools/bin.test.ts:65 'starts the real pnpm on this machine' (runs on Windows CI); no test runs deploy-worker or wrangler",
+        "proven at c71855aa18bfdcceef0f6beecc498f401cfa7244 (tree 185a0986f38f95ed4b330b886f2edd8982853ee4)"
+      ]
     },
     {
       "id": "N-103",
       "title": "агент фида не падает молча (закрывает B-159)",
       "owner": "implementer",
-      "status": "pending",
+      "status": "parked",
       "blocked_by": [],
       "serves": "B-159",
       "check": "pnpm -s exec vitest run tools && pnpm gates",
@@ -144,13 +212,13 @@
         "AGENTS.md"
       ],
       "certification": {
-        "round": 6,
+        "round": 8,
         "tiers": {
-          "unit": "pass",
+          "unit": "fail",
           "seam": "pass",
           "product": "fail"
         },
-        "at": "46a5752b732ba5280d542ab0b9f09585d87f5aa8",
+        "at": "fa1fe6c31135305a1eb6a5238778c0e89794b7da",
         "history": [
           {
             "unit": "pass",
@@ -181,6 +249,16 @@
             "unit": "pass",
             "seam": "pass",
             "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "pass",
+            "product": "fail"
           }
         ],
         "kinds": [
@@ -189,10 +267,13 @@
           "blind",
           "blind",
           "blind",
+          "blind",
+          "blind",
           "blind"
         ],
-        "tree": "7b61f0f7a0aea0b258a1a9e19edad3320cfdaba2"
-      }
+        "tree": "4972314336f7694fcce555f786dd3793933814f7"
+      },
+      "parked_reason": "certification ceiling: 8 failing round(s), ceiling 8; failing tier(s) unit, product; stuck on product; first break tools/launchd/app.okolos.feed.plist ProgramArguments line `if [ \"$c\" -ne 0 ] && [ \"$c\" -ne 75 ] && ! grep ...`; tools/feed/bootstrap.mjs:513; tools/is-main.mjs:32-38: A launch whose node is older than 20.11 (no import.meta.filename) fails silently, exit 0 and no record. isMain(undefined) returns false (realpath throws, caught), so the bootstrap's main never runs and node exits 0; the launch line treats exit 0 as success without checking for a record of its id. The plist prefers the login shell's `node` (from a version manager, as its own comment says) over the installer's node, and nothing checks that node's version against engines (^22.18.0 || >=23.6.0). Every run would then end in 0 with no record, the B-149 shape this node exists to close. On the launchd path every genuine exit 0 already leaves a record carrying the id (published or skipped from the job's finish, adopted records stamped), so 'exit 0 without a record of this id' is unambiguous.; check: A test in tools/install-feed-agent.test.ts that runs the rendered launch line with a fake node on PATH that exits 0 without writing the status file, and expects feed-status.json with stage launch, runId of that launch and consecutiveFailures incremented; plus a bootstrap test calling the main guard with import.meta.filename undefined that expects a non-zero exit.. Blocker row owed on the board"
     },
     {
       "id": "N-105",
@@ -232,7 +313,7 @@
       "id": "N-107",
       "title": "Windows-типы и схемы ссылок (закрывает B-165)",
       "owner": "implementer",
-      "status": "pending",
+      "status": "parked",
       "blocked_by": [],
       "serves": "B-165",
       "check": "pnpm gates",
@@ -247,13 +328,13 @@
         "packages/i18n/**"
       ],
       "certification": {
-        "round": 3,
+        "round": 8,
         "tiers": {
-          "unit": "fail",
-          "seam": "pass",
-          "product": "fail"
+          "unit": "pass",
+          "seam": "fail",
+          "product": "pass"
         },
-        "at": "4830096db0df2112a7fa590548dc21ef29a3549a",
+        "at": "7e69039c8ebe3057de24018ac314e084acd5708a",
         "history": [
           {
             "unit": "fail",
@@ -269,15 +350,46 @@
             "unit": "fail",
             "seam": "pass",
             "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "fail",
+            "product": "pass"
           }
         ],
         "kinds": [
           "blind",
           "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
+          "blind",
           "blind"
         ],
-        "tree": "96c08fb2eef88b07a9ae2729d0281d232c5a429d"
-      }
+        "tree": "52c5ff78b9ede0be7c2d4a4d800e3436a9b2d6ea"
+      },
+      "parked_reason": "certification ceiling: 8 failing round(s), ceiling 8; failing tier(s) seam; churn across levels; first break apps/extension/src/background/index.ts:1125 (cancel: platform.downloads.cancel) and apps/extension/src/background/downloads.ts:92-96, fed by packages/platform/src/adapter.ts:310-319; claim shown at apps/extension/src/content/download.ts:144 (warnDownloadCancelled: 'The file was cancelled, so nothing reached your disk.'): The block path of handleDownload still cancels with plain downloads.cancel and still tells the person nothing reached the disk, but the adapter now delivers every Chrome download to it only after Chrome reports the file name (onChanged) or after 5 s. Before this change the handler ran at onCreated, ahead of name determination. A feed-listed download (block is decided by the URL alone) can now finish before the cancel lands; Chrome's cancel resolves on a finished download and leaves the file, as the adapter's own discard comment states (adapter.ts:343-345), and the cancel's failure is swallowed.; check: pnpm vitest run apps/extension/src/background/downloads.test.ts packages/platform/src/adapter.test.ts with a new case: a feed-listed item whose onChanged name arrives when its state is already complete ends with removeFile called and the verdict not claiming a cancel; then pnpm gates. Blocker row owed on the board"
     },
     {
       "id": "N-108",
@@ -297,15 +409,18 @@
         "docs/store/**"
       ],
       "certification": {
-        "round": 4,
+        "round": 5,
         "tiers": {
           "product": "fail"
         },
-        "at": "8b27409410058c83d99de871628ca85c61de08cb",
+        "at": "5e575d5ac60853a00f9cf3835ad4932e93e7acbc",
         "history": [
           {
             "unit": "pass",
             "seam": "fail",
+            "product": "fail"
+          },
+          {
             "product": "fail"
           },
           {
@@ -322,9 +437,10 @@
           "blind",
           "blind",
           "blind",
+          "blind",
           "blind"
         ],
-        "tree": "8af95191c3b776cb8abe079a962b5649a0de2280"
+        "tree": "417420d2ce6cbf71cb0ade69b6ced0238b81d4c3"
       }
     },
     {
@@ -379,6 +495,22 @@
       "node": "N-101",
       "why": "certified at all 1 tiers in round 3",
       "precondition": "bfb73de1bbfd97ce2d5e14c7fcb2ef96aba1dd4f"
+    },
+    {
+      "verb": "park",
+      "node": "N-103",
+      "why": "certification ceiling: 8 failing round(s), ceiling 8; failing tier(s) unit, product; stuck on product; first break tools/launchd/app.okolos.feed.plist ProgramArguments line `if [ \"$c\" -ne 0 ] && [ \"$c\" -ne 75 ] && ! grep ...`; tools/feed/bootstrap.mjs:513; tools/is-main.mjs:32-38: A launch whose node is older than 20.11 (no import.meta.filename) fails silently, exit 0 and no record. isMain(undefined) returns false (realpath throws, caught), so the bootstrap's main never runs and node exits 0; the launch line treats exit 0 as success without checking for a record of its id. The plist prefers the login shell's `node` (from a version manager, as its own comment says) over the installer's node, and nothing checks that node's version against engines (^22.18.0 || >=23.6.0). Every run would then end in 0 with no record, the B-149 shape this node exists to close. On the launchd path every genuine exit 0 already leaves a record carrying the id (published or skipped from the job's finish, adopted records stamped), so 'exit 0 without a record of this id' is unambiguous.; check: A test in tools/install-feed-agent.test.ts that runs the rendered launch line with a fake node on PATH that exits 0 without writing the status file, and expects feed-status.json with stage launch, runId of that launch and consecutiveFailures incremented; plus a bootstrap test calling the main guard with import.meta.filename undefined that expects a non-zero exit.. Blocker row owed on the board"
+    },
+    {
+      "verb": "park",
+      "node": "N-107",
+      "why": "certification ceiling: 8 failing round(s), ceiling 8; failing tier(s) seam; churn across levels; first break apps/extension/src/background/index.ts:1125 (cancel: platform.downloads.cancel) and apps/extension/src/background/downloads.ts:92-96, fed by packages/platform/src/adapter.ts:310-319; claim shown at apps/extension/src/content/download.ts:144 (warnDownloadCancelled: 'The file was cancelled, so nothing reached your disk.'): The block path of handleDownload still cancels with plain downloads.cancel and still tells the person nothing reached the disk, but the adapter now delivers every Chrome download to it only after Chrome reports the file name (onChanged) or after 5 s. Before this change the handler ran at onCreated, ahead of name determination. A feed-listed download (block is decided by the URL alone) can now finish before the cancel lands; Chrome's cancel resolves on a finished download and leaves the file, as the adapter's own discard comment states (adapter.ts:343-345), and the cancel's failure is swallowed.; check: pnpm vitest run apps/extension/src/background/downloads.test.ts packages/platform/src/adapter.test.ts with a new case: a feed-listed item whose onChanged name arrives when its state is already complete ends with removeFile called and the verdict not claiming a cancel; then pnpm gates. Blocker row owed on the board"
+    },
+    {
+      "verb": "close",
+      "node": "N-102",
+      "why": "certified at all 3 tiers in round 8",
+      "precondition": "c71855aa18bfdcceef0f6beecc498f401cfa7244"
     }
   ]
 }
