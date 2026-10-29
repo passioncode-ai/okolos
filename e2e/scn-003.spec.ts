@@ -1,5 +1,5 @@
 import { expect, serve, test } from './fixtures.js'
-import { expectBanner } from './surfaces.js'
+import { expectBanner, expectPageSettled } from './surfaces.js'
 
 /**
  * SCN-003 — a page carries instructions written for an AI, and the user is
@@ -43,9 +43,10 @@ test('stays silent on a page whose hidden text is ordinary', async ({ context })
   const page = await context.newPage()
   await page.goto('https://fixture.test/')
 
-  // Give the collector, the round trip and a mutation batch time to happen, so
-  // this is a real absence rather than a race won by the assertion.
-  await page.waitForTimeout(2_000)
+  // Until the collector, the round trip and the address check say they are done, so this
+  // is a real absence rather than a race won by the assertion. It used to be two seconds,
+  // which under load ran out before the scan did (B-169).
+  await expectPageSettled(page)
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 })
 

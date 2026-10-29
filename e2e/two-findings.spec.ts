@@ -1,5 +1,5 @@
 import { expect, serve, test } from './fixtures.js'
-import { expectSurface } from './surfaces.js'
+import { expectPageSettled, expectSurface } from './surfaces.js'
 
 /**
  * A page that is both a lookalike and poisoned gets one panel, not two.
@@ -71,8 +71,9 @@ test('one panel on a page with two kinds of finding, and the other is named on i
     'no finding was recorded at all, so one panel proves nothing about two',
   ).toBeGreaterThan(0)
 
-  // Still one panel after everything has settled, not one that arrives late.
-  await page.waitForTimeout(1_000)
+  // Still one panel after everything has settled, not one that arrives late. "Settled" is
+  // the product's word for both sources, not a second of waiting (B-169).
+  await expectPageSettled(page)
   await expect(
     page.locator('[data-okolos=banner]'),
     'a second panel arrived after the first',
