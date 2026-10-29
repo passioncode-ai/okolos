@@ -281,7 +281,25 @@ try {
   )
 
   await driver.get(`${origin}/clean`)
-  await driver.sleep(2500)
+  /*
+   * Until the product says the scan and the address check have settled, not for 2.5 s: a
+   * fixed pause ran out before the check on a loaded machine and the absence below passed
+   * on a check that had not run (B-169). A scan that gave up stops the wait at once, since
+   * an absence after it proves nothing.
+   */
+  await driver.wait(
+    async () => {
+      const seen = await driver.executeScript(() => ({
+        scan: performance.getEntriesByName('okolos:scan').length,
+        lookalike: performance.getEntriesByName('okolos:lookalike').length,
+        failed: performance.getEntriesByName('okolos:scan-failed').length,
+      }))
+      if (seen.failed > 0) throw new Error('the scan of the clean page gave up (okolos:scan-failed)')
+      return seen.scan > 0 && seen.lookalike > 0
+    },
+    35_000,
+    'the clean page never settled: okolos:scan and okolos:lookalike were not both written',
+  )
   const onClean = await driver.findElements(By.css('okolos-banner'))
   check('stays silent on a page whose hidden text is ordinary', onClean.length === 0)
 

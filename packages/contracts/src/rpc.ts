@@ -202,7 +202,19 @@ export interface RpcMap {
         classes: string[]
         domain?: string
       }>
-      sources: Array<{ name: string; answered: boolean; why?: string }>
+      /**
+       * `needsKey` is set when the reason is the person's own key: none saved (`missing`),
+       * the one saved was refused (`refused`), or the one saved could not be read from the
+       * device (`unreadable`). The first two point the screen at the key field; the third
+       * has no field to point at. Mirrors `KeyRemedy` in `@okolos/core-leaks`, which this
+       * package cannot import; `background/leaks.test.ts` holds the two equal.
+       */
+      sources: Array<{
+        name: string
+        answered: boolean
+        why?: string
+        needsKey?: 'missing' | 'refused' | 'unreadable'
+      }>
       complete: boolean
     }
   }
@@ -439,8 +451,6 @@ export interface RpcMap {
   }
   /** Remembers the user's exception and returns where to go, or null if refused. */
   'block/allow': { req: { url: string }; res: { url: string } | null }
-  /** `score: null` means there is no model here — never that the text is fine. */
-  'inference/score': { req: { text: string }; res: { score: number | null; backend: string | null } }
 }
 
 export type RpcType = keyof RpcMap

@@ -81,8 +81,10 @@ Chrome: `chrome://extensions` → Developer mode → **Load unpacked** →
 Add-on** → `apps/extension/dist/firefox/manifest.json`.
 
 **Configure.** The extension needs no account and no key. The email leak check asks Have I
-Been Pwned only with an HIBP API key (from haveibeenpwned.com, paid); without one that source
-says no key is configured and Hudson Rock answers alone. Maintainers only: signing the
+Been Pwned only with your own HIBP API key (from haveibeenpwned.com, paid): paste it into the
+Have I Been Pwned key block under **Your data** («Ваши данные»). It stays on the device and goes
+only to haveibeenpwned.com, in the request header of a check you start. Without one, the leaks
+screen says that source was not checked and Hudson Rock answers alone. Maintainers only: signing the
 blocklist feed reads `OKOLOS_FEED_KEY` ([feed signing](docs/runbooks/feed-signing.md)), and
 deploying the Worker reads `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `OKOLOS_D1_ID` and
 the Worker secret `APPEALS_TOKEN` ([Worker deploy](docs/runbooks/worker-deploy.md)). Ask the

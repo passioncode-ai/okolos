@@ -1,15 +1,13 @@
 import { standingFindings } from '@okolos/core-extensions'
-import { classifyUndecided, detectHidden } from '@okolos/core-injection'
+import { detectHidden } from '@okolos/core-injection'
 import { detectPlatform, type RpcSender } from '@okolos/platform'
 import { buildRules, matchUrl, type FeedSnapshot,
 } from '@okolos/core-feeds'
-import { createOnnxRuntime, MODEL } from '@okolos/model'
 import {
   INVENTORY_INTERVAL_MS,
   LAST_FEED_KEY,
   LAST_INVENTORY_KEY,
   LAST_SWEEP_KEY,
-  createModelCache,
   dueForFeed,
   dueForSweep,
   openDb,
@@ -33,9 +31,8 @@ import {
   journalChanges,
   type InventoryDeps,
 } from './extensions.js'
-import { CAVALIER, hibp, lookupLeaks } from './leaks.js'
+import { CAVALIER, hibpFromStore, lookupLeaks } from './leaks.js'
 import { checkSubmittedPassword } from './password.js'
-import { createInferenceHost } from './inference.js'
 import { ensureRules, runIfDue, WAKE_ALARMS, type DueStore } from './wake.js'
 
 /**
@@ -89,6 +86,18 @@ import { optionsPageFor } from '../options/views.js'
 export const MARK_VERDICT_IN = 'okolos:verdict:start'
 export const MARK_VERDICT_OUT = 'okolos:verdict:end'
 export const MEASURE_VERDICT = 'okolos:verdict'
+
+/**
+ * A submitted password has been judged, and what the judgement set in motion has settled:
+ * a compromised verdict is journalled, held for the tab and offered to the document there
+ * (drawn, or refused because nobody was listening). Measured from the question's arrival.
+ *
+ * In the worker because only the worker knows: the asking document may be gone, taken by
+ * the navigation its own form caused (B-82). A test asserting "a clean password leaves the
+ * landing page alone" waits for this instead of a fixed time, which under load ran out
+ * before the check did and passed on a check that had not run (B-169).
+ */
+export const MEASURE_PASSWORD = 'okolos:password'
 
 // One list of alarms, shared with the wake budget test (wake.ts, wake.test.ts).
 const [FEED, RETENTION, INVENTORY] = WAKE_ALARMS
@@ -184,41 +193,15 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
 })
 
 /**
- * The classifier host.
+ * Stage 3, the classifier, is not wired here: it is not shipped (ADR-0006).
  *
- * It prepares itself once per wake-up and reports honestly why it is
- * unavailable when it is: no place to run a model, no weights the user agreed
- * to fetch, or no runtime bundled. Today the last of those is the real answer —
- * the weights carry a licence question that is the operator's to settle — so
- * stage 3 never fires and nothing above it claims otherwise.
+ * Until 2026-10-29 a classifier host was prepared on every wake-up and asked about every
+ * candidate the rules left undecided. It could never answer (Chrome has nowhere to run a
+ * model since B-50, Firefox has no weights and no runtime), but it put `@okolos/model`
+ * into both background bundles and sent `inference/score` to a receiver that no longer
+ * existed (B-131). The host and the stage's gate stay as library code with their tests:
+ * `createInferenceHost` in `@okolos/model`, `classifyUndecided` in `@okolos/core-injection`.
  */
-const inference = createInferenceHost({
-  ensureHost: () => platform.inference.ensureHost(),
-  weights: async () => {
-    try {
-      const db = await openDb()
-      const cache = createModelCache({ db, now: () => new Date().toISOString() })
-      return await cache.read(MODEL.id, MODEL.version)
-    } catch {
-      return null
-    }
-  },
-  runtime: createOnnxRuntime,
-  remoteScore: async (text) => {
-    const response = await platform.runtime.send('inference/score', { text })
-    return response?.score ?? null
-  },
-  log: (message) => console.warn(message),
-})
-
-/**
- * Prepared per wake-up, not per page. Chrome tears the worker down after about
- * thirty seconds of quiet, so this runs again on the next message — which is
- * also what makes a model installed mid-session take effect without a restart.
- */
-const prepared = inference.prepare().catch(() => 'no-host' as const)
-
-
 async function handleCandidates(page: PageCandidates): Promise<{ verdicts: Verdict[] }> {
   // Before anything that can throw or await: the fact being recorded is "this worker
   // heard the question", and a mark placed after the first await would be missing in
@@ -227,11 +210,6 @@ async function handleCandidates(page: PageCandidates): Promise<{ verdicts: Verdi
   const now = new Date().toISOString()
   const ctx = { now, newId: () => crypto.randomUUID() }
   const verdicts = detectHidden(page, ctx)
-  await prepared
-
-  // Stage 3 sees only what the rules left undecided.
-  const decidedLocators = verdicts.flatMap((v) => v.evidence.map((e) => e.locator ?? ''))
-  verdicts.push(...(await classifyUndecided(page, decidedLocators, inference, ctx)))
 
   if (verdicts.length > 0) {
     try {
@@ -620,6 +598,7 @@ async function handlePasswordCheck(
   payload: { sha1: string; host: string },
   from: RpcSender,
 ): Promise<PasswordAnswer> {
+  const asked = performance.now()
   const verdict = await checkSubmittedPassword(payload.sha1, await auditDeps())
 
   let reusedOn: string[] = []
@@ -653,6 +632,9 @@ async function handlePasswordCheck(
     reuseUnknown,
   }
 
+  /** What was set in motion, so the measure below waits for it rather than for the return. */
+  let offered: Promise<unknown> = Promise.resolve()
+
   if (answer.compromised) {
     /**
      * Recorded here, not by whoever shows it, and that is the point.
@@ -683,16 +665,22 @@ async function handlePasswordCheck(
        * is torn down when the browser decides — measured as a warning that arrived most of
        * the time. Whoever this misses asks for it themselves as they start.
        */
-      void platform.tabs
+      offered = platform.tabs
         .sendToFrame(
           'password/verdict',
           { host: payload.host, verdict: answer },
           { tabId: from.tabId, frameId: 0 },
         )
         .catch(() => false)
-
     }
   }
+
+  // Not awaited, for the reason the offer is not: the asking document must not wait on a
+  // delivery to its own replacement. The measure waits instead.
+  void offered.then(() => {
+    const settled = performance.now()
+    performance.measure(MEASURE_PASSWORD, { start: asked, end: settled })
+  })
 
   return answer
 }
@@ -744,13 +732,11 @@ async function answerPendingVerdict(
   return held === null ? null : { host: held.host, verdict: held.verdict }
 }
 
-async function handleLeakCheck(payload: { address: string }) {
-  const key = await readSetting('hibp:apiKey')
-  const inventory = await lookupLeaks(
-    payload.address,
-    [hibp(typeof key === 'string' && key ? key : null), CAVALIER],
-    await auditDeps(),
-  )
+async function handleLeakCheck(payload: { address: string }): Promise<RpcMap['leaks/check']['res']> {
+  // The read is handed over rather than awaited here, so a failed read stays a failed read
+  // and does not become "no key saved" (B-125 round 2).
+  const breaches = await hibpFromStore(() => readSetting('hibp:apiKey'))
+  const inventory = await lookupLeaks(payload.address, [breaches, CAVALIER], await auditDeps())
   return {
     leaks: inventory.leaks.map((leak) => ({ ...leak, classes: [...leak.classes] })),
     sources: inventory.sources.map((source) => ({ ...source })),
@@ -758,13 +744,13 @@ async function handleLeakCheck(payload: { address: string }) {
   }
 }
 
+/**
+ * A stored setting, or null when there is none. A store that cannot be read throws: it
+ * used to answer null, which made "could not read" and "not set" one answer.
+ */
 async function readSetting(key: string): Promise<unknown> {
-  try {
-    const db = await openDb()
-    return (await db.get('settings', key))?.value ?? null
-  } catch {
-    return null
-  }
+  const db = await openDb()
+  return (await db.get('settings', key))?.value ?? null
 }
 
 async function extensionsState() {

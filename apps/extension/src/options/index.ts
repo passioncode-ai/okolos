@@ -31,6 +31,7 @@ import {
   type AreaRow,
   type AttentionItem,
   type ExtensionsState,
+  type LeakKeyPanel,
   type LeaksState,
   type OverviewHandlers,
   type PanelState,
@@ -51,6 +52,7 @@ import {
 import { mapJournal } from '../popup/state.js'
 import { answered } from './answered.js'
 import { keepingFocus, markFocus } from './keep-focus.js'
+import { hasLeakKey, removeLeakKey, saveLeakKey } from './leak-key.js'
 import { showFailure } from './failure.js'
 import { whilePending } from './pending.js'
 import {
@@ -119,7 +121,13 @@ const addressField = (() => {
   return field
 })()
 
-function leaksSection(): HTMLElement {
+async function leaksSection(): Promise<HTMLElement> {
+  // Which recipients the idle sentence names depends on whether a key is saved; `null` when
+  // that cannot be read, so the sentence names Have I Been Pwned conditionally rather than
+  // guessing (B-125 round 2).
+  const keySaved = await openDb()
+    .then((db) => hasLeakKey(db))
+    .catch(() => null)
   const container = document.createElement('div')
   // Named so the stylesheet can treat the field and the panel as one block.
   // Without it the address input floats between two cards, which is what the
@@ -132,7 +140,7 @@ function leaksSection(): HTMLElement {
   // moving the live input into a tree that has not been swapped in yet takes it
   // out of the document for as long as the remaining sections take to load.
   container.append(
-    renderLeaks(document, leaks, {
+    renderLeaks(document, leaks.kind === 'idle' ? { ...leaks, keySaved } : leaks, {
       onCheck: () => {
         void (async () => {
           // Silence was the old answer here, and it is the worst one: the
@@ -152,10 +160,15 @@ function leaksSection(): HTMLElement {
             return
           }
           leaks = { kind: 'checking' }
+          // The key state this check runs under. If the key is saved, removed or erased
+          // while it runs, here or in another tab, its answer describes a state that is gone
+          // and is dropped rather than drawn over the reset (N-110 round 3).
+          const epoch = leakEpoch
           await paintCurrent()
+          let answer: LeaksState
           try {
             const result = await platform.runtime.send('leaks/check', { address })
-            leaks = result
+            answer = result
               ? {
                   kind: 'ready',
                   inventory: { ...result, leaks: result.leaks },
@@ -163,8 +176,14 @@ function leaksSection(): HTMLElement {
                 }
               : { kind: 'error', message: t('errCheckEmpty') }
           } catch (cause) {
-            leaks = { kind: 'error', message: String(cause) }
+            answer = { kind: 'error', message: String(cause) }
           }
+          // The answer to this check has arrived, drawn or dropped: an e2e spec waits on it
+          // instead of a fixed time (B-169). One per press of «Проверить», on an extension
+          // page no web page can read, so it ships.
+          performance.mark('okolos:leaks-answered')
+          if (epoch !== leakEpoch) return
+          leaks = answer
           await paintCurrent()
         })()
       },
@@ -175,6 +194,8 @@ function leaksSection(): HTMLElement {
         const url = leak.domain ? changePasswordUrl(leak.domain) : null
         if (url !== null) void platform.tabs.create(url)
       },
+      // The key line's link: a source unchecked for want of a key points at the field.
+      keyHref: optionsPageFor('data'),
       onResolve: (name) => {
         void (async () => {
           const db = await openDb()
@@ -1050,13 +1071,98 @@ async function dataSection(): Promise<HTMLElement> {
         const db = await openDb()
         return wipeAll(db)
       },
-      onWiped: () => void reload(),
+      // The erase took the key, so the leaks screen goes back to its start here and in every
+      // other tab: its last result spoke about a key that no longer exists (N-110 round 3).
+      onWiped: () => {
+        forgetLeakScreen()
+        announceKeyChange('erased')
+        void reload()
+      },
     },
     // Every store, from the schema that owns the list — not a subset written here.
     // `DATA_KIND_KEY` is `Record<StoreName, string>`, so a store added later fails
     // the build until the confirmation has words for it.
     Object.values(DATA_KIND_KEY),
+    await leakKeyPanel(),
   )
+}
+
+/**
+ * A leak result computed under the old key state is not shown under the new one.
+ *
+ * `leaks` lives in page memory, and the page is one document routed by hash: after "Add
+ * key", saving, and Back, the leaks screen repainted the earlier result and said "no key is
+ * saved" beside a key that was (N-110 round 2). Only after the write succeeded; a failed
+ * write changed nothing, so the result still describes the key state there is. The address
+ * field is kept, so checking again is one press.
+ */
+function forgetLeakResult(): void {
+  leaks = { kind: 'idle' }
+  leakEpoch += 1
+}
+
+/** Bumped whenever the key state changes; a check that started under another value is stale. */
+let leakEpoch = 0
+
+/**
+ * Everything the leaks screen holds, gone: the result and the typed address. For an erase
+ * and a store reset, which take the key and every other record with them (SCN-023).
+ */
+function forgetLeakScreen(): void {
+  forgetLeakResult()
+  address = ''
+  addressField.value = ''
+}
+
+/**
+ * Other open tabs of this page hold their own `leaks` in their own memory. The key lives in
+ * IndexedDB, which raises no change event, so the tab that changed it says so here and every
+ * other tab drops its result and repaints (N-110 round 3). Absent where the browser has no
+ * BroadcastChannel; the stale tab then keeps its result until its next check.
+ */
+const keyChannel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('okolos:leak-key')
+keyChannel?.addEventListener('message', (event: MessageEvent<unknown>) => {
+  if (event.data === 'erased') forgetLeakScreen()
+  else forgetLeakResult()
+  void reload()
+})
+
+/** Tells the other tabs; this tab has already reset itself. */
+function announceKeyChange(kind: 'changed' | 'erased'): void {
+  keyChannel?.postMessage(kind)
+}
+
+/**
+ * The Have I Been Pwned key block (B-125), or none when whether a key is saved cannot be
+ * read: a block saying "no key" over a key that is there would invite pasting a second
+ * one, and the storage problem itself is SCR-20's to explain.
+ *
+ * Saving and removing go through `act`, so a failed write says so in the page's failure
+ * slot and the repaint shows what is actually stored. The key goes from the field to the
+ * store and nowhere else: not into this page's state, not into a message, not into a log.
+ */
+async function leakKeyPanel(): Promise<LeakKeyPanel | undefined> {
+  let saved: boolean
+  try {
+    saved = await hasLeakKey(await openDb())
+  } catch {
+    return undefined
+  }
+  return {
+    saved,
+    onSave: (key) =>
+      void act(async () => {
+        await saveLeakKey(await openDb(), key)
+        forgetLeakResult()
+        announceKeyChange('changed')
+      }),
+    onRemove: () =>
+      void act(async () => {
+        await removeLeakKey(await openDb())
+        forgetLeakResult()
+        announceKeyChange('changed')
+      }),
+  }
 }
 
 /**
@@ -1157,6 +1263,8 @@ async function storageProblem(): Promise<HTMLElement | null> {
         onReset: () => {
           void (async () => {
             await resetStorage()
+            forgetLeakScreen()
+            announceKeyChange('erased')
             await reload()
           })()
         },

@@ -44,7 +44,19 @@ const rel = (p: string) => path.relative(root, p)
  * is not a formality: it is the sentence someone writes instead of noticing
  * their feature never shipped.
  */
-const EXEMPT: ReadonlyArray<{ readonly file: string; readonly why: string }> = []
+const EXEMPT: ReadonlyArray<{ readonly file: string; readonly why: string }> = [
+  // The model stage is not shipped (ADR-0006), so nothing that ships may import its
+  // library: until B-131 the background did, and both background bundles carried a
+  // classifier that could never run. The package stays as tested library code for the
+  // day the stage is measured again; `tools/model-stage.test.ts` holds the other side,
+  // that no shipped source imports it and no background bundle carries it.
+  ...['index', 'host', 'manager', 'runtime', 'session'].map((name) => ({
+    file: `packages/model/src/${name}.ts`,
+    why:
+      'ADR-0006: the third stage is not shipped, and B-131 took its library out of the ' +
+      'background bundles; kept as tested library code, held out by tools/model-stage.test.ts',
+  })),
+]
 
 // ---------------------------------------------------------------------------
 // Entry points, and the evidence that each one ships.

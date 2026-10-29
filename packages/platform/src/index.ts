@@ -7,8 +7,6 @@ export type {
   Blocking,
   Downloads,
   Extensions,
-  Inference,
-  InferenceHostKind,
   KeyValueStore,
   Platform,
   RpcHandler,

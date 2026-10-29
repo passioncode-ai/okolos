@@ -1,4 +1,5 @@
 
+import { HIBP_KEY_HEADER_SHAPE } from '@okolos/core-leaks'
 import { t } from '@okolos/i18n'
 import type { AuditEntry } from '@okolos/contracts'
 
@@ -162,6 +163,11 @@ function summarise(entries: readonly AuditEntry[], since: string): string {
   if (unrecorded > 0) parts.push(t('auditSummaryUnknownOutcome', String(unrecorded)))
 
   for (const [key, count] of carried(entries)) parts.push(t(key, String(count)))
+  // The person's Have I Been Pwned key, counted on its own: the address count says a lookup
+  // happened and would hide that a credential went with some of them (B-125). Read from the
+  // shape the choke point recorded, which names the header and never its value.
+  const keys = entries.filter((e) => (said(e.payloadShape) ?? '').includes(HIBP_KEY_HEADER_SHAPE)).length
+  if (keys > 0) parts.push(t('auditSummaryCarriedKey', String(keys)))
 
   const unreadable = entries.filter((e) => purposeKey(said(e.purpose) ?? '') === undefined).length
   // A purpose this build cannot read is a request whose payload it cannot vouch for, so it

@@ -8,6 +8,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { KNOWN_HASHES, routeFor } from '../../apps/extension/src/options/views.js'
 import { binInvocation } from '../bin.mjs'
 import { posixRelative } from '../tree.mjs'
+import { buildTooOld } from '../build-age.mjs'
 
 /**
  * The gates that read what actually ships.
@@ -248,6 +249,49 @@ describe('what the shipped extension is made of', () => {
       expect(content, `${browser} build must not carry the test hook`).not.toContain('"open"')
     }
   })
+
+  /**
+   * A mark per focus, per look at the page and per password answer is what lets an e2e
+   * spec assert "no warning" after the check rather than after a fixed wait (B-169). On a
+   * page a person works in for hours it would pile up in the timeline, so the shipped
+   * bundle must not write it.
+   */
+  const TEST_MARKS = ['okolos:focus-judged', 'okolos:trap-judged', 'okolos:password-handled']
+
+  it('keeps the per-event test marks out of the shipped bundles', () => {
+    for (const browser of ['chrome', 'firefox']) {
+      const shipped = readFileSync(path.join(root, `apps/extension/dist/${browser}/content.js`), 'utf8')
+      for (const mark of TEST_MARKS) {
+        // A boolean, not `toContain`: a failure names the mark instead of dumping the bundle.
+        expect(shipped.includes(mark), `${browser} build carries the test mark ${mark}`).toBe(false)
+      }
+    }
+  })
+
+  /**
+   * The test build is checked too, or a typo in the flag would pass above and leave the
+   * specs waiting for marks nothing writes. It is made by `pnpm build:e2e`, which
+   * `pnpm test` and `pnpm gates` do not run, so when it is missing or older than the
+   * sources this is **skipped, with the reason in its name**, rather than failing a gate
+   * on a build the gate did not make. `pnpm build:e2e` (or `pnpm test:e2e`) makes it run.
+   */
+  const e2eStale = ['chrome-e2e', 'firefox-e2e']
+    .map((build) => buildTooOld(path.join(root, `apps/extension/dist/${build}`), 'pnpm build:e2e'))
+    .find((reason) => reason !== null)
+
+  it.skipIf(e2eStale !== undefined)(
+    `carries the per-event test marks in the test build${
+      e2eStale === undefined ? '' : ` (skipped: ${e2eStale})`
+    }`,
+    () => {
+      for (const build of ['chrome-e2e', 'firefox-e2e']) {
+        const text = readFileSync(path.join(root, `apps/extension/dist/${build}/content.js`), 'utf8')
+        for (const mark of TEST_MARKS) {
+          expect(text.includes(mark), `${build} lacks ${mark}: run pnpm build:e2e`).toBe(true)
+        }
+      }
+    },
+  )
 
   it('ships nothing the product does not produce', () => {
     /**

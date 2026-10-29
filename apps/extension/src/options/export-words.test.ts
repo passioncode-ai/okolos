@@ -85,3 +85,37 @@ describe('the note that says what the file does not contain', () => {
     }
   })
 })
+
+/**
+ * B-125 round 2: once a Have I Been Pwned key could be saved, the file marked it with the
+ * reuse key's reason ("this value makes the rest reversible"), which is false for it. Each
+ * withheld path now carries its own reason, and the note gives only the reasons that apply.
+ */
+describe('each withheld value carries its own reason', () => {
+  const OWN = { path: 'settings/hibp:apiKey' }
+  const REUSE = { path: 'settings/reuse:key' }
+  const BYTES = { path: 'models/bytes', bytes: 7 }
+
+  it('marks the person\'s own key as theirs, not as a key to the rest', () => {
+    expect(EXPORT_WORDS.marker(OWN)).toBe(`${WITHHELD_MARKER} ${message('exportWithheldOwnKey')}`)
+    expect(EXPORT_WORDS.marker(OWN)).not.toContain(message('exportWithheldSecret'))
+    expect(EXPORT_WORDS.marker(REUSE)).toBe(`${WITHHELD_MARKER} ${message('exportWithheldSecret')}`)
+  })
+
+  it('gives in the note only the reasons for what this file left out', () => {
+    const own = EXPORT_WORDS.note([OWN])
+    expect(own).toContain(message('exportWhyOwnKey'))
+    expect(own).not.toContain(message('exportWhyReuseKey'))
+    expect(own).not.toContain(message('exportWhyBytes'))
+
+    const reuse = EXPORT_WORDS.note([REUSE])
+    expect(reuse).toContain(message('exportWhyReuseKey'))
+    expect(reuse).not.toContain(message('exportWhyOwnKey'))
+
+    const all = EXPORT_WORDS.note([REUSE, OWN, BYTES])
+    for (const key of ['exportWhyReuseKey', 'exportWhyOwnKey', 'exportWhyBytes']) {
+      expect(all).toContain(message(key))
+    }
+    expect(all).not.toMatch(/\$[A-Z]+\$/)
+  })
+})
