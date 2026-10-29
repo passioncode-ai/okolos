@@ -27,6 +27,8 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 - `change-password`
 - `no-domain`
 - `resolve`
+- `source-key`
+- `add-key`
 - `address-slot`
 
 **States**

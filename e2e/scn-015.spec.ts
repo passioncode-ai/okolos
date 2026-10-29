@@ -154,15 +154,30 @@ async function fillAddress(page: import('@playwright/test').Page, value: string)
 
 /** The body the single Cavalier stub returns. A test that needs another sets it. */
 let cavalierBody = '{"stealers":[]}'
+/**
+ * The single Have I Been Pwned stub, set the same way. 401 by default: with no key saved
+ * the source is never asked, and a test that saves one decides what it answers.
+ */
+let hibpStatus = 401
+let hibpBody = '{}'
+/** The `hibp-api-key` header of every request the stub saw, in order. */
+let hibpKeys: string[] = []
 test.beforeEach(async ({ context }) => {
   cavalierBody = '{"stealers":[]}'
+  hibpStatus = 401
+  hibpBody = '{}'
+  hibpKeys = []
   await context.route('https://cavalier.hudsonrock.com/**', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: cavalierBody }),
   )
-  await context.route('https://haveibeenpwned.com/**', (route) =>
-    route.fulfill({ status: 401, contentType: 'application/json', body: '{}' }),
-  )
+  await context.route('https://haveibeenpwned.com/**', (route) => {
+    hibpKeys.push(route.request().headers()['hibp-api-key'] ?? '')
+    return route.fulfill({ status: hibpStatus, contentType: 'application/json', body: hibpBody })
+  })
 })
+
+/** Obviously fake: no real credential belongs in a repository, a test one included. */
+const FAKE_KEY = 'fake-hibp-key-for-e2e-00000000'
 
 test('the panel says what will be sent before anything is', async ({ context, extensionId }) => {
   const page = await context.newPage()
@@ -200,6 +215,104 @@ test('a source that cannot run is named, and the total says it may be incomplete
     expect(coverage).toContainText('Have I Been Pwned', { timeout: RECORD_VISIBLE_MS }),
   )
   await expect(coverage).toContainText('may be incomplete')
+
+  // B-125: the default state of every install. The source was not asked, the screen says
+  // so in those words, and the line that says it is the way to the field.
+  await expect(coverage).toContainText('Not checked against Have I Been Pwned')
+  await expect(page.locator('[data-role=leaks] [data-role=source-key]')).toContainText(
+    'Have I Been Pwned was not checked: no key is saved.',
+  )
+  const addKey = page.locator('[data-role=leaks] [data-role=add-key]')
+  await expect(addKey).toHaveText('Add key')
+  expect(hibpKeys, 'with no key saved the source must not be asked at all').toEqual([])
+
+  await addKey.click()
+  await expect(page.locator('[data-role=leak-key] [data-role=leak-key-state]')).toHaveText(
+    'No key is saved, so Have I Been Pwned is not checked.',
+  )
+})
+
+test('a saved key is asked with, sent only in its header, never shown back, and removable', async ({
+  context,
+  extensionId,
+}) => {
+  test.slow()
+  hibpStatus = 200
+  hibpBody = JSON.stringify([
+    { Name: 'ExampleBreach', Domain: 'example.test', BreachDate: '2023-04-05', DataClasses: ['Passwords'] },
+  ])
+
+  const page = await context.newPage()
+  watchNavigation(page)
+  await page.goto(`chrome-extension://${extensionId}/options.html#data`)
+
+  const block = page.locator('[data-role=leak-key]')
+  const field = block.locator('[data-role=leak-key-field]')
+  await expect(field).toHaveAttribute('type', 'password')
+  await field.fill(FAKE_KEY)
+  await block.locator('[data-role=leak-key-save]').click()
+
+  await expect(block.locator('[data-role=leak-key-state]')).toHaveText(
+    'A key is saved on this device and is not shown here. To change it, paste a new one.',
+  )
+  await expect(block.locator('[data-role=leak-key-save]')).toHaveText('Replace key')
+  await expect(field).toHaveValue('')
+  expect(await page.content(), 'the key is back on the page after saving').not.toContain(FAKE_KEY)
+
+  await page.goto(`chrome-extension://${extensionId}/options.html#leaks`)
+  await fillAddress(page, 'someone@example.test')
+  await page.locator('[data-role=leaks] [data-role=check]').click()
+
+  const coverage = page.locator('[data-role=leaks] [data-role=coverage]')
+  await expectWithDiagnosis(
+    page,
+    expect(coverage).toContainText('Have I Been Pwned', { timeout: RECORD_VISIBLE_MS }),
+  )
+  // Both sources answered, so the line claims both and admits no gap.
+  await expect(coverage).toHaveText(/^Checked against .*Hudson Rock Cavalier/)
+  await expect(coverage).not.toContainText('Not checked')
+  await expect(page.locator('[data-role=leaks] [data-role=leak][data-leak=ExampleBreach]')).toHaveCount(1)
+  await expect(page.locator('[data-role=leaks] [data-role=source-key]')).toHaveCount(0)
+  expect(hibpKeys, 'the key travels in the header the API asks for').toEqual([FAKE_KEY])
+
+  // The outbound log names the request and keeps the key out of every field it shows.
+  await page.goto(`chrome-extension://${extensionId}/options.html#audit`)
+  await expect(page.locator('body')).toContainText('haveibeenpwned.com')
+  expect(await page.content()).not.toContain(FAKE_KEY)
+
+  await page.goto(`chrome-extension://${extensionId}/options.html#data`)
+  await page.locator('[data-role=leak-key] [data-role=leak-key-remove]').click()
+  await expect(page.locator('[data-role=leak-key] [data-role=leak-key-state]')).toHaveText(
+    'No key is saved, so Have I Been Pwned is not checked.',
+  )
+  await expect(page.locator('[data-role=leak-key] [data-role=leak-key-remove]')).toHaveCount(0)
+})
+
+test('a key the source refuses is named as refused, with the way to replace it', async ({
+  context,
+  extensionId,
+}) => {
+  test.slow()
+  hibpStatus = 401
+
+  const page = await context.newPage()
+  watchNavigation(page)
+  await page.goto(`chrome-extension://${extensionId}/options.html#data`)
+  await page.locator('[data-role=leak-key] [data-role=leak-key-field]').fill(FAKE_KEY)
+  await page.locator('[data-role=leak-key] [data-role=leak-key-save]').click()
+  await expect(page.locator('[data-role=leak-key] [data-role=leak-key-remove]')).toBeVisible()
+
+  await page.goto(`chrome-extension://${extensionId}/options.html#leaks`)
+  await fillAddress(page, 'someone@example.test')
+  await page.locator('[data-role=leaks] [data-role=check]').click()
+
+  const line = page.locator('[data-role=leaks] [data-role=source-key]')
+  await expectWithDiagnosis(
+    page,
+    expect(line).toContainText('Have I Been Pwned refused the saved key.', { timeout: RECORD_VISIBLE_MS }),
+  )
+  await expect(line.locator('[data-role=add-key]')).toHaveText('Replace key')
+  expect(await page.content()).not.toContain(FAKE_KEY)
 })
 
 test('the credit for the data is on the page that shows it', async ({ context, extensionId }) => {

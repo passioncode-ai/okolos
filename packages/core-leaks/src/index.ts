@@ -1,5 +1,6 @@
 export {
   mergeLeaks,
+  type KeyRemedy,
   type Leak,
   type LeakInventory,
   type SourceReport,

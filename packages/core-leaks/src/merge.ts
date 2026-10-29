@@ -28,14 +28,27 @@ export interface Leak {
   readonly domain?: string
 }
 
+/**
+ * Why a source was not checked, when the remedy is the person's own key: none is saved,
+ * or the source refused the one that is. Absent for every other reason, whose remedy is
+ * waiting rather than a setting (B-125).
+ */
+export type KeyRemedy = 'missing' | 'refused'
+
 export type SourceStatus =
   | { readonly name: string; readonly answered: true; readonly leaks: readonly Leak[] }
-  | { readonly name: string; readonly answered: false; readonly why: string }
+  | {
+      readonly name: string
+      readonly answered: false
+      readonly why: string
+      readonly needsKey?: KeyRemedy
+    }
 
 export interface SourceReport {
   readonly name: string
   readonly answered: boolean
   readonly why?: string
+  readonly needsKey?: KeyRemedy
 }
 
 export interface LeakInventory {
@@ -69,7 +82,12 @@ export function mergeLeaks(statuses: readonly SourceStatus[]): LeakInventory {
   const sources: SourceReport[] = statuses.map((status) =>
     status.answered
       ? { name: status.name, answered: true }
-      : { name: status.name, answered: false, why: status.why },
+      : {
+          name: status.name,
+          answered: false,
+          why: status.why,
+          ...(status.needsKey === undefined ? {} : { needsKey: status.needsKey }),
+        },
   )
   const silent = sources.filter((source) => !source.answered)
   const leaks = [...seen.values()].sort(byDateDescending)

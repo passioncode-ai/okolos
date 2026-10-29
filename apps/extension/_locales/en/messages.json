@@ -1262,8 +1262,65 @@
   "journalTitle": {
     "message": "What changed since last time"
   },
+  "leakKeyTitle": {
+    "message": "Have I Been Pwned key"
+  },
+  "leakKeyBlurb": {
+    "message": "Have I Been Pwned looks an address up only with your own paid key. The key is kept on this device and goes only to haveibeenpwned.com, in the request header, when you press Check now. It never goes into the export or the logs."
+  },
+  "leakKeyNone": {
+    "message": "No key is saved, so Have I Been Pwned is not checked."
+  },
+  "leakKeySaved": {
+    "message": "A key is saved on this device and is not shown here. To change it, paste a new one."
+  },
+  "leakKeyField": {
+    "message": "Paste the key"
+  },
+  "leakKeySave": {
+    "message": "Save key"
+  },
+  "leakKeyReplace": {
+    "message": "Replace key"
+  },
+  "leakKeyRemove": {
+    "message": "Remove key"
+  },
+  "leakKeyEmpty": {
+    "message": "The field is empty, so nothing was saved."
+  },
+  "leakKeyShape": {
+    "message": "The key has a space or a non-printing character in it, so nothing was saved."
+  },
+  "leakKeyAdd": {
+    "message": "Add key"
+  },
+  "leakSourceKeyRefused": {
+    "message": "$NAME$ refused the saved key.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "leakSourceStatus": {
+    "message": "$NAME$ answered with error $STATUS$.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "status": {
+        "content": "$2"
+      }
+    }
+  },
   "leakSourceNoKey": {
-    "message": "No API key is configured for this source."
+    "message": "$NAME$ was not checked: no key is saved.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "leakSourceTimedOut": {
     "message": "$NAME$ did not answer within $SECONDS$ seconds.",
@@ -1300,7 +1357,7 @@
     }
   },
   "leaksCoverageIncomplete": {
-    "message": "Checked against $ANSWERED$. $SILENT$ could not be reached, so this list may be incomplete.",
+    "message": "Checked against $ANSWERED$. Not checked against $SILENT$, so this list may be incomplete.",
     "placeholders": {
       "answered": {
         "content": "$1"

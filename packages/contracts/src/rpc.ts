@@ -202,7 +202,11 @@ export interface RpcMap {
         classes: string[]
         domain?: string
       }>
-      sources: Array<{ name: string; answered: boolean; why?: string }>
+      /**
+       * `needsKey` is set when the remedy is the person's own key (none saved, or the one
+       * saved was refused), so the screen can point at the field rather than at waiting.
+       */
+      sources: Array<{ name: string; answered: boolean; why?: string; needsKey?: 'missing' | 'refused' }>
       complete: boolean
     }
   }

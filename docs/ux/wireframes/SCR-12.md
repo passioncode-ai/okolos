@@ -21,11 +21,21 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 - `export-failed`
 - `wipe-retry`
 - `wipe-failed`
+- `leak-key`
+- `leak-key-title`
+- `leak-key-field`
+- `leak-key-actions`
+- `leak-key-needs`
+- `leak-key-save`
+- `leak-key-remove`
+- `leak-key-blurb`
+- `leak-key-state`
 
 **States**
 
 - **success** — default
 - **error** — export or wipe failed
+- **error** — saving or removing the key failed
 
 **Source of truth:** `packages/ui/src/settings/data-controls.ts`. This file is derived from it; if the two
 disagree, the renderer is right and this file is stale.

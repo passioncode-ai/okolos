@@ -1,5 +1,11 @@
 import { t } from '@okolos/i18n'
-import { mergeLeaks, type Leak, type LeakInventory, type SourceStatus } from '@okolos/core-leaks'
+import {
+  mergeLeaks,
+  type KeyRemedy,
+  type Leak,
+  type LeakInventory,
+  type SourceStatus,
+} from '@okolos/core-leaks'
 import { request, type RequestDeps } from '@okolos/net'
 import { withDeadline } from '@okolos/platform'
 
@@ -31,8 +37,20 @@ export interface LeakSource {
   readonly name: string
   /** Null when the source cannot run — the reason is shown to the user. */
   readonly unavailable: string | null
+  /** Set when `unavailable` is for want of the person's key, so the screen can point at the field. */
+  readonly needsKey?: KeyRemedy
   lookup(address: string, deps: RequestDeps): Promise<readonly Leak[]>
 }
+
+/**
+ * The source answered that the key is not good. Its own type so the merge can tell "fix
+ * the key" from "wait and try again", which a message string cannot carry.
+ */
+class KeyRefused extends Error {}
+
+/** The two remedies, named once. */
+const KEY_MISSING: KeyRemedy = 'missing'
+const KEY_REFUSED: KeyRemedy = 'refused'
 
 export const CAVALIER: LeakSource = {
   name: 'Hudson Rock Cavalier',
@@ -67,14 +85,20 @@ export const CAVALIER: LeakSource = {
  * The breached-account API needs a paid key. Without one the source is not
  * silently dropped: it reports why it could not run, and the coverage line says
  * the list may be incomplete because of it.
+ *
+ * The key is the person's own, saved on the settings screen (B-125). It travels in
+ * exactly one place, the `hibp-api-key` header the API requires; the audit entry the
+ * choke point writes carries no headers, and nothing here logs it.
  */
 export function hibp(apiKey: string | null): LeakSource {
+  const name = 'Have I Been Pwned'
   return {
-    name: 'Have I Been Pwned',
+    name,
     // Not caught by the sweep — a capital letter inside the run defeats its anchor, the
     // same family of blind spot as B-76 — and it travels in the same field as the
     // timeout above, which a person can be shown.
-    unavailable: apiKey ? null : t('leakSourceNoKey'),
+    unavailable: apiKey ? null : t('leakSourceNoKey', name),
+    ...(apiKey ? {} : { needsKey: KEY_MISSING }),
     async lookup(address, deps) {
       const response = await request(
         {
@@ -91,6 +115,10 @@ export function hibp(apiKey: string | null): LeakSource {
         deps,
       )
       if (response.status === 404) return []
+      // 401 is this API's word for a key it does not accept. Any other failure used to be
+      // read as a list of breaches and surfaced as "body.map is not a function".
+      if (response.status === 401) throw new KeyRefused(t('leakSourceKeyRefused', name))
+      if (!response.ok) throw new Error(t('leakSourceStatus', name, String(response.status)))
       const body = (await response.json()) as Array<{
         Name?: string
         Domain?: string
@@ -120,7 +148,12 @@ export async function lookupLeaks(
 
   for (const source of sources) {
     if (source.unavailable) {
-      statuses.push({ name: source.name, answered: false, why: source.unavailable })
+      statuses.push({
+        name: source.name,
+        answered: false,
+        why: source.unavailable,
+        ...(source.needsKey === undefined ? {} : { needsKey: source.needsKey }),
+      })
       continue
     }
     try {
@@ -137,6 +170,7 @@ export async function lookupLeaks(
         name: source.name,
         answered: false,
         why: cause instanceof Error ? cause.message : String(cause),
+        ...(cause instanceof KeyRefused ? { needsKey: KEY_REFUSED } : {}),
       })
     }
   }

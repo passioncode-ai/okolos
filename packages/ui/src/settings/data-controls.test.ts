@@ -1,7 +1,11 @@
 /** @vitest-environment happy-dom */
 import { describe, expect, it, vi } from 'vitest'
 
-import { renderDataControls, type DataControlsHandlers } from './data-controls.js'
+import {
+  renderDataControls,
+  type DataControlsHandlers,
+  type LeakKeyPanel,
+} from './data-controls.js'
 
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -371,5 +375,126 @@ describe('one answer on the screen, whatever the clicking', () => {
       expect(el.querySelector('[data-role=wipe-failed]')?.textContent ?? '').toContain('models'),
     )
     expect(el.querySelectorAll('[data-role=wipe-failed]').length).toBe(1)
+  })
+})
+
+/**
+ * B-125: the Have I Been Pwned key, which the background read and nothing wrote.
+ *
+ * The renderer is told whether a key exists, never what it is, so there is no value it
+ * could put back on screen. The fake key below is obviously fake on purpose.
+ */
+describe('the Have I Been Pwned key', () => {
+  const FAKE_KEY = 'fake-hibp-key-for-tests-0000'
+
+  function keyPanel(saved: boolean, overrides: Partial<LeakKeyPanel> = {}): LeakKeyPanel {
+    return { saved, onSave: vi.fn(), onRemove: vi.fn(), ...overrides }
+  }
+
+  function mountKey(panel: LeakKeyPanel): HTMLElement {
+    const el = renderDataControls(document, handlers(), KINDS, panel)
+    document.body.replaceChildren(el)
+    return el
+  }
+
+  const role = (root: HTMLElement, name: string) => root.querySelector<HTMLElement>(`[data-role=${name}]`)
+  const field = (root: HTMLElement) => role(root, 'leak-key-field') as HTMLInputElement
+
+  it('draws no key block when the page passes none', () => {
+    const { el } = mount()
+    expect(role(el, 'leak-key')).toBeNull()
+  })
+
+  it('says no key is saved, and offers only to save one', () => {
+    const el = mountKey(keyPanel(false))
+    expect(role(el, 'leak-key-state')?.textContent).toBe(message('leakKeyNone'))
+    expect(role(el, 'leak-key-save')?.textContent).toBe(message('leakKeySave'))
+    expect(role(el, 'leak-key-remove')).toBeNull()
+    expect(role(el, 'leak-key-blurb')?.textContent).toBe(message('leakKeyBlurb'))
+  })
+
+  it('says a key is saved without showing it, and offers to replace or remove it', () => {
+    const el = mountKey(keyPanel(true))
+    expect(role(el, 'leak-key-state')?.textContent).toBe(message('leakKeySaved'))
+    expect(role(el, 'leak-key-save')?.textContent).toBe(message('leakKeyReplace'))
+    expect(role(el, 'leak-key-remove')?.textContent).toBe(message('leakKeyRemove'))
+    expect(field(el).value).toBe('')
+  })
+
+  it('keeps the field masked and out of the browser\'s memory of typed values', () => {
+    const input = field(mountKey(keyPanel(false)))
+    expect(input.type).toBe('password')
+    expect(input.getAttribute('autocomplete')).toBe('off')
+    expect(input.getAttribute('spellcheck')).toBe('false')
+    expect(input.getAttribute('aria-label')).toBe(message('leakKeyField'))
+  })
+
+  it('saves the pasted key, trimmed, and empties the field at once', () => {
+    const panel = keyPanel(false)
+    const el = mountKey(panel)
+    field(el).value = `  ${FAKE_KEY}\n`
+    role(el, 'leak-key-save')?.click()
+
+    expect(panel.onSave).toHaveBeenCalledWith(FAKE_KEY)
+    // Emptied by the renderer itself, so the key is off the screen even if the page
+    // never repaints after the save.
+    expect(field(el).value).toBe('')
+    expect(el.textContent).not.toContain(FAKE_KEY)
+  })
+
+  it('saves on Enter as well as on the button', () => {
+    const panel = keyPanel(false)
+    const el = mountKey(panel)
+    field(el).value = FAKE_KEY
+    field(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    expect(panel.onSave).toHaveBeenCalledWith(FAKE_KEY)
+  })
+
+  it('refuses an empty field out loud and saves nothing', () => {
+    const panel = keyPanel(false)
+    const el = mountKey(panel)
+    field(el).value = '   '
+    role(el, 'leak-key-save')?.click()
+
+    expect(panel.onSave).not.toHaveBeenCalled()
+    expect(role(el, 'leak-key-needs')?.textContent).toBe(message('leakKeyEmpty'))
+  })
+
+  it('refuses a key with a space inside, and leaves it in the field to correct', () => {
+    const panel = keyPanel(false)
+    const el = mountKey(panel)
+    field(el).value = 'abc def'
+    role(el, 'leak-key-save')?.click()
+    role(el, 'leak-key-save')?.click()
+
+    expect(panel.onSave).not.toHaveBeenCalled()
+    expect(role(el, 'leak-key-needs')?.textContent).toBe(message('leakKeyShape'))
+    // One refusal, however many presses: the slot is replaced, not appended.
+    expect(el.querySelectorAll('[data-role=leak-key-needs]')).toHaveLength(1)
+    expect(field(el).value).toBe('abc def')
+  })
+
+  it('clears an earlier refusal once a key is accepted', () => {
+    const el = mountKey(keyPanel(false))
+    role(el, 'leak-key-save')?.click()
+    field(el).value = FAKE_KEY
+    role(el, 'leak-key-save')?.click()
+    expect(role(el, 'leak-key-needs')).toBeNull()
+  })
+
+  it('removes the key on one press', () => {
+    const panel = keyPanel(true)
+    const el = mountKey(panel)
+    role(el, 'leak-key-remove')?.click()
+    expect(panel.onRemove).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the wipe confirmation next to the wipe button, above the key block', () => {
+    const el = mountKey(keyPanel(false))
+    role(el, 'wipe')?.click()
+    const confirm = role(el, 'confirm') as HTMLElement
+    expect(confirm.compareDocumentPosition(role(el, 'leak-key') as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
   })
 })

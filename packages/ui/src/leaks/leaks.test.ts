@@ -260,3 +260,57 @@ describe('where the address field goes', () => {
     }
   })
 })
+
+/**
+ * B-125: a source that was not checked for want of the person's key says so, and the
+ * line that says so is the way to the field. Other failures do not get the link: their
+ * remedy is waiting, and a link to a setting that cannot help is a wrong answer.
+ */
+describe('the key line under the coverage line', () => {
+  const KEY_HREF = 'options.html#data'
+  const message = (key: string): string => (CATALOGUE[key] as { message: string }).message
+
+  it('points at the key field when no key is saved', () => {
+    const inventory = mergeLeaks([
+      { name: 'Hudson Rock Cavalier', answered: true, leaks: [] },
+      { name: 'Have I Been Pwned', answered: false, why: 'Have I Been Pwned не проверялся', needsKey: 'missing' },
+    ])
+    const el = render({ kind: 'ready', inventory, now: NOW }, handlers({ keyHref: KEY_HREF }))
+
+    expect(role(el, 'source-key')?.textContent).toContain('Have I Been Pwned не проверялся')
+    const link = el.querySelector<HTMLAnchorElement>('[data-role=add-key]')
+    expect(link?.getAttribute('href')).toBe(KEY_HREF)
+    expect(link?.textContent).toBe(message('leakKeyAdd'))
+    // It comes after the sentence that explains it, not before the total.
+    expect(role(el, 'coverage')?.compareDocumentPosition(role(el, 'source-key') as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+  })
+
+  it('offers to replace the key when the source refused it', () => {
+    const inventory = mergeLeaks([
+      { name: 'Have I Been Pwned', answered: false, why: 'не принял ключ', needsKey: 'refused' },
+    ])
+    const el = render({ kind: 'ready', inventory, now: NOW }, handlers({ keyHref: KEY_HREF }))
+    expect(el.querySelector('[data-role=add-key]')?.textContent).toBe(message('leakKeyReplace'))
+  })
+
+  it('stays away when the reason is not a key', () => {
+    const inventory = mergeLeaks([
+      { name: 'Hudson Rock Cavalier', answered: false, why: 'не ответил за 10 с.' },
+    ])
+    const el = render({ kind: 'ready', inventory, now: NOW }, handlers({ keyHref: KEY_HREF }))
+    expect(role(el, 'source-key')).toBeNull()
+    expect(el.querySelector('[data-role=add-key]')).toBeNull()
+  })
+
+  it('names the source as not checked rather than as unreachable', () => {
+    // "Could not be reached" said something false about a source nobody asked.
+    const inventory = mergeLeaks([
+      { name: 'Hudson Rock Cavalier', answered: true, leaks: [] },
+      { name: 'Have I Been Pwned', answered: false, why: 'x', needsKey: 'missing' },
+    ])
+    const el = render({ kind: 'ready', inventory, now: NOW })
+    expect(role(el, 'coverage')?.textContent).toContain('Не проверено по: Have I Been Pwned')
+  })
+})

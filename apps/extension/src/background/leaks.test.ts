@@ -55,7 +55,9 @@ describe('a source that cannot run', () => {
 
     expect(inventory.sources[0]).toMatchObject({
       answered: false,
-      why: message('leakSourceNoKey'),
+      // The sentence names the source, so it reads on its own under the coverage line.
+      why: message('leakSourceNoKey').replace('$NAME$', 'Have I Been Pwned'),
+      needsKey: 'missing',
     })
     expect(inventory.complete).toBe(false)
   })
@@ -151,5 +153,53 @@ describe('a source that never answers', () => {
     expect(inventory.sources.filter((source) => source.answered).map((s) => s.name)).toContain(
       'Hudson Rock Cavalier',
     )
+  })
+})
+
+/**
+ * The person's own key (B-125). Nothing wrote it until 2026-10-29, so these paths had
+ * never run outside a unit test. The value here is obviously fake on purpose: no real
+ * credential belongs in a repository, a test one included.
+ */
+const FAKE_KEY = 'fake-hibp-key-for-tests-0000'
+
+describe('a source that needs the person\'s key', () => {
+  it('sends the key only in the header Have I Been Pwned asks for', async () => {
+    const transport = vi.fn(async (_spec: { url: string; headers?: Record<string, string> }) =>
+      new Response(JSON.stringify([{ Name: 'Example', BreachDate: '2024-01-02', DataClasses: [] }])),
+    )
+    const { deps: d, audit } = deps(transport as unknown as () => Promise<Response>)
+    const inventory = await lookupLeaks('a@b.test', [hibp(FAKE_KEY)], d)
+
+    expect(inventory.sources[0]).toMatchObject({ answered: true })
+    const spec = transport.mock.calls[0]?.[0]
+    expect(spec?.headers?.['hibp-api-key']).toBe(FAKE_KEY)
+    expect(spec?.url).not.toContain(FAKE_KEY)
+    // The outbound log is exportable and shown on a screen: the key is in no field of it.
+    expect(JSON.stringify(audit)).not.toContain(FAKE_KEY)
+  })
+
+  it('says the key was refused, and marks it as the key\'s fault, on a 401', async () => {
+    const { deps: d } = deps(async () => new Response('{"statusCode":401}', { status: 401 }))
+    const inventory = await lookupLeaks('a@b.test', [hibp(FAKE_KEY), CAVALIER], d)
+
+    expect(inventory.sources[0]).toMatchObject({
+      answered: false,
+      why: message('leakSourceKeyRefused').replace('$NAME$', 'Have I Been Pwned'),
+      needsKey: 'refused',
+    })
+    expect(inventory.sources[0]?.why).not.toContain(FAKE_KEY)
+  })
+
+  it('names any other error by its status, and does not blame the key for it', async () => {
+    // It used to read the error body as a list of breaches and fail on `.map`, so the
+    // reason a person would have been shown was "body.map is not a function".
+    const { deps: d } = deps(async () => new Response('{"statusCode":429}', { status: 429 }))
+    const inventory = await lookupLeaks('a@b.test', [hibp(FAKE_KEY)], d)
+
+    expect(inventory.sources[0]).toMatchObject({ answered: false })
+    expect(inventory.sources[0]?.why).toContain('429')
+    expect(inventory.sources[0]?.why).toContain('Have I Been Pwned')
+    expect(inventory.sources[0]).not.toHaveProperty('needsKey')
   })
 })

@@ -15,6 +15,32 @@ export interface WipeOutcome {
   readonly failed: readonly string[]
 }
 
+/**
+ * The Have I Been Pwned key (B-125): whether one is saved, and what to do with a new one.
+ *
+ * `saved` is a boolean and not the key, on purpose. A renderer that is never handed the
+ * value cannot put it back on screen, and nothing a person does here needs it: replacing
+ * pastes a new key over the old one, removing needs none.
+ */
+export interface LeakKeyPanel {
+  readonly saved: boolean
+  /** Called with a key that passed the shape check, already trimmed. */
+  readonly onSave: (key: string) => void
+  readonly onRemove: () => void
+}
+
+/**
+ * Why a pasted key is refused before it is stored, or null when it may be.
+ *
+ * Deliberately loose: the provider's key format is theirs to change, so this refuses only
+ * what can never be a header value, an empty field and a space or control character inside
+ * one, which is what a careless paste brings with it.
+ */
+export function leakKeyProblem(key: string): 'empty' | 'shape' | null {
+  if (key === '') return 'empty'
+  return /^[\x21-\x7e]+$/.test(key) ? null : 'shape'
+}
+
 export interface DataControlsHandlers {
   readonly onExport: () => Promise<void>
   readonly onWipe: () => Promise<WipeOutcome>
@@ -38,6 +64,8 @@ export function renderDataControls(
    * build until it has words.
    */
   dataKinds: readonly string[],
+  /** The key block, drawn under the data actions. Absent, the screen has no key block. */
+  leakKey?: LeakKeyPanel,
 ): HTMLElement {
   // An empty list would render a confirmation that names nothing, which reads as
   // "nothing will be deleted" over a button that deletes everything. Refused
@@ -75,6 +103,18 @@ export function renderDataControls(
   )
   section.append(actions)
 
+  /**
+   * The key block, last. What the export and wipe add later (the confirmation, a failure,
+   * a retry) goes above it through `place`, so an answer stays next to the button it
+   * answers rather than under an unrelated block.
+   */
+  const keyBlock = leakKey === undefined ? null : renderLeakKey(doc, leakKey)
+  if (keyBlock !== null) section.append(keyBlock)
+  const place = (el: HTMLElement): void => {
+    if (keyBlock !== null) section.insertBefore(el, keyBlock)
+    else section.append(el)
+  }
+
   function askFirst(): void {
     if (section.querySelector('[data-role=confirm]')) return
 
@@ -96,7 +136,7 @@ export function renderDataControls(
       button(doc, 'confirm-yes', t('dataConfirmYes'), () => void run()),
       button(doc, 'confirm-no', t('dataConfirmNo'), () => confirm.remove()),
     )
-    section.append(confirm)
+    place(confirm)
   }
 
   /**
@@ -144,13 +184,13 @@ export function renderDataControls(
       detail.textContent = diagnostic
       slot.append(detail)
     }
-    section.append(slot)
+    place(slot)
   }
 
   /** The retry button, created once however many failures pass through. */
   function offerRetry(): void {
     if (section.querySelector('[data-role=wipe-retry]')) return
-    section.append(button(doc, 'wipe-retry', t('dataWipeRetry'), () => void run()))
+    place(button(doc, 'wipe-retry', t('dataWipeRetry'), () => void run()))
   }
 
   async function run(): Promise<void> {
@@ -194,6 +234,66 @@ export function renderDataControls(
   }
 
   return section
+}
+
+/**
+ * The key block: what the key is for, where it goes, and whether one is saved.
+ *
+ * The field is `type=password` and is emptied the moment a key is accepted, before the
+ * page has a chance to repaint: the key is on screen for as long as it takes to paste it.
+ * A refusal is said in the block and leaves the text in the field, so a key pasted with a
+ * stray space can be corrected rather than pasted again.
+ */
+function renderLeakKey(doc: Document, panel: LeakKeyPanel): HTMLElement {
+  const block = doc.createElement('section')
+  block.setAttribute('data-role', 'leak-key')
+
+  const heading = doc.createElement('h2')
+  heading.setAttribute('data-role', 'leak-key-title')
+  heading.textContent = t('leakKeyTitle')
+
+  const field = doc.createElement('input')
+  field.type = 'password'
+  field.setAttribute('data-role', 'leak-key-field')
+  field.setAttribute('autocomplete', 'off')
+  field.setAttribute('spellcheck', 'false')
+  field.setAttribute('aria-label', t('leakKeyField'))
+  field.placeholder = t('leakKeyField')
+
+  const actions = doc.createElement('div')
+  actions.setAttribute('data-role', 'leak-key-actions')
+
+  function save(): void {
+    const key = field.value.trim()
+    const problem = leakKeyProblem(key)
+    block.querySelector('[data-role=leak-key-needs]')?.remove()
+    if (problem !== null) {
+      actions.before(
+        text(doc, 'leak-key-needs', problem === 'empty' ? t('leakKeyEmpty') : t('leakKeyShape')),
+      )
+      return
+    }
+    field.value = ''
+    panel.onSave(key)
+  }
+
+  field.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') save()
+  })
+
+  actions.append(
+    button(doc, 'leak-key-save', panel.saved ? t('leakKeyReplace') : t('leakKeySave'), save, !panel.saved),
+    ...(panel.saved ? [button(doc, 'leak-key-remove', t('leakKeyRemove'), () => panel.onRemove())] : []),
+  )
+
+  block.append(
+    heading,
+    text(doc, 'leak-key-blurb', t('leakKeyBlurb')),
+    text(doc, 'leak-key-state', panel.saved ? t('leakKeySaved') : t('leakKeyNone')),
+    field,
+    actions,
+  )
+  return block
 }
 
 function text(doc: Document, role: string, content: string): HTMLParagraphElement {

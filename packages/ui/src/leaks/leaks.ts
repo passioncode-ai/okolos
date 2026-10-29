@@ -41,6 +41,11 @@ export interface LeaksHandlers {
   readonly onResolve: (leakName: string) => void
   /** Opens the service's own password-change page, where it publishes one. */
   readonly onChangePassword: (leak: Leak) => void
+  /**
+   * Where the key field lives (SCR-12). Given by the page, which owns the addresses; when
+   * absent the key line still says why, and offers no link.
+   */
+  readonly keyHref?: string
 }
 
 export function renderLeaks(doc: Document, state: LeaksState, handlers: LeaksHandlers): HTMLElement {
@@ -115,6 +120,7 @@ export function renderLeaks(doc: Document, state: LeaksState, handlers: LeaksHan
     ),
     // Always, and next to the number rather than beneath the fold.
     text(doc, 'coverage', coverageLine(inventory)),
+    ...keyLines(doc, inventory, handlers.keyHref),
     addressSlot(doc),
   )
 
@@ -179,6 +185,29 @@ function leakRow(doc: Document, leak: Leak, handlers: LeaksHandlers): HTMLElemen
   actions.append(button(doc, 'resolve', t('leaksMarkResolved'), () => handlers.onResolve(leak.name)))
   row.append(actions)
   return row
+}
+
+/**
+ * A source left unchecked for want of the person's key, said once, with the way to fix it.
+ *
+ * Only for that reason (B-125). Until 2026-10-29 nothing in the product could write the
+ * key, so every check ended with Have I Been Pwned unchecked and the screen said only that
+ * it "could not be reached". Other reasons stay in the coverage line: a timeout's remedy is
+ * waiting, and a link to a setting that cannot help would be a wrong answer.
+ */
+function keyLines(doc: Document, inventory: LeakInventory, keyHref: string | undefined): HTMLElement[] {
+  return inventory.sources.flatMap((source) => {
+    if (source.answered || source.needsKey === undefined || !source.why) return []
+    const line = text(doc, 'source-key', source.why)
+    if (keyHref !== undefined) {
+      const link = doc.createElement('a')
+      link.setAttribute('data-role', 'add-key')
+      link.href = keyHref
+      link.textContent = source.needsKey === 'refused' ? t('leakKeyReplace') : t('leakKeyAdd')
+      line.append(' ', link)
+    }
+    return [line]
+  })
 }
 
 /**

@@ -1262,8 +1262,65 @@
   "journalTitle": {
     "message": "Что изменилось с прошлого раза"
   },
+  "leakKeyTitle": {
+    "message": "Ключ Have I Been Pwned"
+  },
+  "leakKeyBlurb": {
+    "message": "Have I Been Pwned ищет адрес в утечках только по вашему платному ключу. Ключ хранится на этом устройстве и уходит только на haveibeenpwned.com, в заголовке запроса, когда вы нажимаете «Проверить». В выгрузку и в журналы он не попадает."
+  },
+  "leakKeyNone": {
+    "message": "Ключ не сохранён, поэтому Have I Been Pwned не проверяется."
+  },
+  "leakKeySaved": {
+    "message": "Ключ сохранён на этом устройстве и здесь не показывается. Чтобы сменить его, вставьте новый."
+  },
+  "leakKeyField": {
+    "message": "Вставьте ключ"
+  },
+  "leakKeySave": {
+    "message": "Сохранить ключ"
+  },
+  "leakKeyReplace": {
+    "message": "Заменить ключ"
+  },
+  "leakKeyRemove": {
+    "message": "Удалить ключ"
+  },
+  "leakKeyEmpty": {
+    "message": "Поле пустое, поэтому ничего не сохранено."
+  },
+  "leakKeyShape": {
+    "message": "В ключе есть пробел или непечатаемый знак, поэтому ничего не сохранено."
+  },
+  "leakKeyAdd": {
+    "message": "Добавить ключ"
+  },
+  "leakSourceKeyRefused": {
+    "message": "$NAME$ не принял сохранённый ключ.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "leakSourceStatus": {
+    "message": "$NAME$ ответил ошибкой $STATUS$.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "status": {
+        "content": "$2"
+      }
+    }
+  },
   "leakSourceNoKey": {
-    "message": "Для этого источника не настроен ключ доступа."
+    "message": "$NAME$ не проверялся: ключ не сохранён.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "leakSourceTimedOut": {
     "message": "$NAME$ не ответил за $SECONDS$ с.",
@@ -1300,7 +1357,7 @@
     }
   },
   "leaksCoverageIncomplete": {
-    "message": "Проверено по: $ANSWERED$. Не ответили: $SILENT$, поэтому список может быть неполным.",
+    "message": "Проверено по: $ANSWERED$. Не проверено по: $SILENT$, поэтому список может быть неполным.",
     "placeholders": {
       "answered": {
         "content": "$1"

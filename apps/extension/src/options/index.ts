@@ -31,6 +31,7 @@ import {
   type AreaRow,
   type AttentionItem,
   type ExtensionsState,
+  type LeakKeyPanel,
   type LeaksState,
   type OverviewHandlers,
   type PanelState,
@@ -51,6 +52,7 @@ import {
 import { mapJournal } from '../popup/state.js'
 import { answered } from './answered.js'
 import { keepingFocus, markFocus } from './keep-focus.js'
+import { hasLeakKey, removeLeakKey, saveLeakKey } from './leak-key.js'
 import { showFailure } from './failure.js'
 import { whilePending } from './pending.js'
 import {
@@ -175,6 +177,8 @@ function leaksSection(): HTMLElement {
         const url = leak.domain ? changePasswordUrl(leak.domain) : null
         if (url !== null) void platform.tabs.create(url)
       },
+      // The key line's link: a source unchecked for want of a key points at the field.
+      keyHref: optionsPageFor('data'),
       onResolve: (name) => {
         void (async () => {
           const db = await openDb()
@@ -1056,7 +1060,31 @@ async function dataSection(): Promise<HTMLElement> {
     // `DATA_KIND_KEY` is `Record<StoreName, string>`, so a store added later fails
     // the build until the confirmation has words for it.
     Object.values(DATA_KIND_KEY),
+    await leakKeyPanel(),
   )
+}
+
+/**
+ * The Have I Been Pwned key block (B-125), or none when whether a key is saved cannot be
+ * read: a block saying "no key" over a key that is there would invite pasting a second
+ * one, and the storage problem itself is SCR-20's to explain.
+ *
+ * Saving and removing go through `act`, so a failed write says so in the page's failure
+ * slot and the repaint shows what is actually stored. The key goes from the field to the
+ * store and nowhere else: not into this page's state, not into a message, not into a log.
+ */
+async function leakKeyPanel(): Promise<LeakKeyPanel | undefined> {
+  let saved: boolean
+  try {
+    saved = await hasLeakKey(await openDb())
+  } catch {
+    return undefined
+  }
+  return {
+    saved,
+    onSave: (key) => void act(async () => saveLeakKey(await openDb(), key)),
+    onRemove: () => void act(async () => removeLeakKey(await openDb())),
+  }
 }
 
 /**
