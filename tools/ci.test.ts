@@ -167,6 +167,57 @@ describe('the workflow runs what the project has', () => {
   })
 })
 
+/**
+ * The jobs of the workflow, each by its key, with its own lines only.
+ *
+ * Reading the workflow as one text let the Linux job answer for the Windows one: the
+ * Windows job could be deleted, moved to ubuntu, or cut to `echo skipped` and every
+ * check above stayed green (round 1 of the N-105 certification, four plants).
+ */
+function jobs(yaml: string): Map<string, string> {
+  const body = yaml.slice(yaml.indexOf('\njobs:\n') + '\njobs:\n'.length)
+  const found = new Map<string, string>()
+  const starts = [...body.matchAll(/^ {2}([\w-]+):\s*$/gm)]
+  starts.forEach((start, i) => {
+    const from = start.index ?? 0
+    const to = starts[i + 1]?.index ?? body.length
+    found.set(start[1] as string, body.slice(from, to))
+  })
+  return found
+}
+
+/** Which gate steps a job body does not run. */
+function gatesMissingFrom(job: string): string[] {
+  const runs = commandsIn(job)
+  return gateSteps().filter((step) => {
+    const resolved = scripts[step] ?? ''
+    return !(runs.includes(`pnpm ${step}`) || (resolved !== '' && shares(runs, resolved)))
+  })
+}
+
+describe('each gates job runs the whole chain on its own system', () => {
+  const GATE_JOBS: Readonly<Record<string, string>> = { gates: 'ubuntu-latest', windows: 'windows-latest' }
+
+  for (const [key, system] of Object.entries(GATE_JOBS)) {
+    it(`the "${key}" job runs on ${system} and runs every step of \`pnpm gates\``, () => {
+      const job = jobs(workflow).get(key)
+      expect(job, `the workflow has no "${key}" job`).toBeDefined()
+      expect(job).toMatch(new RegExp(`^\\s+runs-on: ${system}\\s*$`, 'm'))
+      expect(gatesMissingFrom(job ?? ''), `the "${key}" job skips these gates`).toEqual([])
+    })
+  }
+
+  it('would notice a Windows job cut down, moved or removed', () => {
+    const windows = jobs(workflow).get('windows') ?? ''
+    expect(gatesMissingFrom(windows.replace('run: pnpm test\n', 'run: echo skipped\n'))).toEqual(['test'])
+    expect(windows.replace('runs-on: windows-latest', 'runs-on: ubuntu-latest')).not.toMatch(/^\s+runs-on: windows-latest\s*$/m)
+    const without = workflow.replace(windows, '')
+    expect(jobs(without).get('windows')).toBeUndefined()
+    // A gate dropped from the Windows job and kept in the Linux one.
+    expect(gatesMissingFrom(windows.replace('run: pnpm i18n:sweep\n', ''))).toEqual(['i18n:sweep'])
+  })
+})
+
 describe('the local shortcut matches CI', () => {
   it('builds before running the gates that read the build', () => {
     // Without this `pnpm gates` runs the bundle scanners over whatever dist
@@ -281,6 +332,7 @@ describe('a clone made before .gitattributes is converted by the runbook\'s own 
 
   it('leaves no CRLF on disk, and every line it prints is empty, as the runbook says', () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-crlf-'))
+    try {
     const git = (...args: string[]) =>
       execFileSync('git', ['-c', 'user.email=t@example.test', '-c', 'user.name=t', ...args], { cwd: dir, encoding: 'utf8' })
     const hook = path.join(dir, '.githooks', 'pre-push')
@@ -307,6 +359,10 @@ describe('a clone made before .gitattributes is converted by the runbook\'s own 
     expect(readFileSync(hook, 'utf8').includes('\r'), 'the hook still has CR on disk').toBe(false)
     expect(readFileSync(path.join(dir, 'README.md'), 'utf8')).toBe('a\nb\n')
     expect(git('ls-files', '--eol')).not.toMatch(/w\/crlf/)
+    } finally {
+      // Every pre-push runs this; a repository left per run piles up in TMPDIR (N-105, round 1).
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 
