@@ -405,6 +405,34 @@ describe('the cost of a field name (round 2, unit break)', () => {
   })
 })
 
+describe('an editable combobox is a text box, not a select (round 3)', () => {
+  // Chrome marks a search or autocomplete box `editable` (plaintext); a select is not. The
+  // typed query must not come back through a suggestion that repeats it.
+  const search = tree({
+    id: '1', role: 'RootWebArea', children: [
+      { id: '2', role: 'combobox', name: 'Search', value: 'divorce lawyer', editable: true, children: [
+        { id: '3', role: 'listbox', children: [
+          { id: '4', role: 'option', name: 'divorce lawyer near me' },
+          { id: '5', role: 'option', name: 'tax advice' },
+        ] },
+      ] },
+      { id: '6', role: 'heading', name: 'Results for divorce lawyer' },
+    ],
+  })
+
+  it('gives out no line that holds the typed text, on the whole page and under the box', () => {
+    for (const s of everyAnswer(search)) {
+      for (const l of s.lines) expect(l.name.toLowerCase()).not.toContain('divorce lawyer')
+    }
+  })
+
+  it('shows the box by its role, with no value and no named suggestion', () => {
+    const lines = snap(search).lines.map((l) => `${l.role} ${l.name}`)
+    expect(lines).toContain('combobox Search')
+    expect(lines.filter((l) => l.startsWith('option ') && l !== 'option ')).toEqual([])
+  })
+})
+
 describe('an ordinary select (round 2, product decision 2026-10-27)', () => {
   const country = tree({
     id: '1', role: 'RootWebArea', children: [

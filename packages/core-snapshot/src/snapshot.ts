@@ -290,13 +290,26 @@ function str(value: unknown): string {
   return typeof value === 'string' ? value : value === undefined || value === null ? '' : String(value)
 }
 
-/** A text field by role, or anything Chrome marks editable: `contenteditable` without a role counts (R4). */
-function isField(node: AxNode): boolean {
-  if (FIELD_ROLES.has(str(node.role?.value))) return true
+/** Chrome's `editable` property, set on a `contenteditable` and on a box a person types into. */
+function isEditable(node: AxNode): boolean {
   const editable = node.properties?.find((p) => p.name === 'editable')
   if (editable === undefined) return false
   const value = editable.value?.value
   return value !== false && value !== '' && value !== 'false'
+}
+
+/** A text field by role, or anything Chrome marks editable: `contenteditable` without a role counts (R4). */
+function isField(node: AxNode): boolean {
+  return FIELD_ROLES.has(str(node.role?.value)) || isEditable(node)
+}
+
+/**
+ * A select: a combobox nobody types into. An editable combobox (a search or autocomplete box)
+ * is a text field, so its typed query gets no select's exception and a suggestion that repeats
+ * it is not given out (round 3 of the N-003 certification: `divorce lawyer near me` came back).
+ */
+function isSelect(node: AxNode): boolean {
+  return str(node.role?.value) === 'combobox' && !isEditable(node)
 }
 
 /** Where a node sits, from the outside in; a child is at least as far in as its parent. */
@@ -317,7 +330,7 @@ function isSecret(node: AxNode, secretFields: ReadonlySet<number>): boolean {
 function kindOf(node: AxNode, secretFields: ReadonlySet<number>): Inside {
   if (isSecret(node, secretFields)) return SECRET
   if (!isField(node)) return OUTSIDE
-  return str(node.role?.value) === 'combobox' ? CHOICE : FIELD
+  return isSelect(node) ? CHOICE : FIELD
 }
 
 function isSetLike(value: unknown): value is ReadonlySet<number> {
@@ -670,7 +683,7 @@ function fieldValues(
   fields.sort((a, b) => Number(isSecret(b, secretFields)) - Number(isSecret(a, secretFields)))
   for (const field of fields) {
     const floor = isSecret(field, secretFields) ? MIN_CLEANED_SECRET : MIN_CLEANED_VALUE
-    const fromSelect = str(field.role?.value) === 'combobox'
+    const fromSelect = isSelect(field)
     const pieces: string[] = []
     content.set(field.nodeId, pieces)
     const look = (text: string, kept: boolean): void => {
