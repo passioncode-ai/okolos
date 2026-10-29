@@ -18,7 +18,6 @@
     "@okolos/core-sanitizer": "workspace:*",
     "@okolos/core-gate": "workspace:*",
     "@okolos/core-queue": "workspace:*",
-    "@okolos/model": "workspace:*",
     "@okolos/core-feeds": "workspace:*",
     "@okolos/core-lookalike": "workspace:*",
     "@okolos/core-traps": "workspace:*",

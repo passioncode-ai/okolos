@@ -439,8 +439,6 @@ export interface RpcMap {
   }
   /** Remembers the user's exception and returns where to go, or null if refused. */
   'block/allow': { req: { url: string }; res: { url: string } | null }
-  /** `score: null` means there is no model here — never that the text is fine. */
-  'inference/score': { req: { text: string }; res: { score: number | null; backend: string | null } }
 }
 
 export type RpcType = keyof RpcMap

@@ -13,3 +13,10 @@ export {
   type RuntimeSession,
 } from './session.js'
 export { createOnnxRuntime, MODEL } from './runtime.js'
+export {
+  createInferenceHost,
+  type InferenceDeps,
+  type InferenceHostKind,
+  type InferenceStatus,
+  type PreparedInference,
+} from './host.js'

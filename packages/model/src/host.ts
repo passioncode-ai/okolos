@@ -1,11 +1,18 @@
 
 import { t } from '@okolos/i18n'
-import { ClassifierSession, type InferenceRuntime } from '@okolos/model'
-import type { InferenceHost } from '@okolos/core-injection'
-import type { InferenceHostKind } from '@okolos/platform'
+
+import { ClassifierSession, type InferenceRuntime } from './session.js'
 
 /**
- * Wiring the classifier into the background, without letting it pretend.
+ * Wiring a classifier into a context, without letting it pretend.
+ *
+ * **Not wired into anything that ships** (ADR-0006, B-131). Until 2026-10-29 this lived in
+ * the background and was prepared on every wake-up, which put this module, the session
+ * class and the model descriptor into both background bundles for a stage that is not
+ * shipped and cannot run: Chrome has no host for it, Firefox has no weights and no
+ * runtime. It moved here, beside the session it drives, as library code with its tests;
+ * shipping the stage means wiring it back into a background, deciding where the model
+ * runs, and answering the measurement that stopped it.
  *
  * Three things have to be true before a score is allowed to exist: a context
  * that can run a model (an offscreen document in Chrome, the background page in
@@ -18,6 +25,9 @@ import type { InferenceHostKind } from '@okolos/platform'
  * answer is prepared once and cached. It starts false: a host that claimed to
  * be ready before it was would make stage 3 wait on a session mid-scan.
  */
+
+/** Where a model may run: an offscreen document, a background page, or nowhere. */
+export type InferenceHostKind = 'offscreen' | 'background' | 'none'
 
 export interface InferenceDeps {
   /** Creates the offscreen document if needed and says where a model may run. */
@@ -39,7 +49,13 @@ export type InferenceStatus =
   | 'no-runtime'
   | 'no-backend'
 
-export interface PreparedInference extends InferenceHost {
+/**
+ * Shaped to satisfy `InferenceHost` in `@okolos/core-injection` (stage 3's gate) without
+ * importing it: the model package depends on nothing above the contracts.
+ */
+export interface PreparedInference {
+  available(): boolean
+  score(text: string): Promise<number>
   prepare(): Promise<InferenceStatus>
   status(): InferenceStatus
 }
@@ -77,8 +93,8 @@ export function createInferenceHost(deps: InferenceDeps): PreparedInference {
       } catch (cause) {
         // Every backend refused. Saying so beats reporting a classifier that
         // silently never fires.
-        // i18n-exempt: `deps.log` is wired to `console.warn` at its one site,
-        // `background/index.ts:170`, so this is a devtools line and not a surface
+        // i18n-exempt: `deps.log` is a devtools line for whoever wires this host, not a
+        // surface: no caller shows it to a person
         deps.log?.(`okolos: no inference backend — ${String(cause)}`)
         return (status = 'no-backend')
       }

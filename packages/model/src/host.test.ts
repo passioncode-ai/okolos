@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { InferenceRuntime } from '@okolos/model'
-
-import { createInferenceHost, type InferenceDeps } from './inference.js'
+import { createInferenceHost, type InferenceDeps } from './host.js'
+import type { InferenceRuntime } from './session.js'
 
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -9,7 +8,7 @@ import { fromCatalogue, useResolver, type Catalogue } from '@okolos/i18n'
 
 /** The shipped Russian catalogue: `default_locale` is `ru`, and a fake would let a missing key pass. */
 const CATALOGUE = JSON.parse(
-  readFileSync(path.resolve(import.meta.dirname, '../../_locales/ru/messages.json'), 'utf8'),
+  readFileSync(path.resolve(import.meta.dirname, '../../../apps/extension/_locales/ru/messages.json'), 'utf8'),
 ) as Catalogue
 
 useResolver(fromCatalogue(CATALOGUE))

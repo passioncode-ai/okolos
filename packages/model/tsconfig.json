@@ -6,5 +6,5 @@
   // fixtures — including deliberate examples of the very calls the bundle
   // gates forbid — inside the artefact those gates read.
   "exclude": ["src/**/*.test.ts"],
-  "references": [{ "path": "../contracts" }]
+  "references": [{ "path": "../contracts" }, { "path": "../i18n" }]
 }

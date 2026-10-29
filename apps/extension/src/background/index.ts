@@ -1,15 +1,13 @@
 import { standingFindings } from '@okolos/core-extensions'
-import { classifyUndecided, detectHidden } from '@okolos/core-injection'
+import { detectHidden } from '@okolos/core-injection'
 import { detectPlatform, type RpcSender } from '@okolos/platform'
 import { buildRules, matchUrl, type FeedSnapshot,
 } from '@okolos/core-feeds'
-import { createOnnxRuntime, MODEL } from '@okolos/model'
 import {
   INVENTORY_INTERVAL_MS,
   LAST_FEED_KEY,
   LAST_INVENTORY_KEY,
   LAST_SWEEP_KEY,
-  createModelCache,
   dueForFeed,
   dueForSweep,
   openDb,
@@ -35,7 +33,6 @@ import {
 } from './extensions.js'
 import { CAVALIER, hibp, lookupLeaks } from './leaks.js'
 import { checkSubmittedPassword } from './password.js'
-import { createInferenceHost } from './inference.js'
 import { ensureRules, runIfDue, WAKE_ALARMS, type DueStore } from './wake.js'
 
 /**
@@ -184,41 +181,15 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
 })
 
 /**
- * The classifier host.
+ * Stage 3, the classifier, is not wired here: it is not shipped (ADR-0006).
  *
- * It prepares itself once per wake-up and reports honestly why it is
- * unavailable when it is: no place to run a model, no weights the user agreed
- * to fetch, or no runtime bundled. Today the last of those is the real answer —
- * the weights carry a licence question that is the operator's to settle — so
- * stage 3 never fires and nothing above it claims otherwise.
+ * Until 2026-10-29 a classifier host was prepared on every wake-up and asked about every
+ * candidate the rules left undecided. It could never answer (Chrome has nowhere to run a
+ * model since B-50, Firefox has no weights and no runtime), but it put `@okolos/model`
+ * into both background bundles and sent `inference/score` to a receiver that no longer
+ * existed (B-131). The host and the stage's gate stay as library code with their tests:
+ * `createInferenceHost` in `@okolos/model`, `classifyUndecided` in `@okolos/core-injection`.
  */
-const inference = createInferenceHost({
-  ensureHost: () => platform.inference.ensureHost(),
-  weights: async () => {
-    try {
-      const db = await openDb()
-      const cache = createModelCache({ db, now: () => new Date().toISOString() })
-      return await cache.read(MODEL.id, MODEL.version)
-    } catch {
-      return null
-    }
-  },
-  runtime: createOnnxRuntime,
-  remoteScore: async (text) => {
-    const response = await platform.runtime.send('inference/score', { text })
-    return response?.score ?? null
-  },
-  log: (message) => console.warn(message),
-})
-
-/**
- * Prepared per wake-up, not per page. Chrome tears the worker down after about
- * thirty seconds of quiet, so this runs again on the next message — which is
- * also what makes a model installed mid-session take effect without a restart.
- */
-const prepared = inference.prepare().catch(() => 'no-host' as const)
-
-
 async function handleCandidates(page: PageCandidates): Promise<{ verdicts: Verdict[] }> {
   // Before anything that can throw or await: the fact being recorded is "this worker
   // heard the question", and a mark placed after the first await would be missing in
@@ -227,11 +198,6 @@ async function handleCandidates(page: PageCandidates): Promise<{ verdicts: Verdi
   const now = new Date().toISOString()
   const ctx = { now, newId: () => crypto.randomUUID() }
   const verdicts = detectHidden(page, ctx)
-  await prepared
-
-  // Stage 3 sees only what the rules left undecided.
-  const decidedLocators = verdicts.flatMap((v) => v.evidence.map((e) => e.locator ?? ''))
-  verdicts.push(...(await classifyUndecided(page, decidedLocators, inference, ctx)))
 
   if (verdicts.length > 0) {
     try {
