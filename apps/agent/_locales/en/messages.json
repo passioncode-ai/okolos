@@ -396,6 +396,9 @@
       }
     }
   },
+  "journalDayFull": {
+    "message": "The agents' journal is full until 00:00 UTC: it holds 5000 agent entries for the day. Until then every tool call an agent makes ends in an Okolos Agent failure, and no page content reaches agents. An agent can still close its task."
+  },
   "refusalsIncomplete": {
     "message": "This list is incomplete: while writes to the agents' journal fail, refusals and failures are not recorded."
   },
