@@ -1,5 +1,6 @@
 /** @vitest-environment happy-dom */
 import { describe, expect, it, vi } from 'vitest'
+import { HIBP_KEY_HEADER_SHAPE } from '@okolos/core-leaks'
 import type { AuditEntry } from '@okolos/contracts'
 
 import { renderSelfAudit } from './panel.js'
@@ -462,7 +463,7 @@ describe('the summary counts the key when it left', () => {
 
   it('names the key, counted, beside the address', () => {
     const summary = render([
-      lookup('hibp', 'email:s***@example.test, header:hibp-api-key'),
+      lookup('hibp', `email:s***@example.test, ${HIBP_KEY_HEADER_SHAPE}`),
       lookup('cavalier', 'email:s***@example.test'),
     ])
     expect(summary).toContain(lead('auditSummaryCarriedAddress'))

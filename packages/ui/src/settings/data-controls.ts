@@ -38,14 +38,20 @@ export interface LeakKeyPanel {
  * another keyboard layout brings). The last two are told apart because the remedy differs:
  * a person told to look for a space will not find a Cyrillic letter.
  */
-export function leakKeyProblem(key: string): 'empty' | 'shape' | 'latin' | null {
+export function leakKeyProblem(key: string): 'empty' | 'long' | 'shape' | 'latin' | null {
   if (key === '') return 'empty'
+  // A real key is 32 characters. The cap is far above it and only stops a paste of the wrong
+  // thing (a page, a file) from being stored and sent as a header on every check.
+  if (key.length > LEAK_KEY_MAX) return 'long'
   // A space, a control character or any other blank: code points up to U+0020, DEL, and \s.
   if (/\s/.test(key) || [...key].some((ch) => ch.charCodeAt(0) <= 0x20 || ch.charCodeAt(0) === 0x7f)) {
     return 'shape'
   }
   return /^[\x21-\x7e]+$/.test(key) ? null : 'latin'
 }
+
+/** The longest key the block accepts; `leakKeyLong` names the same number. */
+export const LEAK_KEY_MAX = 256
 
 export interface DataControlsHandlers {
   readonly onExport: () => Promise<void>
@@ -280,9 +286,11 @@ function renderLeakKey(doc: Document, panel: LeakKeyPanel): HTMLElement {
           'leak-key-needs',
           problem === 'empty'
             ? t('leakKeyEmpty')
-            : problem === 'shape'
-              ? t('leakKeyShape')
-              : t('leakKeyLatin'),
+            : problem === 'long'
+              ? t('leakKeyLong')
+              : problem === 'shape'
+                ? t('leakKeyShape')
+                : t('leakKeyLatin'),
         ),
       )
       return

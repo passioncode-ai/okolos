@@ -1,4 +1,5 @@
 export {
+  HIBP_KEY_HEADER_SHAPE,
   HIBP_SOURCE,
   mergeLeaks,
   type KeyRemedy,

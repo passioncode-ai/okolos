@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import type { AuditEntry, RpcMap } from '@okolos/contracts'
-import type { KeyRemedy } from '@okolos/core-leaks'
+import { HIBP_KEY_HEADER_SHAPE, type KeyRemedy } from '@okolos/core-leaks'
 
 import { CAVALIER, hibp, hibpFromStore, lookupLeaks, type LeakSource } from './leaks.js'
 
@@ -179,7 +179,9 @@ describe('a source that needs the person\'s key', () => {
     // The outbound log is exportable and shown on a screen: the key is in no field of it.
     expect(JSON.stringify(audit)).not.toContain(FAKE_KEY)
     // But its "what left" line says a key left, by the header's name (B-125 round 2).
-    expect(audit[0]?.payloadShape).toBe('email:a***@b.test, header:hibp-api-key')
+    // One constant, read by the self-audit summary too, so the two cannot drift apart.
+    expect(audit[0]?.payloadShape).toBe(`email:a***@b.test, ${HIBP_KEY_HEADER_SHAPE}`)
+    expect(HIBP_KEY_HEADER_SHAPE).toBe('header:hibp-api-key')
   })
 
   it('says the key was refused, and marks it as the key\'s fault, on a 401', async () => {

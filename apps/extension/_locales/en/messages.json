@@ -1275,7 +1275,7 @@
     "message": "Have I Been Pwned looks an address up only with your own paid key. The key is kept on this device and goes only to haveibeenpwned.com, in the request header, when you press Check now. It never goes into the export or the logs."
   },
   "leakKeyNone": {
-    "message": "No key is saved, so Have I Been Pwned is not checked."
+    "message": "No key is saved, so your address is not sent to Have I Been Pwned."
   },
   "leakKeySaved": {
     "message": "A key is saved on this device and is not shown here. To change it, paste a new one."
@@ -1285,6 +1285,9 @@
   },
   "leakKeyLatin": {
     "message": "The key has a character outside the Latin keyboard layout, such as a Cyrillic letter, so nothing was saved."
+  },
+  "leakKeyLong": {
+    "message": "The key is longer than 256 characters, so nothing was saved. A Have I Been Pwned key is much shorter."
   },
   "leakKeySave": {
     "message": "Save key"
@@ -1313,7 +1316,7 @@
     }
   },
   "leakSourceKeyUnreadable": {
-    "message": "$NAME$ was not checked: the saved key could not be read on this device.",
+    "message": "$NAME$ was not checked: whether a key is saved could not be read.",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -1430,7 +1433,7 @@
     "message": "Nothing has been looked up yet. Checking sends your address to Hudson Rock Cavalier and, if a key is saved, to Have I Been Pwned with the key in the request header. These sources answer to nothing less. Your passwords are never sent: that check uses a partial hash and is separate."
   },
   "leaksIdleNoKey": {
-    "message": "Nothing has been looked up yet. Checking sends your address to Hudson Rock Cavalier, which answers to nothing less. Have I Been Pwned is not asked until you save a key. Your passwords are never sent: that check uses a partial hash and is separate."
+    "message": "Nothing has been looked up yet. Checking sends your address to Hudson Rock Cavalier, which answers to nothing less. Your address does not go to Have I Been Pwned until you save a key. Your passwords are never sent: that check uses a partial hash and is separate."
   },
   "leaksIdleWithKey": {
     "message": "Nothing has been looked up yet. Checking sends your address to Hudson Rock Cavalier and Have I Been Pwned, which answer to nothing less, and your key goes to Have I Been Pwned in the request header. Your passwords are never sent: that check uses a partial hash and is separate."

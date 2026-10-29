@@ -489,6 +489,19 @@ describe('the Have I Been Pwned key', () => {
     expect(role(el, 'leak-key-needs')?.textContent).toBe(message('leakKeyShape'))
   })
 
+  it('refuses a key longer than any real one, by its own sentence', () => {
+    const panel = keyPanel(false)
+    const el = mountKey(panel)
+    field(el).value = 'a'.repeat(257)
+    role(el, 'leak-key-save')?.click()
+    expect(panel.onSave).not.toHaveBeenCalled()
+    expect(role(el, 'leak-key-needs')?.textContent).toBe(message('leakKeyLong'))
+
+    field(el).value = 'a'.repeat(256)
+    role(el, 'leak-key-save')?.click()
+    expect(panel.onSave).toHaveBeenCalledWith('a'.repeat(256))
+  })
+
   it('clears an earlier refusal once a key is accepted', () => {
     const el = mountKey(keyPanel(false))
     role(el, 'leak-key-save')?.click()

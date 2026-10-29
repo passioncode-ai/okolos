@@ -111,7 +111,7 @@ describe('before and during', () => {
       expect(idleFor(keySaved), 'Cavalier always receives the address').toContain('Hudson Rock Cavalier')
       expect(idleFor(keySaved)).toContain(HIBP_SOURCE)
     }
-    expect(msg('leaksIdleNoKey')).toMatch(/не спрашивается/)
+    expect(msg('leaksIdleNoKey')).toMatch(/адрес не уйдёт, пока не сохранён ключ/)
     expect(msg('leaksIdleWithKey')).toMatch(/в заголовке запроса/)
   })
 

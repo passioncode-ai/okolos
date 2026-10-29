@@ -160,10 +160,15 @@ async function leaksSection(): Promise<HTMLElement> {
             return
           }
           leaks = { kind: 'checking' }
+          // The key state this check runs under. If the key is saved, removed or erased
+          // while it runs, here or in another tab, its answer describes a state that is gone
+          // and is dropped rather than drawn over the reset (N-110 round 3).
+          const epoch = leakEpoch
           await paintCurrent()
+          let answer: LeaksState
           try {
             const result = await platform.runtime.send('leaks/check', { address })
-            leaks = result
+            answer = result
               ? {
                   kind: 'ready',
                   inventory: { ...result, leaks: result.leaks },
@@ -171,8 +176,10 @@ async function leaksSection(): Promise<HTMLElement> {
                 }
               : { kind: 'error', message: t('errCheckEmpty') }
           } catch (cause) {
-            leaks = { kind: 'error', message: String(cause) }
+            answer = { kind: 'error', message: String(cause) }
           }
+          if (epoch !== leakEpoch) return
+          leaks = answer
           await paintCurrent()
         })()
       },
@@ -1060,7 +1067,13 @@ async function dataSection(): Promise<HTMLElement> {
         const db = await openDb()
         return wipeAll(db)
       },
-      onWiped: () => void reload(),
+      // The erase took the key, so the leaks screen goes back to its start here and in every
+      // other tab: its last result spoke about a key that no longer exists (N-110 round 3).
+      onWiped: () => {
+        forgetLeakScreen()
+        announceKeyChange('erased')
+        void reload()
+      },
     },
     // Every store, from the schema that owns the list — not a subset written here.
     // `DATA_KIND_KEY` is `Record<StoreName, string>`, so a store added later fails
@@ -1081,6 +1094,38 @@ async function dataSection(): Promise<HTMLElement> {
  */
 function forgetLeakResult(): void {
   leaks = { kind: 'idle' }
+  leakEpoch += 1
+}
+
+/** Bumped whenever the key state changes; a check that started under another value is stale. */
+let leakEpoch = 0
+
+/**
+ * Everything the leaks screen holds, gone: the result and the typed address. For an erase
+ * and a store reset, which take the key and every other record with them (SCN-023).
+ */
+function forgetLeakScreen(): void {
+  forgetLeakResult()
+  address = ''
+  addressField.value = ''
+}
+
+/**
+ * Other open tabs of this page hold their own `leaks` in their own memory. The key lives in
+ * IndexedDB, which raises no change event, so the tab that changed it says so here and every
+ * other tab drops its result and repaints (N-110 round 3). Absent where the browser has no
+ * BroadcastChannel; the stale tab then keeps its result until its next check.
+ */
+const keyChannel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('okolos:leak-key')
+keyChannel?.addEventListener('message', (event: MessageEvent<unknown>) => {
+  if (event.data === 'erased') forgetLeakScreen()
+  else forgetLeakResult()
+  void reload()
+})
+
+/** Tells the other tabs; this tab has already reset itself. */
+function announceKeyChange(kind: 'changed' | 'erased'): void {
+  keyChannel?.postMessage(kind)
 }
 
 /**
@@ -1105,11 +1150,13 @@ async function leakKeyPanel(): Promise<LeakKeyPanel | undefined> {
       void act(async () => {
         await saveLeakKey(await openDb(), key)
         forgetLeakResult()
+        announceKeyChange('changed')
       }),
     onRemove: () =>
       void act(async () => {
         await removeLeakKey(await openDb())
         forgetLeakResult()
+        announceKeyChange('changed')
       }),
   }
 }
@@ -1212,6 +1259,8 @@ async function storageProblem(): Promise<HTMLElement | null> {
         onReset: () => {
           void (async () => {
             await resetStorage()
+            forgetLeakScreen()
+            announceKeyChange('erased')
             await reload()
           })()
         },

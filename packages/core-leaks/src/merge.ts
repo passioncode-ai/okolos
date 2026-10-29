@@ -43,6 +43,13 @@ export type KeyRemedy = 'missing' | 'refused' | 'unreadable'
  */
 export const HIBP_SOURCE = 'Have I Been Pwned'
 
+/**
+ * How a breach lookup records, in the outbound log's payload shape, that the person's key
+ * went in its header: the header's name, never its value. The background writes it and the
+ * self-audit summary counts it; one constant so the count cannot silently stop matching.
+ */
+export const HIBP_KEY_HEADER_SHAPE = 'header:hibp-api-key'
+
 export type SourceStatus =
   | { readonly name: string; readonly answered: true; readonly leaks: readonly Leak[] }
   | {

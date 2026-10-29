@@ -228,7 +228,7 @@ test('a source that cannot run is named, and the total says it may be incomplete
 
   await addKey.click()
   await expect(page.locator('[data-role=leak-key] [data-role=leak-key-state]')).toHaveText(
-    'No key is saved, so Have I Been Pwned is not checked.',
+    'No key is saved, so your address is not sent to Have I Been Pwned.',
   )
 
   // The return leg (N-110 round 2). The result above lives in page memory, and coming back
@@ -306,7 +306,7 @@ test('a saved key is asked with, sent only in its header, never shown back, and 
   await page.goto(`chrome-extension://${extensionId}/options.html#data`)
   await page.locator('[data-role=leak-key] [data-role=leak-key-remove]').click()
   await expect(page.locator('[data-role=leak-key] [data-role=leak-key-state]')).toHaveText(
-    'No key is saved, so Have I Been Pwned is not checked.',
+    'No key is saved, so your address is not sent to Have I Been Pwned.',
   )
   await expect(page.locator('[data-role=leak-key] [data-role=leak-key-remove]')).toHaveCount(0)
 })
@@ -351,7 +351,7 @@ test('with no key saved, the screen names only the source it will ask, and credi
 
   const idle = page.locator('[data-role=leaks] [data-role=idle]')
   await expect(idle).toContainText('sends your address to Hudson Rock Cavalier')
-  await expect(idle).toContainText('Have I Been Pwned is not asked until you save a key')
+  await expect(idle).toContainText('Your address does not go to Have I Been Pwned until you save a key')
   const attribution = page.locator('[data-role=leaks] [data-role=attribution]')
   await expect(attribution).toHaveCount(0)
 
@@ -491,4 +491,85 @@ test('an address that is not one is refused by name', async ({ context, extensio
   await expect(page.locator('[data-role=leaks] [data-role=needs]')).toContainText(
     'does not look like an email address',
   )
+})
+
+test('erasing all data takes the leaks result with it, key line and address included', async ({
+  context,
+  extensionId,
+}) => {
+  test.slow()
+  // N-110 round 3: the wipe erased the key and left "refused the saved key, Replace key" on
+  // the leaks screen, about a key that no longer existed.
+  hibpStatus = 401
+  const page = await context.newPage()
+  watchNavigation(page)
+  await page.goto(`chrome-extension://${extensionId}/options.html#data`)
+  await page.locator('[data-role=leak-key] [data-role=leak-key-field]').fill(FAKE_KEY)
+  await page.locator('[data-role=leak-key] [data-role=leak-key-save]').click()
+  await expect(page.locator('[data-role=leak-key] [data-role=leak-key-remove]')).toBeVisible()
+
+  await page.goto(`chrome-extension://${extensionId}/options.html#leaks`)
+  await fillAddress(page, 'someone@example.test')
+  await page.locator('[data-role=leaks] [data-role=check]').click()
+  await expectWithDiagnosis(
+    page,
+    expect(page.locator('[data-role=leaks] [data-role=source-key]')).toContainText('refused the saved key', {
+      timeout: RECORD_VISIBLE_MS,
+    }),
+  )
+
+  await page.goto(`chrome-extension://${extensionId}/options.html#data`)
+  await page.locator('[data-role=wipe]').click()
+  await page.locator('[data-role=confirm-yes]').click()
+  await expect(page.locator('[data-role=leak-key] [data-role=leak-key-remove]')).toHaveCount(0)
+
+  await page.goto(`chrome-extension://${extensionId}/options.html#leaks`)
+  await expect(page.locator('[data-role=leaks] [data-role=source-key]')).toHaveCount(0)
+  await expect(page.locator('[data-role=leaks] [data-role=idle]')).toContainText(
+    'Your address does not go to Have I Been Pwned until you save a key',
+  )
+  await expect(page.locator('[data-role=address]')).toHaveValue('')
+})
+
+test('another open tab, and a check still in flight, drop a result computed under the old key', async ({
+  context,
+  extensionId,
+}) => {
+  test.slow()
+  // Hold Cavalier's answer until the key has changed in the other tab.
+  let release: () => void = () => undefined
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await context.unroute('https://cavalier.hudsonrock.com/**')
+  await context.route('https://cavalier.hudsonrock.com/**', async (route) => {
+    await held
+    await route.fulfill({ status: 200, contentType: 'application/json', body: cavalierBody })
+  })
+
+  const leaksTab = await context.newPage()
+  watchNavigation(leaksTab)
+  await leaksTab.goto(`chrome-extension://${extensionId}/options.html#leaks`)
+  await fillAddress(leaksTab, 'someone@example.test')
+  await leaksTab.locator('[data-role=leaks] [data-role=check]').click()
+  await expect(leaksTab.locator('[data-role=leaks] [data-role=status]')).toBeVisible()
+
+  const settingsTab = await context.newPage()
+  await settingsTab.goto(`chrome-extension://${extensionId}/options.html#data`)
+  await settingsTab.locator('[data-role=leak-key] [data-role=leak-key-field]').fill(FAKE_KEY)
+  await settingsTab.locator('[data-role=leak-key] [data-role=leak-key-save]').click()
+  await expect(settingsTab.locator('[data-role=leak-key] [data-role=leak-key-remove]')).toBeVisible()
+
+  // The other tab was told: it is back before a check, named for the key that now exists.
+  await expect(leaksTab.locator('[data-role=leaks] [data-role=idle]')).toContainText(
+    'Hudson Rock Cavalier and Have I Been Pwned',
+    { timeout: RECORD_VISIBLE_MS },
+  )
+
+  // And the answer to the check started under no key is dropped when it lands.
+  release()
+  await leaksTab.waitForTimeout(1500)
+  await expect(leaksTab.locator('[data-role=leaks] [data-role=source-key]')).toHaveCount(0)
+  await expect(leaksTab.locator('[data-role=leaks] [data-role=coverage]')).toHaveCount(0)
+  await expect(leaksTab.locator('[data-role=leaks] [data-role=idle]')).toBeVisible()
 })

@@ -1,5 +1,6 @@
 import { t } from '@okolos/i18n'
 import {
+  HIBP_KEY_HEADER_SHAPE,
   HIBP_SOURCE,
   mergeLeaks,
   type KeyRemedy,
@@ -109,7 +110,7 @@ export function hibp(apiKey: string | null): LeakSource {
           purpose: 'leak-lookup',
           // The header is named, never its value: the self-audit's "what left" line has to say a
           // key left, and this log is exportable (B-125 round 2).
-          payloadShape: `email:${redact(address)}, header:hibp-api-key`,
+          payloadShape: `email:${redact(address)}, ${HIBP_KEY_HEADER_SHAPE}`,
           triggeredBy: 'user:leak-check',
           headers: { 'hibp-api-key': apiKey ?? '' },
           // The address is a path segment here, which the guard did not
