@@ -1,0 +1,191 @@
+{
+  "node": "N-106",
+  "done": [
+    "B-158 is met inside the unit: after a successful publish with --snapshot-pr (implied by --agent, which the installed plist already passes) the job proposes feeds/phishing.json when origin/main's snapshot is >= FEED_MAX_AGE_DAYS/2 = 7 days old (unrounded compare), and skips when main already carries the version (snapshot-pr.mjs:279-297, feed-job.mjs:403)",
+    "never force-pushes: the only push is `git push --quiet origin <commit>:refs/heads/chore/feed-snapshot-auto` with no + and no --force; parents are chosen so the push is always a fast-forward of the branch tip (snapshot-pr.mjs:318-337, 361)",
+    "commits only the snapshot: the tree is origin/main's tree plus one blob at FEED_PATH via a private GIT_INDEX_FILE; a branch carrying any other path versus its merge base is refused and left for a person (snapshot-pr.mjs:321-327, 346-351)",
+    "never touches the agent's checkout HEAD, index or files: read-tree/update-index/write-tree use a private index in a mkdtemp folder that finally removes; only objects and a remote-tracking ref are written (snapshot-pr.mjs:346-351, 462-464)",
+    "edits only its own pull request: candidates are filtered on isCrossRepository === false and headRepositoryOwner.login equal to the repository owner, and an own PR is edited only once headRefOid equals the commit just pushed, after up to 3 reads 3 s apart (snapshot-pr.mjs:395-426)",
+    "asks auto-merge only where allowed and gated: allow_auto_merge false or zero required_status_checks rules leads to auto-merge-unavailable with a 'waits for a person' body; otherwise `gh pr merge --auto --merge --match-head-commit <commit>`, never --admin; a GitHub refusal rewrites the body (snapshot-pr.mjs:371-387, 443-455)",
+    "leaks no token: GH_TOKEN, GITHUB_TOKEN and both enterprise tokens are deleted and withoutSecrets strips the Cloudflare credential for every git and gh child; reasons carry only the last stderr line (snapshot-pr.mjs:141, 229-236)",
+    "bounded in time: every child gets min(own limit, deadline - now) and none starts with < 1 s left; the job's deadline is min(now + 5 min, begun + watchdog - grace - 30 s) (snapshot-pr.mjs:238-246, feed-job.mjs:407)",
+    "a failure or stop in the step never fails a publish: proposeSnapshot never throws, the job wraps it again, writeSnapshotPr failure is only logged, the stage returns outcome published; a stop after onPublished makes signalRecord write outcome published with the step recorded as stopped (feed-job.mjs:401-444, 490-502)",
+    "a waiting PR is not hidden by a failed step: withSince carries previous.pr with since/prAt/prOutcome forward unless the step saw it MERGED/CLOSED/NOT_OPEN or saw main carry the version; every run record (published, skipped, failed, stopped) carries the last step; --status names the PR and says it waits for a person unless auto-merge was requested (snapshot-pr.mjs:118-135, feed-job.mjs:249, 511, install-feed-agent.mjs:423-439)",
+    "the hook's skip notice reaches feed.log: the push runs with OKOLOS_SKIP_GATES=1 and onLine forwards each line to `log`, which the job binds to its feed.log writer; a real-git, real-hook test asserts 'pre-push: SKIPPED by OKOLOS_SKIP_GATES' in the log file (snapshot-pr.mjs:361-364, snapshot-pr.test.ts:631-685)",
+    "the installed bootstrap files are byte-identical to c71855a: git diff c71855a eea8bc9 is empty for every BOOTSTRAP_SOURCES entry (feed/bootstrap, bounded, lock, log, paths, status .mjs and tools/is-main.mjs); the plist change is a comment only",
+    "importing feed-snapshot.mjs from snapshot-pr.mjs has no side effect: its CLI body is behind isMain (feed-snapshot.mjs tail), and snapshot() now writes the same bytes through snapshotText",
+    "gh field names the step reads exist in the installed gh 2.100.0 (autoMergeRequest, isCrossRepository, headRepositoryOwner, headRefOid in `gh pr list --json`), and a live list returns headRepositoryOwner as {id, login}, the shape the own-PR filter reads",
+    "replayed against the real repository from a worktree of the same clone: `gh api repos/{owner}/{repo} --jq .allow_auto_merge` -> false, `gh repo view --json owner` -> passioncode-ai, rules/branches/main required_status_checks count -> 0, `gh pr list --head chore/feed-snapshot-auto ...` -> []; the step therefore resolves to auto-merge-unavailable here, the path the docs describe",
+    "the plist launch line still parses a record that carries snapshotPr: writeStatus keeps consecutiveFailures and lastPublished as the last two top-level keys and snapshotPr's nested braces are indented four spaces, so its sed lines extracted p=1 and the lastPublished block correctly on a generated record",
+    "a stop after the publish is recorded by the job as outcome published, exit 0, with runId (toldByBootstrap), so the bootstrap adopts it (runId match) and the launch line, seeing the runId, writes no second failure; consecutiveFailures stays 0 and lastPublished moves, as AGENTS.md says",
+    "the snapshot step's deadline (begun + watchdog - grace - 30 s) leaves room for one call's 5 s kill grace plus readServed's 20 s, so it cannot itself push the job past its watchdog; the bootstrap's OKOLOS_WATCHDOG_MS reaches it through watchdogFrom",
+    "a linked worktree runs its own .githooks/pre-push copy (experiment with git 2.55.0: hook cwd and copy were the worktree's), so the agent's push runs origin/main's hook, which exits 0 on OKOLOS_SKIP_GATES and prints the notice the log is meant to keep",
+    "the pin stage of the next run is untouched: the step writes through GIT_INDEX_FILE in a private temp folder and never moves HEAD, index or files; `git status --porcelain --untracked-files=no` sees nothing (real-git test asserts it)",
+    "snapshot-pr.mjs imports only node built-ins and repository modules (feed-age.mjs, feed-snapshot.mjs, feed/bounded.mjs), so the agent checkout, which installs only @okolos/proxy, can load it; feed-snapshot.mjs's CLI runs only under isMain",
+    "no bootstrap file changed (BOOTSTRAP_FILES: bootstrap, bounded, is-main, lock, log, paths, status), so the installed copy reports no drift and no reinstall is needed; the plist template changed only in a comment, which --status does not compare",
+    "the served-equals-published check compares like with like: sign-feed.mjs signs the parsed input unchanged and writes {update, signature}, and readServed returns the raw text, so {kind, body} deep-equality holds for an honest publish",
+    "a snapshot-only PR already passed this repository's CI (PR #19, 8798558: gates, e2e chromium, e2e firefox success), and no CI test pins a number taken from feeds/phishing.json",
+    "under launchd's login shell the tools the step needs resolve: env -i ... /bin/sh -lc finds /opt/homebrew/bin/gh, pnpm, node and /usr/bin/git; SSH auth for the push is the same key the pin stage's fetch already uses over git@github.com",
+    "--purge removes snapshot-pr.json with the state directory, and AGENTS.md says the GitHub branch, the PR and the remote-tracking ref stay",
+    "The repository state the documents cite is true today: allow_auto_merge false, merge commit, squash and rebase all allowed, delete_branch_on_merge false, main's rules are deletion and non_fast_forward only, ruleset protect-default-branch has bypass_actors [] (gh api GET, 2026-10-29). So 'every PR waits for a person until B-186' and the side effect of a required check (direct pushes to main refused) are stated correctly.",
+    "The dates hold: main carries v65 with body.updatedAt 2026-10-26T21:08:47.576Z, so 7 days is 2026-11-02T21:08Z and the 14-day gate (FEED_MAX_AGE_DAYS 14, measured from body.updatedAt) is 2026-11-09T21:08Z, as AGENTS.md, ADR-0017, feed-signing.md and docs/README.md say.",
+    "'No reinstall needed' holds for both plists: main's old plist runs `cd {{CHECKOUT}} && exec node tools/feed-job.mjs --agent` and the B-159 bootstrap runs the same job, and --agent now implies --snapshot-pr; the one-run lag the documents name follows from the job fast-forwarding the checkout while already running the previous commit's code. The B-159 reinstall step is not changed or made a prerequisite.",
+    "gh is reachable under launchd's login shell on this Mac: `env -i HOME=... /bin/sh -lc 'command -v gh'` prints /opt/homebrew/bin/gh (/etc/paths.d/homebrew); gh is logged in (keyring) with push and admin on the repository. The documents name the push and gh as not yet observed under launchd, which is the honest status.",
+    "Uninstall and --purge: the documents say GitHub, the branch and the remote-tracking ref stay, and --purge removes snapshot-pr.json with the state folder; the code removes paths.state on purge and never calls GitHub on uninstall. The runbook gives the three manual cleanup commands.",
+    "The manual snapshot procedure is reconciled, not contradicted: feed-signing.md says hands commit only when no agent PR exists, covers the hand-commit-while-open case (close the PR, keep the branch) and the 'failed is not no PR' case, and the fallback on day eight is the old pnpm feed:snapshot route through a PR.",
+    "The 14-day gate is not touched and nothing else in CI pins the snapshot's content: no gate reads its version or entry count (tools/docs.test.ts, docs/licences.md, docs/brand/facts.md checked), so an agent PR that changes only feeds/phishing.json can pass CI.",
+    "No user of the extension sees a change: the extension pulls the signed feed from the worker and the package does not bundle feeds/phishing.json; docs/ux/scenarios.md and facts.md carry no claim about the committed snapshot, so no scenario update was owed.",
+    "The PR text says what will happen to the PR in both branches and always names 'Create a merge commit'; the --status note names the PR, link, since and as-of times as the documents claim (tools/install-feed-agent.test.ts 'shows the snapshot pull request that waits for a person...').",
+    "The alarm fields are unchanged in meaning: a snapshot-step failure or stop leaves outcome published and consecutiveFailures not raised, as documented, so OBS-32's two-failures and 26-hour rules count the same set as before.",
+    "No em dash (U+2014) in any added prose line; the only hit is the pre-existing table placeholder cell."
+  ],
+  "not_done": [],
+  "not_verified": [
+    "unit: how the bootstrap and launchd count the 143 exit of a run stopped after a successful publish (the record says published, exit 0); that crosses into tools/feed/bootstrap.mjs and is the seam tier's",
+    "unit: live GitHub behaviour: whether allow_auto_merge is visible to the agent's gh login, what repos/{owner}/{repo}/rules/branches/main returns for this repository, and whether auto-merge persists across the agent's pushes; only fakes and a local bare remote were exercised",
+    "unit: core.hooksPath resolution inside the agent's detached worktree (~/.okolos/agent-checkout); the skip notice is proved with a test hook path, not the installed checkout",
+    "unit: whether an origin URL with embedded credentials could surface in a git push error line logged to feed.log",
+    "unit: the doc changes (AGENTS.md, ADR-0017, docs/runbooks/feed-signing.md, development.md, README.md) against the code; gates' docs tests passed but the prose was not read",
+    "unit: the full bodies of the 75 snapshot-pr tests and the new feed-job/install tests; only their titles and the skip-notice assertions were read",
+    "seam: the installed plist, ~/.okolos state, snapshot-pr.json and the agent checkout's own runtime (gh keychain access and SSH push from a launchd gui session), per the rules: not touched",
+    "seam: a real push or gh pr create/edit/merge against GitHub (GET only): opening, updating and the auto-merge request were read only through the test doubles",
+    "seam: the Windows CI job running the new tests (no run exists for the branch)",
+    "seam: tools/docs.test.ts and the other gates on a merged sw-06 + sw-08 tree, since the merge conflicts",
+    "seam: cross-repository pages that may list the feed agent's runtime dependencies (fabric-workspace knowledge/lifecycle.md, org-index repositories.json): not opened",
+    "seam: the full pnpm gates chain (lint, build, ux, brand, i18n, package:check) on the branch: unit and product tier ground, and it writes build output into a read-only worktree",
+    "product: Whether the SSH key and gh's keyring login work from a launchd run (the documents name this as unobserved; the first evidence is snapshotPr after the first publish past 2026-11-02T21:08Z). Not exercised: launchctl and ~/.okolos were out of bounds.",
+    "product: Whether CI on an agent-opened PR actually goes green end to end (no agent PR exists yet); only that no gate pins the snapshot's content.",
+    "product: The Russian grammar of the PR body's count ('221 записей') and the decimal point in 'ему 7.3 дн.': PR text is outside the brand pack's boundary, and the operator's voice for it was not read.",
+    "product: The org knowledge base beyond a grep of a local fabric-workspace/knowledge (no page describes the feed agent, so no cross-repository fact was found to move).",
+    "product: Earlier rounds' reports for this node and the unit and seam reports of this round, read on purpose: this reading is blind."
+  ],
+  "blockers": [
+    {
+      "what": "The own-PR lookup reads at most 20 open PRs whose head branch NAME is chore/feed-snapshot-auto and filters forks client-side. On a public repository, 20 or more fork PRs from a same-named branch can push the agent's own open PR out of the list. Then mine is null, facts.previousPr is set to NOT_OPEN, gh pr create fails ('already exists'), and withSince drops the still-open waiting PR from snapshot-pr.json, the record and --status. (tools/feed/snapshot-pr.mjs:398-420 (with withSince at :125), found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "A PR opened in this step can be lost on a stop. onSignal kills child groups, waits 2 s, then writes signalRecord from the snapshot-pr.json on disk and calls process.exit. If gh pr create has already succeeded and the following gh pr merge child outlives SIGTERM for the full grace, or its close event is processed after the timer, the new PR number never reaches the record or snapshot-pr.json. (tools/feed-job.mjs:524-533 with tools/feed/snapshot-pr.mjs:431-445, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "readServedFeed is not bounded by the step's deadline: it uses readServed's own 20 s timeout. The worst case ends about 5 s before the watchdog (a child started with just over 1 s left, plus 5 s kill grace, plus 20 s fetch, set against the 30 s slack). It is inside the watchdog today only because of that slack. (tools/feed/snapshot-pr.mjs:305 and tools/feed-job.mjs:409, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "mainCarries drops the recorded PR even when it is still open. For example, a person committed the snapshot by hand while the agent's PR still waited, possibly with auto-merge requested. The obsolete PR stays open on GitHub and disappears from --status. (tools/feed/snapshot-pr.mjs:279-282 and :125, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "When the own PR's head is not the commit just pushed after 3 reads, and no earlier step recorded that PR, the step fails with the PR number only in `reason`. facts.pr is not set, so --status names no PR. (tools/feed/snapshot-pr.mjs:421-426, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The record's readers that alert do not read the new state. A PR that waits for a person produces outcome published, consecutiveFailures 0 and a fresh lastPublished, so the host rule in AGENTS.md (two failures in a row, or lastPublished older than 26 h) stays silent; only a person who runs `node tools/install-feed-agent.mjs --status` sees it, and GitHub sends no notice for one's own PR. On this repository every proposal ends auto-merge-unavailable. Records written by the bootstrap or the launch line (fail, signalRecord, crashRecord, the printf) do not carry snapshotPr either, though --status still reads snapshot-pr.json. (the status record's alerting reader as documented in AGENTS.md (Lifecycle: alert at two failures or lastPublished.at older than 26 h); tools/feed/bootstrap.mjs:239-258,392-404; tools/launchd/app.okolos.feed.plist launch line, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "This branch and its sibling sw/sw-08 rewrite the same docs/README.md row ('Ждёт человека'), and this branch's docs and the PR body the agent posts cite 'решение B-186', a row that exists only on sw/sw-08. sw/sw-06 is not an ancestor of sw/sw-08 (both branch from c71855a). (docs/README.md:18 on sw/sw-08 (e1f78c0); docs/backlog.md:62 on sw/sw-08 (B-186); tools/feed/snapshot-pr.mjs:197; AGENTS.md:157; docs/runbooks/feed-signing.md:91,252, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The new real-git tests (bare origin, a shell pre-push guard calling `exec /bin/sh '<REAL_HOOK>'`, GIT_INDEX_FILE) have never run under the Windows CI job this run added (B-164). sw/sw-06 is pushed at eea8bc9 but no Actions run exists for it, because CI runs on pull_request and on push to main only. (tools/feed/snapshot-pr.test.ts:591-700 under the 'gates (windows)' job in .github/workflows/ci.yml, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The step's new runtime dependencies (a gh login on github.com and push rights over the SSH key) are not checked by the installer or by --status. The first time they are used is the first publish after the committed snapshot turns 7 days old, which leaves at most 7 days before the release gate goes red. (tools/install-feed-agent.mjs install path and agentStatus (tools/install-feed-agent.mjs:409-458); the first exercise is tools/feed/snapshot-pr.mjs:283-285, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "docs/README.md 'Ждёт человека' is rewritten on both sw/sw-06 and sw/sw-08 with different counts and wording: sw-06 says '3 шага' (B-137 accounts, the snapshot PR merge, the B-159 reinstall); sw-08 says '3 шага и 3 решения' (adds the Edge Add-ons yes, puts the PR merge inside the B-186 decision). git merge-tree reports a content conflict in docs/README.md. (docs/README.md:18 on sw/sw-06 versus docs/README.md:18 on sw/sw-08 (e1f78c0), found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Six places say B-186's row is 'on branch sw/sw-08 until the branches merge'. True today; false the moment sw-08 lands, and nothing in this change or a gate removes the parenthetical. If sw-06 lands first, B-186 is referenced from main while the row is not on main. (AGENTS.md:157; docs/README.md:18; docs/adr/0017-*.md point 8 and Цена; docs/runbooks/feed-signing.md:92 and :252, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Backlog row B-158 is unchanged by the change that delivers its first half: it still reads only as the problem with 'Что сделать ... слияние по зелёным проверкам' and status 'open', with no note that the agent's PR step is built and that the rest waits on B-186. B-186 (on sw-08) points at B-158, but B-158 does not point back. (docs/backlog.md:37 (B-158), found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Two operator surfaces give different instructions for one documented case. When a snapshot was committed by hand while the agent's PR is open, feed-signing.md says to close that PR (it has a conflict and an old title). In the same case the step records skipped-fresh with previousPr OPEN and carries the PR, so --status keeps saying it 'waits for a person ... merge it with \"Create a merge commit\" once CI is green'. On a conflicting PR, CI does not run for the merge ref, so 'once CI is green' never comes. (tools/install-feed-agent.mjs agentStatus note (the 'waits for a person' text) versus docs/runbooks/feed-signing.md, 'снимок закоммичен руками, пока PR агента открыт', found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The hook's trace is promised without its condition. The documents say feed.log keeps the line 'pre-push: SKIPPED by OKOLOS_SKIP_GATES'. That holds only where core.hooksPath is .githooks: the agent's worktree shares the installing clone's config (set to .githooks on this Mac). When the installing clone is gone, the B-159 bootstrap recovers with `git clone --no-checkout`, which sets no hooksPath, so the push runs no hook and leaves no line. In that case the objects and the remote-tracking ref also land in the recovered clone, not 'the installing clone' AGENTS.md names. (AGENTS.md:150 and the files paragraph near :102; docs/runbooks/feed-signing.md:196; docs/adr/0017-*.md point 8 ('that notice is the trace the escape promises'); tools/feed/bootstrap.mjs:175, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The 'a week for a person' window depends on when the stack lands, and the stack is waiting on an operator decision. sw-06 is built on sw-05 (B-159), whose certification N-103 is parked waiting for the operator (B-159 row). The step first runs one agent run after this reaches origin/main. If that is later than about 2026-11-02T09:08Z the week shrinks, and after about 2026-11-09T09:08Z the PR cannot arrive before main's gate turns red. Nothing reads the record either (OBS-32), so a waiting PR shows only to a person who runs --status. (docs/README.md:18 ('в течение недели'); AGENTS.md:157-167; docs/adr/0017-*.md Цена; docs/backlog.md B-159, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "ADR-0017's proof table cites two describe names with a straight apostrophe ('only the agent's own pull request is touched', 'the pull request's text says what will happen to it'). The test file uses a typographic apostrophe (’) and a longer first name, so `grep -F` with the ADR's text finds nothing. (docs/adr/0017-*.md Чем держится, last row; tools/feed/snapshot-pr.test.ts:465 and :565, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    }
+  ],
+  "replan": {
+    "possible": true,
+    "add": [],
+    "park": [],
+    "why": "certified at all 3 tiers in round 3"
+  },
+  "evidence": [
+    "unit: pnpm exec vitest run tools/feed/snapshot-pr.test.ts tools/feed-job.test.ts tools/install-feed-agent.test.ts tools/feed-snapshot.test.ts -> Test Files 4 passed (4), Tests 168 passed (168)",
+    "unit: pnpm gates (worktree okolos-sw-06 at eea8bc9) -> exit 0: lint, typecheck, build, Test Files 198 passed, Tests 3143 passed | 1 skipped, ux:lint, brand:lint, i18n:sweep, package:check 'every check passed'",
+    "unit: git diff --quiet c71855a eea8bc9 -- tools/feed/{bootstrap,bounded,lock,log,paths,status}.mjs tools/is-main.mjs -> all identical",
+    "unit: git diff --name-only c71855a..eea8bc9 -- tools/feed/ -> only snapshot-pr.{mjs,d.mts,test.ts} and status.d.mts",
+    "unit: git diff of tools/launchd/app.okolos.feed.plist -> comment lines only",
+    "unit: git status --short in the worktree -> clean after the run; no process of mine left (vitest processes running belong to okolos-b1-n-003 and okolos-sw-10)",
+    "seam: git diff --stat c71855a..eea8bc9 -> 18 files, 1938 insertions, 26 deletions",
+    "seam: git grep for signalRecord|runJob|agentStatus|snapshotText|readSnapshotPr|snapshotPrFile|proposeSnapshot|SNAPSHOT_BRANCH|snapshotPr outside the module and tests -> call sites listed in scope",
+    "seam: git grep -ln phishing.json|FEED_PATH|freshestFeed|feedAge -> readers listed in scope; grep of docs/brand/facts.md and tools/docs.test.ts -> no snapshot-derived number",
+    "seam: OKOLOS_STATE_DIR/LOG_DIR/AGENT_BIN/AGENT_CHECKOUT pointed at the scratchpad; pnpm exec vitest run tools/feed-job.test.ts tools/feed/snapshot-pr.test.ts tools/install-feed-agent.test.ts tools/feed/bootstrap.test.ts tools/feed-snapshot.test.ts tools/feed-age.test.ts tools/feed/status.test.ts tools/feed/lock.test.ts tools/feed/bounded.test.ts tools/one-deadline.test.ts tools/ci.test.ts tools/runbook.test.ts tools/adr.test.ts tools/secrets.test.ts tools/destinations.test.ts tools/scripts-do-what-they-say.test.ts tools/imports.test.ts tools/test-quality.test.ts -> 18 files, 711 passed",
+    "seam: pnpm exec vitest run tools/docs.test.ts tools/licensing.test.ts tools/verification.test.ts tools/deferred-assertions.test.ts tools/vitest-git-env.test.ts -> 5 files, 104 passed",
+    "seam: pnpm exec tsc -p tsconfig.tests.json (noEmit) -> exit 0, so the changed .d.mts files typecheck against every test that imports them",
+    "seam: gh api repos/passioncode-ai/okolos -> allow_auto_merge false, allow_merge_commit true, delete_branch_on_merge false, forks_count 0; rulesets -> protect-default-branch [deletion, non_fast_forward]; branches/main/protection -> 404 Branch not protected",
+    "seam: gh pr list --json (no fields) -> field list includes autoMergeRequest, headRefOid, headRepositoryOwner, isCrossRepository; gh 2.100.0",
+    "seam: gh api commits/8798558/check-runs -> gates, e2e (firefox), e2e (chromium) success (PR #19, a snapshot-only change)",
+    "seam: gh api actions/runs?branch=sw/sw-06 -> no runs; branches/sw/sw-06 -> eea8bc9",
+    "seam: git worktree list on the main clone -> /Users/sshlg/.okolos/agent-checkout is a linked worktree; git config of the main clone -> one remote over SSH, core.hookspath .githooks, no push/sign config",
+    "seam: scratch experiment (bare origin, main clone with core.hooksPath=.githooks, linked worktree with an edited hook, commit-tree + push) -> the worktree's own hook ran; directory removed afterwards",
+    "seam: node -e writeStatus twice with snapshotPr, then the plist's two sed lines -> p=1 and an intact lastPublished block; scratch file removed",
+    "seam: env -i HOME=... PATH=/usr/bin:/bin:/usr/sbin:/sbin /bin/sh -lc 'command -v gh pnpm node git' -> /opt/homebrew/bin/gh, pnpm, node; /usr/bin/git",
+    "seam: git merge-tree --write-tree --name-only eea8bc9 sw/sw-08 -> CONFLICT (content) in docs/README.md; same against sw/sw-05 -> clean",
+    "seam: git status --short in the sw-06 worktree before and after -> empty; no process left running",
+    "product: git diff c71855a..eea8bc9 --stat: 18 files; documents changed are AGENTS.md, docs/README.md, docs/adr/0017-*.md, docs/runbooks/development.md, docs/runbooks/feed-signing.md, the plist comment; docs/backlog.md not changed",
+    "product: gh api repos/passioncode-ai/okolos → allow_auto_merge false, allow_merge_commit true, allow_squash_merge true, allow_rebase_merge true, delete_branch_on_merge false",
+    "product: gh api repos/passioncode-ai/okolos/rules/branches/main → [\"deletion\",\"non_fast_forward\"]; rulesets/24429962 → bypass_actors [], include ~DEFAULT_BRANCH",
+    "product: gh api repos/passioncode-ai/okolos/branches/chore/feed-snapshot-auto → 404; pulls?state=all&head=passioncode-ai:chore/feed-snapshot-auto → 0 (no agent PR yet)",
+    "product: git show main:feeds/phishing.json → version 65, updatedAt 2026-10-26T21:08:47.576Z, 220 entries",
+    "product: git show main:tools/launchd/app.okolos.feed.plist → ProgramArguments `cd {{CHECKOUT}} && exec node tools/feed-job.mjs --agent`; tools/feed-job.mjs main(): snapshotPr: agent || --snapshot-pr",
+    "product: env -i HOME=... /bin/sh -lc 'command -v gh' → /opt/homebrew/bin/gh; gh auth status → logged in as sshlg (keyring); repo permissions push and admin true",
+    "product: git -C /Users/sshlg/DATA/okolos-extension config --get core.hooksPath → .githooks; tools/feed/bootstrap.mjs:175 recovers with `git clone --quiet --no-checkout` and sets no hooksPath",
+    "product: git merge-tree --write-tree --name-only sw/sw-06 sw/sw-08 → CONFLICT (content) in docs/README.md; same against sw/sw-07 and sw/sw-09 → no conflict",
+    "product: git show sw/sw-08:docs/backlog.md → B-186 row present (41fb9aa), B-158 row text identical to sw-06's",
+    "product: OKOLOS_STATE_DIR and OKOLOS_LOG_DIR set to scratch; pnpm exec vitest run tools/feed/snapshot-pr.test.ts tools/feed-job.test.ts tools/install-feed-agent.test.ts tools/docs.test.ts tools/runbook.test.ts → 5 files, 239 tests passed; ~/.okolos/state/snapshot-pr.json absent afterwards",
+    "product: grep for feeds/phishing.json across tools, apps, packages, docs: no gate pins its version or entry count; the extension does not bundle it; docs/ux/scenarios.md has no claim about it",
+    "product: grep -n U+2014 over added lines of the documents and snapshot-pr.mjs → one hit, the pre-existing placeholder cell ('With no window') of the children row"
+  ],
+  "tested": {
+    "head": "eea8bc989c41cbf7d9baf3d828d5667a4780b8a1",
+    "tree": "c0cc433802ecdd51bd22347455bb2491a8bd55d3"
+  }
+}

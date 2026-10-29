@@ -333,7 +333,7 @@
       "id": "N-106",
       "title": "снимок фида без ручного шага (закрывает B-158)",
       "owner": "implementer",
-      "status": "pending",
+      "status": "done",
       "blocked_by": [],
       "serves": "B-158",
       "check": "pnpm gates",
@@ -345,25 +345,80 @@
         "tools/feed/**"
       ],
       "certification": {
-        "round": 1,
+        "round": 3,
         "tiers": {
           "unit": "pass",
-          "seam": "fail",
-          "product": "fail"
+          "seam": "pass",
+          "product": "pass"
         },
-        "at": "2fb3f64bca1514b5d5bf6bdd7517f9d1a64f23c9",
+        "at": "eea8bc989c41cbf7d9baf3d828d5667a4780b8a1",
         "history": [
           {
             "unit": "pass",
             "seam": "fail",
             "product": "fail"
+          },
+          {
+            "unit": "fail",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "pass"
           }
         ],
         "kinds": [
+          "blind",
+          "blind",
           "blind"
         ],
-        "tree": "d49c9f3c4ec76894b6e15e83cc67a9cf87f890b0"
-      }
+        "tree": "c0cc433802ecdd51bd22347455bb2491a8bd55d3"
+      },
+      "proof": {
+        "head": "eea8bc989c41cbf7d9baf3d828d5667a4780b8a1",
+        "tree": "c0cc433802ecdd51bd22347455bb2491a8bd55d3",
+        "graph_revision": "6"
+      },
+      "evidence": [
+        "unit: pnpm exec vitest run tools/feed/snapshot-pr.test.ts tools/feed-job.test.ts tools/install-feed-agent.test.ts tools/feed-snapshot.test.ts -> Test Files 4 passed (4), Tests 168 passed (168)",
+        "unit: pnpm gates (worktree okolos-sw-06 at eea8bc9) -> exit 0: lint, typecheck, build, Test Files 198 passed, Tests 3143 passed | 1 skipped, ux:lint, brand:lint, i18n:sweep, package:check 'every check passed'",
+        "unit: git diff --quiet c71855a eea8bc9 -- tools/feed/{bootstrap,bounded,lock,log,paths,status}.mjs tools/is-main.mjs -> all identical",
+        "unit: git diff --name-only c71855a..eea8bc9 -- tools/feed/ -> only snapshot-pr.{mjs,d.mts,test.ts} and status.d.mts",
+        "unit: git diff of tools/launchd/app.okolos.feed.plist -> comment lines only",
+        "unit: git status --short in the worktree -> clean after the run; no process of mine left (vitest processes running belong to okolos-b1-n-003 and okolos-sw-10)",
+        "seam: git diff --stat c71855a..eea8bc9 -> 18 files, 1938 insertions, 26 deletions",
+        "seam: git grep for signalRecord|runJob|agentStatus|snapshotText|readSnapshotPr|snapshotPrFile|proposeSnapshot|SNAPSHOT_BRANCH|snapshotPr outside the module and tests -> call sites listed in scope",
+        "seam: git grep -ln phishing.json|FEED_PATH|freshestFeed|feedAge -> readers listed in scope; grep of docs/brand/facts.md and tools/docs.test.ts -> no snapshot-derived number",
+        "seam: OKOLOS_STATE_DIR/LOG_DIR/AGENT_BIN/AGENT_CHECKOUT pointed at the scratchpad; pnpm exec vitest run tools/feed-job.test.ts tools/feed/snapshot-pr.test.ts tools/install-feed-agent.test.ts tools/feed/bootstrap.test.ts tools/feed-snapshot.test.ts tools/feed-age.test.ts tools/feed/status.test.ts tools/feed/lock.test.ts tools/feed/bounded.test.ts tools/one-deadline.test.ts tools/ci.test.ts tools/runbook.test.ts tools/adr.test.ts tools/secrets.test.ts tools/destinations.test.ts tools/scripts-do-what-they-say.test.ts tools/imports.test.ts tools/test-quality.test.ts -> 18 files, 711 passed",
+        "seam: pnpm exec vitest run tools/docs.test.ts tools/licensing.test.ts tools/verification.test.ts tools/deferred-assertions.test.ts tools/vitest-git-env.test.ts -> 5 files, 104 passed",
+        "seam: pnpm exec tsc -p tsconfig.tests.json (noEmit) -> exit 0, so the changed .d.mts files typecheck against every test that imports them",
+        "seam: gh api repos/passioncode-ai/okolos -> allow_auto_merge false, allow_merge_commit true, delete_branch_on_merge false, forks_count 0; rulesets -> protect-default-branch [deletion, non_fast_forward]; branches/main/protection -> 404 Branch not protected",
+        "seam: gh pr list --json (no fields) -> field list includes autoMergeRequest, headRefOid, headRepositoryOwner, isCrossRepository; gh 2.100.0",
+        "seam: gh api commits/8798558/check-runs -> gates, e2e (firefox), e2e (chromium) success (PR #19, a snapshot-only change)",
+        "seam: gh api actions/runs?branch=sw/sw-06 -> no runs; branches/sw/sw-06 -> eea8bc9",
+        "seam: git worktree list on the main clone -> /Users/sshlg/.okolos/agent-checkout is a linked worktree; git config of the main clone -> one remote over SSH, core.hookspath .githooks, no push/sign config",
+        "seam: scratch experiment (bare origin, main clone with core.hooksPath=.githooks, linked worktree with an edited hook, commit-tree + push) -> the worktree's own hook ran; directory removed afterwards",
+        "seam: node -e writeStatus twice with snapshotPr, then the plist's two sed lines -> p=1 and an intact lastPublished block; scratch file removed",
+        "seam: env -i HOME=... PATH=/usr/bin:/bin:/usr/sbin:/sbin /bin/sh -lc 'command -v gh pnpm node git' -> /opt/homebrew/bin/gh, pnpm, node; /usr/bin/git",
+        "seam: git merge-tree --write-tree --name-only eea8bc9 sw/sw-08 -> CONFLICT (content) in docs/README.md; same against sw/sw-05 -> clean",
+        "seam: git status --short in the sw-06 worktree before and after -> empty; no process left running",
+        "product: git diff c71855a..eea8bc9 --stat: 18 files; documents changed are AGENTS.md, docs/README.md, docs/adr/0017-*.md, docs/runbooks/development.md, docs/runbooks/feed-signing.md, the plist comment; docs/backlog.md not changed",
+        "product: gh api repos/passioncode-ai/okolos → allow_auto_merge false, allow_merge_commit true, allow_squash_merge true, allow_rebase_merge true, delete_branch_on_merge false",
+        "product: gh api repos/passioncode-ai/okolos/rules/branches/main → [\"deletion\",\"non_fast_forward\"]; rulesets/24429962 → bypass_actors [], include ~DEFAULT_BRANCH",
+        "product: gh api repos/passioncode-ai/okolos/branches/chore/feed-snapshot-auto → 404; pulls?state=all&head=passioncode-ai:chore/feed-snapshot-auto → 0 (no agent PR yet)",
+        "product: git show main:feeds/phishing.json → version 65, updatedAt 2026-10-26T21:08:47.576Z, 220 entries",
+        "product: git show main:tools/launchd/app.okolos.feed.plist → ProgramArguments `cd {{CHECKOUT}} && exec node tools/feed-job.mjs --agent`; tools/feed-job.mjs main(): snapshotPr: agent || --snapshot-pr",
+        "product: env -i HOME=... /bin/sh -lc 'command -v gh' → /opt/homebrew/bin/gh; gh auth status → logged in as sshlg (keyring); repo permissions push and admin true",
+        "product: git -C /Users/sshlg/DATA/okolos-extension config --get core.hooksPath → .githooks; tools/feed/bootstrap.mjs:175 recovers with `git clone --quiet --no-checkout` and sets no hooksPath",
+        "product: git merge-tree --write-tree --name-only sw/sw-06 sw/sw-08 → CONFLICT (content) in docs/README.md; same against sw/sw-07 and sw/sw-09 → no conflict",
+        "product: git show sw/sw-08:docs/backlog.md → B-186 row present (41fb9aa), B-158 row text identical to sw-06's",
+        "product: OKOLOS_STATE_DIR and OKOLOS_LOG_DIR set to scratch; pnpm exec vitest run tools/feed/snapshot-pr.test.ts tools/feed-job.test.ts tools/install-feed-agent.test.ts tools/docs.test.ts tools/runbook.test.ts → 5 files, 239 tests passed; ~/.okolos/state/snapshot-pr.json absent afterwards",
+        "product: grep for feeds/phishing.json across tools, apps, packages, docs: no gate pins its version or entry count; the extension does not bundle it; docs/ux/scenarios.md has no claim about it",
+        "product: grep -n U+2014 over added lines of the documents and snapshot-pr.mjs → one hit, the pre-existing placeholder cell ('With no window') of the children row",
+        "proven at eea8bc989c41cbf7d9baf3d828d5667a4780b8a1 (tree c0cc433802ecdd51bd22347455bb2491a8bd55d3)"
+      ]
     },
     {
       "id": "N-107",
@@ -540,7 +595,27 @@
       "touches": [
         "e2e/**",
         "apps/extension/src/content/**"
-      ]
+      ],
+      "certification": {
+        "round": 1,
+        "tiers": {
+          "unit": "fail",
+          "seam": "pass",
+          "product": "pass"
+        },
+        "at": "5598c01c01addc9458127a6b8349df9c4f5b683b",
+        "history": [
+          {
+            "unit": "fail",
+            "seam": "pass",
+            "product": "pass"
+          }
+        ],
+        "kinds": [
+          "blind"
+        ],
+        "tree": "51de8acec6b84e5f5af63a492c7026181ccab0f1"
+      }
     },
     {
       "id": "N-110",
@@ -557,7 +632,33 @@
         "apps/extension/src/background/**",
         "packages/contracts/**",
         "docs/ux/**"
-      ]
+      ],
+      "certification": {
+        "round": 2,
+        "tiers": {
+          "unit": "pass",
+          "seam": "fail",
+          "product": "fail"
+        },
+        "at": "f6897b4680ed7cd048ba6e5cdcc3e06cbadebab8",
+        "history": [
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "fail",
+            "product": "fail"
+          }
+        ],
+        "kinds": [
+          "blind",
+          "blind"
+        ],
+        "tree": "4fa6a6ffb8368b7ea5d534df45594e5f8efbb201"
+      }
     }
   ],
   "edges": [
@@ -606,6 +707,12 @@
       "node": "N-105",
       "why": "certified at all 1 tiers in round 2",
       "precondition": "1e1bb181644a97ed65550dfcd6d83ddf80ada574"
+    },
+    {
+      "verb": "close",
+      "node": "N-106",
+      "why": "certified at all 3 tiers in round 3",
+      "precondition": "eea8bc989c41cbf7d9baf3d828d5667a4780b8a1"
     }
   ]
 }
