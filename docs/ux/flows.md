@@ -351,16 +351,27 @@ flowchart TD
   C -->|none| E[State: clean, with the list of sources actually checked]
   C -->|a source failed| C_err[Row: source unavailable + retry]
   C_err -->|retry| A_load
+  C -->|no HIBP key saved| K[Line: Have I Been Pwned not checked, no key + Add key]
+  C -->|HIBP refused the key| K_ref[Line: key refused + Replace key]
+  K -->|add key| S[Screen: Settings - HIBP key block]
+  K_ref -->|replace key| S
+  S -->|paste and save| S_saved[State: key saved, field emptied, key not shown]
+  S -->|save with an empty field or a space| S_needs[State: refused - nothing saved, says why]
+  S_needs --> S
+  S_saved -->|remove key| S
+  S_saved -->|back to leaks, check again| A_load
   D -->|open entry| F[Entry: data classes, date, source, next steps]
   F -->|change password| G[Site change-password opened]
   F -->|check reuse| H[Local reuse list]
   F -->|mark resolved| I[Entry archived; leaves active queue]
 ```
 
+- **The key is the one setting this flow needs, and it is optional.** Hudson Rock Cavalier answers without one; Have I Been Pwned answers only with the person's own paid key. With none saved the list is built from one source and says so; the line that says so is also the way to the field (FLW-11 -> SCN-015)
 - **Screens traversed:**
   | Screen | States used here |
   |--------|------------------|
   | SCR-08 Leaks and repair | loading, empty, error, success |
+  | SCR-12 Settings | success, error |
 
 ### FLW-12: Extension change alert
 - **Traces:** ST-013, ST-014 (JTBD-03)

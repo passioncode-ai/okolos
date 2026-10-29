@@ -295,7 +295,7 @@ generator, and the sheet declares no colour of its own.
 ### SCR-08: Leaks and repair
 - **Used by:** FLW-10 (reuse list), FLW-11, FLW-16
 - **Purpose:** what of mine is exposed, and the repair for each
-- **Elements:** monitored sources (email, phone) with add/remove; results split into "Недавние: устройство было заражено" and "Более старые утечки"; per-entry data classes, date, source; **primary action per entry: "Сменить пароль"**; "Отметить решённым"; archive; manual password check field; the list of sources actually checked and when
+- **Elements:** monitored sources (email, phone) with add/remove; results split into "Недавние: устройство было заражено" and "Более старые утечки"; per-entry data classes, date, source; **primary action per entry: "Сменить пароль"**; "Отметить решённым"; archive; manual password check field; the list of sources actually checked and when; **the key line** under the coverage line (`source-key`) when Have I Been Pwned was not checked for want of a key or refused the one saved, with "Добавить ключ" or "Заменить ключ" (`add-key`), a link to the key block on SCR-12
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
@@ -304,11 +304,14 @@ generator, and the sheet declares no colour of its own.
   | refused | Check now pressed with no usable address | - | states why nothing was sent (`[data-role=needs]`) and keeps the control, so the press is never silent |
   | error | a source failed | - | that row states unavailable + retry; other results stand |
   | success | results present | - | freshest first, historical collapsed |
+  | no key | a check ran with no Have I Been Pwned key saved | - | the coverage line names Have I Been Pwned as not checked; the key line says no key is saved and offers "Добавить ключ" |
+  | key refused | Have I Been Pwned answered 401 to the saved key | - | the key line says the key was refused and offers "Заменить ключ"; the other sources' results stand |
+- **Behavior notes (the missing source):** it says how to have it checked. Until 2026-10-29 nothing in the product wrote the key, so every check ended with Have I Been Pwned unchecked and the screen said only that it "could not be reached" (B-125). The coverage line now says "not checked", and the line under it names the reason and links to the one place the reason can be fixed. Other failures (a timeout, a 429 or 5xx) stay in the coverage line: their remedy is waiting, not a setting
 - **Behavior notes:** the idle state names what is sent, and it is **the address itself** — Hudson Rock's Cavalier and HIBP's breached-account endpoint answer to nothing less, so a screen implying a hashed lookup would be a false privacy claim on the surface where the user decides. The password check is the k-anonymous one and is kept distinct in the copy. The network choke point permits the address only because the request declares `carries: 'address'`, and the self-audit journal records that it left.
 - **Behavior notes:** the reuse answer is **on the password warning, not behind a control**. Between 2026-08-08 and 2026-08-09 there was no answer at all: a "Check reuse" control opened `options.html#reuse=`, a hash nothing read, and the index it implied was never built. A panel answering "no reuse found" from a store that does not exist tells the safest possible lie, so the control was removed rather than left lying. The index exists now (`reuse` store, DB v4) and the warning says one of three things — the other sites, "not seen on any other site on this device", or "unknown: this device has not seen it before". The third is the one the old control could not say, and it is what a fresh install has to say
 - **Behavior notes (address field):** the field is moved between repaints, never rebuilt, and **its focus and caret are carried with it**. Moving a node keeps its value; removing it from the document blurs it, and native typing needs a focused element to land in — so an address typed while the page was still settling went nowhere. That was the four-day flake tracked as #29: `apps/extension/src/options/keep-focus.ts` carries the rule
 - **Wireframe:** wireframes/SCR-08.md
-- **Coverage:** packages/ui/src/leaks/leaks.ts:renderLeaks, packages/core-leaks/src/group.ts:groupLeaks, packages/core-leaks/src/merge.ts:mergeLeaks, e2e/scn-015.spec.ts
+- **Coverage:** packages/ui/src/leaks/leaks.ts:renderLeaks, packages/core-leaks/src/group.ts:groupLeaks, packages/core-leaks/src/merge.ts:mergeLeaks, apps/extension/src/background/leaks.ts:hibp, e2e/scn-015.spec.ts
 - **Scenarios:** SCN-014, SCN-015, SCN-016
 - **Resources:** source adapters (HIBP, XposedOrNot, Hudson Rock), local hash store, **reuse index** — `reuse` store keyed by [tag, host], tag = HMAC-SHA-256 over the leak-check digest under a device-local random key ([privacy](../privacy.md))
 - **Status:** built
@@ -395,17 +398,22 @@ generator, and the sheet declares no colour of its own.
 - **Status:** built
 
 ### SCR-12: Settings
-- **Used by:** FLW-05 (watchlist edit), FLW-14
+- **Used by:** FLW-05 (watchlist edit), FLW-11 (the HIBP key), FLW-14
 - **Purpose:** the few switches that change behaviour, plus data ownership
-- **Elements:** brand watchlist (add/edit/remove); quiet mode toggle; proxy on/off with a plain explanation of what each option reveals and to whom; retention period; **primary action: "Выгрузить все данные"**; "Удалить все данные" (разрушительное, подтверждается списком того, что удаляется — **по одному виду на каждое хранилище, девять**; список приходит из схемы, а не пишется рядом с ней, и рендерер отказывается рисовать подтверждение, которое не называет ничего). **The trusted domains list moved to SCR-16** on 2026-08-12: the dashboard lists one area per view, the overview names "Доверенные домены" and "Ваши данные" separately, and reviewing what you trusted is a different job from exporting and wiping
+- **Elements:** brand watchlist (add/edit/remove); quiet mode toggle; proxy on/off with a plain explanation of what each option reveals and to whom; retention period; **primary action: "Выгрузить все данные"**; "Удалить все данные" (разрушительное, подтверждается списком того, что удаляется — **по одному виду на каждое хранилище, девять**; список приходит из схемы, а не пишется рядом с ней, и рендерер отказывается рисовать подтверждение, которое не называет ничего). **The trusted domains list moved to SCR-16** on 2026-08-12: the dashboard lists one area per view, the overview names "Доверенные домены" and "Ваши данные" separately, and reviewing what you trusted is a different job from exporting and wiping. **The Have I Been Pwned key block** (`leak-key`), under the export and wipe actions: a heading, a sentence naming where the key goes (only haveibeenpwned.com, in the request header, when a check is pressed) and where it does not (the export, the log), a status line, a masked field (`leak-key-field`), "Сохранить ключ" or, once one is saved, "Заменить ключ" (`leak-key-save`), and "Удалить ключ" (`leak-key-remove`) only when there is something to remove
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
   | success | default | - | grouped settings |
   | error | export or wipe failed | - | inline failure with retry; state left unchanged |
+  | no key | no Have I Been Pwned key saved, the state every install starts in | - | the status line says no key is saved, so Have I Been Pwned is not checked; an empty field and "Сохранить ключ" |
+  | key saved | a key is stored | - | the status line says a key is saved and is not shown; the field is empty; "Заменить ключ" and "Удалить ключ" |
+  | refused | "Сохранить ключ" pressed with an empty field, or a key holding a space or a non-printing character | - | nothing is saved and the block says why (`leak-key-needs`); the field keeps what was typed so it can be corrected |
+  | error | saving or removing the key failed | - | the page's failure slot says the action did not go through; the block shows what is actually stored |
+- **Behavior notes (the key field):** the key is never put back on screen. The field is `type=password`, is emptied the moment a key is accepted, and is never filled from storage: the renderer is told only whether a key exists. Showing even its last characters would put part of a paid credential into every screenshot of this page, and nothing a person does here needs it: replacing pastes a new key over the old, removing needs none
 - **Wireframe:** wireframes/SCR-12.md
-- **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, e2e/scn-024.spec.ts (data controls built; watchlist, quiet mode and the proxy toggle land with their modules)
-- **Scenarios:** SCN-023, SCN-024
+- **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, apps/extension/src/options/leak-key.ts, e2e/scn-024.spec.ts (data controls built; watchlist, quiet mode and the proxy toggle land with their modules), e2e/scn-015.spec.ts (the key block: saved, never shown back, removed)
+- **Scenarios:** SCN-015, SCN-023, SCN-024
 - **Resources:** settings store, exporter, wipe routine
 - **Status:** built
 

@@ -24,7 +24,7 @@ are specified once in [screens.md](screens.md).
 | SCN-012 | Download stopped by feed or hash | web-guard | P-01 | ST-009, FLW-08 | implemented | 2026-08-05 unit |
 | SCN-013 | Download partially checked — hash unavailable | web-guard | P-01 | ST-009, FLW-08 | implemented | 2026-08-05 unit |
 | SCN-014 | Submitted password is compromised | credentials | P-01 | ST-011, FLW-10 | implemented | 2026-08-05 unit |
-| SCN-015 | Leak inventory with one source unavailable | credentials | P-01 | ST-012, FLW-11 | implemented | 2026-08-05 PASS |
+| SCN-015 | Leak inventory, with and without a HIBP key | credentials | P-01 | ST-012, FLW-11 | implemented | 2026-08-05 PASS |
 | SCN-016 | Repair a leak and mark it resolved | credentials | P-01 | ST-015, ST-012, FLW-11 | implemented | 2026-08-05 unit |
 | SCN-017 | Extension gained permissions — disable it | extensions | P-01 | ST-013, ST-014, FLW-12 | implemented | 2026-08-05 PASS |
 | SCN-018 | Extension changed publisher, package unavailable | extensions | P-01 | ST-013, FLW-12 | implemented | 2026-08-05 PASS |
@@ -447,23 +447,26 @@ See [foundation.md](foundation.md) → Personas.
 - **Status:** implemented
 - **Coverage:** apps/extension/src/background/index.ts:handlePasswordCheck (journal + hold + push), apps/extension/src/background/pending-password.ts:holdVerdict/takeVerdict/releaseVerdict, apps/extension/src/content/index.ts:showPasswordVerdict and the `password/pending` question, packages/contracts/src/rpc.ts:PasswordAnswer, e2e/scn-036.spec.ts (four checks, including the journal row read through the screen a person uses), apps/extension/src/background/pending-password.test.ts (nine)
 
-### SCN-015: Leak inventory with one source unavailable
+### SCN-015: Leak inventory, with and without a HIBP key
 - **Persona:** P-01
 - **Feature:** credentials
 - **Traces:** ST-012, FLW-11 (JTBD-04, JRN-02/#2-3)
 - **Entry point:** the leaks screen, with at least one monitored email or phone
-- **Preconditions:** at least one source configured
+- **Preconditions:** an address to check. Have I Been Pwned answers only with the person's own paid key, so there are two states, and the first is where every install starts: **no key saved** (Hudson Rock Cavalier is asked, Have I Been Pwned is not) and **a key saved** in "Ваши данные" (SCR-12; both sources are asked)
 - **Steps:**
   1. User opens the leaks screen -> system queries each source and shows partial results as they arrive
   2. User sees results split into fresh infostealer hits and historical breaches -> system shows data classes, dates, and the source for each entry
-  3. User reads the coverage line -> system names every source checked, every source that failed, and when each was last updated
-- **Expected result:** the user knows what is exposed and, equally, what was not checked
-- **Alt paths:** pressing Check now with an empty or malformed address -> the panel **states the refusal** and keeps the control, rather than redrawing identically; no sources configured -> the empty state prompts to add an email or phone and states exactly what will and will not be sent — **and what is sent is the address itself**: Hudson Rock's Cavalier and HIBP's breached-account endpoint answer to nothing less, so the leak check is not k-anonymous and the empty state may not imply that it is (the password check is a separate, k-anonymous one)
-- **UI elements:** monitored sources list, results grouped fresh/historical, per-entry data classes, coverage line, per-source retry
-- **States covered:** loading, empty, error, success
-- **Errors & recovery:** a source is unreachable or rate-limited -> that row states unavailable with a retry; results from other sources stand and the summary never implies full coverage
+  3. User reads the coverage line -> system names every source checked and every source not checked, so a total never reads as full coverage
+  4. With no key saved -> under the coverage line the system says Have I Been Pwned was not checked because no key is saved, and offers "Добавить ключ", a link to the key field in "Ваши данные"
+  5. User pastes their key there and presses "Сохранить ключ" -> the field empties, the block says a key is saved on this device and does not show it, and the next check asks Have I Been Pwned too
+- **Expected result:** the user knows what is exposed and, equally, what was not checked, and how to have the missing source checked
+- **Alt paths:** **a key is saved** -> Have I Been Pwned is asked with the rest, and the key leaves the device only in the `hibp-api-key` header of that one request to haveibeenpwned.com; **the key is refused** (Have I Been Pwned answers 401) -> the line under the coverage line says so and offers "Заменить ключ", a link to the same field, and the other sources' results stand; **Have I Been Pwned answers another error** (429, 5xx) -> the coverage line names it as not checked, never as "no breaches"; **replacing the key** -> a new key pasted over the saved one and "Заменить ключ" pressed; **removing it** -> "Удалить ключ", after which the block and the next check are back in the no-key state; **an empty field or one holding a space** -> "Сохранить ключ" saves nothing and says why in the block (`[data-role=leak-key-needs]`); pressing Check now with an empty or malformed address -> the panel **states the refusal** and keeps the control, rather than redrawing identically; no sources configured -> the empty state prompts to add an email or phone and states exactly what will and will not be sent — **and what is sent is the address itself**: Hudson Rock's Cavalier and HIBP's breached-account endpoint answer to nothing less, so the leak check is not k-anonymous and the empty state may not imply that it is (the password check is a separate, k-anonymous one)
+- **UI elements:** monitored sources list, results grouped fresh/historical, per-entry data classes, coverage line, the key line under it (`[data-role=source-key]`) with "Добавить ключ" or "Заменить ключ"; on SCR-12 the key block: a masked field that is never filled back, "Сохранить ключ" (or "Заменить ключ" once a key is saved), "Удалить ключ"
+- **States covered:** loading, empty, error, success; no key saved, key saved, key refused
+- **Errors & recovery:** a source is unreachable or rate-limited -> it is named as not checked; results from other sources stand and the summary never implies full coverage. Saving or removing the key fails -> the page's failure slot says the action did not go through, and the block still shows the state that is stored
+- **Behaviour notes:** **the key is the person's paid credential, and it is shown to nobody, the person included.** It is stored in `settings` under `hibp:apiKey`, read by the background only when a check is pressed, and sent only as the request header Have I Been Pwned requires. It is held out of the export (`WITHHELD_SETTINGS`), the outbound log records the request without its headers, and nothing writes it to the journal or to a console. After saving, the field is emptied and the block says only that a key is saved: a field that echoed the key back would put it on screen for anyone behind the person and into every screenshot. Until 2026-10-29 nothing in the product wrote this setting at all, so the no-key state was the only state there was (B-125)
 - **Status:** implemented
-- **Coverage:** apps/extension/src/options/keep-focus.ts:keepingFocus (typing survives a repaint — focus and caret, not only the value), packages/core-leaks/src/merge.ts:mergeLeaks, packages/core-leaks/src/group.ts:groupLeaks, packages/ui/src/leaks/leaks.ts:renderLeaks, e2e/scn-015.spec.ts
+- **Coverage:** apps/extension/src/options/keep-focus.ts:keepingFocus (typing survives a repaint — focus and caret, not only the value), packages/core-leaks/src/merge.ts:mergeLeaks, packages/core-leaks/src/group.ts:groupLeaks, packages/ui/src/leaks/leaks.ts:renderLeaks, apps/extension/src/background/leaks.ts:hibp (refused key, other errors), packages/ui/src/settings/data-controls.ts:renderDataControls (the key block), apps/extension/src/options/leak-key.ts, e2e/scn-015.spec.ts (both states: no key, and a key saved, sent in the header, never shown back, then removed)
 
 ### SCN-016: Repair a leak and mark it resolved
 - **Persona:** P-01
