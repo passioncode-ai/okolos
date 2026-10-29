@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
@@ -16,8 +16,9 @@ import { withoutSecrets } from './bounded.mjs'
  * 2026-11-09. After a publish, when the snapshot on origin/main is SNAPSHOT_PR_AFTER_DAYS
  * old or older, this step:
  *
- *   1. checks that the worker serves exactly the feed this machine just published
- *      (ADR-0017: the served feed is the truth), and takes that file's bytes with the
+ *   1. checks that the `update` the worker serves (signed, `{update, signature}`) equals
+ *      the feed this machine just published (ADR-0017: the served feed is the truth), and
+ *      takes the published file's bytes (the unsigned `{kind, body}`) with the
  *      newline `pnpm feed:snapshot` adds, so the commit is what the manual procedure
  *      would have committed and nothing else;
  *   2. builds a commit that changes only that file, from origin/main's tree, through a
@@ -41,13 +42,18 @@ import { withoutSecrets } from './bounded.mjs'
  *
  * The push sets OKOLOS_SKIP_GATES=1: `.githooks/pre-push` would run all eight gates,
  * and the agent's checkout has only the publish tools installed. That variable is the
- * hook's documented escape, and it prints what it skipped (into feed.log); the gate
- * for this commit is the pull request's checks, which auto-merge waits for.
+ * hook's documented escape, and it prints what it skipped; the push's output goes line
+ * by line to `log`, which the job points at feed.log, so the skip leaves its trace there.
+ * The gate for this commit is the pull request's checks, which auto-merge waits for.
  *
  * Every child is bounded by its own deadline and by `deadline`, the time the run's
  * watchdog leaves, so this step can never turn a publish into a watchdog failure.
  * It never throws: every outcome is a record, `{ outcome, reason?, branch, version,
- * committed?, commit?, pr? }`, with `outcome` one of SNAPSHOT_OUTCOMES. gh runs on its
+ * committed?, commit?, pr? }`, with `outcome` one of SNAPSHOT_OUTCOMES and `pr.action`
+ * saying whether the pull request was opened or updated. Once `stopped()` names a
+ * signal, no further child starts. The job keeps the last step's record, dated by
+ * `withSince`, in its own file (`snapshotPrFile`) and in every later run record, so a
+ * pull request that waits for a person stays visible until a newer step replaces it. gh runs on its
  * own stored login: GH_TOKEN and GITHUB_TOKEN are removed from its environment, as
  * the Cloudflare credential is from every child here.
  */
@@ -61,7 +67,49 @@ export const SNAPSHOT_DEADLINES = { git: 90_000, gh: 60_000 }
 /** A child is not started with less than this left. */
 const MIN_CALL_MS = 1000
 
-export const SNAPSHOT_OUTCOMES = ['skipped-fresh', 'opened', 'updated', 'auto-merge-requested', 'auto-merge-unavailable', 'failed']
+/**
+ * Every outcome a step can end with. `opened` is not one: a new pull request always goes
+ * on to the auto-merge request, so whether it was opened or updated is `pr.action`.
+ * `updated` ends a step only when auto-merge is already on for the open pull request.
+ */
+export const SNAPSHOT_OUTCOMES = ['skipped-fresh', 'updated', 'auto-merge-requested', 'auto-merge-unavailable', 'failed']
+
+/** Where the job keeps the last snapshot step: beside the run record, not in it alone. */
+export function snapshotPrFile(paths) {
+  return path.join(paths.state, 'snapshot-pr.json')
+}
+
+/** The last snapshot step, or null when there is none or it cannot be read. */
+export function readSnapshotPr(file) {
+  try {
+    const record = JSON.parse(readFileSync(file, 'utf8'))
+    return record && typeof record === 'object' && typeof record.outcome === 'string' ? record : null
+  } catch {
+    return null
+  }
+}
+
+/** Writes the last snapshot step whole, owner-only, through a temp file. */
+export function writeSnapshotPr(file, record) {
+  mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 })
+  const temporary = `${file}.${process.pid}.tmp`
+  writeFileSync(temporary, `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 })
+  renameSync(temporary, file)
+  return record
+}
+
+/**
+ * `next` stamped with `at`, and, when it names a pull request, `since`: when that pull
+ * request was first recorded (kept from `previous` while the number is the same).
+ */
+export function withSince(previous, next, at) {
+  const fields = { ...next }
+  delete fields.since
+  delete fields.at
+  if (!fields.pr) return { ...fields, at }
+  const same = previous?.pr?.number === fields.pr.number
+  return { ...fields, at, since: same ? (previous.since ?? previous.at ?? at) : at }
+}
 
 const GITHUB_TOKENS = ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']
 
@@ -100,12 +148,17 @@ function title(version) {
   return `chore(feed): снимок фида v${version} из опубликованного агентом (B-158)`
 }
 
+/** The committed snapshot's age in words, for a commit message and a pull request. */
+function ageWords(ageDays) {
+  return ageDays === null ? 'возраст неизвестен (нет читаемого body.updatedAt)' : `ему ${ageDays} дн.`
+}
+
 function body({ version, entries, updatedAt, committed }) {
   return [
     `Агент фида опубликовал v${version} (${entries} записей, собран ${updatedAt}).`,
-    `Снимок \`${FEED_PATH}\` на main: v${committed.version}, ему ${committed.ageDays} дн.; гейт выпуска отказывает после ${FEED_MAX_AGE_DAYS} дн.`,
+    `Снимок \`${FEED_PATH}\` на main: v${committed.version}, ${ageWords(committed.ageDays)}; гейт выпуска отказывает после ${FEED_MAX_AGE_DAYS} дн.`,
     '',
-    `Меняется только \`${FEED_PATH}\`: байты того фида, который отдаёт воркер (ADR-0017), как их записал бы \`pnpm feed:snapshot\`.`,
+    `Меняется только \`${FEED_PATH}\`: опубликованный с этой машины фид без подписи (\`{kind, body}\`), как его записал бы \`pnpm feed:snapshot\`; перед коммитом сверено, что его \`body\` равен тому, что отдаёт воркер в \`update\` (ADR-0017).`,
     'Слияние коммитом слияния, автоматически, когда обязательные проверки main зелёные. Если автослияние в репозитории выключено, PR ждёт человека.',
     '',
     `Открыт и обновляется агентом фида (\`tools/feed/snapshot-pr.mjs\`), ветка \`${SNAPSHOT_BRANCH}\`.`,
@@ -127,6 +180,8 @@ export async function proposeSnapshot({
   now = Date.now,
   deadline = now() + SNAPSHOT_BUDGET_MS,
   tmp = tmpdir(),
+  log = () => {},
+  stopped = () => null,
 } = {}) {
   const facts = { branch: SNAPSHOT_BRANCH }
   let work
@@ -141,6 +196,8 @@ export async function proposeSnapshot({
     const ghEnv = { ...clean, GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1', NO_COLOR: '1', GIT_TERMINAL_PROMPT: '0' }
 
     const call = (command, args, { limit, ...options }) => {
+      const signal = stopped()
+      if (signal) throw new Stop('failed', `stopped by ${signal}`)
       const left = deadline - now()
       if (left < MIN_CALL_MS) {
         throw new Stop('failed', `out of time: the run's watchdog leaves ${Math.max(0, Math.round(left / 1000))} s for ${command}`)
@@ -148,7 +205,12 @@ export async function proposeSnapshot({
       return tool(command, args, { cwd: root, ...options, timeoutMs: Math.min(limit, left) })
     }
     const git = (args, options = {}) =>
-      call('git', ['-C', root, ...args], { env: { ...gitEnv, ...options.env }, limit: SNAPSHOT_DEADLINES.git, input: options.input })
+      call('git', ['-C', root, ...args], {
+        env: { ...gitEnv, ...options.env },
+        limit: SNAPSHOT_DEADLINES.git,
+        input: options.input,
+        ...(options.onLine ? { onLine: options.onLine } : {}),
+      })
     const gh = (args, options = {}) => call('gh', args, { env: ghEnv, limit: SNAPSHOT_DEADLINES.gh, input: options.input })
     const must = async (name, promise) => {
       const result = await promise
@@ -170,12 +232,14 @@ export async function proposeSnapshot({
     if (shown.code !== 0) throw new Stop('failed', describe(`git show origin/main:${FEED_PATH}`, shown))
     const onMain = parseFeed(shown.stdout, `${FEED_PATH} on origin/main`).body
     const at = Date.parse(onMain.updatedAt)
-    const ageDays = Number.isFinite(at) ? Math.round(((now() - at) / 86_400_000) * 10) / 10 : null
+    // Compared unrounded; rounded only for the record and the text.
+    const exactDays = Number.isFinite(at) ? (now() - at) / 86_400_000 : null
+    const ageDays = exactDays === null ? null : Math.round(exactDays * 10) / 10
     facts.committed = { version: onMain.version, ageDays }
     if (onMain.version >= local.body.version) {
       throw new Stop('skipped-fresh', `origin/main already carries v${onMain.version}`)
     }
-    if (ageDays !== null && ageDays < SNAPSHOT_PR_AFTER_DAYS) {
+    if (exactDays !== null && exactDays < SNAPSHOT_PR_AFTER_DAYS) {
       throw new Stop('skipped-fresh', `the snapshot on origin/main is ${ageDays} days old, under ${SNAPSHOT_PR_AFTER_DAYS}`)
     }
 
@@ -226,6 +290,7 @@ export async function proposeSnapshot({
     if (carried?.code === 0 && carried.stdout.trim() === blob) {
       commit = tip
     } else {
+      mkdirSync(tmp, { recursive: true })
       work = mkdtempSync(path.join(tmp, 'okolos-feed-'))
       const index = { env: { GIT_INDEX_FILE: path.join(work, 'index') } }
       await must('git read-tree', git(['read-tree', 'origin/main'], index))
@@ -233,14 +298,16 @@ export async function proposeSnapshot({
       const tree = await must('git write-tree', git(['write-tree'], index))
       const message =
         `${title(local.body.version)}\n\n` +
-        `Агент фида опубликовал v${local.body.version}; снимок на main был v${onMain.version} (${ageDays} дн.).\n` +
-        `Меняется только ${FEED_PATH}: то, что отдаёт воркер (ADR-0017).\n`
+        `Агент фида опубликовал v${local.body.version}; снимок на main был v${onMain.version}, ${ageWords(ageDays)}.\n` +
+        `Меняется только ${FEED_PATH}: опубликованный фид без подписи, сверенный с тем, что отдаёт воркер (ADR-0017).\n`
       commit = await must(
         'git commit-tree',
         git(['commit-tree', tree, ...parents.flatMap((parent) => ['-p', parent]), '-F', '-'], { input: message }),
       )
+      // The hook's output (its skip notice) and git's go to the run's log, line by line.
       const pushed = await git(['push', '--quiet', 'origin', `${commit}:refs/heads/${SNAPSHOT_BRANCH}`], {
         env: { OKOLOS_SKIP_GATES: '1' },
+        onLine: (_stream, line) => log(`   ${line}`),
       })
       if (pushed.code !== 0) throw new Stop('failed', describe('git push', pushed))
     }

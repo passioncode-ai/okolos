@@ -1,12 +1,13 @@
 import { spawnSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { BoundedOptions, BoundedResult } from './bounded.mjs'
 import { runBounded } from './bounded.mjs'
-import { proposeSnapshot, SNAPSHOT_BRANCH, SNAPSHOT_PR_AFTER_DAYS } from './snapshot-pr.mjs'
+import { openLog } from './log.mjs'
+import { proposeSnapshot, readSnapshotPr, SNAPSHOT_BRANCH, SNAPSHOT_OUTCOMES, SNAPSHOT_PR_AFTER_DAYS, withSince, writeSnapshotPr } from './snapshot-pr.mjs'
 
 /**
  * The feed agent proposes the committed snapshot itself (B-158).
@@ -21,6 +22,7 @@ import { proposeSnapshot, SNAPSHOT_BRANCH, SNAPSHOT_PR_AFTER_DAYS } from './snap
  */
 
 const DAY = 86_400_000
+const REAL_HOOK = path.resolve(import.meta.dirname, '../../.githooks/pre-push')
 const NOW = Date.parse('2026-11-05T12:00:00.000Z')
 const MAIN = 'a'.repeat(40)
 const TIP = 'e'.repeat(40)
@@ -58,7 +60,7 @@ function published(version = 66, updatedAt = new Date(NOW - 60_000).toISOString(
 type Call = { command: string; args: string[]; options: BoundedOptions }
 
 interface FakeOptions {
-  committed?: { version: number; ageDays: number } | 'missing'
+  committed?: { version: number; ageDays: number | null } | 'missing'
   tip?: string
   threeDot?: string[]
   mainInTip?: boolean
@@ -100,6 +102,7 @@ function fake(o: FakeOptions = {}) {
     if (verb === 'show') {
       if (o.committed === 'missing') return no("fatal: path 'feeds/phishing.json' does not exist in 'origin/main'", 128)
       const c = o.committed ?? { version: 65, ageDays: 9 }
+      if (c.ageDays === null) return ok(JSON.stringify({ kind: 'snapshot', body: { name: 'phishing', version: c.version, entries: [] } }))
       return ok(feedText(c.version, new Date(NOW - c.ageDays * DAY).toISOString()))
     }
     if (verb === 'rev-parse' && rest.at(-1) === 'origin/main') return ok(`${MAIN}\n`)
@@ -157,6 +160,64 @@ describe('when the committed snapshot is young enough, nothing is proposed', () 
 
   it('waits seven days, half the fourteen-day ceiling of the release gate', () => {
     expect(SNAPSHOT_PR_AFTER_DAYS).toBe(7)
+  })
+
+  it('compares the unrounded age: 6.97 days is under seven, though the record rounds it to 7', async () => {
+    const { record, ran } = await propose({ committed: { version: 65, ageDays: 6.97 } })
+    expect(record).toMatchObject({ outcome: 'skipped-fresh', committed: { ageDays: 7 } })
+    expect(ran().filter((line) => line.startsWith('gh'))).toEqual([])
+  })
+
+  it('proposes a snapshot whose age cannot be read, and says so in words, not "null"', async () => {
+    const { record, calls } = await propose({ committed: { version: 65, ageDays: null } })
+    expect(record).toMatchObject({ outcome: 'auto-merge-requested', committed: { version: 65, ageDays: null } })
+    const message = calls.find((call) => call.args.includes('commit-tree'))?.options.input ?? ''
+    const body = calls.find((call) => call.args[1] === 'create')?.options.input ?? ''
+    for (const text of [message, body]) {
+      expect(text).not.toMatch(/null/)
+      expect(text).toMatch(/возраст неизвестен/)
+    }
+  })
+})
+
+describe('the outcomes the record can hold', () => {
+  it('lists exactly the outcomes some path produces; "opened" is pr.action, not an outcome', async () => {
+    const produced = new Set<string>()
+    for (const o of [
+      { committed: { version: 65, ageDays: 1 } },
+      { gh: 'missing' as const },
+      {},
+      { allowAutoMerge: 'false' },
+      { tip: TIP, mainInTip: true, open: [{ number: 42, url: PR_URL, autoMergeRequest: { mergeMethod: 'MERGE' } }] },
+    ]) {
+      produced.add((await propose(o)).record.outcome)
+    }
+    expect([...produced].sort()).toEqual([...SNAPSHOT_OUTCOMES].sort())
+    expect(SNAPSHOT_OUTCOMES).not.toContain('opened')
+    expect((await propose()).record.pr?.action).toBe('opened')
+  })
+})
+
+describe('the last snapshot step outlives later runs (B-158: a waiting PR stays visible)', () => {
+  const opened = { outcome: 'auto-merge-unavailable' as const, branch: SNAPSHOT_BRANCH, pr: { number: 42, url: PR_URL, action: 'opened' as const } }
+
+  it('dates a pull request from the step that first recorded it, and keeps that date while it is the same one', () => {
+    const first = withSince(null, opened, '2026-11-03T09:00:00.000Z')
+    expect(first).toMatchObject({ at: '2026-11-03T09:00:00.000Z', since: '2026-11-03T09:00:00.000Z' })
+    const again = withSince(first, { ...opened, pr: { ...opened.pr, action: 'updated' } }, '2026-11-03T21:00:00.000Z')
+    expect(again).toMatchObject({ at: '2026-11-03T21:00:00.000Z', since: '2026-11-03T09:00:00.000Z' })
+    const other = withSince(again, { ...opened, pr: { ...opened.pr, number: 43 } }, '2026-11-10T09:00:00.000Z')
+    expect(other.since).toBe('2026-11-10T09:00:00.000Z')
+    const none = withSince(other, { outcome: 'skipped-fresh', branch: SNAPSHOT_BRANCH }, '2026-11-11T09:00:00.000Z')
+    expect(none.since).toBeUndefined()
+  })
+
+  it('keeps the last step in its own owner-only file beside the record', () => {
+    const file = path.join(tempDir('okolos-snappr-file-'), 'state', 'snapshot-pr.json')
+    expect(readSnapshotPr(file)).toBeNull()
+    writeSnapshotPr(file, withSince(null, opened, '2026-11-03T09:00:00.000Z'))
+    expect(readSnapshotPr(file)).toMatchObject({ outcome: 'auto-merge-unavailable', pr: { number: 42 }, since: '2026-11-03T09:00:00.000Z' })
+    expect(process.platform === 'win32' || (statSync(file).mode & 0o777) === 0o600).toBe(true)
   })
 })
 
@@ -399,12 +460,16 @@ describe('with real git: a bare origin, the agent’s checkout, gh as a double',
     git('-C', seed, 'push', '--quiet', origin, 'main')
     git('clone', '--quiet', origin, checkout)
     git('-C', checkout, 'checkout', '--quiet', '--detach', 'origin/main')
-    // The repository's hook path, as the clone the agent's worktree belongs to has it:
-    // a pre-push that refuses unless the gates' skip is set, as `.githooks/pre-push` would
-    // fail there (no full install in the agent's checkout).
+    // The repository's own `.githooks/pre-push`, as the clone the agent's worktree shares
+    // it. Behind a guard: without the gates' skip it would run all eight gates against this
+    // fixture, so the guard refuses first, as the real gates would fail there (no full
+    // install in the agent's checkout).
     const hooks = path.join(base, 'hooks')
     mkdirSync(hooks)
-    writeFileSync(path.join(hooks, 'pre-push'), '#!/bin/sh\n[ -n "$OKOLOS_SKIP_GATES" ] || { echo "gates would run" >&2; exit 1; }\necho "$OKOLOS_SKIP_GATES" > "$(dirname "$0")/skipped"\n')
+    writeFileSync(
+      path.join(hooks, 'pre-push'),
+      `#!/bin/sh\n[ -n "$OKOLOS_SKIP_GATES" ] || { echo "gates would run" >&2; exit 1; }\necho "$OKOLOS_SKIP_GATES" > "$(dirname "$0")/skipped"\nexec /bin/sh '${REAL_HOOK}'\n`,
+    )
     chmodSync(path.join(hooks, 'pre-push'), 0o755)
     git('-C', checkout, 'config', 'core.hooksPath', hooks)
     return { base, origin, seed, checkout, hooks }
@@ -431,7 +496,11 @@ describe('with real git: a bare origin, the agent’s checkout, gh as a double',
   async function run(r: ReturnType<typeof repos>, version: number, open: () => Array<{ number: number; url: string; autoMergeRequest: unknown }> = () => []) {
     const feed = published(version)
     const t = tools(open)
+    // The run's own log writer, into a feed.log in the fixture.
+    const logFile = path.join(r.base, 'logs', 'feed.log')
+    const file = openLog(logFile)
     const record = await proposeSnapshot({
+      log: (line: string) => file.write(line),
       root: r.checkout,
       feedFile: feed.feedFile,
       readServedFeed: feed.readServedFeed,
@@ -440,7 +509,7 @@ describe('with real git: a bare origin, the agent’s checkout, gh as a double',
       now: () => NOW,
       tmp: feed.dir,
     })
-    return { record, feed, gh: t.gh }
+    return { record, feed, gh: t.gh, logFile }
   }
 
   const branchTip = (r: ReturnType<typeof repos>) => git('-C', r.origin, 'rev-parse', `refs/heads/${SNAPSHOT_BRANCH}`)
@@ -448,8 +517,11 @@ describe('with real git: a bare origin, the agent’s checkout, gh as a double',
   it('pushes a branch whose only change against main is the snapshot, byte for byte, and leaves the checkout alone', async () => {
     const r = repos()
     const head = git('-C', r.checkout, 'rev-parse', 'HEAD')
-    const { record, feed } = await run(r, 66)
+    const { record, feed, logFile } = await run(r, 66)
     expect(record).toMatchObject({ outcome: 'auto-merge-requested', pr: { action: 'opened' } })
+    // The real hook's own words for what it did not check, in the run's log (the trace
+    // OKOLOS_SKIP_GATES leaves where --no-verify would leave none).
+    expect(readFileSync(logFile, 'utf8')).toContain('pre-push: SKIPPED by OKOLOS_SKIP_GATES')
     const tip = branchTip(r)
     expect(record.commit).toBe(tip)
     const main = git('-C', r.origin, 'rev-parse', 'main')

@@ -18,4 +18,15 @@ export function proposeSnapshot(options: {
   now?: () => number
   deadline?: number
   tmp?: string
+  /** A line of the push's output (the pre-push hook's skip notice); the job writes it to feed.log. */
+  log?: (line: string) => void
+  /** The signal stopping the run, or null: once set, no further child starts. */
+  stopped?: () => string | null
 }): Promise<SnapshotPrRecord>
+
+/** `~/.okolos/state/snapshot-pr.json`: the last snapshot step, beside the run record. */
+export function snapshotPrFile(paths: { state: string }): string
+export function readSnapshotPr(file: string): SnapshotPrRecord | null
+export function writeSnapshotPr(file: string, record: SnapshotPrRecord): SnapshotPrRecord
+/** `next` with `at`, and `since` (first sight of the same pull request) when it names one. */
+export function withSince(previous: SnapshotPrRecord | null | undefined, next: SnapshotPrRecord, at: string): SnapshotPrRecord

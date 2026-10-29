@@ -23,15 +23,23 @@ export interface RunRecord {
   readonly snapshotPr?: SnapshotPrRecord
 }
 
-/** What the snapshot pull request step did (`feed/snapshot-pr.mjs`). */
+/**
+ * What the snapshot pull request step did (`feed/snapshot-pr.mjs`). The job keeps the last
+ * one in every later record and in `snapshot-pr.json` until a newer step replaces it.
+ * `opened` is never an outcome: it is `pr.action`.
+ */
 export interface SnapshotPrRecord {
-  readonly outcome: 'skipped-fresh' | 'opened' | 'updated' | 'auto-merge-requested' | 'auto-merge-unavailable' | 'failed'
+  readonly outcome: 'skipped-fresh' | 'updated' | 'auto-merge-requested' | 'auto-merge-unavailable' | 'failed'
   readonly reason?: string
   readonly branch?: string
   readonly version?: number
   readonly committed?: { readonly version: number; readonly ageDays: number | null }
   readonly commit?: string
   readonly pr?: { readonly number: number; readonly url: string; readonly action: 'opened' | 'updated' }
+  /** When this step ran. */
+  readonly at?: string
+  /** When the pull request in `pr` was first recorded. */
+  readonly since?: string
 }
 
 export interface StatusRecord extends RunRecord {
