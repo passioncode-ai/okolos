@@ -73,8 +73,8 @@ Corepack ships with Node 22 to 24 only, on every OS, Windows included (where `co
 needs an administrator shell when Node is under Program Files). On Node 25 and later,
 install pnpm as the [development runbook](docs/runbooks/development.md#windows) says (`npm i -g
 pnpm` or the pnpm.io installer; `packageManager` still pins the version). On Windows,
-`pnpm package` writes the zips with `tar.exe` from System32; no store has yet been sent a zip
-built on Windows, so build release archives on macOS or Linux.
+`pnpm package` writes the zips with `tar.exe` from System32. No run of `pnpm package` that writes
+the archives has a recorded commit on any OS yet (B-172).
 
 Chrome: `chrome://extensions` → Developer mode → **Load unpacked** →
 `apps/extension/dist/chrome`. Edge takes the same Chrome build: `edge://extensions` →
