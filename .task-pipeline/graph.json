@@ -291,7 +291,23 @@
       "x-sw": "SW-05",
       "touches": [
         ".github/workflows/**"
-      ]
+      ],
+      "certification": {
+        "round": 1,
+        "tiers": {
+          "unit": "fail"
+        },
+        "at": "c71855aa18bfdcceef0f6beecc498f401cfa7244",
+        "history": [
+          {
+            "unit": "fail"
+          }
+        ],
+        "kinds": [
+          "blind"
+        ],
+        "tree": "185a0986f38f95ed4b330b886f2edd8982853ee4"
+      }
     },
     {
       "id": "N-106",
@@ -395,7 +411,7 @@
       "id": "N-108",
       "title": "обещание ОС и браузеров; решение для Okolos Agent (закрывает B-166, B-167)",
       "owner": "implementer",
-      "status": "pending",
+      "status": "done",
       "blocked_by": [],
       "serves": "B-166",
       "check": "pnpm gates",
@@ -409,11 +425,11 @@
         "docs/store/**"
       ],
       "certification": {
-        "round": 5,
+        "round": 6,
         "tiers": {
-          "product": "fail"
+          "product": "pass"
         },
-        "at": "5e575d5ac60853a00f9cf3835ad4932e93e7acbc",
+        "at": "633f2bfd7c3ce2c44471695bd6b514a029bb809d",
         "history": [
           {
             "unit": "pass",
@@ -431,6 +447,9 @@
           },
           {
             "product": "fail"
+          },
+          {
+            "product": "pass"
           }
         ],
         "kinds": [
@@ -438,10 +457,34 @@
           "blind",
           "blind",
           "blind",
+          "blind",
           "blind"
         ],
-        "tree": "417420d2ce6cbf71cb0ade69b6ced0238b81d4c3"
-      }
+        "tree": "0745050bf1860b7c764fdeea4689489896826226"
+      },
+      "proof": {
+        "head": "633f2bfd7c3ce2c44471695bd6b514a029bb809d",
+        "tree": "0745050bf1860b7c764fdeea4689489896826226",
+        "graph_revision": "4"
+      },
+      "evidence": [
+        "product: git log --first-parent 5d664c5..633f2bf and git diff --stat origin/sw/sw-05...633f2bf: 14 files, the documents above plus launch.mjs, adapter.test.ts, docs.test.ts",
+        "product: python3 docs/brand/lint.py: 'brand pack is clean', exit 0",
+        "product: pnpm -s exec vitest run tools/docs.test.ts tools/adr.test.ts: 2 files, 132 tests passed, exit 0 (dist built 2026-10-29 11:54, after the last extension or packages commit 6998f97)",
+        "product: python3 docs/ux/lint.py: exit 0",
+        "product: gh run view for 40402594155, 40517607494, 40572549603, 40625746452, 40634027046, 40665996073: completed/success in every job, head SHAs 5d664c5, 714e336, 3276f2c, 46a5752, ba846d2, c71855a; git merge-base --is-ancestor: all ancestors of 633f2bf, as is 4c22375 and 6279013",
+        "product: grep minimum_chrome_version / strict_min_version: 137 and 129.0 in source and dist manifests",
+        "product: canvas docs/superpowers/specs/2026-10-27-stability-windows-canvas.md:41-47: question 1 'Принято по умолчанию', question 3 Edge card needs the operator's yes",
+        "product: git show 4de1dff (bridge brief 'Не входит' adds Windows and Linux); git show origin/bridge/b1-run2:apps/agent/src/service/dirs.ts: serviceDirs under ~/Library",
+        "product: ADR numbers across all remote branches: only origin/sw/sw-08 has 0020",
+        "product: grep -i chrome|firefox|edge|windows|macos in apps/extension/_locales/*/messages.json: no browser or OS name; grep chrome:// in apps/extension/src and packages/*/src outside tests: one comment only",
+        "product: packages/core-download/src/judge.ts:88-101 EXECUTABLE list read against facts.md:51",
+        "product: node apps/mail-cli/bin/okolos-mail.mjs scan plain.eml at 633f2bf, Node v26.10.0: verdict printed, three checks 'ещё не сделана', exit 0; missing file: exit 2",
+        "product: grep 'Ждёт человека' docs/README.md:18 (3 шага) against docs/backlog.md:59 B-180 'open: ждёт оператора'",
+        "product: gh run list -R passioncode-ai/okolos --branch sw/sw-08: no runs; git ls-remote origin refs/heads/sw/sw-08 = 633f2bf",
+        "product: fabric-workspace origin/main e83797e3: git grep for Okolos with windows|macos|linux|edge in knowledge/products.md and roadmap.md: no platform claim",
+        "proven at 633f2bfd7c3ce2c44471695bd6b514a029bb809d (tree 0745050bf1860b7c764fdeea4689489896826226)"
+      ]
     },
     {
       "id": "N-109",
@@ -511,6 +554,12 @@
       "node": "N-102",
       "why": "certified at all 3 tiers in round 8",
       "precondition": "c71855aa18bfdcceef0f6beecc498f401cfa7244"
+    },
+    {
+      "verb": "close",
+      "node": "N-108",
+      "why": "certified at all 1 tiers in round 6",
+      "precondition": "633f2bfd7c3ce2c44471695bd6b514a029bb809d"
     }
   ]
 }

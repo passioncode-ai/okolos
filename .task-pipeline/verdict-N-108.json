@@ -1,0 +1,93 @@
+{
+  "node": "N-108",
+  "done": [
+    "The promise and its gap sit in the same row: facts.md:51 says Chrome 137+, Edge 137+, Firefox 129+ on Windows, macOS, Linux and in the same cell that Windows, macOS and Edge rest on reading code, that e2e runs only on Linux in Playwright's Chromium and Firefox, and that the missing runs belong to B-172 (open).",
+    "The floors are the manifests': minimum_chrome_version 137 (apps/extension/manifest.chrome.json:60) and strict_min_version 129.0 (manifest.firefox.json:68), the same in dist/chrome and dist/firefox; ADR-0011:16 and docs/ux/scenarios.md:243 (signature branch) agree with these floors, Edge included.",
+    "The browser decision has a source (docs/open-questions.md:14 Q5, 2026-08-04) and the OS decision is recorded honestly as a default without an operator answer (canvas question 1 'Принято по умолчанию', commit 4c22375, an ancestor of 633f2bf).",
+    "README 'Where it runs', the runbook OS table and facts.md agree row for row: same floors, same gaps (no Edge, Windows or macOS browser run; no archive-writing pnpm package on any OS; macOS gates without a stored record; mail watching Apple Mail on macOS and unbuilt; Okolos Agent B1 macOS only).",
+    "B-167 holds: ADR-0020 records B1 as macOS only with Windows as B-171 (open) and Linux out; the ADR is indexed; no other branch uses number 0020; the bridge brief on bridge/b1-run2 carries the same decision at 4de1dff (an ancestor of that branch's tip 2aa15ae); serviceDirs there builds ~/Library paths as the ADR says.",
+    "Edge is handled where a user would meet it: README gives edge://extensions load steps with the Chrome build, docs/store/listing.md says there is no Edge Add-ons card and why, B-137 carries the Edge card as an operator decision, docs/README.md counts it among human steps.",
+    "The store listing body makes no OS or browser claim, so nothing there outruns facts.md; the UI catalogues name no browser or OS and the product uses no chrome:// page in user paths, so the Edge promise needs no string change.",
+    "The Windows download gap in facts.md:51 is accurate: judge.ts EXECUTABLE lists exe, msi, ps1, lnk and the macro Office types and lacks dll, one, xll, appinstaller, library-ms; B-165 and B-180 say the fix waits on sw/sw-07.",
+    "The okolos-mail claim was reproduced at 633f2bf on macOS, Node 26.10.0: a plain five-header .eml prints a verdict and exits 0, a missing file prints 'Письмо не прочитано ... непрочитанное письмо не считается чистым' and exits 2, matching facts.md:54.",
+    "Every CI run the documents cite exists, is completed/success in every job, and sits on the commit named: 40402594155 on 5d664c5, 40517607494 on 714e336, 40572549603 on 3276f2c, 40625746452 on 46a5752, 40634027046 on ba846d2, 40665996073 on c71855a; all those commits are ancestors of 633f2bf.",
+    "No cross-repository collision: fabric-workspace knowledge/products.md and roadmap.md RM-18 state no OS for Okolos or Okolos Agent; AGENTS.md 'Chrome, Edge, Firefox' matches."
+  ],
+  "not_done": [],
+  "not_verified": [
+    "product: Whether Edge actually refuses the Chrome build below 137 and whether Edge-specific surfaces (the Copilot sidebar, SmartScreen on downloads) change what the extension promises there: needs an Edge run (B-172)",
+    "product: ChromeOS and Firefox for Android: neither promised nor excluded; the Chrome Web Store would offer the extension on ChromeOS once published",
+    "product: Rendered pixels and the store screenshots' captions (visual tier)",
+    "product: The code paths behind the promise (unit and seam tiers)",
+    "product: Earlier rounds' product reports for N-108, not read to keep this reading independent"
+  ],
+  "blockers": [
+    {
+      "what": "The status table says three steps wait for a person, while this branch adds B-180, an open row marked 'ждёт оператора'. (docs/README.md:18 ('Ждёт человека | 3 шага') against docs/backlog.md:59 (B-180, added by 633f2bf), found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "facts.md, the file of what may be said publicly, says 'okolos-mail scan работает' on three OSes, while its scenario SCN-038 is draft and three of its six checks (links, hidden text, attachments) print 'эта проверка ещё не сделана'; SCN-038's own coverage line is stale and still says every check reports mailSkipNotBuilt. (docs/brand/facts.md:54; docs/ux/scenarios.md:856 (SCN-038 Coverage); apps/mail-cli/src/scan.ts outcomes() builds senderAuth, senderIdentity, replyPath only, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The browser floors are written in three places and only one is gated: tools/docs.test.ts compares the facts.md row with the manifests; README.md and the runbook OS table repeat 'Chrome 137+, Edge 137+ and Firefox 129+' with nothing reading them. (README.md:84-85; docs/runbooks/development.md 'На каких ОС' row 'Расширение'; tools/docs.test.ts:648 reads facts.md only, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The runbook's Windows table lists deploy-worker among tools that run through cmd.exe on Windows, proven only by unit tests, and neither its 'not checked on Windows' list nor the new OS table names deploy-worker; README calls B-163 closed while open B-173 asks whether it is. (docs/runbooks/development.md:88 and the sentence beginning 'На Windows не проверены'; README.md:96-97; docs/backlog.md:52 (B-173), found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The OS promise and ADR-0020 are an agent's default decisions with no operator answer, and publication (B-137) carries no dependency on B-172, so the first store release could ship to Windows, macOS and Edge users with no recorded browser run there. (docs/brand/facts.md:42-45; docs/adr/0020-okolos-agent-b1-runs-on-macos-only.md 'Статус'; docs/backlog.md:21 (B-137), :51 (B-172), found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "A user-facing string changed (the okolos-mail launcher refusal now names both Node floors) with no Copylot check id recorded in the change. (apps/mail-cli/src/launch.mjs:105; commit 8b27409, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "No CI run exists for sw/sw-08 (CI runs on PRs and main only); the tree's new gate, the OS test in tools/docs.test.ts that reads dist, has not run on windows-latest, while the runbook says pnpm gates is green on Windows by runs on 3276f2c and 46a5752. (gh run list --branch sw/sw-08 is empty; .github/workflows/ci.yml:3-6; docs/runbooks/development.md 'На каких ОС' row 'pnpm gates', found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Small truth gaps in neighbouring documents: facts.md keeps the header 'Проверено 2026-08-08 на de48b24' above a section proven by October commits; ADR-0020's index row is held by documents only, with no test or code (the daemon is not in main); docs/README.md counts REQ-27 ('Chrome/Edge и Firefox') among 36 DONE while facts.md says Edge has never been run. (docs/brand/facts.md:10; docs/adr/README.md:31; docs/README.md:13 with docs/superpowers/briefs/2026-08-04-okolos-p0-p5.md:85, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    }
+  ],
+  "replan": {
+    "possible": true,
+    "add": [],
+    "park": [],
+    "why": "certified at all 1 tiers in round 6"
+  },
+  "evidence": [
+    "product: git log --first-parent 5d664c5..633f2bf and git diff --stat origin/sw/sw-05...633f2bf: 14 files, the documents above plus launch.mjs, adapter.test.ts, docs.test.ts",
+    "product: python3 docs/brand/lint.py: 'brand pack is clean', exit 0",
+    "product: pnpm -s exec vitest run tools/docs.test.ts tools/adr.test.ts: 2 files, 132 tests passed, exit 0 (dist built 2026-10-29 11:54, after the last extension or packages commit 6998f97)",
+    "product: python3 docs/ux/lint.py: exit 0",
+    "product: gh run view for 40402594155, 40517607494, 40572549603, 40625746452, 40634027046, 40665996073: completed/success in every job, head SHAs 5d664c5, 714e336, 3276f2c, 46a5752, ba846d2, c71855a; git merge-base --is-ancestor: all ancestors of 633f2bf, as is 4c22375 and 6279013",
+    "product: grep minimum_chrome_version / strict_min_version: 137 and 129.0 in source and dist manifests",
+    "product: canvas docs/superpowers/specs/2026-10-27-stability-windows-canvas.md:41-47: question 1 'Принято по умолчанию', question 3 Edge card needs the operator's yes",
+    "product: git show 4de1dff (bridge brief 'Не входит' adds Windows and Linux); git show origin/bridge/b1-run2:apps/agent/src/service/dirs.ts: serviceDirs under ~/Library",
+    "product: ADR numbers across all remote branches: only origin/sw/sw-08 has 0020",
+    "product: grep -i chrome|firefox|edge|windows|macos in apps/extension/_locales/*/messages.json: no browser or OS name; grep chrome:// in apps/extension/src and packages/*/src outside tests: one comment only",
+    "product: packages/core-download/src/judge.ts:88-101 EXECUTABLE list read against facts.md:51",
+    "product: node apps/mail-cli/bin/okolos-mail.mjs scan plain.eml at 633f2bf, Node v26.10.0: verdict printed, three checks 'ещё не сделана', exit 0; missing file: exit 2",
+    "product: grep 'Ждёт человека' docs/README.md:18 (3 шага) against docs/backlog.md:59 B-180 'open: ждёт оператора'",
+    "product: gh run list -R passioncode-ai/okolos --branch sw/sw-08: no runs; git ls-remote origin refs/heads/sw/sw-08 = 633f2bf",
+    "product: fabric-workspace origin/main e83797e3: git grep for Okolos with windows|macos|linux|edge in knowledge/products.md and roadmap.md: no platform claim"
+  ],
+  "tested": {
+    "head": "633f2bfd7c3ce2c44471695bd6b514a029bb809d",
+    "tree": "0745050bf1860b7c764fdeea4689489896826226"
+  }
+}
