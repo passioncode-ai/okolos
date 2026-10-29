@@ -9,7 +9,10 @@
  * `git checkout -- .` took the version counter backwards. The committed snapshot
  * is still worth keeping — a seed for a new machine, a reference the licence
  * table and `suffix-gap` read, and the fallback the release gate measures on CI —
- * so bringing it up to date is a deliberate act, followed by a commit.
+ * so bringing it up to date is a deliberate act, followed by a commit. Since B-158 the
+ * feed agent makes that commit itself, as a pull request, when the snapshot on main is
+ * a week old (`tools/feed/snapshot-pr.mjs`); it writes the same bytes as this command,
+ * through `snapshotText`.
  */
 import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -29,6 +32,11 @@ function versionOf(file) {
   }
 }
 
+/** The committed snapshot's bytes for a published feed's text: the text, ending in one newline. */
+export function snapshotText(text) {
+  return text.endsWith('\n') ? text : `${text}\n`
+}
+
 /** Copies `from` over `to` when it is newer. Returns `{ copied, version }`. */
 export function snapshot({ from = feedPaths().feed, to = path.join(root, FEED_PATH) } = {}) {
   const fresh = versionOf(from)
@@ -39,7 +47,7 @@ export function snapshot({ from = feedPaths().feed, to = path.join(root, FEED_PA
   if (committed !== null && fresh <= committed) return { copied: false, version: committed }
   const text = readFileSync(from, 'utf8')
   const temporary = `${to}.${process.pid}.tmp`
-  writeFileSync(temporary, text.endsWith('\n') ? text : `${text}\n`)
+  writeFileSync(temporary, snapshotText(text))
   renameSync(temporary, to)
   return { copied: true, version: fresh }
 }

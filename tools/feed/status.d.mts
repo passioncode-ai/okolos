@@ -19,6 +19,19 @@ export interface RunRecord {
   readonly recovery?: string
   /** Set when the agent was installed off origin/main with --allow-branch: branch and commits. */
   readonly installedOffMain?: string
+  /** After a publish with --snapshot-pr: the snapshot pull request step (B-158). */
+  readonly snapshotPr?: SnapshotPrRecord
+}
+
+/** What the snapshot pull request step did (`feed/snapshot-pr.mjs`). */
+export interface SnapshotPrRecord {
+  readonly outcome: 'skipped-fresh' | 'opened' | 'updated' | 'auto-merge-requested' | 'auto-merge-unavailable' | 'failed'
+  readonly reason?: string
+  readonly branch?: string
+  readonly version?: number
+  readonly committed?: { readonly version: number; readonly ageDays: number | null }
+  readonly commit?: string
+  readonly pr?: { readonly number: number; readonly url: string; readonly action: 'opened' | 'updated' }
 }
 
 export interface StatusRecord extends RunRecord {
