@@ -62,8 +62,10 @@
     it was found under (/opt/homebrew/bin/node), not its versioned realpath that the
     next upgrade deletes.
 
-    Agent mode is if-stale plus follow: a run whose served feed is younger than
-    its interval records "skipped" and ends, so a login is not a publish.
+    Agent mode is if-stale plus follow plus snapshot-pr: a run whose served feed is
+    younger than its interval records "skipped" and ends, so a login is not a publish;
+    a run that published proposes the committed snapshot as a pull request when the
+    one on origin/main is a week old (B-158).
   -->
   <key>ProgramArguments</key>
   <array>
