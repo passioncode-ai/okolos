@@ -178,6 +178,10 @@ async function leaksSection(): Promise<HTMLElement> {
           } catch (cause) {
             answer = { kind: 'error', message: String(cause) }
           }
+          // The answer to this check has arrived, drawn or dropped: an e2e spec waits on it
+          // instead of a fixed time (B-169). One per press of «Проверить», on an extension
+          // page no web page can read, so it ships.
+          performance.mark('okolos:leaks-answered')
           if (epoch !== leakEpoch) return
           leaks = answer
           await paintCurrent()

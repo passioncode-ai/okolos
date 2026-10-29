@@ -1,5 +1,6 @@
 import { expect, test } from './fixtures.js'
 import { RECORD_VISIBLE_MS } from './budgets.js'
+import { expectSettled, SETTLED, settledCount } from './surfaces.js'
 
 /**
  * SCN-015 and SCN-016 — the leak inventory, and the coverage line that gives
@@ -567,8 +568,9 @@ test('another open tab, and a check still in flight, drop a result computed unde
   )
 
   // And the answer to the check started under no key is dropped when it lands.
+  const before = await settledCount(leaksTab, SETTLED.leaksAnswered)
   release()
-  await leaksTab.waitForTimeout(1500)
+  await expectSettled(leaksTab, SETTLED.leaksAnswered, before + 1)
   await expect(leaksTab.locator('[data-role=leaks] [data-role=source-key]')).toHaveCount(0)
   await expect(leaksTab.locator('[data-role=leaks] [data-role=coverage]')).toHaveCount(0)
   await expect(leaksTab.locator('[data-role=leaks] [data-role=idle]')).toBeVisible()

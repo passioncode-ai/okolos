@@ -4,13 +4,13 @@
   "why": "The content script runs on every page and, because the manifest sets all_frames, in every frame of it. That weight is a cost the product charges a person for visiting anything, and nothing was watching it: a stray import that pulled the UI graph or the storage layer into this bundle would double it silently, and the only way anyone would find out is by profiling a page one day.",
   "rule": "A ten-percent band each way. Outside it, in either direction, the build fails and the number here has to move in the same change — up with an argument, down because the saving is real. The band is not about micro-optimisation: what it exists to catch is an accidental graph, and an unintended import of a package is tens of kilobytes, far outside ten percent.",
   "whyBytesMayGateWhereMillisecondsMayNot": "This project refuses to gate on wall-clock ceilings (see the m0/m1 spec and the bench decision): a timing ceiling reddens from runner load rather than from code, which teaches people to ignore it. A byte count is deterministic — the same source produces the same bundle on any machine — so it is exactly the kind of ceiling this project can hold somebody to.",
-  "lastMove": "2026-10-29, every number re-measured. options.js 39435 -> 45929: it had already drifted to 42597 (+8%) by origin/main 5d664c5 without crossing the band, and the Have I Been Pwned key block on the settings screen, the key line, the per-key-state sentence and the cross-tab reset on the leaks screen (B-125) add 3332 bytes. background.js 60557 -> 59332: the model stage left the bundle (B-131, 62173 -> 58791 on its own), and the key handling of the breach lookup added back 541; net against origin/main, 2841 bytes lighter (re-measured at 3b762e1).",
+  "lastMove": "2026-10-29, every number re-measured. options.js 39435 -> 45929: it had already drifted to 42597 (+8%) by origin/main 5d664c5 without crossing the band, and the Have I Been Pwned key block on the settings screen, the key line, the per-key-state sentence and the cross-tab reset on the leaks screen (B-125) add 3332 bytes. background.js 60557 -> 59332: the model stage left the bundle (B-131, 62173 -> 58791 on its own), and the key handling of the breach lookup added back 541; net against origin/main, 2841 bytes lighter (re-measured at 3b762e1). After main (sw/sw-09: settle marks, the password range status check) was merged in: background.js 59625, content.js 71321, options.js 45971 with the shipped `okolos:leaks-answered` mark.",
   "files": {
-    "background.js": 59332,
-    "content.js": 70656,
+    "background.js": 59625,
+    "content.js": 71321,
     "first-run.js": 3400,
     "interstitial.js": 2708,
-    "options.js": 45929,
+    "options.js": 45971,
     "page-watch.js": 1181,
     "popup.js": 3094
   }

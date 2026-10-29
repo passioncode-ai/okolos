@@ -355,6 +355,7 @@ export const SETTLED = {
   focus: 'okolos:focus-judged',
   trap: 'okolos:trap-judged',
   passwordHandled: 'okolos:password-handled',
+  leaksAnswered: 'okolos:leaks-answered',
 } as const
 
 export type Settled = (typeof SETTLED)[keyof typeof SETTLED]
