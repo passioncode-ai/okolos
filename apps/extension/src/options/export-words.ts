@@ -1,6 +1,8 @@
 import { WITHHELD_MARKER, type ExportWords, type Withheld } from '@okolos/storage'
 import { t } from '@okolos/i18n'
 
+import { HIBP_KEY_SETTING } from './leak-key.js'
+
 /**
  * The words inside the file the user downloads.
  *
@@ -57,7 +59,8 @@ export const EXPORT_WORDS: ExportWords = {
  */
 type OmissionKind = 'own-key' | 'reversible' | 'size'
 
-const OWN_KEY_PATHS: ReadonlySet<string> = new Set(['settings/hibp:apiKey'])
+/** From the constant the settings screen writes with, so the path cannot drift from the key. */
+const OWN_KEY_PATHS: ReadonlySet<string> = new Set([`settings/${HIBP_KEY_SETTING}`])
 
 function kindOf(item: Withheld): OmissionKind {
   if (item.bytes !== undefined) return 'size'

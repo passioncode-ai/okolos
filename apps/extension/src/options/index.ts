@@ -1071,6 +1071,19 @@ async function dataSection(): Promise<HTMLElement> {
 }
 
 /**
+ * A leak result computed under the old key state is not shown under the new one.
+ *
+ * `leaks` lives in page memory, and the page is one document routed by hash: after "Add
+ * key", saving, and Back, the leaks screen repainted the earlier result and said "no key is
+ * saved" beside a key that was (N-110 round 2). Only after the write succeeded; a failed
+ * write changed nothing, so the result still describes the key state there is. The address
+ * field is kept, so checking again is one press.
+ */
+function forgetLeakResult(): void {
+  leaks = { kind: 'idle' }
+}
+
+/**
  * The Have I Been Pwned key block (B-125), or none when whether a key is saved cannot be
  * read: a block saying "no key" over a key that is there would invite pasting a second
  * one, and the storage problem itself is SCR-20's to explain.
@@ -1088,8 +1101,16 @@ async function leakKeyPanel(): Promise<LeakKeyPanel | undefined> {
   }
   return {
     saved,
-    onSave: (key) => void act(async () => saveLeakKey(await openDb(), key)),
-    onRemove: () => void act(async () => removeLeakKey(await openDb())),
+    onSave: (key) =>
+      void act(async () => {
+        await saveLeakKey(await openDb(), key)
+        forgetLeakResult()
+      }),
+    onRemove: () =>
+      void act(async () => {
+        await removeLeakKey(await openDb())
+        forgetLeakResult()
+      }),
   }
 }
 

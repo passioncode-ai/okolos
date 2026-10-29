@@ -152,6 +152,8 @@ export function statesOf(id) {
     }
     const cells = line.split('|').slice(1, -1).map((cell) => cell.trim())
     if (cells.length < 2 || /^-+$/.test(cells[0] ?? '')) continue
+    // A struck state (`~~loading~~`) is one the record says was removed, kept for its history.
+    if (/^~~.*~~$/.test(cells[0] ?? '')) continue
     states.push({ state: cells[0], trigger: cells[1] })
   }
   return states

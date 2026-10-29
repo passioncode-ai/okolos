@@ -14,8 +14,11 @@ import { groupLeaks, HIBP_SOURCE, type Leak, type LeakInventory } from '@okolos/
  * The attribution is not decoration either. Have I Been Pwned's breach data is
  * CC BY 4.0, which requires credit wherever the data appears — so it appears
  * here, on the screen that shows it, rather than only in a README a user will
- * never open. It is rendered in every state, including the empty one: a result
- * of "nothing found" is still a result computed from someone else's work.
+ * never open. It is rendered wherever its data is: in the result of a check Have I
+ * Been Pwned answered, including one that found nothing, since "nothing found" is still
+ * a result computed from someone else's work. It is not rendered before a check, or
+ * after one Have I Been Pwned took no part in (B-125): there it named, as the only
+ * source on the screen, the one that was not asked.
  */
 
 /**

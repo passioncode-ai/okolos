@@ -7,5 +7,5 @@
   "description": "Getting the classifier's weights onto the device: consent, audited download, pinned digest, cache.",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "build": "tsc -b" },
-  "dependencies": { "@okolos/contracts": "workspace:*", "@okolos/i18n": "workspace:*" }
+  "dependencies": { "@okolos/contracts": "workspace:*" }
 }

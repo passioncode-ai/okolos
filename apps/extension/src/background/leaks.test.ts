@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
-import type { AuditEntry } from '@okolos/contracts'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
+import type { AuditEntry, RpcMap } from '@okolos/contracts'
+import type { KeyRemedy } from '@okolos/core-leaks'
 
 import { CAVALIER, hibp, hibpFromStore, lookupLeaks, type LeakSource } from './leaks.js'
 
@@ -237,5 +238,14 @@ describe('reading the saved key', () => {
     const inventory = await lookupLeaks('a@b.test', [source], d)
     expect(transport, 'a source with no key it can read must not be asked').not.toHaveBeenCalled()
     expect(inventory.sources[0]).toMatchObject({ answered: false, needsKey: 'unreadable' })
+  })
+})
+
+describe('the leaks/check contract admits every key remedy the background sends', () => {
+  it('types needsKey as exactly the remedies core-leaks produces', () => {
+    // Round 2 added 'unreadable' and the contract still said 'missing' | 'refused': the
+    // receiver's cast to RpcMap[T]['res'] hid it. Checked by `tsc -p tsconfig.tests.json`.
+    type Wire = NonNullable<RpcMap['leaks/check']['res']['sources'][number]['needsKey']>
+    expectTypeOf<Wire>().toEqualTypeOf<KeyRemedy>()
   })
 })

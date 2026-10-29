@@ -162,6 +162,11 @@ function summarise(entries: readonly AuditEntry[], since: string): string {
   if (unrecorded > 0) parts.push(t('auditSummaryUnknownOutcome', String(unrecorded)))
 
   for (const [key, count] of carried(entries)) parts.push(t(key, String(count)))
+  // The person's Have I Been Pwned key, counted on its own: the address count says a lookup
+  // happened and would hide that a credential went with some of them (B-125). Read from the
+  // shape the choke point recorded, which names the header and never its value.
+  const keys = entries.filter((e) => (said(e.payloadShape) ?? '').includes(KEY_HEADER_SHAPE)).length
+  if (keys > 0) parts.push(t('auditSummaryCarriedKey', String(keys)))
 
   const unreadable = entries.filter((e) => purposeKey(said(e.purpose) ?? '') === undefined).length
   // A purpose this build cannot read is a request whose payload it cannot vouch for, so it
@@ -339,6 +344,9 @@ const CARRIED_KEY: Record<string, string> = {
   'leak-lookup': 'auditSummaryCarriedAddress',
   'domain-status': 'auditSummaryCarriedDomain',
 }
+
+/** How a leak lookup records that the person's key went in its header (`background/leaks.ts`). */
+const KEY_HEADER_SHAPE = 'header:hibp-api-key'
 
 const purposeKey = (purpose: string): string | undefined => PURPOSE_KEY[purpose]
 

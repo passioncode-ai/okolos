@@ -230,6 +230,19 @@ test('a source that cannot run is named, and the total says it may be incomplete
   await expect(page.locator('[data-role=leak-key] [data-role=leak-key-state]')).toHaveText(
     'No key is saved, so Have I Been Pwned is not checked.',
   )
+
+  // The return leg (N-110 round 2). The result above lives in page memory, and coming back
+  // to it after saving a key showed "no key is saved" under a key that was. Saving resets
+  // the leaks screen to its state before a check, named for the key as it now is.
+  await page.locator('[data-role=leak-key] [data-role=leak-key-field]').fill(FAKE_KEY)
+  await page.locator('[data-role=leak-key] [data-role=leak-key-save]').click()
+  await expect(page.locator('[data-role=leak-key] [data-role=leak-key-remove]')).toBeVisible()
+  await page.goBack()
+  await expect(page).toHaveURL(/#leaks$/)
+  await expect(page.locator('[data-role=leaks] [data-role=source-key]')).toHaveCount(0)
+  await expect(page.locator('[data-role=leaks] [data-role=idle]')).toContainText(
+    'Hudson Rock Cavalier and Have I Been Pwned',
+  )
 })
 
 test('a saved key is asked with, sent only in its header, never shown back, and removable', async ({

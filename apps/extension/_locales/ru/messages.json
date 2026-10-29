@@ -1149,12 +1149,6 @@
   "gateUnknownAction": {
     "message": "Действие на этой странице, которое не удалось описать"
   },
-  "inferenceNoModel": {
-    "message": "Модель для классификатора не найдена."
-  },
-  "inferenceNotReady": {
-    "message": "Классификатор ещё не готов."
-  },
   "inspectorEmpty": {
     "message": "После находки страница изменилась, и доказательства больше нет."
   },
@@ -2291,6 +2285,14 @@
   },
   "auditSummaryCarriedAddress": {
     "message": "адрес почты, который вы попросили проверить: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "auditSummaryCarriedKey": {
+    "message": "ваш ключ Have I Been Pwned, в заголовке запроса: $COUNT$",
     "placeholders": {
       "count": {
         "content": "$1"

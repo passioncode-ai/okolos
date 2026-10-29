@@ -438,3 +438,40 @@ describe('the period is a control, not a fixed sentence', () => {
     expect(onWindow).toHaveBeenCalledWith('all')
   })
 })
+
+/**
+ * B-125: with a key saved, a leak lookup to Have I Been Pwned carries the person's key in a
+ * header. The summary counted the address and said nothing of the key.
+ */
+describe('the summary counts the key when it left', () => {
+  const lookup = (id: string, payloadShape: string): AuditEntry =>
+    entry({
+      id,
+      destination: id === 'hibp' ? 'haveibeenpwned.com' : 'cavalier.hudsonrock.com',
+      purpose: 'leak-lookup',
+      payloadShape,
+      triggeredBy: 'user:leak-check',
+    })
+  const render = (entries: AuditEntry[]): string =>
+    renderSelfAudit(
+      document,
+      { kind: 'ready', window: 'week' as const, entries, since: 'x', windowStartIso: '2026-08-01T00:00:00.000Z' },
+      handlers,
+    ).querySelector('[data-role=summary]')?.textContent ?? ''
+  const lead = (key: string): string => message(key).split('$')[0]?.trim() ?? ''
+
+  it('names the key, counted, beside the address', () => {
+    const summary = render([
+      lookup('hibp', 'email:s***@example.test, header:hibp-api-key'),
+      lookup('cavalier', 'email:s***@example.test'),
+    ])
+    expect(summary).toContain(lead('auditSummaryCarriedAddress'))
+    expect(summary).toContain(`${lead('auditSummaryCarriedKey')} 1`)
+  })
+
+  it('says nothing about a key when none left', () => {
+    expect(render([lookup('cavalier', 'email:s***@example.test')])).not.toContain(
+      lead('auditSummaryCarriedKey'),
+    )
+  })
+})

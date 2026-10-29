@@ -203,10 +203,18 @@ export interface RpcMap {
         domain?: string
       }>
       /**
-       * `needsKey` is set when the remedy is the person's own key (none saved, or the one
-       * saved was refused), so the screen can point at the field rather than at waiting.
+       * `needsKey` is set when the reason is the person's own key: none saved (`missing`),
+       * the one saved was refused (`refused`), or the one saved could not be read from the
+       * device (`unreadable`). The first two point the screen at the key field; the third
+       * has no field to point at. Mirrors `KeyRemedy` in `@okolos/core-leaks`, which this
+       * package cannot import; `background/leaks.test.ts` holds the two equal.
        */
-      sources: Array<{ name: string; answered: boolean; why?: string; needsKey?: 'missing' | 'refused' }>
+      sources: Array<{
+        name: string
+        answered: boolean
+        why?: string
+        needsKey?: 'missing' | 'refused' | 'unreadable'
+      }>
       complete: boolean
     }
   }

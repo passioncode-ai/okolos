@@ -198,9 +198,6 @@ importers:
       '@okolos/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@okolos/i18n':
-        specifier: workspace:*
-        version: link:../i18n
 
   packages/net:
     dependencies:

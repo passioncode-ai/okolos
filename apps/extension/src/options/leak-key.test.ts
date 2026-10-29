@@ -70,6 +70,9 @@ describe('the Have I Been Pwned key, as the settings screen stores it (B-125)', 
     const file = await exportAll(db, EXPORT_WORDS)
     expect(file).not.toContain(FAKE_KEY)
     expect(file).toContain(`settings/${HIBP_KEY_SETTING}`)
+    // And with the reason that is true of this key: it is the person's own, not a key to
+    // the rest of the file.
+    expect(file).toContain(JSON.stringify(EXPORT_WORDS.marker({ path: `settings/${HIBP_KEY_SETTING}` })))
     await removeLeakKey(db)
   })
 })

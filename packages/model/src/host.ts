@@ -1,6 +1,4 @@
 
-import { t } from '@okolos/i18n'
-
 import { ClassifierSession, type InferenceRuntime } from './session.js'
 
 /**
@@ -106,10 +104,14 @@ export function createInferenceHost(deps: InferenceDeps): PreparedInference {
       if (session) return session.score(text)
       if (remote) {
         const value = await remote(text)
-        if (value === null) throw new Error(t('inferenceNoModel'))
+        // i18n-exempt: never shown. Nothing that ships wires this host (ADR-0006, B-131), and
+        // stage 3's `scoreWithin` turns any rejection into silence rather than a sentence; the
+        // catalogue strings it once used were dropped so nothing unreachable ships.
+        if (value === null) throw new Error('okolos: no model in the context that was asked')
         return value
       }
-      throw new Error(t('inferenceNotReady'))
+      // i18n-exempt: never shown, for the reason above
+      throw new Error('okolos: the classifier host was not prepared')
     },
   }
 }

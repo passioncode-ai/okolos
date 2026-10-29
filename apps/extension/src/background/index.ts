@@ -710,7 +710,7 @@ async function answerPendingVerdict(
   return held === null ? null : { host: held.host, verdict: held.verdict }
 }
 
-async function handleLeakCheck(payload: { address: string }) {
+async function handleLeakCheck(payload: { address: string }): Promise<RpcMap['leaks/check']['res']> {
   // The read is handed over rather than awaited here, so a failed read stays a failed read
   // and does not become "no key saved" (B-125 round 2).
   const breaches = await hibpFromStore(() => readSetting('hibp:apiKey'))

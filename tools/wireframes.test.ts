@@ -215,4 +215,14 @@ describe('a wireframe lists every state its screen record declares', () => {
       expect(names(id), 'the header row is not a state').not.toContain('State')
     }
   })
+
+  it('leaves out a state the record struck through, and lists each state once', async () => {
+    const { SCREENS, statesOf } = await import('./wireframes.mjs')
+    expect(statesOf('SCR-04').map((entry: { state: string }) => entry.state)).not.toContain('~~loading~~')
+    for (const id of Object.keys(SCREENS)) {
+      const names = statesOf(id).map((entry: { state: string }) => entry.state)
+      expect(names.some((name: string) => name.includes('~~')), `${id} copies a struck row`).toBe(false)
+      expect(new Set(names).size, `${id} lists a state twice: ${names.join(', ')}`).toBe(names.length)
+    }
+  })
 })
