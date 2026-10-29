@@ -152,7 +152,7 @@
       "id": "N-003",
       "title": "K2 снимок: вердикт движка, корпус инъекций, fuzz секретов",
       "owner": "implementer",
-      "status": "pending",
+      "status": "parked",
       "blocked_by": [
         "N-023",
         "N-024"
@@ -172,13 +172,13 @@
       ],
       "risk": "R3",
       "certification": {
-        "round": 5,
+        "round": 8,
         "tiers": {
           "unit": "pass",
-          "seam": "pass",
+          "seam": "fail",
           "product": "fail"
         },
-        "at": "4d4fdb91d4259a18dbe83def6bef376d368a0a71",
+        "at": "5a34311cb948786949460cea4a7d169fbb7032b6",
         "history": [
           {
             "unit": "fail",
@@ -204,6 +204,21 @@
             "unit": "pass",
             "seam": "pass",
             "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "fail",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "fail",
+            "product": "fail"
           }
         ],
         "kinds": [
@@ -211,10 +226,14 @@
           "blind",
           "blind",
           "blind",
+          "blind",
+          "blind",
+          "blind",
           "blind"
         ],
-        "tree": "e5926cdb006f05a9614ab419e4ca9eb4e03003fe"
-      }
+        "tree": "9d2f981c11579c8d2170db84d5d7d67eba6c760b"
+      },
+      "parked_reason": "certification ceiling: 8 failing round(s), ceiling 8; failing tier(s) seam, product; churn across levels; first break Dependent: N-004 paginate (.task-pipeline/packets/N-004.json acceptance 'вердикт целого снимка приложен к каждой странице' and 'каждая страница ≤ 32 КБ'), the ADR promise docs/superpowers/specs/2026-10-06-bridge-b1-design.md:183 'Снимок для агента частями, не больше 32 КБ на ответ' (REQ-56, REQ-67), and N-011's snapshot answers. Mechanism: apps/extension/src/agent-probe.ts:81 and packages/core-snapshot/src/verdict.ts:46-53: The snapshot verdict this node produces can on its own exceed the 32 KB per-answer ceiling, and it is attached to every page. MAX_PROBE_VERDICTS (200) with dedup by the full finding allows up to 200 distinct findings: the concealment field is a subset of 8 techniques, times 2 confidences, so 510 distinct findings exist. Measured in Chromium: 255 elements each hidden by a different combination of techniques give a snapshotVerdict of 36 968 bytes; the worst 200 (computed from the closed sets) give 42 366 bytes. Before this node the probe's budget capped verdicts at 50 (DEFAULT_BUDGET at 31a1745). Every page of such a snapshot is therefore over 32 KB whatever maxBytes the agent asks for (even maxBytes 1024).; check: A verdict.test.ts case feeding 510 verdicts (2 confidences x 255 concealment sets) asserts utf8Bytes(JSON.stringify(snapshotVerdict(...))) <= 4096: pnpm -s exec vitest run packages/core-snapshot/src/verdict.test.ts; and the Chromium fixture of 255 concealment combinations reports verdict bytes <= 4096. Blocker row owed on the board"
     },
     {
       "id": "N-004",
@@ -1771,6 +1790,11 @@
       "verb": "park",
       "node": "N-006",
       "why": "certification ceiling: 8 failing round(s), ceiling 8; failing tier(s) seam, product; stuck on seam; first break .task-pipeline/packets/N-011.json acceptance 46 (= plans/2026-10-27-bridge-b1.md:533, test 47), against journal.ts write() exemption `closes = line.outcome === 'answered' && line.verb === 'close'` and spec §3 sentence 'удачных закрытий не больше открытых задач': The day cap's bound rests on 'a successful close happens at most once per open task', but the planned caller N-011 makes a close of a timer-swept task answer success from a per-agent memory with no once-only rule, and the journal writes every successful close past the cap without checking the task. One agent past 5000 entries can repeat close on one swept id and grow the day file without limit.; check: a journal test that seeds AGENT_LINES_PER_DAY agent lines, records 200 successful closes of one task id and expects exactly one more line on disk and 199 rejections with code day_full; pnpm -s exec vitest run apps/agent/src/journal. Blocker row owed on the board"
+    },
+    {
+      "verb": "park",
+      "node": "N-003",
+      "why": "certification ceiling: 8 failing round(s), ceiling 8; failing tier(s) seam, product; churn across levels; first break Dependent: N-004 paginate (.task-pipeline/packets/N-004.json acceptance 'вердикт целого снимка приложен к каждой странице' and 'каждая страница ≤ 32 КБ'), the ADR promise docs/superpowers/specs/2026-10-06-bridge-b1-design.md:183 'Снимок для агента частями, не больше 32 КБ на ответ' (REQ-56, REQ-67), and N-011's snapshot answers. Mechanism: apps/extension/src/agent-probe.ts:81 and packages/core-snapshot/src/verdict.ts:46-53: The snapshot verdict this node produces can on its own exceed the 32 KB per-answer ceiling, and it is attached to every page. MAX_PROBE_VERDICTS (200) with dedup by the full finding allows up to 200 distinct findings: the concealment field is a subset of 8 techniques, times 2 confidences, so 510 distinct findings exist. Measured in Chromium: 255 elements each hidden by a different combination of techniques give a snapshotVerdict of 36 968 bytes; the worst 200 (computed from the closed sets) give 42 366 bytes. Before this node the probe's budget capped verdicts at 50 (DEFAULT_BUDGET at 31a1745). Every page of such a snapshot is therefore over 32 KB whatever maxBytes the agent asks for (even maxBytes 1024).; check: A verdict.test.ts case feeding 510 verdicts (2 confidences x 255 concealment sets) asserts utf8Bytes(JSON.stringify(snapshotVerdict(...))) <= 4096: pnpm -s exec vitest run packages/core-snapshot/src/verdict.test.ts; and the Chromium fixture of 255 concealment combinations reports verdict bytes <= 4096. Blocker row owed on the board"
     }
   ]
 }
