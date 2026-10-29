@@ -1,0 +1,59 @@
+{
+  "node": "N-105",
+  "done": [
+    "B-164 is met: a job named `gates (windows)` runs on windows-latest, on the same triggers as the Linux job (push to main, pull_request), and runs all eight steps of `pnpm gates` in the same order (lint, typecheck, build, test, ux:lint, brand:lint, i18n:sweep, package:check); e2e stays on Linux as the row says",
+    "Each Windows step really runs what its name claims, read from the log of run 40865342179 on 1e1bb18: `eslint .`; `tsc -b && tsc -p tsconfig.tests.json`; `node tools/build.mjs` built chrome and firefox; `vitest run` 197 files passed, 3046 tests passed, 30 skipped; `node tools/python.mjs docs/ux/lint.py` printed `OK - docs/ux is consistent` against CPython 3.12.10; `node tools/brand-gate.mjs` clean; `node tools/i18n-sweep.mjs` 0 sentences; `node tools/package.mjs --check` every check passed for both browsers. The job conclusion is success with every step success",
+    "Steps run under pwsh (`pwsh -command \". '{0}'\"`), where the runner appends an exit on $LASTEXITCODE, so a failing single pnpm command fails its step; nothing in the job sets continue-on-error or if",
+    "`pnpm install` on Windows ran `prepare` as `git config core.hooksPath .githooks || exit 0` and it completed under cmd.exe, which the new prepare test at tools/ci.test.ts:488-497 pins",
+    "The per-job guard closes the round-1 gap: the Windows job is now read on its own key, so deleting it, moving it to ubuntu-latest or another runner label, replacing `pnpm test` with `echo skipped`, dropping a gate, or calling python3 directly each turns tools/ci.test.ts red (plants below)",
+    "The CRLF fixture repository is removed after the test: with TMPDIR pointed at an empty scratch directory, one run of tools/ci.test.ts left 0 okolos-crlf-* directories",
+    "shares() now skips the launcher tools/python.mjs and matches the linter file itself, so the Linux job's switch to `node tools/python.mjs docs/ux/lint.py` (ci.yml:76) still counts as running the ux gate and the B-162 finder is the only way CI starts Python"
+  ],
+  "not_done": [],
+  "not_verified": [
+    "unit: Whether `gates (windows)` is a required status check in branch protection: a repository setting, not this unit; without it a red Windows job may still merge",
+    "unit: Why each of the 26 Windows-only skips is justified: they live in other modules' test files (install-feed-agent, feed/*, feed-key, ingest, mail-cli, access)",
+    "unit: tools/python.mjs and its tests beyond the log line showing it found Python 3.12 on the runner; the finder is B-162's unit",
+    "unit: The runbook's Windows section and the PR template line (.github/PULL_REQUEST_TEMPLATE.md:6), which the diff also touches",
+    "unit: Whether the Windows working tree is LF on disk: the line-ending tests read the index and attributes columns of `git ls-files --eol` and ignore the w/ column",
+    "unit: Concurrency and cancel-in-progress interplay between the four jobs, and runner image drift of windows-latest",
+    "unit: Side effect of this certification: running vitest in the scratch clone (node_modules symlinked to the worktree's) rewrote the git-ignored cache file node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json in the worktree; no tracked file changed"
+  ],
+  "blockers": [
+    {
+      "what": "The per-job guard checks that a gate is mentioned in a job's run lines, not that it runs and can fail the job. One-line edits that disarm the Windows job or one of its gates leave tools/ci.test.ts green: job-level `if: false`; job-level `continue-on-error: true`; step-level `continue-on-error: true`; step-level `if: false`; `run: pnpm lint || exit 0`; `run: pnpm typecheck; exit 0`; `run: pnpm package:check || true`; `run: echo pnpm brand:lint`; `run: node tools/build.mjs --help`; `run: echo docs/ux/lint.py`. The test titled 'would notice a Windows job cut down, moved or removed' (tools/ci.test.ts:210) claims more than gatesMissingFrom delivers; `echo pnpm brand:lint` is the same 'mention rather than use' defect the shares() docstring at :45-53 names (tools/ci.test.ts:190-196 (gatesMissingFrom: substring includes over commandsIn) and :198-219 (no check on job or step `if:` / `continue-on-error:`), found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The self-test at tools/ci.test.ts:210-219 builds its plants with exact-string replace on `run: pnpm test\\n` and `run: pnpm i18n:sweep\\n`. Any legitimate edit to either line (a flag, a comment after it) makes replace a no-op and fails the self-test with a misleading message; it is also why `pnpm test || exit 0` and `pnpm test tools/ci.test.ts` appear caught: they are caught by the self-test losing its anchor, not by the guard (verified: the only failing test for that plant is 'would notice a Windows job cut down, moved or removed') (tools/ci.test.ts:210-219, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The Windows `pnpm test` step passes with 30 skipped tests against 4 on Linux in the same run (3046 passed | 30 skipped of 3076 on Windows; 3074 passed | 4 skipped of 3078 on Linux), and 2 tests are not registered at all on Windows. Nothing in the job or in tools/ci.test.ts records or bounds the Windows-only skips (16 in tools/install-feed-agent.test.ts, 3 in tools/feed/bootstrap.test.ts, 3 in tools/feed/log.test.ts, 2 in tools/feed-key.test.ts, 1 each in ci, ingest, mail-cli bin, access, feed/bounded, feed/status) (.github/workflows/ci.yml:122-123 (the step) and run 40865342179 job 123418577660, `unit tests and bundle gates`, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    }
+  ],
+  "replan": {
+    "possible": true,
+    "add": [],
+    "park": [],
+    "why": "certified at all 1 tiers in round 2"
+  },
+  "evidence": [
+    "unit: ./node_modules/.bin/vitest run tools/ci.test.ts in a scratch clone at 1e1bb18 -> 1 file, 35 tests passed (macOS)",
+    "unit: gh run view 40865342179 -R passioncode-ai/okolos --json ...: headSha 1e1bb181644a97ed65550dfcd6d83ddf80ada574, conclusion success; `gates (windows)` every step success (lint, typecheck, build both browser targets, unit tests and bundle gates, ux lint, brand pack, sentences outside the catalogue, release checks)",
+    "unit: gh run view 40865342179 --log --job 123418577660: `$ eslint .`, `$ tsc -b && tsc -p tsconfig.tests.json`, `built chrome -> apps\\extension\\dist\\chrome`, `built firefox`, `Test Files 197 passed (197)`, `Tests 3046 passed | 30 skipped (3076)`, `$ node tools/python.mjs docs/ux/lint.py` then `OK - docs/ux is consistent (D:\\a\\okolos\\okolos\\docs\\ux)`, `brand pack is clean`, `0 sentence(s) in 0 file(s) outside the catalogue`, `every check passed; no archive written (--check)`; CPython 3.12.10 from setup-python; shell pwsh",
+    "unit: Linux job 123418577759 in the same run: `Tests 3074 passed | 4 skipped (3078)`",
+    "unit: Plants in a scratch clone, one at a time, vitest run tools/ci.test.ts after each: caught = job removed, `echo skipped` for pnpm test, runs-on ubuntu-latest, runs-on windows-2022, python3 called directly for ux lint, `; exit 0` appended to every gate at once (caught by the self-test anchor), pnpm test variants (caught only by the self-test anchor)",
+    "unit: Plants that SURVIVED (test green): job `if: false`; job `continue-on-error: true`; step `continue-on-error: true`; step `if: false`; `pnpm lint || exit 0`; `pnpm typecheck; exit 0`; `pnpm package:check || true`; `echo pnpm brand:lint`; `node tools/build.mjs --help` for build; `echo docs/ux/lint.py` for ux:lint; setup-python removed (acceptable: tools/python.mjs finds the image's Python)",
+    "unit: TMPDIR=<empty scratch dir> vitest run tools/ci.test.ts -> 35 passed, 0 okolos-crlf-* left behind",
+    "unit: git -C /Users/sshlg/DATA/_worktrees/okolos-sw-05 status --short -> empty before and after"
+  ],
+  "tested": {
+    "head": "1e1bb181644a97ed65550dfcd6d83ddf80ada574",
+    "tree": "970745a8c5ef2b645a7ac8fd6543ed1b94a9f75f"
+  }
+}

@@ -279,7 +279,7 @@
       "id": "N-105",
       "title": "CI на Windows (после SW-01, SW-02) (закрывает B-164)",
       "owner": "implementer",
-      "status": "pending",
+      "status": "done",
       "blocked_by": [
         "N-101",
         "N-102"
@@ -293,21 +293,41 @@
         ".github/workflows/**"
       ],
       "certification": {
-        "round": 1,
+        "round": 2,
         "tiers": {
-          "unit": "fail"
+          "unit": "pass"
         },
-        "at": "c71855aa18bfdcceef0f6beecc498f401cfa7244",
+        "at": "1e1bb181644a97ed65550dfcd6d83ddf80ada574",
         "history": [
           {
             "unit": "fail"
+          },
+          {
+            "unit": "pass"
           }
         ],
         "kinds": [
+          "blind",
           "blind"
         ],
-        "tree": "185a0986f38f95ed4b330b886f2edd8982853ee4"
-      }
+        "tree": "970745a8c5ef2b645a7ac8fd6543ed1b94a9f75f"
+      },
+      "proof": {
+        "head": "1e1bb181644a97ed65550dfcd6d83ddf80ada574",
+        "tree": "970745a8c5ef2b645a7ac8fd6543ed1b94a9f75f",
+        "graph_revision": "5"
+      },
+      "evidence": [
+        "unit: ./node_modules/.bin/vitest run tools/ci.test.ts in a scratch clone at 1e1bb18 -> 1 file, 35 tests passed (macOS)",
+        "unit: gh run view 40865342179 -R passioncode-ai/okolos --json ...: headSha 1e1bb181644a97ed65550dfcd6d83ddf80ada574, conclusion success; `gates (windows)` every step success (lint, typecheck, build both browser targets, unit tests and bundle gates, ux lint, brand pack, sentences outside the catalogue, release checks)",
+        "unit: gh run view 40865342179 --log --job 123418577660: `$ eslint .`, `$ tsc -b && tsc -p tsconfig.tests.json`, `built chrome -> apps\\extension\\dist\\chrome`, `built firefox`, `Test Files 197 passed (197)`, `Tests 3046 passed | 30 skipped (3076)`, `$ node tools/python.mjs docs/ux/lint.py` then `OK - docs/ux is consistent (D:\\a\\okolos\\okolos\\docs\\ux)`, `brand pack is clean`, `0 sentence(s) in 0 file(s) outside the catalogue`, `every check passed; no archive written (--check)`; CPython 3.12.10 from setup-python; shell pwsh",
+        "unit: Linux job 123418577759 in the same run: `Tests 3074 passed | 4 skipped (3078)`",
+        "unit: Plants in a scratch clone, one at a time, vitest run tools/ci.test.ts after each: caught = job removed, `echo skipped` for pnpm test, runs-on ubuntu-latest, runs-on windows-2022, python3 called directly for ux lint, `; exit 0` appended to every gate at once (caught by the self-test anchor), pnpm test variants (caught only by the self-test anchor)",
+        "unit: Plants that SURVIVED (test green): job `if: false`; job `continue-on-error: true`; step `continue-on-error: true`; step `if: false`; `pnpm lint || exit 0`; `pnpm typecheck; exit 0`; `pnpm package:check || true`; `echo pnpm brand:lint`; `node tools/build.mjs --help` for build; `echo docs/ux/lint.py` for ux:lint; setup-python removed (acceptable: tools/python.mjs finds the image's Python)",
+        "unit: TMPDIR=<empty scratch dir> vitest run tools/ci.test.ts -> 35 passed, 0 okolos-crlf-* left behind",
+        "unit: git -C /Users/sshlg/DATA/_worktrees/okolos-sw-05 status --short -> empty before and after",
+        "proven at 1e1bb181644a97ed65550dfcd6d83ddf80ada574 (tree 970745a8c5ef2b645a7ac8fd6543ed1b94a9f75f)"
+      ]
     },
     {
       "id": "N-106",
@@ -323,7 +343,27 @@
       "touches": [
         "tools/feed-job.mjs",
         "tools/feed/**"
-      ]
+      ],
+      "certification": {
+        "round": 1,
+        "tiers": {
+          "unit": "pass",
+          "seam": "fail",
+          "product": "fail"
+        },
+        "at": "2fb3f64bca1514b5d5bf6bdd7517f9d1a64f23c9",
+        "history": [
+          {
+            "unit": "pass",
+            "seam": "fail",
+            "product": "fail"
+          }
+        ],
+        "kinds": [
+          "blind"
+        ],
+        "tree": "d49c9f3c4ec76894b6e15e83cc67a9cf87f890b0"
+      }
     },
     {
       "id": "N-107",
@@ -560,6 +600,12 @@
       "node": "N-108",
       "why": "certified at all 1 tiers in round 6",
       "precondition": "633f2bfd7c3ce2c44471695bd6b514a029bb809d"
+    },
+    {
+      "verb": "close",
+      "node": "N-105",
+      "why": "certified at all 1 tiers in round 2",
+      "precondition": "1e1bb181644a97ed65550dfcd6d83ddf80ada574"
     }
   ]
 }
