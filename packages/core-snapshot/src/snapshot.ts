@@ -127,6 +127,14 @@ export interface SnapshotOptions {
    * daemon passes one for every secret field at least.
    */
   readonly domValues?: ReadonlyMap<number, string>
+  /**
+   * Backend DOM node ids of elements people can see that the probe cut because the rules flagged
+   * an attribute (an `aria-label`, `title`, `alt` or `data-*` reading as an instruction). They are
+   * cut from the view like `hidden`, but the fields inside them stay searched: a person sees those
+   * fields, and a value the page repeats outside the region must still be masked (round 8 of the
+   * N-003 certification: a password in a form with a flagged label reached the agent in clear).
+   */
+  readonly flagged?: ReadonlySet<number>
 }
 
 /** Roles an agent acts on or orients by. Everything else is layout. */
@@ -403,15 +411,19 @@ export function buildSnapshot(nodes: readonly AxNode[], options: SnapshotOptions
   if (!isSetLike(given?.secretFields)) throw new RangeError('secretFields is required: pass an empty set when no field is secret')
   // i18n-exempt: a programming error in the daemon's call, thrown to its caller; never shown to a person
   if (!isSetLike(given?.hidden)) throw new RangeError('hidden must be a set of backend node ids')
+  if (given?.flagged !== undefined && !isSetLike(given.flagged)) throw new RangeError('flagged must be a set of backend node ids')
   if (given?.domValues !== undefined && typeof (given.domValues as { get?: unknown }).get !== 'function') {
     throw new RangeError('domValues must be a map of backend node ids to values')
   }
-  const { hidden, secretFields, taskKey } = options
+  const { hidden: hiddenFromPeople, secretFields, taskKey } = options
+  const flagged = options.flagged ?? new Set<number>()
+  // Everything cut from the view: hidden from people, or visible and flagged.
+  const hidden: ReadonlySet<number> = flagged.size === 0 ? hiddenFromPeople : new Set([...hiddenFromPeople, ...flagged])
 
   const backends = new Set<number>()
   for (const n of nodes) if (n.backendDOMNodeId !== undefined) backends.add(n.backendDOMNodeId)
   let hiddenUnmatched = 0
-  for (const id of hidden) if (!backends.has(id)) hiddenUnmatched++
+  for (const id of hiddenFromPeople) if (!backends.has(id)) hiddenUnmatched++
   const empty = (incomplete: boolean): Snapshot => ({
     lines: [], refMap: new Map(), hiddenRemoved: 0, fieldTextDropped: 0, hiddenUnmatched, incomplete,
   })
@@ -428,18 +440,19 @@ export function buildSnapshot(nodes: readonly AxNode[], options: SnapshotOptions
   // The whole page is always walked and cleaned, so a subtree is cleaned with the
   // page around it in view: a value split across spans, one of which is the
   // subtree, is masked in the subtree too.
-  const walk = walkTree(nodes, hidden, secretFields)
+  const walk = walkTree(nodes, hidden, secretFields, hiddenFromPeople)
   // Fail closed (round 6; a field under a hidden parent is exempt too, round 7): a visible secret field whose tree value is only mask glyphs (Chrome
   // shows a password as dots) and whose page value the caller did not give cannot be searched
   // for, so a page that repeats it would reach the agent in clear. Refused, like a cut list
   // that ran out of budget, rather than cleaned in part.
   for (const n of nodes) {
     const backend = n.backendDOMNodeId
-    if (backend === undefined || !secretFields.has(backend) || walk.underCut.has(n.nodeId)) continue
-    if (isMaskGlyphs(str(n.value?.value)) && options.domValues?.get(backend) === undefined) return empty(true)
+    if (backend === undefined || !secretFields.has(backend) || walk.underHidden.has(n.nodeId)) continue
+    // An empty page value beside dots in the tree is no value either (round 8).
+    if (isMaskGlyphs(str(n.value?.value)) && !options.domValues?.get(backend)) return empty(true)
   }
 
-  const { patterns, content } = fieldValues(nodes, walk.byId, secretFields, walk.underCut, options.domValues)
+  const { patterns, content } = fieldValues(nodes, walk.byId, secretFields, walk.underHidden, options.domValues)
   const budget: Budget = { left: CLEANING_BUDGET }
   for (const entry of walk.entries) {
     const pieces = content.get(entry.nodeId)
@@ -501,6 +514,7 @@ function walkTree(
   nodes: readonly AxNode[],
   hidden: ReadonlySet<number>,
   secretFields: ReadonlySet<number>,
+  hiddenFromPeople: ReadonlySet<number>,
 ): {
   entries: Entry[]
   run: Piece[]
@@ -509,6 +523,8 @@ function walkTree(
   cut: Array<[string, number]>
   /** Every node cut as hidden, and everything under it. */
   underCut: ReadonlySet<string>
+  /** The part of `underCut` hidden from people: fields here are not searched. */
+  underHidden: ReadonlySet<string>
   dropped: string[]
 } {
   const byId = new Map(nodes.map((n) => [n.nodeId, n]))
@@ -518,6 +534,7 @@ function walkTree(
   const frameDepth = new Map<string, number>()
   const cut: Array<[string, number]> = []
   const underCut = new Set<string>()
+  const underHidden = new Set<string>()
   const dropped: string[] = []
 
   const stack: Array<{ node: AxNode; depth: number; inside: Inside }> = []
@@ -537,6 +554,10 @@ function walkTree(
     if (node.backendDOMNodeId !== undefined && hidden.has(node.backendDOMNodeId)) {
       underCut.add(node.nodeId)
       cut.push([node.nodeId, 1 + countDescendants(node, byId, underCut)])
+      if (hiddenFromPeople.has(node.backendDOMNodeId)) {
+        underHidden.add(node.nodeId)
+        countDescendants(node, byId, underHidden)
+      }
       continue
     }
 
@@ -567,7 +588,7 @@ function walkTree(
       if (child !== undefined) stack.push({ node: child, depth: shownDepth, inside: childInside })
     }
   }
-  return { entries, run, byId, frameDepth, cut, underCut, dropped }
+  return { entries, run, byId, frameDepth, cut, underCut, underHidden, dropped }
 }
 
 /** The line a node shows, by where it sits; `null` when it shows none. */
@@ -743,10 +764,14 @@ function fieldValues(
       if (known === undefined) found.set(key, { text, kept, fromSelect })
       else known.fromSelect &&= fromSelect
     }
+    // Dots the tree draws are not a value (rounds 6 and 7); a value read from the page is,
+    // whatever it is made of: a password of eight asterisks is still a password (round 8).
     const add = (raw: unknown): void => {
+      if (isMaskGlyphs(str(raw))) return
+      addValue(raw)
+    }
+    const addValue = (raw: unknown): void => {
       const value = str(raw)
-      // Dots are not a value, in the field or in its own text node (rounds 6 and 7).
-      if (isMaskGlyphs(value)) return
       const plain = bare(value).text
       if (plain !== '') pieces.push(plain)
       let text = plain
@@ -766,7 +791,7 @@ function fieldValues(
     // Dots are not the value (round 6): searching for them masked "Saved card •••• 4242".
     add(field.value?.value)
     const fromPage = field.backendDOMNodeId === undefined ? undefined : domValues?.get(field.backendDOMNodeId)
-    if (fromPage !== undefined) add(fromPage)
+    if (fromPage !== undefined && fromPage !== '') addValue(fromPage)
     // A select's value is its chosen option; the names under it (a listbox's label, a group's
     // name) are the page's open text, not a value, and searching for them masked headings such
     // as "Suggestions for you" (round 5).

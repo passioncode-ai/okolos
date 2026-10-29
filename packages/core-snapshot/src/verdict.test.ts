@@ -90,3 +90,19 @@ describe('a page that plants the same finding many times (round 7)', () => {
     expect('level' in v && v.findings.length).toBe(1)
   })
 })
+
+describe('a page that plants every distinct finding it can (round 8)', () => {
+  it('sends a verdict of a few kilobytes however many distinct findings the page builds', () => {
+    const techniques = ['color-on-color', 'display-none', 'visibility-hidden', 'opacity-zero', 'clip', 'offscreen', 'font-size-zero', 'non-rendered']
+    const many: Verdict[] = []
+    for (let mask = 1; mask < 1 << techniques.length; mask++) {
+      for (const confidence of ['high', 'medium'] as const) {
+        const concealment = techniques.filter((_, i) => mask & (1 << i)).join(',')
+        many.push({ ...finding, id: `v${mask}-${confidence}`, confidence, evidence: [{ ...finding.evidence[0]!, detail: { ...finding.evidence[0]!.detail, concealment } }] })
+      }
+    }
+    const v = snapshotVerdict({ verdicts: many, truncated: false, unresolved: 0 }, COMPLETE)
+    expect('level' in v && v.level).toBe('finding')
+    expect(JSON.stringify(v).length).toBeLessThanOrEqual(4096)
+  })
+})

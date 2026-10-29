@@ -1,5 +1,5 @@
 import { toSnapshotFinding } from '@okolos/contracts'
-import type { SnapshotVerdict, Verdict } from '@okolos/contracts'
+import type { SnapshotEvidence, SnapshotFinding, SnapshotVerdict, Verdict } from '@okolos/contracts'
 
 import type { Snapshot } from './snapshot.js'
 
@@ -41,14 +41,37 @@ export interface CleaningIncomplete {
 export function snapshotVerdict(probe: SnapshotProbe, snapshot: Pick<Snapshot, 'incomplete'>): SnapshotVerdict | CleaningIncomplete {
   if (probe.truncated !== false || probe.unresolved !== 0) return { refused: 'cleaning_incomplete' }
   if ((snapshot as Partial<Snapshot> | undefined)?.incomplete !== false) return { refused: 'cleaning_incomplete' }
-  // Each distinct finding once (round 7): a page that plants the same one thousands of times
-  // made a verdict of megabytes, attached to every page of the snapshot.
-  const seen = new Set<string>()
-  const findings = probe.verdicts.map(toSnapshotFinding).filter((f) => {
-    const key = JSON.stringify(f)
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
-  return { level: findings.length === 0 ? 'clean' : 'finding', findings }
+  return { level: probe.verdicts.length === 0 ? 'clean' : 'finding', findings: mergeFindings(probe.verdicts.map(toSnapshotFinding)) }
+}
+
+/**
+ * One finding per kind and confidence, one evidence row per evidence kind, stage and carrier, the
+ * hiding techniques joined (rounds 7 and 8). The verdict goes with every page of a snapshot, and
+ * distinct combinations of techniques made it 42 KB, past the 32 KB an answer may weigh; merged,
+ * it is bounded by the closed sets it is built from, a few kilobytes at most.
+ */
+function mergeFindings(all: readonly SnapshotFinding[]): SnapshotFinding[] {
+  const byFinding = new Map<string, { kind: SnapshotFinding['kind']; confidence: SnapshotFinding['confidence']; rows: Map<string, { kind: SnapshotEvidence['kind']; stage: SnapshotEvidence['stage']; carrier: SnapshotEvidence['carrier']; concealment: Set<SnapshotEvidence['concealment'][number]> }> }>()
+  for (const f of all) {
+    const fk = `${f.kind}|${f.confidence}`
+    let group = byFinding.get(fk)
+    if (group === undefined) {
+      group = { kind: f.kind, confidence: f.confidence, rows: new Map() }
+      byFinding.set(fk, group)
+    }
+    for (const e of f.evidence) {
+      const ek = `${e.kind}|${e.stage}|${e.carrier ?? ''}`
+      let row = group.rows.get(ek)
+      if (row === undefined) {
+        row = { kind: e.kind, stage: e.stage, carrier: e.carrier, concealment: new Set() }
+        group.rows.set(ek, row)
+      }
+      for (const c of e.concealment) row.concealment.add(c)
+    }
+  }
+  return [...byFinding.values()].map((g) => ({
+    kind: g.kind,
+    confidence: g.confidence,
+    evidence: [...g.rows.values()].map((r) => ({ kind: r.kind, stage: r.stage, carrier: r.carrier, concealment: [...r.concealment].sort() })),
+  }))
 }
