@@ -27,7 +27,38 @@ test('the screen reports the state of this browser rather than an empty list', a
   // silently going missing.
   await expect(panel).toHaveAttribute('data-state', 'ready')
   await expect(panel.locator('[data-role=unsupported]')).toHaveCount(0)
-  await expect(panel.locator('[data-role=no-changes]')).toBeVisible()
+
+  /**
+   * The screen paints once, so with `ready` on it this line is either there or never will
+   * be: in a ready state it is absent exactly when the comparison returned changes. That is
+   * what CI saw once (run 36563089100, 2026-09-29: `ready`, no `unsupported`, no
+   * `no-changes` for five seconds), and the report said "element(s) not found" and nothing
+   * about which change a fresh profile could have. 150 runs of this test under load did
+   * not reproduce it (B-168), so the next firing has to name it: the change rows on the
+   * screen, and what the browser lists now.
+   */
+  try {
+    await expect(panel.locator('[data-role=no-changes]')).toBeVisible()
+  } catch (cause) {
+    const changes = await panel
+      .locator('[data-role=change]')
+      .evaluateAll((rows) =>
+        rows.map((row) => `${row.getAttribute('data-kind')}: ${row.textContent ?? ''}`),
+      )
+    const listed = await page.evaluate(async () =>
+      (await chrome.management.getAll()).map(
+        (entry) => `${entry.id} ${entry.name} ${entry.version} (${entry.installType})`,
+      ),
+    )
+    throw new Error(
+      `${(cause as Error).message}\n\nwhat was true when the no-changes line was missing:\n` +
+        `  - change rows on the screen: ${changes.length === 0 ? 'none' : changes.join(' | ')}\n` +
+        `  - the browser lists now: ${listed.join(' | ') || 'nothing'}\n` +
+        '  - a fresh profile is baselined by the first comparison (the daily review at the' +
+        ' worker\'s start, or this screen); a change here means that baseline held an' +
+        ' extension the browser no longer lists, or the reverse',
+    )
+  }
 })
 
 test('the inventory lists what is installed, with what each may do', async ({
