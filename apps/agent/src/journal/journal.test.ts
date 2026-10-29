@@ -1579,6 +1579,24 @@ describe('agent entries: at most AGENT_LINES_PER_DAY lines a UTC day, then day_f
     expect(after(dir, AGENT_LINES_PER_DAY)).toEqual([full(0), close])
   })
 
+  it('writes a successful close past the cap once per agent and task a day, so repeats cannot grow the file (round 8)', async () => {
+    const dir = temp()
+    seedAgents(dir, AGENT_LINES_PER_DAY)
+    const journal = Journal.open(dir, { retentionDays: 90 })
+    const close = (i: number, task = 'a'.repeat(32)): JournalEntry => ({ ...answered, at: journalTime(t0 + i), verb: 'close', task })
+    await journal.record(close(0))
+    for (let i = 1; i <= 200; i += 1) await expect(journal.record(close(i))).rejects.toMatchObject({ code: 'day_full' })
+    // Another task of the same agent still closes; a close with no task gets no exemption.
+    await journal.record(close(201, 'b'.repeat(32)))
+    const untasked: Record<string, unknown> = { ...close(202) }
+    delete untasked['task']
+    await expect(journal.record(untasked as unknown as JournalEntry)).rejects.toMatchObject({ code: 'day_full' })
+    expect(after(dir, AGENT_LINES_PER_DAY).filter((l) => (l as { verb?: string }).verb === 'close')).toHaveLength(2)
+    // A restart reads the closes already written and keeps refusing a repeat.
+    const again = Journal.open(dir, { retentionDays: 90 })
+    await expect(again.record(close(203))).rejects.toMatchObject({ code: 'day_full' })
+  })
+
   it('refuses a refused close past the cap like any other entry: only a successful close passes (round 7)', async () => {
     const dir = temp()
     seedAgents(dir, AGENT_LINES_PER_DAY)

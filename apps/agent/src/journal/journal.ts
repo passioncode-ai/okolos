@@ -119,10 +119,14 @@ export const REJECTED_LINES_PER_DAY = 2_000
  * one DAY_FULL line is written once that day for SCR-24. Bound (the line sizes are pinned by a
  * test): an agent line is at most 719 bytes (a 40-code-point name of 4-byte characters, an origin of
  * MAX_ORIGIN_LENGTH, the longest verb and code, the largest `bytes`, the newline and a TORN_SEAL
- * before it), a DAY_FULL line 63. So the agents' part of a day file stays under
- * 5 000 x 719 + 63 = 3 595 063 bytes, about 3.6 MB, and over the 92 day files the journal can hold
- * (see REJECTED_LINES_PER_DAY) under 331 MB; with the door's part, the whole journal stays under
- * 544 MB. 5 000 is ten tasks of the 500-step budget a day (decision 2026-10-27, N-006 round 4).
+ * before it), a DAY_FULL line 63. Past the cap only the first successful close of each task is
+ * written (round 8), and a task closed on a day was opened that day or, its time limit being at
+ * most an hour (SCOPE_LIMITS.maxTtlSeconds), the day before; each open is an agent line under a
+ * day's cap, so past the cap a day adds at most 10 000 closes. So the agents' part of a day file
+ * stays under 15 000 x 719 + 63 = 10 785 063 bytes, about 10.8 MB, and over the 92 day files the
+ * journal can hold (see REJECTED_LINES_PER_DAY) under 993 MB; with the door's part (213 MB), the
+ * whole journal stays under 1.21 GB. Without a flood past the cap a day stays under 3.6 MB.
+ * 5 000 is ten tasks of the 500-step budget a day (decision 2026-10-27, N-006 round 4).
  */
 export const AGENT_LINES_PER_DAY = 5_000
 
@@ -574,6 +578,15 @@ interface DayState {
   agentLines: number
   /** Whether the day file holds its DAY_FULL line. */
   full: boolean
+  /** `agentId task` of every successful close in the day file: past the cap each is written once. */
+  readonly closed: Set<string>
+}
+
+/** The key a successful close is counted under past the cap, or null for an entry that is not one. */
+function closeKey(line: { outcome: string; verb?: string; agentId?: string; task?: string }): string | null {
+  return line.outcome === 'answered' && line.verb === 'close' && line.agentId !== undefined && line.task !== undefined
+    ? `${line.agentId} ${line.task}`
+    : null
 }
 
 export class Journal {
@@ -850,11 +863,13 @@ export class Journal {
     const today = await this.dayOf(line.at.slice(0, 10))
     if (line.outcome === 'answered' || line.outcome === 'refused') {
       await this.writeCounts(today, at)
-      // A successful `close` is always written: the agent may always close its task, and past
-      // the cap no task opens, so successful closes are bounded by the tasks already open
-      // (round 6). A refused close costs no step and could be sent without end: it is capped
-      // like any other entry (round 7).
-      const closes = line.outcome === 'answered' && line.verb === 'close'
+      // A successful `close` of a task is written past the cap once a day: the agent may always
+      // close its task, and past the cap no task opens, so these closes are bounded by the tasks
+      // already open (round 6) only while each counts once; a repeat (a close answered from
+      // memory for a task already closed) is refused like any entry (round 8). A refused close
+      // costs no step and could be sent without end: it is capped like any other entry (round 7).
+      const key = closeKey(line)
+      const closes = key !== null && !today.closed.has(key)
       if (today.agentLines >= AGENT_LINES_PER_DAY && !closes) {
         if (!today.full) {
           await this.append({ at: line.at, outcome: DAY_FULL })
@@ -864,6 +879,7 @@ export class Journal {
       }
       await this.append(line)
       today.agentLines += 1
+      if (key !== null) today.closed.add(key)
       return
     }
     // A caller's line is an agent entry or a door rejection: checkEntry gives no other.
@@ -902,13 +918,16 @@ export class Journal {
     for (const group of GROUPS) groups[group] = { lines: 0, capped: false, pending: 0, lastDropped: '', since: undefined }
     let agentLines = 0
     let full = false
+    const closed = new Set<string>()
     for (const entry of entries) {
+      const key = closeKey(entry as { outcome: string })
+      if (key !== null) closed.add(key)
       if (entry.outcome === 'answered' || entry.outcome === 'refused') agentLines += 1
       else if (entry.outcome === DAY_FULL) full = true
       else if (entry.code !== CAP_REACHED) groups[REJECTION_GROUPS[entry.code]].lines += 1
       else if (entry.count === undefined && entry.group !== undefined) groups[entry.group].capped = true
     }
-    this.today = { day, groups, agentLines, full }
+    this.today = { day, groups, agentLines, full, closed }
     return this.today
   }
 
