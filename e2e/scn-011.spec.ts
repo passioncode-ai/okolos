@@ -1,5 +1,12 @@
 import { expect, serve, test } from './hooks.js'
-import { expectBanner, expectScriptReady, expectSettled, expectSurface, SETTLED } from './surfaces.js'
+import {
+  expectBanner,
+  expectScriptReady,
+  expectSettled,
+  expectSurface,
+  settledCount,
+  SETTLED,
+} from './surfaces.js'
 
 /**
  * SCN-011 — a pause before a password on a site this device does not know.
@@ -68,9 +75,11 @@ test('an ordinary text field is not a password field', async ({ context }) => {
   await page.goto('https://fixture.test/login')
   await expectScriptReady(page)
 
-  await page.locator('#user').focus()
   // Until the pause says it judged this focus (a test-hook mark), not for a time: a fixed
-  // wait ran out first under load and passed on a judgement not yet made (B-169).
-  await expectSettled(page, SETTLED.focus)
+  // wait ran out first under load and passed on a judgement not yet made (B-169). Counted
+  // from before the focus, so an earlier focus cannot stand in for this one.
+  const before = await settledCount(page, SETTLED.focus)
+  await page.locator('#user').focus()
+  await expectSettled(page, SETTLED.focus, before + 1)
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 })

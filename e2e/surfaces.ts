@@ -172,13 +172,23 @@ async function diagnose(page: Page, context?: BrowserContext): Promise<string> {
        */
       bannerMs: performance.getEntriesByName('okolos:banner')[0]?.duration ?? null,
       /**
-       * Did a scan settle, its answer back and handled in this page?
+       * Did the latest scan settle, and had it asked anything?
        *
-       * The product writes `okolos:scan` only once the verdict came back and the warning
-       * was drawn, or there was nothing to ask. With it present and no host on the page,
-       * the reply arrived and was acted on, so the loss is in the mount (B-78).
+       * The product writes `okolos:scan` once the verdict came back and the warning was
+       * drawn, or once it found there was nothing to ask, and says which in `detail.asked`.
+       * A scan that asked and settled, with no host on the page, means the reply arrived
+       * and was acted on, so the loss is in the mount (B-78).
        */
-      settledMs: performance.getEntriesByName('okolos:scan')[0]?.duration ?? null,
+      settled: (() => {
+        // The product keeps one entry, the latest scan's; `detail.asked` says whether that
+        // scan put a question to the worker at all.
+        const entry = performance.getEntriesByName('okolos:scan').at(-1) as
+          | (PerformanceEntry & { detail?: { asked?: boolean } | null })
+          | undefined
+        return entry === undefined
+          ? null
+          : { ms: entry.duration, asked: entry.detail?.asked === true }
+      })(),
     }))
     lines.push(`  - page ${page_.url} (${page_.ready}), ${page_.nodes} nodes`)
     lines.push(
@@ -212,10 +222,18 @@ async function diagnose(page: Page, context?: BrowserContext): Promise<string> {
               ' both — the reply, or the mount',
       )
     }
-    if (page_.settledMs !== null) {
+    if (page_.settled !== null) {
+      /**
+       * Worded by what the scan did. "Its answer came back" is true only of a scan that
+       * asked, on a page that was not blinded, with a worker that says it answered; the
+       * same measure is written for a scan that had nothing to ask.
+       */
       lines.push(
-        `  - a scan SETTLED in ${page_.settledMs.toFixed(1)} ms: its answer came back and was` +
-          ' handled in this page',
+        page_.settled.asked && !page_.blinded && answered !== null && answered > 0
+          ? `  - the last scan SETTLED in ${page_.settled.ms.toFixed(1)} ms: it asked, the answer` +
+              ' came back and was handled in this page'
+          : `  - the last scan settled in ${page_.settled.ms.toFixed(1)} ms without an answer` +
+              ' to hand: it asked nothing, or the worker does not say it answered',
       )
     }
     if (page_.gaveUp) {
@@ -316,9 +334,15 @@ export async function expectJournalLine(
  * - `okolos:pending`: the question "does this tab hold a leak verdict nobody was shown?";
  * - `okolos:password` (in the **worker**): a submitted password judged, and a compromised
  *   verdict held and offered to the tab;
- * - `okolos:focus-judged`, `okolos:trap-judged`: a focus judged by the password pause, a
- *   look at the page by the trap watcher. These two are per event, so they exist only in
- *   the build with test hooks (`e2e/hooks.ts`); the shipped bundle does not carry them.
+ * - `okolos:focus-judged`, `okolos:trap-judged`, `okolos:password-handled`: a focus judged
+ *   by the password pause (after the first decision, and in a frame after the report has
+ *   arrived), a look at the page by the trap watcher, and the asking document having
+ *   handled its password answer. Per event, so they exist only in the build with test hooks
+ *   (`e2e/hooks.ts`); the shipped bundle does not carry them. Count before acting and wait
+ *   for one more: an earlier event satisfies "at least one".
+ *
+ * `okolos:scan` keeps one entry per document, the latest, so it answers "has a scan
+ * settled", not "how many".
  *
  * None of them is written for a check that failed, so a check that did not finish makes the
  * wait run out with a sentence saying so, rather than an absence that proves nothing.
@@ -330,6 +354,7 @@ export const SETTLED = {
   password: 'okolos:password',
   focus: 'okolos:focus-judged',
   trap: 'okolos:trap-judged',
+  passwordHandled: 'okolos:password-handled',
 } as const
 
 export type Settled = (typeof SETTLED)[keyof typeof SETTLED]

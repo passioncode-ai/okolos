@@ -288,15 +288,43 @@ export const MEASURE_PENDING = 'okolos:pending'
 const MARK_FOCUS_JUDGED = 'okolos:focus-judged'
 const MARK_TRAP_JUDGED = 'okolos:trap-judged'
 
+/**
+ * Test-hook mark: this document has handled the answer to its own password check, the
+ * warning drawn, the leak relayed to the embedding page (or given up), or nothing to say.
+ * The worker's `okolos:password` cannot say this: the asking document handles the answer
+ * after the worker has returned it. Per submission, so test build only, like the two above.
+ */
+function passwordHandled(): void {
+  // The name is written inside the guard, not as a module constant: the bundler kept an
+  // unused constant in the shipped build, and the bundle gate refuses the name there.
+  if (__OKOLOS_TEST_HOOKS__) performance.mark('okolos:password-handled')
+}
+
 declare const __OKOLOS_TEST_HOOKS__: boolean | undefined
 
 /**
- * The scan has settled. Inside the scan's own fail-open wrapper on the paths that end
- * there; the frame's path ends later and catches for itself.
+ * The scan has settled, and whether it asked the worker anything.
+ *
+ * **One entry per document, the latest.** A page that keeps changing is rescanned up to
+ * twice a second, and user-timing entries are never evicted, so a measure per scan would
+ * pile up in the timeline of a page someone keeps open all day: up to 7 200 an hour. The
+ * previous entry is cleared before the next is written; a reader waiting for "settled at
+ * least once" sees one entry either way.
+ *
+ * `asked` travels in the entry's `detail`, so the e2e report can tell "the answer came
+ * back" from "there was no question" (a blinded walk, or nothing to ask about).
+ *
+ * Wrapped like its siblings: a page can have replaced the API, and a measurement that
+ * throws must not turn a scan that did its work into a scan journalled as failed.
  */
-function scanSettled(started: number): void {
-  const end = performance.now()
-  performance.measure(MEASURE_SCAN, { start: started, end })
+function scanSettled(started: number, asked: boolean): void {
+  try {
+    const end = performance.now()
+    performance.clearMeasures(MEASURE_SCAN)
+    performance.measure(MEASURE_SCAN, { start: started, end, detail: { asked } })
+  } catch {
+    // Nothing to report is better than a scan reported as failed.
+  }
 }
 
 /**
@@ -383,7 +411,7 @@ async function scan(): Promise<void> {
         })
       })
     }
-    scanSettled(started)
+    scanSettled(started, false)
     return
   }
 
@@ -395,7 +423,7 @@ async function scan(): Promise<void> {
 
   const verdicts: Verdict[] = response?.verdicts ?? []
   if (verdicts.length === 0) {
-    scanSettled(started)
+    scanSettled(started, true)
     return
   }
 
@@ -416,12 +444,16 @@ async function scan(): Promise<void> {
     // Settled once the embedding page has it, or the report was given up: a frame's
     // finding is not on screen until then.
     void tellEmbeddingPage(verdicts)
-      .then(() => scanSettled(started))
-      .catch(() => undefined)
+      .then(() => scanSettled(started, true))
+      .catch((cause: unknown) => {
+        // Visible, as it was when this rejection went unhandled: a report that failed
+        // outright, rather than being given up, is a defect worth a console line.
+        console.warn('okolos: a frame report failed', cause)
+      })
     return
   }
   show(worst(verdicts), verdicts.length, page.truncated, neutralised)
-  scanSettled(started)
+  scanSettled(started, true)
 }
 
 /**
@@ -1154,8 +1186,9 @@ watchCredentialFields({
 function tellEmbeddingPageOfPassword(finding: {
   severity: 'critical' | 'major' | 'minor'
   lines: FrameLine[]
-}): void {
-  void reportToEmbeddingPage(
+}): Promise<unknown> {
+  // Returned so the pause can say it judged the focus only once the report has arrived.
+  return reportToEmbeddingPage(
     { kind: 'credential', origin: '', severity: finding.severity, lines: finding.lines },
     {
       relay: (report) => platform.runtime.send('frame/report', report),
@@ -1178,8 +1211,9 @@ function tellEmbeddingPageOfPassword(finding: {
  * password and a verdict on a password already sent are different events with different
  * remedies, and the journal is queried by kind.
  */
-function tellEmbeddingPageOfLeak(lines: FrameLine[], offline: boolean): void {
-  void reportToEmbeddingPage(
+function tellEmbeddingPageOfLeak(lines: FrameLine[], offline: boolean): Promise<unknown> {
+  // Returned so the submit handler can say it handled the answer once the report arrived.
+  return reportToEmbeddingPage(
     { kind: 'password', origin: '', lines, offline },
     {
       relay: (report) => platform.runtime.send('frame/report', report),
@@ -1250,14 +1284,18 @@ document.addEventListener(
           sha1,
           host: location.host,
         })
-        if (!verdict?.compromised) return
+        if (!verdict?.compromised) {
+          passwordHandled()
+          return
+        }
 
         const lines = passwordLines(verdict)
 
         // A frame reports rather than draws, and the words are not decided here: keys
         // travel and the surface that draws them resolves them.
         if (!isTopFrame) {
-          tellEmbeddingPageOfLeak(lines, verdict.offline)
+          await tellEmbeddingPageOfLeak(lines, verdict.offline)
+          passwordHandled()
           return
         }
 
@@ -1269,6 +1307,7 @@ document.addEventListener(
           host: location.host === '' ? null : location.host,
           headline: t('warnPasswordHeadline'),
         })
+        passwordHandled()
       } catch (cause) {
         /**
          * A failed check is not a clean password, and it is not a broken login

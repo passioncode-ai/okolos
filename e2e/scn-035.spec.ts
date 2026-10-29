@@ -1,5 +1,5 @@
 import { expect, test } from './hooks.js'
-import { serveHosts } from './serve.js'
+import { serveCleanRange, serveHosts } from './serve.js'
 import { SURFACE_MOUNT_MS } from './budgets.js'
 import { extensionWorker } from './ready.js'
 import { expectScriptReady, expectSettled, frameAt, SETTLED } from './surfaces.js'
@@ -196,6 +196,7 @@ test('stays silent when the password submitted from the frame is not in a breach
   // Without this, the tests above pass just as well against a build that warns about
   // every password submitted anywhere.
   await serveHosts(context, { 'parent.test': PARENT, 'sso.partner.test': LOGIN_FRAME })
+  await serveCleanRange(context)
   const page = await context.newPage()
   await page.goto('https://parent.test/')
   await frameScriptReady(page)
@@ -211,6 +212,9 @@ test('stays silent when the password submitted from the frame is not in a breach
   // Until the worker says it judged the password and offered whatever it found to the tab,
   // not for a time: three seconds ran out first under load (B-169).
   await expectSettled(await extensionWorker(context), SETTLED.password)
+  // And until the frame that asked has handled the answer, relay to this page included:
+  // the worker's measure is written before the frame acts on what it returned.
+  await expectSettled(await frameAt(page, 'https://sso.partner.test'), SETTLED.passwordHandled)
   const variant = await page.evaluate(
     () =>
       document

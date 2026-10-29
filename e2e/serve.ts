@@ -25,3 +25,18 @@ export async function serveHosts(
     )
   }
 }
+
+/**
+ * A range answer that does not contain the password being checked.
+ *
+ * Without it the harness's catch-all answers the range service with a 503, and the net
+ * layer does not read the status, so "not in a breach" would rest on an error body being
+ * parsed as an empty range. A padded answer of the real shape makes "absent" come from a
+ * range answer, which is what the specs about a clean password mean.
+ */
+export async function serveCleanRange(context: BrowserContext): Promise<void> {
+  const padding = Array.from({ length: 8 }, (_, i) => `${'F'.repeat(34)}${i}:0`).join('\r\n')
+  await context.route('https://api.pwnedpasswords.com/range/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/plain', body: padding }),
+  )
+}

@@ -1,4 +1,5 @@
 import { expect, serve, test } from './fixtures.js'
+import { RECORD_VISIBLE_MS } from './budgets.js'
 import { expectBanner, expectPageSettled } from './surfaces.js'
 
 /**
@@ -65,4 +66,39 @@ test('the page cannot read or remove the warning', async ({ context }) => {
   // itself, which would make the whole surface pointless.
   expect(reachable.shadow).toBeNull()
   expect(reachable.innerText).toBe('')
+})
+
+test('a page that keeps changing keeps one settle entry, not one per rescan', async ({
+  context,
+}) => {
+  /**
+   * The settle measure ships, and a page that keeps changing is rescanned up to twice a
+   * second; user-timing entries are never evicted. Written once per scan it would grow
+   * by thousands an hour in a page someone keeps open, so the product clears the previous
+   * entry before writing the next. Several rescans are waited for by their own measure
+   * (`okolos:collect`, one per scan) before the count is read.
+   */
+  await serve(
+    context,
+    CLEAN.replace(
+      '</body>',
+      `<p id="tick">0</p><script>
+         let n = 0
+         setInterval(() => { document.getElementById('tick').textContent = String(++n) }, 150)
+       </script></body>`,
+    ),
+  )
+  const page = await context.newPage()
+  await page.goto('https://fixture.test/')
+  await expectPageSettled(page)
+
+  await expect
+    .poll(() => page.evaluate(() => performance.getEntriesByName('okolos:collect').length), {
+      timeout: RECORD_VISIBLE_MS,
+      message: 'the page was not rescanned, so this proves nothing about rescans',
+    })
+    .toBeGreaterThanOrEqual(4)
+  // A rescan whose collect is measured may not have settled yet; give it its own signal.
+  await expectPageSettled(page)
+  expect(await page.evaluate(() => performance.getEntriesByName('okolos:scan').length)).toBe(1)
 })

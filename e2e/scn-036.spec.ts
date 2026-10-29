@@ -1,5 +1,5 @@
 import { expect, test } from './hooks.js'
-import { serveHosts } from './serve.js'
+import { serveCleanRange, serveHosts } from './serve.js'
 import { SURFACE_MOUNT_MS } from './budgets.js'
 import { extensionWorker } from './ready.js'
 import { expectJournalLine, expectSettled, SETTLED } from './surfaces.js'
@@ -217,6 +217,7 @@ test('a password that is not in a breach leaves the landing page alone', async (
   // Without this, the tests above pass just as well against a build that warns on every
   // navigation that followed a password field.
   await serve(context)
+  await serveCleanRange(context)
   await workerAwake(context, extensionId)
   const page = await context.newPage()
   await page.goto('https://bank.test/')
