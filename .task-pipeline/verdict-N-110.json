@@ -1,0 +1,178 @@
+{
+  "node": "N-110",
+  "done": [
+    "B-125: the key now has a writer. The settings screen saves, replaces and removes it under the same literal the background reads (leak-key.ts:14, index.ts:716; leak-key.test.ts pins the pair)",
+    "B-125: the key is never shown back. The renderer receives only a boolean `saved`; the field is type=password, autocomplete off, and is emptied before onSave runs (data-controls.ts:259-320)",
+    "B-125: the key is never exported. WITHHELD_SETTINGS holds hibp:apiKey; the export carries a marker with its own reason (export-words.ts kindOf/reasonFor) and the export test asserts the value is absent and the path present",
+    "B-125: the key leaves only in the hibp-api-key header. The URL, the outbound log, the journal and every error sentence carry no value; the audit payload shape names the header only (leaks.ts:105-118; leaks.test.ts asserts all four)",
+    "B-125: a read failure is told apart from no key. hibpFromStore returns needsKey 'unreadable' with its own sentence and the source is not asked; readSetting no longer swallows the error and has one caller, so no other path changed meaning",
+    "B-125: a 401 is reported as a refused key with a replace link; any other non-OK status is named by status and does not blame the key (previously surfaced as 'body.map is not a function')",
+    "B-125: the leaks idle sentence names Cavalier always and Have I Been Pwned per key state (saved, not saved, unknown); the CC BY credit is drawn only when HIBP answered",
+    "B-125: the result resets after save, remove, erase and store reset, in this tab (forgetLeakResult/forgetLeakScreen) and in other tabs (BroadcastChannel), and an in-flight check started under the old key state is dropped by the epoch guard (options/index.ts:166,181)",
+    "B-125: the length cap holds at 256 (257 refused with its own sentence, 256 accepted), with separate refusals for empty, whitespace or control characters, and non-Latin characters",
+    "B-125: the leaks/check contract type admits exactly the KeyRemedy union; checked by expectTypeOf under `tsc -p tsconfig.tests.json`, which `pnpm typecheck` runs",
+    "B-131: no shipped source imports @okolos/model, the dependency is gone from the extension package, and neither background bundle carries the model id or its download host (tools/model-stage.test.ts, run against the bundles this run built)",
+    "B-131: inference/score is gone from RpcMap, the platform inference section and offscreen API type are gone, and no residual reference remains in apps/, packages/*/src or tools/ (grep); tools/rpc-receivers.test.ts now fails any contract type with no receiver",
+    "Removing inference/score left the contract fully answered: tools/rpc-receivers.test.ts passes and grep finds no sender in any context",
+    "Removing Platform.inference and WebExtensionApi.offscreen broke no implementor or fake: pnpm typecheck (tsc -b and tsconfig.tests.json) exit 0",
+    "Both background bundles carry no model code: built background.js 59332 bytes in chrome and firefox, model markers absent (tools/model-stage.test.ts green), and the Firefox background round trip (detect hidden, frames, leak verdict) still passes in real Firefox",
+    "readSetting turning from swallow-to-null into throw reaches exactly one caller, which hands it to hibpFromStore and converts it into needsKey 'unreadable'; no other path lost its null fallback",
+    "The needsKey union in the RPC contract and KeyRemedy cannot drift silently: narrowing the contract to 'missing' | 'refused' in a throwaway copy made tsc -p tsconfig.tests.json fail at background/leaks.test.ts:251 (TS2344); CI runs pnpm typecheck (.github/workflows/ci.yml:45)",
+    "The three spellings of the setting name (options constant, background literal, WITHHELD_SETTINGS literal) are pinned pairwise: options/leak-key.test.ts:37 reads the background source, tools/secrets.test.ts checks both directions of WITHHELD_SETTINGS against written keys; retention keeps the row whatever its name",
+    "The new payloadShape suffix is read consistently: self-audit summary and row detail use the same HIBP_KEY_HEADER_SHAPE constant the background writes; the redactor ignores headers and the e2e saw the key only in the hibp-api-key header",
+    "The wider statesOf parser regenerated all 16 wireframes with zero drift against the committed files, and python3 docs/ux/lint.py passes",
+    "The new optional arguments of renderDataControls and renderLeaks reach their only callers; every neighbour e2e on #leaks and #data (a11y, narrow, panel-shape, no-flush-text, rendered-instants, scn-027) passes in Chromium",
+    "Erase-all and the cross-tab channel work end to end in Chromium: scn-015 'erasing all data takes the leaks result with it' and 'another open tab, and a check still in flight, drop a result' pass, and scn-023 still empties every store",
+    "Locale parity holds for every new key (same key sets in ru and en, $NAME$/$STATUS$/$COUNT$ placeholders declared in both); the dropped inference keys have no remaining reader",
+    "SCN-015 holds as written, in Russian, on a build of 3b762e1: the idle sentence names Hudson Rock Cavalier only and says the address does not go to Have I Been Pwned with no key; names both and says the key goes in the request header with a key; no credit line before a check or after a check Have I Been Pwned took no part in",
+    "the key line reads 'Have I Been Pwned не проверялся: ключ не сохранён.' with 'Добавить ключ' linking to options.html#data; a Cyrillic key is refused with leakKeyLatin; surrounding spaces are trimmed silently; after saving the field is empty and the status says the key is saved and not shown; browser Back returns the leaks screen to its before-check state with the with-key sentence",
+    "every privacy promise about the key holds: no request reaches haveibeenpwned.com without a key; with one, the key travels only in the hibp-api-key header of that request (stub saw it present); it is absent from the options page HTML, the self-audit page, the outbound log rows (which name header:hibp-api-key only) and the export file; the export marks settings/hibp:apiKey with its own reason ('Ключ Have I Been Pwned ваш ...'); retention.ts does not sweep it; wipeAll removes it and the block returns to the no-key state",
+    "SCN-023 and SCN-024 changes hold: the wipe confirmation names 'настройки, включая сохранённый ключ Have I Been Pwned'; the export closing note gives only the reasons for what this file withheld",
+    "SCR-10: the summary adds 'ваш ключ Have I Been Pwned, в заголовке запроса: 1' after one keyed lookup, and the address count and the unconditional page-content clause are unchanged",
+    "SCN-016's new precondition is true: Cavalier entries carry no domain, so with no key every entry takes the no-domain path",
+    "the cross-tab and in-flight claims of SCN-015 step 6 and the erase claim of SCN-023 step 3 are held by e2e/scn-015.spec.ts tests 10 and 11, which pass",
+    "CHANGELOG numbers are measured: background.js 62 173 bytes at 5d664c5 and 59 332 at 3b762e1 (Chrome and Firefox alike); ADR-0006's 58 791 is the B-131 commit f9f5abb on its own, as tools/bundle-sizes.json says",
+    "the B-131 docs (ADR-0006 second half, licences.md step 3, packages/platform/README.md) describe the tree: no product doc outside the ADR names background/inference.ts, inference/score or platform.inference",
+    "the product strings follow terminology.md (ключ / key; no 'токен', 'API-ключ', 'API key' in either catalogue) and carry no em dash",
+    "facts.md leak-lookup row, privacy.md and the generated privacy page agree with each other and with packages/net/src/destinations.ts"
+  ],
+  "not_done": [],
+  "not_verified": [
+    "unit: @okolos/net request(): whether the choke point logs or echoes request headers on any path; leaks.test.ts proves the audit record carries no key, but the net package is not in the diff",
+    "unit: Firefox end-to-end (pnpm test:e2e:firefox) for SCN-015; only Chromium was run",
+    "unit: BroadcastChannel absence path: with no channel, another tab keeps its stale result until its next check (stated in the code), not exercised by any test",
+    "unit: whilePending marking on an Enter-key save, where the pressed control is the field rather than the button",
+    "unit: callers of renderLeaks, renderDataControls and renderSelfAudit outside options/index.ts, and the docs/ux, wireframe and screenshot changes in the diff: seam and product tiers",
+    "unit: a real Have I Been Pwned response; no real key was used, every key in the tests is a fake literal",
+    "seam: The HIBP key, the leaks screen and the BroadcastChannel in Firefox: tools/firefox-e2e.mjs drives no options page, so the cross-tab reset and the key block are proven in Chromium only",
+    "seam: Edge as a separate browser build",
+    "seam: The real Have I Been Pwned API: every run used a fake key and intercepted routes; no real key was used",
+    "seam: The store screenshots (docs/store/screenshots) were not regenerated or compared",
+    "seam: The cross-repository facts (fabric-workspace knowledge, org-index repositories.json) that ADR-0006 and the platform README changes may touch",
+    "product: Firefox: the geckodriver harness (pnpm test:e2e:firefox) was not run, so the key block, BroadcastChannel between moz-extension tabs and the export on Firefox are unproven here",
+    "product: SCN-032 store reset: the reset path's forgetLeakScreen and announce were read in code, not driven (it needs a profile written by a newer schema)",
+    "product: the real haveibeenpwned.com API (all checks used a stub): actual 401/429 bodies and header name casing",
+    "product: whether a browser password manager offers to save the type=password key field on the options page",
+    "product: layout and pixels of the key block and the two re-taken store screenshots (visual tier)",
+    "product: Copylot checks of the new strings (copylot_check) were not run; the brand lint and terminology were",
+    "product: fabric-workspace knowledge pages and org-index rows that may describe the leak check or the model stage"
+  ],
+  "blockers": [
+    {
+      "what": "A partial erase that did clear the settings store (so the key is gone) does not reset the leaks screen, does not notify other tabs, and leaves the key block saying a key is saved. onWiped fires only on outcome.ok. (packages/ui/src/settings/data-controls.ts:234-245 with apps/extension/src/options/index.ts:1072-1076, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The key field is emptied before the write; if saveLeakKey fails, act() shows the failure but the pasted key is gone and must be pasted again. (packages/ui/src/settings/data-controls.ts:298-299, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The self-audit key count counts every leak-lookup entry whose payload shape names the header, whatever its outcome, so a lookup that failed before sending is counted as the key having gone in a header. (packages/ui/src/self-audit/panel.ts:169-170, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The HIBP source name is computed twice: the status uses HIBP_SOURCE but each leak row still carries the literal 'Have I Been Pwned'. (apps/extension/src/background/leaks.ts:136, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The bundle baseline for options.js says 45540 bytes 're-measured at 1d8a446', but the shipped code at 1d8a446 and 3b762e1 (3b762e1 changed docs only) builds options.js at 45929 bytes. The recorded number matches the size before round 3 added the epoch and BroadcastChannel code, so the baseline and its lastMove arithmetic describe a build that does not exist. (tools/bundle-sizes.json:9 (files.options.js) and :8 (lastMove), read by tools/bundle-sizes.test.ts, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "A partial wipe that did clear the settings store (so the key is gone) never calls onWiped: data-controls only names the failed stores. The page is not reloaded, so the key block on #data still says a key is saved, this tab's leaks result and typed address stay, and no 'erased' message reaches other tabs. The cross-tab and in-flight protection added for N-110 depends on the all-or-nothing success branch only. (packages/ui/src/settings/data-controls.ts:234-245 (onWiped only when outcome.ok) as used by apps/extension/src/options/index.ts:1066-1076, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "tools/bundle-sizes.json, re-stamped by 3b762e1, says 'every number re-measured ... (re-measured at 1d8a446)' and records options.js 45540 with 'the HIBP key block ... add 2943 bytes'. The same source builds options.js at 45929 bytes; main builds it at 42597, so the change adds 3332, not 2943 (tools/bundle-sizes.json:7 (lastMove) and :13 (options.js), found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "SCR-08's error row says 'that row states unavailable + retry' and FLW-11 still draws 'Row: source unavailable + retry'. The product has no per-source row and no per-source retry: a failed source is only named in the coverage line, and 'Проверить снова' re-runs the whole check. The change's own SCN-015 rewrite dropped 'per-source retry' and its new SCR-08 note says other failures 'stay in the coverage line', so the screen record now contradicts itself (docs/ux/screens.md:307 (error row); docs/ux/flows.md FLW-11 C_err node, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "the reason for a non-key failure never reaches the person. The new string leakSourceStatus ('$NAME$ ответил ошибкой $STATUS$.') and the existing leakSourceTimedOut are put into the source's `why`, but renderLeaks draws `why` only for key reasons (keyLines); a 429, 5xx or timeout reads only as 'Не проверено по: Have I Been Pwned' (apps/extension/src/background/leaks.ts:123 (leakSourceStatus); packages/ui/src/leaks/leaks.ts keyLines and coverageLine, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "the store listing promises 'Не хранит ничего дольше 90 дней' / 'Keeps nothing longer than 90 days'. privacy.md's retention table (edited here) keeps the saved Have I Been Pwned key until the person removes it or erases data, alongside trusted domains, the reuse index and its key (docs/store/listing.md:56 and :112, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "docs/backlog.md still lists B-125 as open under the title 'Ключ HIBP читается, но ввести его негде', and B-131 as open; docs/README.md now hands the state of B-125 to the backlog (docs/backlog.md:12 and :17; docs/README.md:64-66, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "README.md still sells 'Three local stages: ... -> a compact ONNX classifier', and SCN-003's Errors & recovery still describes 'the classifier stage fails or times out'. After B-131 no build contains the stage at all (README.md:30; docs/ux/scenarios.md:121 (SCN-003), found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "the self-audit key count counts every outbound-log row whose shape names header:hibp-api-key. A failed lookup writes a 'sent' row and then a 'failed' row, so one request is counted twice; a blocked row would be counted though nothing left. The address count beside it already does the same (packages/ui/src/self-audit/panel.ts summarise (keys); packages/net/src/request.ts entry('failed'), found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "04-popup.png, re-taken in this change, shows 'Не удалось определить страницу, поэтому она не проверялась' at the top, while listing.md's table says it shows 'вердикт по текущей странице'. The 5d664c5 image shows the same state; only the dates moved (docs/store/screenshots/04-popup.png; docs/store/listing.md screenshot table, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "CHANGELOG 'Чего сознательно нет' still lists 'Индекса переиспользования паролей', while the reuse index exists (privacy.md describes it, SCR-08 names the reuse store). The change added three items above this list and left it (CHANGELOG.md:79-80, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    }
+  ],
+  "replan": {
+    "possible": true,
+    "add": [],
+    "park": [],
+    "why": "certified at all 3 tiers in round 5"
+  },
+  "evidence": [
+    "unit: pnpm gates in /Users/sshlg/DATA/_worktrees/okolos-sw-10 at 3b762e1 -> exit 0: lint, typecheck (tsc -b and tsconfig.tests.json), build, vitest 190 files / 2888 passed / 1 skipped, ux lint OK, brand gate clean, i18n sweep 0 outside catalogue, package --check every check passed",
+    "unit: npx vitest run on the 14 changed test files (background/leaks, options/leak-key, options/export-words, core-leaks merge, model host, platform adapter, ui leaks, self-audit panel, data-controls, tools model-stage, rpc-receivers, reachable, manifest, wireframes) -> 14 files, 255 passed",
+    "unit: pnpm build:e2e && npx playwright test e2e/scn-015.spec.ts -> 11 passed in Chromium, including saved key sent only in its header, refused key, no-key credit, erase reset and cross-tab plus in-flight drop",
+    "unit: grep for leakSourceNoKey, inferenceNoModel, inferenceNotReady, inference/score, platform.inference, ensureHost across apps/extension/src, packages/*/src, tools (non-test) -> only the comment at background/index.ts:189 and the library host",
+    "unit: grep -c hibp-api-key apps/extension/dist/chrome/background.js -> 1 (the header name), and no ClassifierSession/onnx/inference/score strings in either background bundle",
+    "unit: node read of both catalogues: every new key (leakSource*, leaksIdle*, leakKey*, exportWithheldOwnKey, exportWhy*, auditSummaryCarriedKey) present in ru and en, removed inference keys absent from both",
+    "unit: worktree left as found: git status --short empty at 3b762e1; the test-results/ directory my Playwright run created (untracked) removed; no Chromium process left",
+    "seam: git diff --stat 5d664c5..3b762e1 -> 62 files; git show --stat 3b762e1 -> CHANGELOG.md, docs/ux/scenarios.md, docs/ux/screens.md, tools/bundle-sizes.json only",
+    "seam: grep -rn readSetting apps packages tools e2e (no dist/.tsc) -> background/index.ts:716,729, options/leak-key.test.ts:37, tools/secrets.test.ts:83",
+    "seam: grep for inference/score, platform.inference, InferenceHostKind, ensureHost, 'inference\\s*:' outside docs -> only packages/model, comments and gate tests",
+    "seam: Verification ran in an APFS clone of the worktree detached into its own throwaway git repo, so the worktree stayed clean at 3b762e1 (git status empty); clone removed afterwards",
+    "seam: pnpm build -> chrome and firefox built; sizes background.js 59332, content.js 70656, options.js 45929, popup.js 3094 (both browsers identical); main checkout dist shows background.js 62173, options.js 42597",
+    "seam: pnpm test -> 190 files, 2888 passed, 1 skipped",
+    "seam: pnpm typecheck -> exit 0; mutation of RpcMap needsKey to 'missing' | 'refused' -> TS2344 at apps/extension/src/background/leaks.test.ts:251 (reverted in the clone)",
+    "seam: python3 docs/ux/lint.py -> OK; node tools/wireframes.mjs -> wrote 16 wireframes, git status in the clone empty (no drift)",
+    "seam: pnpm run i18n:sweep -> OK; pnpm run package:check -> every check passed; pnpm run brand:lint -> brand pack is clean",
+    "seam: pnpm run build:e2e && npx playwright test (Chromium, whole suite) -> 194 passed (2.9m), including scn-015 (11 tests), scn-023 (3), a11y, rendered-instants",
+    "seam: node tools/firefox-e2e.mjs -> all Firefox checks passed (15 ok)",
+    "seam: python3 placeholder check over ru/en messages.json -> identical key sets, placeholders declared for every new $X$",
+    "seam: pgrep for geckodriver, playwright and the clone path after the runs -> nothing left running",
+    "product: python3 docs/ux/lint.py -> 'OK - docs/ux is consistent', exit 0; python3 docs/brand/lint.py -> 'brand pack is clean', exit 0 (run in the read-only worktree at 3b762e1)",
+    "product: private copy of 3b762e1 (git archive, pnpm install --offline): pnpm test -> 190 files, 2843 passed + 1 failed; the 1 failure and 3 file failures were 'not a git repository'; after fetching sw/sw-10 with tags into the copy, tools/ci, feed-key, graph-check and docs tests -> 4 files passed, 113 tests passed",
+    "product: node tools/build.mjs --with-test-hooks; pnpm exec playwright test e2e/scn-015.spec.ts e2e/scn-023.spec.ts -> 14 passed (15.6s), headless Chromium",
+    "product: own probe (probe/ru.mjs) on the Russian build (_locales/en removed, as tools/screenshots does), fake key, network stubbed: idle/coverage/key line/key block/refusal/Back/audit/export/wipe texts as quoted in confirms; requests seen: cavalier, haveibeenpwned with header present, cavalier; 'fake0000' absent from options HTML, audit page and export file",
+    "product: byte counts: 5d664c5 background.js 62173, options.js 42597; f9f5abb background.js 58791; 3b762e1 background.js 59332 (Chrome and Firefox), options.js 45929",
+    "product: git show 5d664c5:docs/store/screenshots/04-popup.png compared with HEAD: same content, dates moved",
+    "product: grep -rn 'xposedornot' over apps and packages -> no hits (SCR-08 Resources still names it; pre-existing, not reported as a finding)",
+    "product: grep for api key / API-ключ / токен / token in both catalogues -> no product string uses them",
+    "product: grep -n 'B-125\\|B-131' docs/backlog.md -> both 'open'"
+  ],
+  "tested": {
+    "head": "3b762e11553dad2996918b663298a1c63e22316b",
+    "tree": "941bb7a6c339f92b5a5d02df8c4e167d59b699cd"
+  }
+}

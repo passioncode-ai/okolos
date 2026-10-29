@@ -1,0 +1,170 @@
+{
+  "node": "N-109",
+  "done": [
+    "pnpm gates passes on 530f21d in a standalone clone: exit 0, 188 test files, 2865 passed, 2 skipped (one is the bundle gate's e2e half, skipped with its reason in its name because gates does not build dist/*-e2e)",
+    "all eleven changed specs pass in bundled Chromium on the unmodified build (47 passed), and the full Chromium suite passes (191 passed), so the new catch-all route in e2e/hooks.ts breaks no existing spec",
+    "every changed absence check fails when the thing under test appears late, with the product's settle mark written after it: scn-003 silent page, scn-006 genuine and subdomain, scn-031 and scn-034 silent frames (late banner in the top frame through the scan, and separately a frame report 2.5 s late), scn-006 and scn-003 again through a lookalike check 2.5 s late, scn-036 'not delivered twice' and 'not in a breach' (held-verdict answer 3.5 s late), scn-035 and scn-036 clean-password tests (worker judging a clean password compromised after 3.5 s), scn-011 ordinary text field (text field treated as sensitive, 1.5 s late), scn-008 ordinary copy page (accusation 2.5 s after the copy), scn-003 one-settle-entry test (clearMeasures removed: Received 5)",
+    "the r1 'breaks' is closed: the asking frame now writes okolos:password-handled after its relay resolved, scn-035 waits for it in the sso.partner.test frame, and the r1 plant (frame draws a leak on a clean answer after 400 ms) turns 'not in a breach' red 3 of 3; with 3000 ms it is red too",
+    "every settle mark is written only after its check finished and never on a failed check: okolos:scan after show() in the top frame, after the frame relay resolved in a frame, after nothing in the two empty exits, not on throw (fail-open writes scan-failed) and wrapped in try/catch; okolos:lookalike after warnIfLookalike resolved (show() mounts synchronously before it returns), not on reject; okolos:pending after showPasswordVerdict, not on reject; okolos:password after the offer to frame 0 settled; okolos:password-handled after claimPasswordBanner or the awaited relay, not in the catch; focus-judged after the first decision (a second focus waits on the same promise) and in a frame after the report resolved, not when the facts could not be read; trap-judged after look(), whose mount is synchronous",
+    "the extensions baseline race is gone at unit level: the first baseline is one readwrite transaction, so a reader sees no rows or all of them; the new test drives a second first comparison from inside the first one's write and passes; reverting to the per-row put loop turns it red ('expected [ ...(2) ] to deeply equal []'); two comparisons that both read an empty store write the same keys (3 rows after both)",
+    "shipped behaviour is unchanged apart from the intended B-168 fix and new user-timing entries: dist/chrome and dist/firefox content.js carry 0 occurrences of okolos:focus-judged, okolos:trap-judged, okolos:password-handled and of __OKOLOS_TEST_HOOKS__ (the define is set in both builds), the e2e builds carry each once; the two report helpers end in .catch(() => undefined), so awaiting them in the submit handler and in warn() routes no new error into the password-unchecked journal path; okolos:scan is one entry per document (cleared before each write), okolos:lookalike and okolos:pending once per top document, okolos:password once per check in the worker",
+    "the bundle gate fails by name when a test mark is written unguarded (planted: 'chrome build carries the test mark okolos:password-handled'); the fixed-wait gate fails when a waitForTimeout is added to a spec or a driver.sleep to the Gecko harness",
+    "serveCleanRange actually answers the worker's range request: planting the password's suffix into the served range turns scn-036 'not in a breach' red, so 'absent' comes from a served range answer, not from the 503 catch-all",
+    "B-78 narrowing is consistent inside the unit: okolos:collect is written synchronously by the first scan, which the content script starts at the end of the file after every listener is registered, so expectScriptReady before a focus, click or submit means the listener exists; scn-035's readiness helper now targets its own frame host",
+    "All three compareInventory callers already absorb a rejection (extensionsState .catch(() => []), reviewExtensions try/catch, the RPC wrapper), so an aborted baseline transaction is handled exactly as a failed per-row put was; Promise.all over the puts and tx.done leaves no unhandled rejection",
+    "The fix has no duplicate to miss: the first baseline is written in one place only, acceptInventoryChange writes one row and is not a baseline, and the e2e seeds write before the screen opens, as before",
+    "The return-type change of tellEmbeddingPageOf* cannot route a relay failure into the submit handler's 'password-unchecked' catch: both promises end in .catch(() => undefined) (index.ts:1205, :1228)",
+    "The frame scan's tellEmbeddingPage rejection, previously unhandled, is now caught with a console line; scan() still returns before the relay, so safely(scan) timing and okolos:scan-failed are unchanged",
+    "handlePasswordCheck still returns the answer before the offer settles; only the measure waits on the offer, and the offer still ends in .catch(() => false), so the void chain cannot reject",
+    "The flag is defined for every build pass, and no unit test imports content/index.ts at runtime (the tools that name it read it as text), so the bare __OKOLOS_TEST_HOOKS__ reference cannot throw outside the build",
+    "Shipped bundles carry none of okolos:focus-judged, okolos:trap-judged, okolos:password-handled; both test builds carry all three; okolos:scan, okolos:lookalike, okolos:pending ship in both (grep of rebuilt dist)",
+    "Bundle sizes stay inside the band: content.js 71394 bytes against the 69006 baseline (+3.5 percent), background.js 62378 against 60557 (+3.0 percent)",
+    "Marks written in the isolated world are readable from the page world in both engines: the Gecko harness waited on okolos:scan and okolos:lookalike and passed; the Chromium specs read them through page.evaluate and passed",
+    "Nothing a page can read is new in kind: okolos:collect and okolos:banner already announced the extension on every page; scanSettled clears its own entry, so the shipped per-scan growth is zero for okolos:scan",
+    "The hooks harness catch-all does not starve any spec: every non-fixture host navigated by a hooks spec (g00gle.com, google.com, accounts.google.com, parent.test, framed.test, sso.partner.test, bank.test, host.test) is routed later in that spec and wins by Playwright's reverse registration order; payload.test and example.test are only text",
+    "Context routes do intercept the extension worker's range request: a probe spec registering a counting route after serveCleanRange saw the latest route run and serveCleanRange answer (hits = 100), so 'no test reaches the internet' holds for the worker too",
+    "The fixed-waits gate covers both Playwright harnesses' specs and the Gecko harness; its known list matches the tree (scn-007 1, scn-023 2, scn-037 1, firefox-e2e.mjs 1)",
+    "expectPageSettled's callers (scn-003, scn-006, scn-031, scn-034, two-findings) use only frames that run the content script; the rescan spec waits on okolos:collect before re-reading the single okolos:scan entry",
+    "Every claim the runbook's new section makes was found true: the shipped chrome and firefox builds carry okolos:scan, okolos:lookalike, okolos:pending and okolos:password and none of okolos:focus-judged, okolos:trap-judged, okolos:password-handled; the -e2e builds carry all seven; okolos:scan is cleared before each write (apps/extension/src/content/index.ts:323); lookalike and pending are measured once per top document inside the success branch only, so a failed check writes no mark; okolos:password is written only after journal, hold and offer (apps/extension/src/background/index.ts:669-717); expectSettled, expectPageSettled, expectJournalRows, expectScriptReady and frameAt exist in e2e/surfaces.ts; the report's 'came back and was handled in this page' sentence requires asked, not blinded and a worker answer (e2e/surfaces.ts:228-236); both Playwright harnesses fence the internet the same way (e2e/fixtures.ts:84-89, e2e/hooks.ts)",
+    "The new SCN-017 bullet is true: the first baseline is one IndexedDB transaction (apps/extension/src/background/extensions.ts:96-97), the unit test that starts a second first comparison mid-write passes and both comparisons return no change; the only other writer of the snapshot store is acceptance (extensions.ts:117-118), so 'only a decision writes, with the first baseline as the one exception' holds",
+    "The change does not alter anything a person sees on any changed path: frames still report rather than draw, the password verdict is still offered once and not awaited, the lookalike and pending paths keep their silent catch, the trap and credential 'judged' callbacks write marks only under __OKOLOS_TEST_HOOKS__; no user-facing string was added or changed (git diff touches no _locales, packages/i18n or packages/ui file)",
+    "No scenario lost an assertion: the spec diffs remove only fixed waits and one container wait; every absence (scn-003, 006, 008, 011, 031, 034, 035, 036, two-findings) is still asserted, now after the product's settle signal, and scn-017 still asserts the no-changes line, adding a diagnosis when it is missing; the Coverage lines that name these specs remain accurate",
+    "CHANGELOG does not need an entry for the extensions fix, by its own rule. The fix does change what a person could see: before it, on a fresh profile, a reader racing the first baseline could list other extensions as newly installed on the extensions screen and the overview counter, and the daily review could journal those rows. But no version is released (CHANGELOG.md:11-12 'Первая версия ещё не в магазине'), the existing line 'Наблюдение за расширениями' already promises the corrected behaviour, and no released user can hold the mixed state (false journal rows from the race exist only on source installs made before the fix). Recording it is optional, not owed",
+    "ADR-0001 (closed shadow root) is untouched: no mark carries finding text or surface content; okolos:scan's detail is one boolean",
+    "Shipped browser floors support what the shipped marks use: chrome minimum_chrome_version 137, firefox strict_min_version 129, both support performance.measure with an options object and detail, and every shipped measure is wrapped so a page that replaced the API cannot turn a scan into a failure",
+    "docs/brand/facts.md still holds: no spec file added or removed (the 38-spec fact row), SCN-017 fact row unchanged; tools/docs.test.ts passes"
+  ],
+  "not_done": [],
+  "not_verified": [
+    "unit: Firefox: tools/firefox-e2e.mjs was not run (no Firefox or geckodriver on this machine). Its clean-page wait now depends on a Gecko content script writing okolos:scan with a detail object, and scanSettled swallows a throw; if that measure is refused under Xray the harness fails after 35 s naming the marks (a loud failure, not a false pass), but whether it is refused was not observed",
+    "unit: repeat runs under load: each changed spec ran once on the clean build; the B-78 narrowing and the B-168 claim that 150 runs did not reproduce were not re-measured",
+    "unit: whether the worker's frame/report and password/verdict handlers answer only after the top frame drew is cross-module; it held under the scan-frame, worker and frame-clean plants, but was not read",
+    "unit: whether the worker start-up review and the extensions screen really reach compareInventory concurrently on a fresh profile (the caller side of B-168) is a seam question; only the function's own race was examined",
+    "unit: the three remaining waitForTimeout sites allowed by tools/fixed-waits.test.ts (scn-007, scn-023 x2, scn-037) and whether B-169 may close with two of them named as the same class",
+    "unit: two-findings and panel-shape changes ran green, but no defect was planted for them (neither is an absence check of a check result); the scn-017 diagnostic was not re-planted in r2 (its hunk is unchanged since r1, where it was)",
+    "unit: the backlog receipts closing B-78, B-168 and B-169 are not on this branch (run.md places them on sw/sw-08 later), so row closure was not checked",
+    "seam: The hosted CI run of sw/sw-09 itself: the branch was not pushed by this tier and no run id was given, so the claim about CI rests on reading ci.yml and on reproducing the skip locally",
+    "seam: The B-168 original failure (run 36563089100): not reproduced; this tier only checked that the transaction leaves no reader a partial baseline and that every caller survives an aborted one",
+    "seam: Edge and a real (non-headless) Firefox profile; the event-page lifetime of okolos:password entries in Firefox was reasoned from the per-submission write, not measured",
+    "seam: Under-load behaviour beyond 5 repeats at one worker; the node's own claim of 1-in-10 before the fix was not re-measured",
+    "seam: Backlog closure receipts for B-78, B-168, B-169 in their canonical source: that is the unit and product tiers' subject",
+    "product: Firefox end to end (pnpm test:e2e:firefox) was not run; the Firefox clean-page wait is read, not executed",
+    "product: Whether real RUM vendors on popular sites in fact forward okolos:* measures: inferred from how PerformanceObserver and user timing work, not measured",
+    "product: Whether a dev profile that hit the B-168 race before the fix holds false 'installed' journal rows; unreleased, so no shipped user can, and none was inspected",
+    "product: The full e2e suite under load; flake rates for the replaced waits are the unit and seam tiers' evidence, not this one",
+    "product: The visual layer: no surface changed, so no contact sheet was read"
+  ],
+  "blockers": [
+    {
+      "what": "The fixed-wait gate recognises only the spelling `.waitForTimeout(` in e2e/*.spec.ts and `driver.sleep(` in the Gecko harness. A spec that writes `await new Promise((r) => setTimeout(r, 2_000))` before `toHaveCount(0)` passes it: planted in scn-003's silent test, tools/fixed-waits.test.ts reported 4 passed. (tools/fixed-waits.test.ts:23, 52-53 (FIXED_WAIT and GECKO_SLEEP patterns), found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The per-event test marks carry no identity. focus-judged is written at once for any focus on a non-sensitive element, including one that lands while an earlier password-field decision is still pending; trap-judged is written at once for any trusted copy. 'Count before acting, wait for one more' is therefore satisfied by an unrelated event the page itself causes (a page script moving focus, an autofocus). (apps/extension/src/content/credential.ts:104-107; apps/extension/src/content/traps.ts:80-83, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "In the blinded exit of scan() the journal note is fired with `void journal.record(...)` and okolos:scan is written straight after, so the settle mark precedes the one thing that branch sets in motion. The worker's okolos:password measure is the one new measure not wrapped in try/catch (inside `void offered.then(...)`). (apps/extension/src/content/index.ts:396-410 (blinded branch, then scanSettled at :411); apps/extension/src/background/index.ts:714-717, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The test-build half of the bundle gate never runs in CI. The gates job runs pnpm build then pnpm test with no dist/*-e2e, so it.skipIf skips it; the e2e job builds chrome-e2e but runs no vitest; the Firefox job builds firefox-e2e but runs only the Gecko harness. The ci.yml comment on that step still says the bundle gates 'fail, never skip'. The pre-push gates also skip it whenever the e2e build is older than the sources. (.github/workflows/ci.yml:51-55 (gates job, 'unit tests and bundle gates'); tools/gates/bundle-scan.test.ts:276, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The range client reads the body without reading the HTTP status, so an error answer from the range service (503, 429) is parsed as a range that does not hold the suffix: 'not in a breach' instead of 'not checked'. The change documents this in serveCleanRange and works around it in the harness rather than changing it. Pre-existing; this node did not move it. (apps/extension/src/background/password.ts:108 (return { body: await response.text() }); named by e2e/serve.ts:586-593, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "A wait of the B-169 class sits outside the new gate's reach. tools/gecko-layout.mjs waits 600 ms after navigating to each options area, then reads #root and asserts that no flush violations exist. An area that has not rendered yet yields empty markup and passes. tools/fixed-waits.test.ts globs only e2e/*.spec.ts and tools/firefox-e2e.mjs, so it cannot refuse this site. tools/screenshots.mjs:123 has a 400 ms pause before a capture; that one guards an image, not an absence. (tools/gecko-layout.mjs:81, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "expectPageSettled waits for okolos:scan in every frame from page.frames(), but the manifest's content script has all_frames without match_about_blank or match_origin_as_fallback, so an about:blank, srcdoc or data: frame never writes the mark. expectSettled also accepts atLeast > 1 for okolos:scan, which keeps one entry per document and so can never reach 2. No current caller hits either case (191 of 191 passed). (e2e/surfaces.ts:377 and :412, against apps/extension/manifest.chrome.json:19-20, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The shipped extension now writes three more page-readable entries (okolos:scan on every page and every frame, okolos:lookalike and okolos:pending in every top document), and no document says that a page, its scripts or its RUM vendor can read Okolos's performance entries. Together with the pre-existing okolos:collect, a clean page learns that Okolos is installed, when each scan settled and whether it asked the worker; a site's PerformanceObserver for 'measure' receives every okolos:scan as it is written (clearMeasures empties the buffer, not the observer stream), up to twice a second on a changing page, and RUM tools forward user timing to the site owner (apps/extension/src/content/index.ts:324,1085,1407 (writes); docs/ux/scenarios.md:263 ('Detection is closed on Chrome'); docs/adr/0009-the-page-watcher-observes-and-never-holds.md:88-90 (what the page learns: 'нового это ей не сообщает' because the banner host is in its DOM, which is true only of a page with a finding); docs/privacy.md 'Чего нет', found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The privacy page says extension snapshots are 'перезаписывается при каждом обзоре'; they are not. Since 2026-08-20 a review reads and never writes; a snapshot is written at the first comparison (now one transaction) and rewritten or deleted only when the person accepts a change. This node's new SCN-017 bullet states the true rule, so the scenario and the privacy page now contradict each other about the same store (docs/privacy.md:82 (also the comment at tools/data-kinds.test.ts:131), found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Okolos's 'okolos:collect' measure and its two marks are still written on every scan and never cleared; the change's own docstring gives the reason to clear (a page open all day, up to 7 200 entries an hour) and applies it only to okolos:scan, and the runbook now records the asymmetry ('по-прежнему пишется на каждый скан') without a board row (apps/extension/src/content/index.ts:374-382 against :303-318; docs/runbooks/development.md:142-143, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "This branch's docs and code cite B-168 and B-169 as rows, but they are defined only on the sw/sw-05 lineage (okolos-stability docs/backlog.md:47-48), not on this branch's base (main 5d664c5 has no B-168 or B-169 in docs/backlog.md); and B-78, said to be narrowed, has no edit to its row or history in this change (docs/runbooks/development.md:124 and scenarios.md:506 (cite B-168, B-169); docs/backlog.md:10 on this branch (B-78 row unchanged), found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    }
+  ],
+  "replan": {
+    "possible": true,
+    "add": [],
+    "park": [],
+    "why": "certified at all 3 tiers in round 2"
+  },
+  "evidence": [
+    "unit: pnpm gates in standalone clone /Users/sshlg/DATA/_worktrees/okolos-n109-r2-unit-scratch at 530f21d -> exit 0, Test Files 188 passed, Tests 2865 passed | 2 skipped, package:check 'every check passed' (1:05.65 total)",
+    "unit: pnpm build:e2e -> exit 0; npx vitest run bundle-scan, fixed-waits, credential, traps, extensions tests -> 5 files, 81 passed (bundle gate e2e half ran with the e2e build present)",
+    "unit: grep counts in built content.js: chrome and firefox 0x okolos:focus-judged, okolos:trap-judged, okolos:password-handled, __OKOLOS_TEST_HOOKS__; chrome-e2e and firefox-e2e 1x each mark; okolos:scan 4x, okolos:lookalike 1x, okolos:pending 1x in all four",
+    "unit: npx playwright test on the eleven changed specs, bundled Chromium -> 47 passed (48.6 s); full suite npx playwright test --retries=0 -> 191 passed (2.6 m)",
+    "unit: plant scan-top (top frame claims a banner 2.5 s late in both empty exits, before scanSettled): scn-003 silent, scn-006 x2, scn-031 silent, scn-034 silent all failed 'Received: 1'",
+    "unit: plant scan-frame (frame relays a leak 2.5 s late before scanSettled): scn-031 and scn-034 silent failed 'Received: 1'",
+    "unit: plant lookalike (banner 2.5 s late before the lookalike measure): scn-003 silent, scn-006 x2 failed 'Received: 1'",
+    "unit: plant pending (banner 3.5 s late before the pending measure): scn-036 'not delivered twice' and 'not in a breach' failed 'Received: 1'",
+    "unit: plant worker (clean verdict made compromised after 3.5 s): scn-035 'not in a breach' failed 'Received: \"password\"', scn-036 'not in a breach' failed 'Received: 1'",
+    "unit: plant frame-clean-400 (frame relays a leak on a clean answer after 400 ms, the r1 breaks check) --repeat-each=3: 3 of 3 failed 'Received: \"password\"'; frame-clean-3000: failed",
+    "unit: plant credential (text field treated as sensitive, warn delayed 1.5 s): scn-011 ordinary text field failed 'Received: 1'",
+    "unit: plant trap (copies looked into and accused after 2.5 s): scn-008 ordinary copy page failed 'Received: 1'",
+    "unit: plant no-clear (clearMeasures removed): scn-003 one-settle-entry test failed 'Received: 5'",
+    "unit: plant extensions-per-row (old per-row put loop): extensions.test.ts 'reports nothing to a second first comparison that reads while the first writes' failed 'expected [ ...(2) ] to deeply equal []', every other test in the file passed",
+    "unit: plant unguarded okolos:password-handled + pnpm build: bundle-scan 'keeps the per-event test marks out of the shipped bundles' failed naming the mark",
+    "unit: plant waitForTimeout in scn-003 and driver.sleep in firefox-e2e.mjs: both fixed-waits tests failed; plant `new Promise(setTimeout 2000)` in scn-003: fixed-waits 4 passed",
+    "unit: plant range hit for 'correct horse battery staple 8f2a' (prefix FE6FA) in serveCleanRange: scn-036 'not in a breach' failed 'Received: 1'",
+    "unit: all plants in the standalone clone, restored with git checkout after each and the clone removed; /Users/sshlg/DATA/_worktrees/okolos-sw-09 still at 530f21d with a clean status; no Playwright browser left running",
+    "seam: git diff --stat 5d664c5..530f21d: 28 files, +1063 -61; all checks below ran in a private copy of the worktree (/Users/sshlg/DATA/_worktrees/okolos-n109-r2-seam-scratch), not in okolos-sw-09",
+    "seam: pnpm test (copy, with fresh dist and dist/*-e2e) -> 188 files passed, 2866 tests passed, 1 skipped (tools/feed-key.test.ts, unrelated), exit 0",
+    "seam: pnpm build && pnpm build:e2e (copy) -> exit 0; then vitest run bundle-scan, bundle-sizes, fixed-waits, marks-read, extensions.test -> 5 files, 53 tests passed, 0 skipped",
+    "seam: dist/*-e2e moved aside, vitest run tools/gates/bundle-scan.test.ts -> 23 passed, 1 skipped: 'carries the per-event test marks in the test build (skipped: no build in apps/extension/dist/chrome-e2e, run pnpm build:e2e)'",
+    "seam: pnpm exec playwright test (copy, full Chromium suite, workers 1) -> 191 passed (2.5 min), exit 0",
+    "seam: playwright test scn-035 scn-036 scn-011 scn-008 scn-017 --repeat-each=5 --retries=0 -> 85 passed (1.5 min), exit 0",
+    "seam: probe spec (copy of scn-036 'not in a breach', counting routes around serveCleanRange, deleted after) -> 'SEAM-PROBE range route hits = 100', 1 passed",
+    "seam: node tools/firefox-e2e.mjs (copy, headless Gecko) -> 15 ok, 'all Firefox checks passed', including 'stays silent on a page whose hidden text is ordinary' after the okolos:scan + okolos:lookalike wait, exit 0",
+    "seam: pnpm typecheck -> exit 0; pnpm lint -> exit 0; python3 docs/ux/lint.py -> 'OK, docs/ux is consistent', exit 0",
+    "seam: grep of rebuilt content.js: chrome and firefox carry 0 of the three test marks, chrome-e2e and firefox-e2e carry all three; wc -c content.js 71394, background.js 62378 vs tools/bundle-sizes.json 69006 and 60557",
+    "seam: grep -rn compareInventory|'snapshots' -> callers at background/index.ts:807, :901 (accept), :1228; grep -rn '\\.transaction(|tx.done' in apps and packages -> only extensions.ts:96-97 and db.ts:232",
+    "seam: grep -n response.text() apps/extension/src/background/password.ts -> :108; packages/net/src/request.ts returns the Response unread",
+    "seam: grep waitForTimeout|driver.sleep across e2e and tools -> known sites plus tools/gecko-layout.mjs:81 and tools/screenshots.mjs:123 outside the gate",
+    "seam: pgrep after the runs -> no geckodriver, Firefox or Playwright Chromium left from this tier (one process seen belongs to the unit tier's own scratch run)",
+    "product: git diff --stat 5d664c5..530f21d: 28 files; no _locales, packages/i18n or packages/ui file changed",
+    "product: pnpm exec vitest run tools/docs.test.ts tools/runbook.test.ts tools/marks-read.test.ts tools/fixed-waits.test.ts tools/gates/bundle-scan.test.ts apps/extension/src/background/extensions.test.ts: 6 files, 123 tests passed, none skipped (the bundle-scan e2e half ran)",
+    "product: python3 docs/ux/lint.py: 'OK, docs/ux is consistent', exit 0",
+    "product: CI=1 pnpm exec playwright test e2e/scn-017.spec.ts e2e/scn-036.spec.ts: 7 passed (6.7 s), against the existing dist/chrome-e2e; no browser left running afterwards",
+    "product: grep -rl for each mark name in apps/extension/dist/{chrome,firefox,chrome-e2e,firefox-e2e}: shipped builds 1/1/1/1/0/0/0 for scan, lookalike, pending, password, focus-judged, trap-judged, password-handled; e2e builds 1 for all seven",
+    "product: grep -rn \"'snapshots'\" apps packages (no tests, no build output): extensions.ts:82 read, :96 baseline transaction, :117 put and :118 delete on acceptance; db.ts and schema.ts declare the store",
+    "product: git diff of e2e/scn-*.spec.ts, panel-shape and two-findings, removed lines only: waitForTimeout calls, one journal container wait, the scn-035 frame lookup by the wrong address; no expect on a user-visible outcome removed",
+    "product: CHANGELOG.md:3-4 inclusion rule ('только то, что меняет продукт для вас'), :11-12 nothing released, :31-32 extensions line",
+    "product: docs/superpowers/backlog.md:4822-4827 (B-95 calls a page-detectable install a fingerprint the product gives away); docs/ux/scenarios.md:263; docs/adr/0009:88-90",
+    "product: chrome/manifest.json minimum_chrome_version 137; firefox/manifest.json strict_min_version 129.0",
+    "product: okolos-stability docs/backlog.md:10,47,48 define B-78, B-168, B-169; .task-pipeline/run.md:36 records the receipt and integration plan",
+    "product: Side effects of verification: the bundle-scan test rebuilt git-ignored apps/extension/dist output (manifest mtime 16:14); pnpm's prepare re-set core.hooksPath to its existing value .githooks; git status clean"
+  ],
+  "tested": {
+    "head": "530f21da6bf5b263d979418c8f53ea8c275a512a",
+    "tree": "fc656522a0c4bf92769bdea4ffe6eabd63829b5f"
+  }
+}

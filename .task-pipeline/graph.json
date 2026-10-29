@@ -585,7 +585,7 @@
       "id": "N-109",
       "title": "скан под нагрузкой и ожидания в e2e (закрывает B-78, B-168, B-169)",
       "owner": "implementer",
-      "status": "pending",
+      "status": "done",
       "blocked_by": [],
       "serves": "B-78",
       "check": "pnpm gates",
@@ -597,31 +597,89 @@
         "apps/extension/src/content/**"
       ],
       "certification": {
-        "round": 1,
+        "round": 2,
         "tiers": {
-          "unit": "fail",
+          "unit": "pass",
           "seam": "pass",
           "product": "pass"
         },
-        "at": "5598c01c01addc9458127a6b8349df9c4f5b683b",
+        "at": "530f21da6bf5b263d979418c8f53ea8c275a512a",
         "history": [
           {
             "unit": "fail",
             "seam": "pass",
             "product": "pass"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "pass"
           }
         ],
         "kinds": [
+          "blind",
           "blind"
         ],
-        "tree": "51de8acec6b84e5f5af63a492c7026181ccab0f1"
-      }
+        "tree": "fc656522a0c4bf92769bdea4ffe6eabd63829b5f"
+      },
+      "proof": {
+        "head": "530f21da6bf5b263d979418c8f53ea8c275a512a",
+        "tree": "fc656522a0c4bf92769bdea4ffe6eabd63829b5f",
+        "graph_revision": "7"
+      },
+      "evidence": [
+        "unit: pnpm gates in standalone clone /Users/sshlg/DATA/_worktrees/okolos-n109-r2-unit-scratch at 530f21d -> exit 0, Test Files 188 passed, Tests 2865 passed | 2 skipped, package:check 'every check passed' (1:05.65 total)",
+        "unit: pnpm build:e2e -> exit 0; npx vitest run bundle-scan, fixed-waits, credential, traps, extensions tests -> 5 files, 81 passed (bundle gate e2e half ran with the e2e build present)",
+        "unit: grep counts in built content.js: chrome and firefox 0x okolos:focus-judged, okolos:trap-judged, okolos:password-handled, __OKOLOS_TEST_HOOKS__; chrome-e2e and firefox-e2e 1x each mark; okolos:scan 4x, okolos:lookalike 1x, okolos:pending 1x in all four",
+        "unit: npx playwright test on the eleven changed specs, bundled Chromium -> 47 passed (48.6 s); full suite npx playwright test --retries=0 -> 191 passed (2.6 m)",
+        "unit: plant scan-top (top frame claims a banner 2.5 s late in both empty exits, before scanSettled): scn-003 silent, scn-006 x2, scn-031 silent, scn-034 silent all failed 'Received: 1'",
+        "unit: plant scan-frame (frame relays a leak 2.5 s late before scanSettled): scn-031 and scn-034 silent failed 'Received: 1'",
+        "unit: plant lookalike (banner 2.5 s late before the lookalike measure): scn-003 silent, scn-006 x2 failed 'Received: 1'",
+        "unit: plant pending (banner 3.5 s late before the pending measure): scn-036 'not delivered twice' and 'not in a breach' failed 'Received: 1'",
+        "unit: plant worker (clean verdict made compromised after 3.5 s): scn-035 'not in a breach' failed 'Received: \"password\"', scn-036 'not in a breach' failed 'Received: 1'",
+        "unit: plant frame-clean-400 (frame relays a leak on a clean answer after 400 ms, the r1 breaks check) --repeat-each=3: 3 of 3 failed 'Received: \"password\"'; frame-clean-3000: failed",
+        "unit: plant credential (text field treated as sensitive, warn delayed 1.5 s): scn-011 ordinary text field failed 'Received: 1'",
+        "unit: plant trap (copies looked into and accused after 2.5 s): scn-008 ordinary copy page failed 'Received: 1'",
+        "unit: plant no-clear (clearMeasures removed): scn-003 one-settle-entry test failed 'Received: 5'",
+        "unit: plant extensions-per-row (old per-row put loop): extensions.test.ts 'reports nothing to a second first comparison that reads while the first writes' failed 'expected [ ...(2) ] to deeply equal []', every other test in the file passed",
+        "unit: plant unguarded okolos:password-handled + pnpm build: bundle-scan 'keeps the per-event test marks out of the shipped bundles' failed naming the mark",
+        "unit: plant waitForTimeout in scn-003 and driver.sleep in firefox-e2e.mjs: both fixed-waits tests failed; plant `new Promise(setTimeout 2000)` in scn-003: fixed-waits 4 passed",
+        "unit: plant range hit for 'correct horse battery staple 8f2a' (prefix FE6FA) in serveCleanRange: scn-036 'not in a breach' failed 'Received: 1'",
+        "unit: all plants in the standalone clone, restored with git checkout after each and the clone removed; /Users/sshlg/DATA/_worktrees/okolos-sw-09 still at 530f21d with a clean status; no Playwright browser left running",
+        "seam: git diff --stat 5d664c5..530f21d: 28 files, +1063 -61; all checks below ran in a private copy of the worktree (/Users/sshlg/DATA/_worktrees/okolos-n109-r2-seam-scratch), not in okolos-sw-09",
+        "seam: pnpm test (copy, with fresh dist and dist/*-e2e) -> 188 files passed, 2866 tests passed, 1 skipped (tools/feed-key.test.ts, unrelated), exit 0",
+        "seam: pnpm build && pnpm build:e2e (copy) -> exit 0; then vitest run bundle-scan, bundle-sizes, fixed-waits, marks-read, extensions.test -> 5 files, 53 tests passed, 0 skipped",
+        "seam: dist/*-e2e moved aside, vitest run tools/gates/bundle-scan.test.ts -> 23 passed, 1 skipped: 'carries the per-event test marks in the test build (skipped: no build in apps/extension/dist/chrome-e2e, run pnpm build:e2e)'",
+        "seam: pnpm exec playwright test (copy, full Chromium suite, workers 1) -> 191 passed (2.5 min), exit 0",
+        "seam: playwright test scn-035 scn-036 scn-011 scn-008 scn-017 --repeat-each=5 --retries=0 -> 85 passed (1.5 min), exit 0",
+        "seam: probe spec (copy of scn-036 'not in a breach', counting routes around serveCleanRange, deleted after) -> 'SEAM-PROBE range route hits = 100', 1 passed",
+        "seam: node tools/firefox-e2e.mjs (copy, headless Gecko) -> 15 ok, 'all Firefox checks passed', including 'stays silent on a page whose hidden text is ordinary' after the okolos:scan + okolos:lookalike wait, exit 0",
+        "seam: pnpm typecheck -> exit 0; pnpm lint -> exit 0; python3 docs/ux/lint.py -> 'OK, docs/ux is consistent', exit 0",
+        "seam: grep of rebuilt content.js: chrome and firefox carry 0 of the three test marks, chrome-e2e and firefox-e2e carry all three; wc -c content.js 71394, background.js 62378 vs tools/bundle-sizes.json 69006 and 60557",
+        "seam: grep -rn compareInventory|'snapshots' -> callers at background/index.ts:807, :901 (accept), :1228; grep -rn '\\.transaction(|tx.done' in apps and packages -> only extensions.ts:96-97 and db.ts:232",
+        "seam: grep -n response.text() apps/extension/src/background/password.ts -> :108; packages/net/src/request.ts returns the Response unread",
+        "seam: grep waitForTimeout|driver.sleep across e2e and tools -> known sites plus tools/gecko-layout.mjs:81 and tools/screenshots.mjs:123 outside the gate",
+        "seam: pgrep after the runs -> no geckodriver, Firefox or Playwright Chromium left from this tier (one process seen belongs to the unit tier's own scratch run)",
+        "product: git diff --stat 5d664c5..530f21d: 28 files; no _locales, packages/i18n or packages/ui file changed",
+        "product: pnpm exec vitest run tools/docs.test.ts tools/runbook.test.ts tools/marks-read.test.ts tools/fixed-waits.test.ts tools/gates/bundle-scan.test.ts apps/extension/src/background/extensions.test.ts: 6 files, 123 tests passed, none skipped (the bundle-scan e2e half ran)",
+        "product: python3 docs/ux/lint.py: 'OK, docs/ux is consistent', exit 0",
+        "product: CI=1 pnpm exec playwright test e2e/scn-017.spec.ts e2e/scn-036.spec.ts: 7 passed (6.7 s), against the existing dist/chrome-e2e; no browser left running afterwards",
+        "product: grep -rl for each mark name in apps/extension/dist/{chrome,firefox,chrome-e2e,firefox-e2e}: shipped builds 1/1/1/1/0/0/0 for scan, lookalike, pending, password, focus-judged, trap-judged, password-handled; e2e builds 1 for all seven",
+        "product: grep -rn \"'snapshots'\" apps packages (no tests, no build output): extensions.ts:82 read, :96 baseline transaction, :117 put and :118 delete on acceptance; db.ts and schema.ts declare the store",
+        "product: git diff of e2e/scn-*.spec.ts, panel-shape and two-findings, removed lines only: waitForTimeout calls, one journal container wait, the scn-035 frame lookup by the wrong address; no expect on a user-visible outcome removed",
+        "product: CHANGELOG.md:3-4 inclusion rule ('только то, что меняет продукт для вас'), :11-12 nothing released, :31-32 extensions line",
+        "product: docs/superpowers/backlog.md:4822-4827 (B-95 calls a page-detectable install a fingerprint the product gives away); docs/ux/scenarios.md:263; docs/adr/0009:88-90",
+        "product: chrome/manifest.json minimum_chrome_version 137; firefox/manifest.json strict_min_version 129.0",
+        "product: okolos-stability docs/backlog.md:10,47,48 define B-78, B-168, B-169; .task-pipeline/run.md:36 records the receipt and integration plan",
+        "product: Side effects of verification: the bundle-scan test rebuilt git-ignored apps/extension/dist output (manifest mtime 16:14); pnpm's prepare re-set core.hooksPath to its existing value .githooks; git status clean",
+        "proven at 530f21da6bf5b263d979418c8f53ea8c275a512a (tree fc656522a0c4bf92769bdea4ffe6eabd63829b5f)"
+      ]
     },
     {
       "id": "N-110",
       "title": "ключ HIBP и inference/score (закрывает B-125, B-131)",
       "owner": "implementer",
-      "status": "pending",
+      "status": "done",
       "blocked_by": [],
       "serves": "B-125",
       "check": "pnpm gates",
@@ -634,13 +692,13 @@
         "docs/ux/**"
       ],
       "certification": {
-        "round": 2,
+        "round": 5,
         "tiers": {
           "unit": "pass",
-          "seam": "fail",
-          "product": "fail"
+          "seam": "pass",
+          "product": "pass"
         },
-        "at": "f6897b4680ed7cd048ba6e5cdcc3e06cbadebab8",
+        "at": "3b762e11553dad2996918b663298a1c63e22316b",
         "history": [
           {
             "unit": "pass",
@@ -651,14 +709,69 @@
             "unit": "pass",
             "seam": "fail",
             "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "fail"
+          },
+          {
+            "unit": "pass",
+            "seam": "pass",
+            "product": "pass"
           }
         ],
         "kinds": [
           "blind",
+          "blind",
+          "blind",
+          "blind",
           "blind"
         ],
-        "tree": "4fa6a6ffb8368b7ea5d534df45594e5f8efbb201"
-      }
+        "tree": "941bb7a6c339f92b5a5d02df8c4e167d59b699cd"
+      },
+      "proof": {
+        "head": "3b762e11553dad2996918b663298a1c63e22316b",
+        "tree": "941bb7a6c339f92b5a5d02df8c4e167d59b699cd",
+        "graph_revision": "8"
+      },
+      "evidence": [
+        "unit: pnpm gates in /Users/sshlg/DATA/_worktrees/okolos-sw-10 at 3b762e1 -> exit 0: lint, typecheck (tsc -b and tsconfig.tests.json), build, vitest 190 files / 2888 passed / 1 skipped, ux lint OK, brand gate clean, i18n sweep 0 outside catalogue, package --check every check passed",
+        "unit: npx vitest run on the 14 changed test files (background/leaks, options/leak-key, options/export-words, core-leaks merge, model host, platform adapter, ui leaks, self-audit panel, data-controls, tools model-stage, rpc-receivers, reachable, manifest, wireframes) -> 14 files, 255 passed",
+        "unit: pnpm build:e2e && npx playwright test e2e/scn-015.spec.ts -> 11 passed in Chromium, including saved key sent only in its header, refused key, no-key credit, erase reset and cross-tab plus in-flight drop",
+        "unit: grep for leakSourceNoKey, inferenceNoModel, inferenceNotReady, inference/score, platform.inference, ensureHost across apps/extension/src, packages/*/src, tools (non-test) -> only the comment at background/index.ts:189 and the library host",
+        "unit: grep -c hibp-api-key apps/extension/dist/chrome/background.js -> 1 (the header name), and no ClassifierSession/onnx/inference/score strings in either background bundle",
+        "unit: node read of both catalogues: every new key (leakSource*, leaksIdle*, leakKey*, exportWithheldOwnKey, exportWhy*, auditSummaryCarriedKey) present in ru and en, removed inference keys absent from both",
+        "unit: worktree left as found: git status --short empty at 3b762e1; the test-results/ directory my Playwright run created (untracked) removed; no Chromium process left",
+        "seam: git diff --stat 5d664c5..3b762e1 -> 62 files; git show --stat 3b762e1 -> CHANGELOG.md, docs/ux/scenarios.md, docs/ux/screens.md, tools/bundle-sizes.json only",
+        "seam: grep -rn readSetting apps packages tools e2e (no dist/.tsc) -> background/index.ts:716,729, options/leak-key.test.ts:37, tools/secrets.test.ts:83",
+        "seam: grep for inference/score, platform.inference, InferenceHostKind, ensureHost, 'inference\\s*:' outside docs -> only packages/model, comments and gate tests",
+        "seam: Verification ran in an APFS clone of the worktree detached into its own throwaway git repo, so the worktree stayed clean at 3b762e1 (git status empty); clone removed afterwards",
+        "seam: pnpm build -> chrome and firefox built; sizes background.js 59332, content.js 70656, options.js 45929, popup.js 3094 (both browsers identical); main checkout dist shows background.js 62173, options.js 42597",
+        "seam: pnpm test -> 190 files, 2888 passed, 1 skipped",
+        "seam: pnpm typecheck -> exit 0; mutation of RpcMap needsKey to 'missing' | 'refused' -> TS2344 at apps/extension/src/background/leaks.test.ts:251 (reverted in the clone)",
+        "seam: python3 docs/ux/lint.py -> OK; node tools/wireframes.mjs -> wrote 16 wireframes, git status in the clone empty (no drift)",
+        "seam: pnpm run i18n:sweep -> OK; pnpm run package:check -> every check passed; pnpm run brand:lint -> brand pack is clean",
+        "seam: pnpm run build:e2e && npx playwright test (Chromium, whole suite) -> 194 passed (2.9m), including scn-015 (11 tests), scn-023 (3), a11y, rendered-instants",
+        "seam: node tools/firefox-e2e.mjs -> all Firefox checks passed (15 ok)",
+        "seam: python3 placeholder check over ru/en messages.json -> identical key sets, placeholders declared for every new $X$",
+        "seam: pgrep for geckodriver, playwright and the clone path after the runs -> nothing left running",
+        "product: python3 docs/ux/lint.py -> 'OK - docs/ux is consistent', exit 0; python3 docs/brand/lint.py -> 'brand pack is clean', exit 0 (run in the read-only worktree at 3b762e1)",
+        "product: private copy of 3b762e1 (git archive, pnpm install --offline): pnpm test -> 190 files, 2843 passed + 1 failed; the 1 failure and 3 file failures were 'not a git repository'; after fetching sw/sw-10 with tags into the copy, tools/ci, feed-key, graph-check and docs tests -> 4 files passed, 113 tests passed",
+        "product: node tools/build.mjs --with-test-hooks; pnpm exec playwright test e2e/scn-015.spec.ts e2e/scn-023.spec.ts -> 14 passed (15.6s), headless Chromium",
+        "product: own probe (probe/ru.mjs) on the Russian build (_locales/en removed, as tools/screenshots does), fake key, network stubbed: idle/coverage/key line/key block/refusal/Back/audit/export/wipe texts as quoted in confirms; requests seen: cavalier, haveibeenpwned with header present, cavalier; 'fake0000' absent from options HTML, audit page and export file",
+        "product: byte counts: 5d664c5 background.js 62173, options.js 42597; f9f5abb background.js 58791; 3b762e1 background.js 59332 (Chrome and Firefox), options.js 45929",
+        "product: git show 5d664c5:docs/store/screenshots/04-popup.png compared with HEAD: same content, dates moved",
+        "product: grep -rn 'xposedornot' over apps and packages -> no hits (SCR-08 Resources still names it; pre-existing, not reported as a finding)",
+        "product: grep for api key / API-ключ / токен / token in both catalogues -> no product string uses them",
+        "product: grep -n 'B-125\\|B-131' docs/backlog.md -> both 'open'",
+        "proven at 3b762e11553dad2996918b663298a1c63e22316b (tree 941bb7a6c339f92b5a5d02df8c4e167d59b699cd)"
+      ]
     }
   ],
   "edges": [
@@ -713,6 +826,18 @@
       "node": "N-106",
       "why": "certified at all 3 tiers in round 3",
       "precondition": "eea8bc989c41cbf7d9baf3d828d5667a4780b8a1"
+    },
+    {
+      "verb": "close",
+      "node": "N-109",
+      "why": "certified at all 3 tiers in round 2",
+      "precondition": "530f21da6bf5b263d979418c8f53ea8c275a512a"
+    },
+    {
+      "verb": "close",
+      "node": "N-110",
+      "why": "certified at all 3 tiers in round 5",
+      "precondition": "3b762e11553dad2996918b663298a1c63e22316b"
     }
   ]
 }
