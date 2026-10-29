@@ -411,8 +411,10 @@ export function buildSnapshot(nodes: readonly AxNode[], options: SnapshotOptions
   if (!isSetLike(given?.secretFields)) throw new RangeError('secretFields is required: pass an empty set when no field is secret')
   // i18n-exempt: a programming error in the daemon's call, thrown to its caller; never shown to a person
   if (!isSetLike(given?.hidden)) throw new RangeError('hidden must be a set of backend node ids')
+  // i18n-exempt: a programming error in the daemon's call, thrown to its caller; never shown to a person
   if (given?.flagged !== undefined && !isSetLike(given.flagged)) throw new RangeError('flagged must be a set of backend node ids')
   if (given?.domValues !== undefined && typeof (given.domValues as { get?: unknown }).get !== 'function') {
+    // i18n-exempt: a programming error in the daemon's call, thrown to its caller; never shown to a person
     throw new RangeError('domValues must be a map of backend node ids to values')
   }
   const { hidden: hiddenFromPeople, secretFields, taskKey } = options
