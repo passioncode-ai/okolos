@@ -1,7 +1,7 @@
 /** Types for `install-feed-agent.mjs` (see `feed/bounded.d.mts` for why these are hand-written). */
 import type { BoundedOptions, BoundedResult } from './feed/bounded.mjs'
 import type { FeedPaths } from './feed/paths.mjs'
-import type { StatusRecord } from './feed/status.mjs'
+import type { SnapshotPrRecord, StatusRecord } from './feed/status.mjs'
 
 export const LABEL: string
 
@@ -87,5 +87,7 @@ export function agentStatus(options: {
   loaded: boolean
   launchd: { state: string | null; runs: number | null; lastExit: number | null } | null
   lastRun: StatusRecord | null
+  /** The last snapshot pull request step (B-158), from `snapshot-pr.json`; null when none ran. */
+  snapshotPr: SnapshotPrRecord | null
   log: string
 }>

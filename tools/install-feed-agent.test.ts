@@ -5,6 +5,7 @@ import path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
 import { feedPaths } from './feed/paths.mjs'
+import { snapshotPrFile, writeSnapshotPr } from './feed/snapshot-pr.mjs'
 import { readStatus, stampRunId, writeStatus } from './feed/status.mjs'
 import { filesIn } from './tree.mjs'
 // @ts-expect-error: a plain .mjs tool, typed by its use here (as in feed-agent-credential.test.ts)
@@ -774,6 +775,44 @@ describe('whether the installed bootstrap is the checkout’s', () => {
     const status = await agentStatus({ ...base, target: h.target, launchctl: fakeLaunchd({ loaded: true }).launchctl, paths: h.paths })
     expect(status).toMatchObject({ bootstrap: true, plistStartsBootstrap: true, bootstrapMatchesCheckout: false, bootstrapDiffers: ['log.mjs'] })
     expect(status.note).toMatch(/differs .* pnpm feed:agent/)
+  })
+
+  it('shows the snapshot pull request that waits for a person, with its number, link and since when (B-158)', async () => {
+    const h = home()
+    writeSnapshotPr(snapshotPrFile(h.paths), {
+      outcome: 'auto-merge-unavailable',
+      reason: 'the repository does not allow auto-merge (allow_auto_merge is false); the pull request stays open for a person',
+      branch: 'chore/feed-snapshot-auto',
+      version: 70,
+      pr: { number: 7, url: 'https://github.com/passioncode-ai/okolos/pull/7', action: 'updated' },
+      at: '2026-11-04T09:00:00.000Z',
+      since: '2026-11-03T09:00:00.000Z',
+    })
+    const status = await agentStatus({ ...base, target: h.target, launchctl: fakeLaunchd({ loaded: true }).launchctl, paths: h.paths })
+    expect(status.snapshotPr).toMatchObject({ outcome: 'auto-merge-unavailable', pr: { number: 7 }, since: '2026-11-03T09:00:00.000Z' })
+    expect(status.note).toContain('snapshot pull request #7 (https://github.com/passioncode-ai/okolos/pull/7) waits for a person since 2026-11-03T09:00:00.000Z')
+    expect(status.note).toMatch(/merge commit/)
+  })
+
+  it('shows no snapshot pull request when no step has run, and says nothing about one', async () => {
+    const h = home()
+    const status = await agentStatus({ ...base, target: h.target, launchctl: fakeLaunchd({ loaded: true }).launchctl, paths: h.paths })
+    expect(status.snapshotPr).toBeNull()
+    expect(status.note ?? '').not.toMatch(/snapshot/)
+  })
+
+  it('names a requested auto-merge without asking a person for anything', async () => {
+    const h = home()
+    writeSnapshotPr(snapshotPrFile(h.paths), {
+      outcome: 'auto-merge-requested',
+      branch: 'chore/feed-snapshot-auto',
+      pr: { number: 8, url: 'https://github.com/passioncode-ai/okolos/pull/8', action: 'opened' },
+      at: '2026-11-04T09:00:00.000Z',
+      since: '2026-11-04T09:00:00.000Z',
+    })
+    const status = await agentStatus({ ...base, target: h.target, launchctl: fakeLaunchd({ loaded: true }).launchctl, paths: h.paths })
+    expect(status.note).toContain('snapshot pull request #8 (https://github.com/passioncode-ai/okolos/pull/8): auto-merge-requested since 2026-11-04T09:00:00.000Z')
+    expect(status.note).not.toMatch(/waits for a person/)
   })
 
   it('says when the plist is the old one that cd’d into the checkout', async () => {

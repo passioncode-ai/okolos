@@ -21,6 +21,7 @@ import { BOOTSTRAP_FILES, BOOTSTRAP_SOURCES } from './feed/bootstrap.mjs'
 import { runBounded, withoutSecrets } from './feed/bounded.mjs'
 import { openLog } from './feed/log.mjs'
 import { feedPaths } from './feed/paths.mjs'
+import { readSnapshotPr, snapshotPrFile } from './feed/snapshot-pr.mjs'
 import { readStatus } from './feed/status.mjs'
 import { discover, quote, runnerArgv, xml } from './feed-agent-credential.mjs'
 import { directoriesIn, filesIn } from './tree.mjs'
@@ -34,7 +35,7 @@ import { isMain } from './is-main.mjs'
  *   node tools/install-feed-agent.mjs --allow-branch       # install from HEAD other than origin/main, or with
  *                                                          # uncommitted edits to what it installs (recorded:
  *                                                          # feed.log, and installedOffMain in every run's record)
- *   node tools/install-feed-agent.mjs --status             # plist, bootstrap (and drift), launchd's view, last run
+ *   node tools/install-feed-agent.mjs --status             # plist, bootstrap (and drift), launchd's view, last run, snapshot PR
  *   node tools/install-feed-agent.mjs --uninstall          # bootout, delete the plist and bootstrap, verify
  *   node tools/install-feed-agent.mjs --uninstall --purge  # and the checkout, state and logs
  *
@@ -419,6 +420,18 @@ export async function agentStatus({ label = LABEL, domain, target, launchctl = r
   if (drift.matches === false) {
     notes.push(`the installed bootstrap differs from the checkout's (${drift.differs.join(', ')}); run pnpm feed:agent from the main clone`)
   }
+  // The last snapshot step (B-158). Nothing else tells anyone that its pull request waits:
+  // GitHub does not notify the author of their own pull request, and no alarm reads the record.
+  const snapshotPr = readSnapshotPr(snapshotPrFile(paths))
+  if (snapshotPr?.pr) {
+    const { number, url } = snapshotPr.pr
+    const since = snapshotPr.since ?? snapshotPr.at
+    notes.push(
+      snapshotPr.outcome === 'auto-merge-requested' || snapshotPr.outcome === 'updated'
+        ? `snapshot pull request #${number} (${url}): ${snapshotPr.outcome} since ${since}`
+        : `snapshot pull request #${number} (${url}) waits for a person since ${since} (${snapshotPr.outcome}${snapshotPr.reason ? `: ${snapshotPr.reason}` : ''}); merge it with a merge commit once CI is green`,
+    )
+  }
   return {
     plist: existsSync(target),
     plistStartsBootstrap,
@@ -435,6 +448,7 @@ export async function agentStatus({ label = LABEL, domain, target, launchctl = r
         }
       : null,
     lastRun: readStatus(paths.status),
+    snapshotPr,
     log: paths.log,
   }
 }

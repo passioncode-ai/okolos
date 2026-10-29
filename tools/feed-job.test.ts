@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest'
 
 import { acquireLock } from './feed/lock.mjs'
 import { feedPaths } from './feed/paths.mjs'
-import { readStatus } from './feed/status.mjs'
+import { readSnapshotPr, snapshotPrFile } from './feed/snapshot-pr.mjs'
+import { readStatus, writeStatus } from './feed/status.mjs'
 import { runJob, signalRecord, STALE_AFTER_MS, sweepLeftovers, WATCHDOG_MS, watchdogFrom } from './feed-job.mjs'
 
 /**
@@ -490,6 +491,104 @@ describe('after a publish the agent proposes the committed snapshot (B-158)', ()
     await job(failed, { tool: t.tool, flags: { snapshotPr: true } }, { FAKE_PUBLISH: 'fail' }).promise
     expect(readStatus(failed.paths.status)?.snapshotPr).toBeUndefined()
     expect(t.seen.filter((call) => call.command === 'gh')).toEqual([])
+  })
+
+  /** The worker serving exactly what the fake ingest wrote, and every git and gh answer of a full step. */
+  const SERVED = JSON.stringify({ update: { kind: 'snapshot', body: { name: 'phishing', version: 52, updatedAt: 'x', entries: ['a.test', 'b.test', 'c.test'] } }, signature: 's' })
+  const serving = (async () => new Response(SERVED)) as typeof fetch
+  const SKIPPED = 'pre-push: SKIPPED by OKOLOS_SKIP_GATES: lint, typecheck, build, unit, ux, brand, i18n and package were not run.'
+  function fullStep(open: () => unknown[] = () => [], onCall: (command: string, args: string[]) => void = () => {}) {
+    const base = fakeTool().tool
+    const tool = async (command: string, args: string[], options: { onLine?: (stream: string, line: string) => void } = {}) => {
+      onCall(command, args)
+      const ok = (stdout = '') => ({ code: 0, signal: null, stdout, stderr: '', timedOut: false })
+      const old = oldSnapshot(command, args)
+      if (old) return { signal: null, stderr: '', timedOut: false, ...old }
+      if (command === 'gh') {
+        if (args[0] === 'pr' && args[1] === 'list') return ok(JSON.stringify(open()))
+        if (args[0] === 'pr' && args[1] === 'create') return ok('https://github.com/passioncode-ai/okolos/pull/7\n')
+        if (args[0] === 'api' && args[1] === 'repos/{owner}/{repo}') return ok('false\n')
+        return ok()
+      }
+      const verb = args[2]
+      if (verb === 'ls-remote' || verb === 'read-tree' || verb === 'update-index') return ok()
+      if (verb === 'hash-object' || verb === 'write-tree' || verb === 'commit-tree') return ok(`${'f'.repeat(40)}\n`)
+      if (verb === 'push') {
+        options.onLine?.('stdout', SKIPPED)
+        return ok(`${SKIPPED}\n`)
+      }
+      return base(command, args)
+    }
+    return tool
+  }
+
+  it('writes the pre-push hook’s skip notice of the agent’s push into feed.log', async () => {
+    const w = world()
+    await job(w, { tool: fullStep(), fetchImpl: serving, flags: { snapshotPr: true }, log: undefined }).promise
+    expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'published', snapshotPr: { outcome: 'auto-merge-unavailable', pr: { number: 7 } } })
+    expect(readFileSync(w.paths.log, 'utf8')).toContain(SKIPPED)
+  })
+
+  it('keeps the last snapshot step in every later record until a newer step replaces it, dated from the first sight of its PR', async () => {
+    const w = world()
+    let clock = Date.parse('2026-11-03T09:00:00.000Z')
+    const now = () => clock
+    const pr = { number: 7, url: 'https://github.com/passioncode-ai/okolos/pull/7', autoMergeRequest: null }
+    await job(w, { tool: fullStep(), fetchImpl: serving, flags: { snapshotPr: true }, now }).promise
+    const first = readStatus(w.paths.status)?.snapshotPr
+    expect(first).toMatchObject({ outcome: 'auto-merge-unavailable', pr: { number: 7, action: 'opened' }, since: '2026-11-03T09:00:00.000Z' })
+
+    // A login run that skips, and a run that fails, both still show it.
+    clock += 60_000
+    const fresh = new Date(clock - 60 * 60 * 1000).toISOString()
+    await job(w, { tool: fullStep(), fetchImpl: servedAt(fresh), flags: { snapshotPr: true, ifStale: true }, now }).promise
+    expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'skipped', snapshotPr: first })
+    await job(w, { tool: fullStep(), fetchImpl: serving, flags: { snapshotPr: true }, now }, { FAKE_PUBLISH: 'fail' }).promise
+    expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'failed', snapshotPr: first })
+
+    // The next step updates the same PR: a new record, the same "since".
+    clock += 12 * 60 * 60 * 1000
+    await job(w, { tool: fullStep(() => [pr]), fetchImpl: serving, flags: { snapshotPr: true }, now }).promise
+    expect(readStatus(w.paths.status)?.snapshotPr).toMatchObject({ pr: { number: 7, action: 'updated' }, since: '2026-11-03T09:00:00.000Z', at: new Date(clock).toISOString() })
+    expect(readSnapshotPr(snapshotPrFile(w.paths))).toEqual(readStatus(w.paths.status)?.snapshotPr)
+  })
+
+  it('records a stop during the snapshot step as a publish whose snapshot step was stopped', async () => {
+    const w = world()
+    writeStatus(w.paths.status, { startedAt: 's', at: 's', outcome: 'failed', stage: 'publish', exit: 1 })
+    let signal: string | null = null
+    const published: unknown[] = []
+    const after: string[] = []
+    const tool = fullStep(() => [], (command, args) => {
+      if (signal) after.push(`${command} ${args.join(' ')}`)
+      if (command === 'gh' && args[0] === 'auth') signal = 'SIGTERM'
+    })
+    const record = await job(w, { tool, fetchImpl: serving, flags: { snapshotPr: true }, stopped: () => signal, onPublished: (facts: unknown) => published.push(facts) }).promise
+    expect(record).toMatchObject({ outcome: 'published', stage: 'done', exit: 0, version: 52, snapshotPr: { outcome: 'failed', reason: 'stopped by SIGTERM' } })
+    expect(readStatus(w.paths.status)).toMatchObject({ consecutiveFailures: 0, lastPublished: { version: 52, entries: 3 } })
+    expect(published).toEqual([expect.objectContaining({ version: 52, entries: 3 })])
+    // Nothing more is started once the stop is known: no push, no pull request.
+    expect(after).toEqual([])
+  })
+
+  it('a stop the job cannot record itself is recorded as the publish it was, by the signal record', () => {
+    const current = { stage: 'snapshot', startedAt: 's', published: { version: 52, entries: 3, commit: 'c'.repeat(40), pinned: true } }
+    const before = { outcome: 'auto-merge-unavailable' as const, branch: 'chore/feed-snapshot-auto', pr: { number: 7, url: 'u', action: 'opened' as const }, at: 'a', since: 'a' }
+    const record = signalRecord(current, 'SIGTERM', 'now', { OKOLOS_RUN_ID: 'run-9' }, before)
+    expect(record).toMatchObject({
+      outcome: 'published',
+      stage: 'done',
+      exit: 0,
+      version: 52,
+      entries: 3,
+      runId: 'run-9',
+      snapshotPr: { outcome: 'failed', reason: 'stopped by SIGTERM', branch: 'chore/feed-snapshot-auto', at: 'now' },
+    })
+    const w = world()
+    writeStatus(w.paths.status, { startedAt: 's', at: 's', outcome: 'failed', stage: 'publish', exit: 1 })
+    expect(writeStatus(w.paths.status, record)).toMatchObject({ consecutiveFailures: 0, lastPublished: { version: 52, entries: 3, at: 'now' } })
+    // Stopped before publishing: failed as before, still carrying the last step.
+    expect(signalRecord({ stage: 'ingest', startedAt: 's' }, 'SIGTERM', 'now', {}, before)).toMatchObject({ outcome: 'failed', exit: 143, snapshotPr: before })
   })
 
   it('bounds the step inside the run’s watchdog, so it cannot turn a publish into a watchdog failure', async () => {

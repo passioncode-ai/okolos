@@ -1,7 +1,7 @@
 /** Types for `feed-job.mjs` (see `feed/bounded.d.mts` for why these are hand-written). */
 import type { BoundedOptions, BoundedResult } from './feed/bounded.mjs'
 import type { FeedPaths } from './feed/paths.mjs'
-import type { RunRecord, StatusRecord } from './feed/status.mjs'
+import type { RunRecord, SnapshotPrRecord, StatusRecord } from './feed/status.mjs'
 
 export const INTERVAL_MS: number
 export const STALE_AFTER_MS: number
@@ -17,10 +17,17 @@ export function sweepLeftovers(tmp?: string, now?: number): string[]
 
 /** The record of a run stopped by `signal`, with what the bootstrap told it. */
 export function signalRecord(
-  current: { stage: string; startedAt: string },
+  current: {
+    stage: string
+    startedAt: string
+    /** Set once the publish succeeded: a stop after it is recorded as the publish it was. */
+    published?: { version?: number; entries?: number; commit?: string | null; pinned?: boolean } | null
+  },
   signal: string,
   at: string,
   env?: Record<string, string | undefined>,
+  /** The last snapshot step (`snapshot-pr.json`), carried into the record. */
+  lastSnapshot?: SnapshotPrRecord | null,
 ): RunRecord
 
 export function runJob(options?: {
@@ -44,5 +51,7 @@ export function runJob(options?: {
   stopped?: () => string | null
   /** Told when this run's record is written. */
   onRecord?: (record: StatusRecord) => void
+  /** Told once the publish succeeded. */
+  onPublished?: (facts: { version?: number; entries?: number; commit?: string | null; pinned?: boolean }) => void
   [key: string]: unknown
 }): Promise<RunRecord>
