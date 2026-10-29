@@ -68,7 +68,20 @@ export interface ProbeResult {
   readonly truncated: boolean
   /** Locators that no longer resolved to an element when the cut list was built. */
   readonly unresolved: number
+  /** How many verdicts the rules produced; `verdicts` carries at most MAX_PROBE_VERDICTS of them. */
+  readonly verdictsTotal: number
 }
+
+/**
+ * The most verdicts the probe hands across CDP. With the whole-page budget a page could plant tens
+ * of thousands of flagged attributes, and the verdicts that crossed CDP measured 40 to 96 MB, enough
+ * to crash the renderer (round 7 of the N-003 certification). A finding is built from closed sets,
+ * so a few hundred verdicts already carry every distinct one; the rest only repeat them.
+ */
+export const MAX_PROBE_VERDICTS = 200
+
+/** A comment's locator: comments have no element and no node in the accessibility tree, so nothing to cut. */
+const COMMENT_LOCATOR = 'comment()'
 
 export function runProbe(
   doc: Document,
@@ -93,6 +106,12 @@ export function runProbe(
   const cut: Element[] = []
   let unresolved = 0
   for (const locator of locators) {
+    // A hang guard over the lookups too (round 7): they ran unbounded after the collector.
+    if (options.elapsed() > AGENT_BUDGET.maxMillis) {
+      return { cut, verdicts: verdicts.slice(0, MAX_PROBE_VERDICTS), candidates: page.candidates.length, truncated: true, unresolved, verdictsTotal: verdicts.length }
+    }
+    // A flagged comment was counted as an element lost, which refused every such page (round 7).
+    if (locator === COMMENT_LOCATOR) continue
     let element: Element | null = null
     try {
       element = doc.querySelector(locator)
@@ -103,5 +122,12 @@ export function runProbe(
     else if (!cut.includes(element)) cut.push(element)
   }
 
-  return { cut, verdicts, candidates: page.candidates.length, truncated: page.truncated, unresolved }
+  return {
+    cut,
+    verdicts: verdicts.slice(0, MAX_PROBE_VERDICTS),
+    candidates: page.candidates.length,
+    truncated: page.truncated,
+    unresolved,
+    verdictsTotal: verdicts.length,
+  }
 }

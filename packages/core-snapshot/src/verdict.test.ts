@@ -82,3 +82,11 @@ describe('the verdict sent with a snapshot', () => {
     }
   })
 })
+
+describe('a page that plants the same finding many times (round 7)', () => {
+  it('sends each distinct finding once', () => {
+    const many = Array.from({ length: 300 }, (_, i) => ({ ...finding, id: `v${i}` }))
+    const v = snapshotVerdict({ verdicts: many, truncated: false, unresolved: 0 }, COMPLETE)
+    expect('level' in v && v.findings.length).toBe(1)
+  })
+})

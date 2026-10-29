@@ -41,6 +41,14 @@ export interface CleaningIncomplete {
 export function snapshotVerdict(probe: SnapshotProbe, snapshot: Pick<Snapshot, 'incomplete'>): SnapshotVerdict | CleaningIncomplete {
   if (probe.truncated !== false || probe.unresolved !== 0) return { refused: 'cleaning_incomplete' }
   if ((snapshot as Partial<Snapshot> | undefined)?.incomplete !== false) return { refused: 'cleaning_incomplete' }
-  const findings = probe.verdicts.map(toSnapshotFinding)
+  // Each distinct finding once (round 7): a page that plants the same one thousands of times
+  // made a verdict of megabytes, attached to every page of the snapshot.
+  const seen = new Set<string>()
+  const findings = probe.verdicts.map(toSnapshotFinding).filter((f) => {
+    const key = JSON.stringify(f)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
   return { level: findings.length === 0 ? 'clean' : 'finding', findings }
 }

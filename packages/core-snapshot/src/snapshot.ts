@@ -428,17 +428,17 @@ export function buildSnapshot(nodes: readonly AxNode[], options: SnapshotOptions
   // The whole page is always walked and cleaned, so a subtree is cleaned with the
   // page around it in view: a value split across spans, one of which is the
   // subtree, is masked in the subtree too.
-  // Fail closed (round 6): a visible secret field whose tree value is only mask glyphs (Chrome
+  const walk = walkTree(nodes, hidden, secretFields)
+  // Fail closed (round 6; a field under a hidden parent is exempt too, round 7): a visible secret field whose tree value is only mask glyphs (Chrome
   // shows a password as dots) and whose page value the caller did not give cannot be searched
   // for, so a page that repeats it would reach the agent in clear. Refused, like a cut list
   // that ran out of budget, rather than cleaned in part.
   for (const n of nodes) {
     const backend = n.backendDOMNodeId
-    if (backend === undefined || !secretFields.has(backend) || hidden.has(backend)) continue
+    if (backend === undefined || !secretFields.has(backend) || walk.underCut.has(n.nodeId)) continue
     if (isMaskGlyphs(str(n.value?.value)) && options.domValues?.get(backend) === undefined) return empty(true)
   }
 
-  const walk = walkTree(nodes, hidden, secretFields)
   const { patterns, content } = fieldValues(nodes, walk.byId, secretFields, walk.underCut, options.domValues)
   const budget: Budget = { left: CLEANING_BUDGET }
   for (const entry of walk.entries) {
@@ -745,6 +745,8 @@ function fieldValues(
     }
     const add = (raw: unknown): void => {
       const value = str(raw)
+      // Dots are not a value, in the field or in its own text node (rounds 6 and 7).
+      if (isMaskGlyphs(value)) return
       const plain = bare(value).text
       if (plain !== '') pieces.push(plain)
       let text = plain
@@ -762,7 +764,7 @@ function fieldValues(
       look(text.slice(text.length - VALUE_PIECE), kept)
     }
     // Dots are not the value (round 6): searching for them masked "Saved card •••• 4242".
-    if (!isMaskGlyphs(str(field.value?.value))) add(field.value?.value)
+    add(field.value?.value)
     const fromPage = field.backendDOMNodeId === undefined ? undefined : domValues?.get(field.backendDOMNodeId)
     if (fromPage !== undefined) add(fromPage)
     // A select's value is its chosen option; the names under it (a listbox's label, a group's

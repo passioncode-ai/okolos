@@ -485,6 +485,21 @@ describe('a password Chrome shows as dots (round 5, measured on Chromium)', () =
   })
 })
 
+describe('dots as Chrome draws them, and a password under a hidden section (round 7)', () => {
+  it('does not search the dots in the field\'s own text node, and does not refuse a dotted field under a hidden parent', () => {
+    const page = tree({
+      id: '1', role: 'RootWebArea', children: [
+        { id: '2', role: 'textbox', name: 'Password', value: '\u2022'.repeat(4), children: [{ id: '3', role: 'StaticText', name: '\u2022'.repeat(4) }] },
+        { id: '4', role: 'heading', name: 'Saved card \u2022\u2022\u2022\u2022 4242' },
+        { id: '5', role: 'group', name: 'Old form', children: [{ id: '6', role: 'textbox', name: 'Old password', value: '\u2022'.repeat(6) }] },
+      ],
+    })
+    const s = snap(page, { secretFields: new Set([2, 6]), hidden: new Set([5]), domValues: new Map([[2, 'abcd']]) })
+    expect(s.incomplete).toBe(false)
+    expect(text(s)).toContain('Saved card \u2022\u2022\u2022\u2022 4242')
+  })
+})
+
 describe('the names under a select are open text, not its value (round 5)', () => {
   const page = tree({
     id: '1', role: 'RootWebArea', children: [
