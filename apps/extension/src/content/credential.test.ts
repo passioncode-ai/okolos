@@ -397,8 +397,54 @@ describe('saying that a focus has been judged', () => {
     input.dispatchEvent(new Event('focusin', { bubbles: true }))
     await settle()
     input.dispatchEvent(new Event('focusin', { bubbles: true }))
+    await settle()
 
     expect(judged).toHaveBeenCalledTimes(2)
+  })
+
+  it('answers a second focus only once the first one has been decided', async () => {
+    let release: () => void = () => undefined
+    const facts = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const judged = vi.fn()
+    watch({
+      judged,
+      facts: async () => {
+        await facts
+        return { trusted: false, firstSeen: null, secure: true, postsTo: null, resembles: null }
+      },
+    })
+    const input = field()
+    input.dispatchEvent(new Event('focusin', { bubbles: true }))
+    input.dispatchEvent(new Event('focusin', { bubbles: true }))
+    await settle()
+    expect(judged, 'a focus was called judged while the first decision was pending').not.toHaveBeenCalled()
+
+    release()
+    await settle()
+    expect(judged).toHaveBeenCalledTimes(2)
+    expect(banner()).not.toBeNull()
+  })
+
+  it('says so in a frame only after the embedding page has the report', async () => {
+    let delivered: () => void = () => undefined
+    const report = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          delivered = resolve
+        }),
+    )
+    const judged = vi.fn()
+    watch({ report, judged })
+    field().dispatchEvent(new Event('focusin', { bubbles: true }))
+    await settle()
+    expect(report).toHaveBeenCalledTimes(1)
+    expect(judged, 'judged before the report arrived').not.toHaveBeenCalled()
+
+    delivered()
+    await settle()
+    expect(judged).toHaveBeenCalledTimes(1)
   })
 
   it('stays quiet when the facts could not be read, because nothing was judged', async () => {

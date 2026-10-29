@@ -52,7 +52,10 @@ export interface CredentialDeps {
    * and a shadow root for something it never mounts. A seam that has to lie about its
    * return value is the wrong seam.
    */
-  report?: (finding: { severity: CredentialWarning['severity']; lines: FrameLine[] }) => void
+  report?: (finding: {
+    severity: CredentialWarning['severity']
+    lines: FrameLine[]
+  }) => void | Promise<unknown>
   /**
    * Told when a focus has been judged: at once for a field that asks for nothing
    * sensitive, and after the warning is drawn (or handed to the embedding page, or decided
@@ -94,6 +97,8 @@ export function watchCredentialFields(deps: CredentialDeps): CredentialWatcher {
   const mount = mounting(deps)
   let banner: BannerHandle | null = null
   let asked = false
+  /** The first decision, so a later focus is called judged only once it is made. */
+  let decided: Promise<boolean> = Promise.resolve(false)
 
   const onFocus = (event: Event) => {
     const target = event.target
@@ -105,12 +110,17 @@ export function watchCredentialFields(deps: CredentialDeps): CredentialWatcher {
     // while someone types, and a warning that reappears is a warning that gets
     // clicked away without reading.
     if (asked) {
-      deps.judged?.()
+      // Not before the first decision: a second focus while the facts are still being
+      // read has not been judged yet, it is waiting on the same answer.
+      void decided.then((made) => {
+        if (made) deps.judged?.()
+      })
       return
     }
     asked = true
-    void warn(target).then((decided) => {
-      if (decided) deps.judged?.()
+    decided = warn(target)
+    void decided.then((made) => {
+      if (made) deps.judged?.()
     })
   }
 
@@ -136,7 +146,9 @@ export function watchCredentialFields(deps: CredentialDeps): CredentialWatcher {
     // drawn a dozen times across ad frames. The relay is the surface here, and it
     // gets facts — the page that embeds this one words them.
     if (deps.report) {
-      deps.report({ severity: warning.severity, lines })
+      // Judged once the embedding page has it (or the report was given up), not when it
+      // left: until then the warning is on nobody's screen.
+      await Promise.resolve(deps.report({ severity: warning.severity, lines })).catch(() => undefined)
       return true
     }
 
