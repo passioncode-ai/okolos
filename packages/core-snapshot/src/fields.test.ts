@@ -467,9 +467,21 @@ describe('a password Chrome shows as dots (round 5, measured on Chromium)', () =
     expect(text(snap(page, given))).toContain('Your password *** is weak')
   })
 
-  it('masks nothing for the dots themselves, and refuses a domValues that is not a map', () => {
-    expect(text(snap(page, secret))).not.toContain('\u2022')
+  it('searches no dots, refuses a domValues that is not a map, and refuses a dotted password it cannot search', () => {
+    const card = tree({
+      id: '1', role: 'RootWebArea', children: [
+        { id: '2', role: 'textbox', name: 'Password', value: '\u2022'.repeat(4) },
+        { id: '3', role: 'heading', name: 'Saved card \u2022\u2022\u2022\u2022 4242' },
+      ],
+    })
+    expect(text(snap(card, { ...secret, domValues: new Map([[2, 'hunter22x']]) }))).toContain('Saved card \u2022\u2022\u2022\u2022 4242')
     expect(() => snap(page, { ...secret, domValues: [[2, 'x']] as unknown as ReadonlyMap<number, string> })).toThrow(RangeError)
+    // Without the page value the repeated password cannot be found: refused, not leaked.
+    const refused = snap(page, secret)
+    expect(refused.incomplete).toBe(true)
+    expect(refused.lines).toEqual([])
+    // A dotted field that is hidden from people needs nothing.
+    expect(snap(page, { ...secret, hidden: new Set([2]) }).incomplete).toBe(false)
   })
 })
 
@@ -491,6 +503,27 @@ describe('the names under a select are open text, not its value (round 5)', () =
     const t = text(snap(page))
     expect(t).toContain('Suggestions for you')
     expect(t).toContain('Flights to ***')
+  })
+})
+
+describe('the parts of a date or time input are not searched (round 6, Chrome roles measured)', () => {
+  const page = tree({
+    id: '1', role: 'RootWebArea', children: [
+      { id: '2', role: 'Date', name: 'Booked for', children: [
+        { id: '3', role: 'spinbutton', name: 'Month', value: '10' },
+        { id: '4', role: 'spinbutton', name: 'Day', value: '29' },
+        { id: '5', role: 'spinbutton', name: 'Year', value: '2026' },
+      ] },
+      { id: '6', role: 'heading', name: 'Since 2026 we ship' },
+      { id: '7', role: 'spinbutton', name: 'Guests', value: '1234' },
+      { id: '8', role: 'heading', name: 'Room for 1234 guests' },
+    ],
+  })
+
+  it('leaves a year the page shows alone, and still masks an ordinary number field', () => {
+    const t = text(snap(page))
+    expect(t).toContain('Since 2026 we ship')
+    expect(t).toContain('Room for *** guests')
   })
 })
 

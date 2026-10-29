@@ -141,6 +141,17 @@ const KEPT_ROLES: ReadonlySet<string> = new Set([
 /** Roles whose descendants' text is what a person typed, not what the page says. */
 const FIELD_ROLES: ReadonlySet<string> = new Set(['textbox', 'searchbox', 'combobox', 'spinbutton'])
 
+/** Glyphs a browser draws in place of a password's characters. */
+const MASK_GLYPHS = /^[\u2022\u25CF\u2219\u00B7*]+$/u
+
+/** True for a non-empty value made only of mask glyphs: a password as the tree shows it. */
+function isMaskGlyphs(value: string): boolean {
+  return value !== '' && MASK_GLYPHS.test(value)
+}
+
+/** Chrome's roles for a date or time input, whose parts are spinbuttons (measured on Chromium, round 6). */
+const DATE_CONTROLS: ReadonlySet<string> = new Set(['Date', 'DateTime', 'InputTime', 'date', 'time'])
+
 const NAME_LIMIT = 160
 
 /**
@@ -417,6 +428,16 @@ export function buildSnapshot(nodes: readonly AxNode[], options: SnapshotOptions
   // The whole page is always walked and cleaned, so a subtree is cleaned with the
   // page around it in view: a value split across spans, one of which is the
   // subtree, is masked in the subtree too.
+  // Fail closed (round 6): a visible secret field whose tree value is only mask glyphs (Chrome
+  // shows a password as dots) and whose page value the caller did not give cannot be searched
+  // for, so a page that repeats it would reach the agent in clear. Refused, like a cut list
+  // that ran out of budget, rather than cleaned in part.
+  for (const n of nodes) {
+    const backend = n.backendDOMNodeId
+    if (backend === undefined || !secretFields.has(backend) || hidden.has(backend)) continue
+    if (isMaskGlyphs(str(n.value?.value)) && options.domValues?.get(backend) === undefined) return empty(true)
+  }
+
   const walk = walkTree(nodes, hidden, secretFields)
   const { patterns, content } = fieldValues(nodes, walk.byId, secretFields, walk.underCut, options.domValues)
   const budget: Budget = { left: CLEANING_BUDGET }
@@ -691,7 +712,25 @@ function fieldValues(
   const found = new Map<string, Pattern>()
   const content = new Map<string, string[]>()
   const inside = new Set<string>()
-  const fields = nodes.filter((n) => !underCut.has(n.nodeId) && (isField(n) || isSecret(n, secretFields)))
+  // The parts of a date or time input (Chrome gives each as a spinbutton under a `Date`,
+  // `DateTime` or `InputTime` node) are not searched: the year alone masked every "2026" on the
+  // page, and dates are not searched by decision (spec §11 S4, B-185; round 6). A secret one is.
+  const dateParts = new Set<string>()
+  for (const n of nodes) {
+    if (!DATE_CONTROLS.has(str(n.role?.value))) continue
+    const stack = [...(n.childIds ?? [])]
+    while (stack.length > 0) {
+      const id = stack.pop()
+      if (id === undefined || dateParts.has(id)) continue
+      dateParts.add(id)
+      stack.push(...(byId.get(id)?.childIds ?? []))
+    }
+  }
+  const fields = nodes.filter(
+    (n) =>
+      !underCut.has(n.nodeId) &&
+      (isSecret(n, secretFields) || (isField(n) && !dateParts.has(n.nodeId))),
+  )
   fields.sort((a, b) => Number(isSecret(b, secretFields)) - Number(isSecret(a, secretFields)))
   for (const field of fields) {
     const floor = isSecret(field, secretFields) ? MIN_CLEANED_SECRET : MIN_CLEANED_VALUE
@@ -722,7 +761,8 @@ function fieldValues(
       for (let at = 0; at < text.length; at += VALUE_PIECE) look(text.slice(at, at + VALUE_PIECE), kept)
       look(text.slice(text.length - VALUE_PIECE), kept)
     }
-    add(field.value?.value)
+    // Dots are not the value (round 6): searching for them masked "Saved card •••• 4242".
+    if (!isMaskGlyphs(str(field.value?.value))) add(field.value?.value)
     const fromPage = field.backendDOMNodeId === undefined ? undefined : domValues?.get(field.backendDOMNodeId)
     if (fromPage !== undefined) add(fromPage)
     // A select's value is its chosen option; the names under it (a listbox's label, a group's

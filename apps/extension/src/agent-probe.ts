@@ -1,7 +1,7 @@
 import type { ConcealmentTechnique, Verdict } from '@okolos/contracts'
 import { detectHidden } from '@okolos/core-injection'
 
-import { collect, DEFAULT_BUDGET } from './content/collect.js'
+import { collect, type Budget } from './content/collect.js'
 
 /**
  * The extension's own detector, run for Okolos Bridge inside an agent's page.
@@ -24,9 +24,28 @@ import { collect, DEFAULT_BUDGET } from './content/collect.js'
  *     every one would blind the agent to the page's own buttons. One the rules
  *     flag takes its element with it.
  *
- * Same collector, same rules, same budget as the extension: one detector, two
- * readers, so the agent is never protected by a weaker copy.
+ * Same collector, same rules as the extension: one detector, two readers, so the agent is
+ * never protected by a weaker copy. The budget is the agent's own (AGENT_BUDGET).
  */
+
+/**
+ * The probe's budget: a whole page, not the person's quick scan.
+ *
+ * The person's scan (`DEFAULT_BUDGET`: 5000 elements, 50 candidates) keeps a page responsive
+ * while someone uses it, and stopping early there only means a weaker warning. Here a stop
+ * means `cleaning_incomplete`, a refusal: with that budget the probe stopped on Wikipedia,
+ * Hacker News, gov.uk, MDN and GitHub (round 6 of the N-003 certification, measured in
+ * Chromium), because every non-empty `alt`, `title`, `aria-label` and `data-*` counts as a
+ * candidate. The page's scripts are paused while the probe runs and nobody waits on the page,
+ * so the probe can read all of it; the ceilings stay as a guard against a pathological page,
+ * which is still refused rather than read in part. Measured with this budget: the English Wikipedia article on the United States (21 955 elements, 11 354 candidates) in 291 ms, untruncated.
+ */
+export const AGENT_BUDGET: Budget = {
+  maxNodes: 200_000,
+  maxMillis: 5_000,
+  maxCandidates: 50_000,
+  maxTextLength: 2000,
+}
 
 const RENDERING_CONCEALMENT: ReadonlySet<ConcealmentTechnique> = new Set([
   'color-on-color',
@@ -55,7 +74,7 @@ export function runProbe(
   doc: Document,
   options: { readonly url: string; readonly now: string; readonly elapsed: () => number },
 ): ProbeResult {
-  const page = collect(doc, { url: options.url, frameId: 0, budget: DEFAULT_BUDGET, elapsed: options.elapsed })
+  const page = collect(doc, { url: options.url, frameId: 0, budget: AGENT_BUDGET, elapsed: options.elapsed })
   let next = 0
   const verdicts = detectHidden(page, { now: options.now, newId: () => `probe-${++next}` })
 
