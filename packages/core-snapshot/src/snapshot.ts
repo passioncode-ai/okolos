@@ -119,6 +119,14 @@ export interface SnapshotOptions {
    * default; an empty set says "no secret field on this page".
    */
   readonly secretFields: ReadonlySet<number>
+  /**
+   * Backend DOM node id to the field's current value as the page holds it (`input.value`, read
+   * by the caller in an isolated world). Chrome's tree gives a password field's value as dots, so
+   * without this a password the page repeats in its text is not found (round 5 of the N-003
+   * certification, measured on Chromium). The values are only searched for, never given out. The
+   * daemon passes one for every secret field at least.
+   */
+  readonly domValues?: ReadonlyMap<number, string>
 }
 
 /** Roles an agent acts on or orients by. Everything else is layout. */
@@ -384,6 +392,9 @@ export function buildSnapshot(nodes: readonly AxNode[], options: SnapshotOptions
   if (!isSetLike(given?.secretFields)) throw new RangeError('secretFields is required: pass an empty set when no field is secret')
   // i18n-exempt: a programming error in the daemon's call, thrown to its caller; never shown to a person
   if (!isSetLike(given?.hidden)) throw new RangeError('hidden must be a set of backend node ids')
+  if (given?.domValues !== undefined && typeof (given.domValues as { get?: unknown }).get !== 'function') {
+    throw new RangeError('domValues must be a map of backend node ids to values')
+  }
   const { hidden, secretFields, taskKey } = options
 
   const backends = new Set<number>()
@@ -407,7 +418,7 @@ export function buildSnapshot(nodes: readonly AxNode[], options: SnapshotOptions
   // page around it in view: a value split across spans, one of which is the
   // subtree, is masked in the subtree too.
   const walk = walkTree(nodes, hidden, secretFields)
-  const { patterns, content } = fieldValues(nodes, walk.byId, secretFields, walk.underCut)
+  const { patterns, content } = fieldValues(nodes, walk.byId, secretFields, walk.underCut, options.domValues)
   const budget: Budget = { left: CLEANING_BUDGET }
   for (const entry of walk.entries) {
     const pieces = content.get(entry.nodeId)
@@ -675,6 +686,7 @@ function fieldValues(
   byId: ReadonlyMap<string, AxNode>,
   secretFields: ReadonlySet<number>,
   underCut: ReadonlySet<string>,
+  domValues: ReadonlyMap<number, string> | undefined,
 ): { patterns: readonly Pattern[]; content: ReadonlyMap<string, readonly string[]> } {
   const found = new Map<string, Pattern>()
   const content = new Map<string, string[]>()
@@ -711,7 +723,12 @@ function fieldValues(
       look(text.slice(text.length - VALUE_PIECE), kept)
     }
     add(field.value?.value)
-    const stack = [...(field.childIds ?? [])]
+    const fromPage = field.backendDOMNodeId === undefined ? undefined : domValues?.get(field.backendDOMNodeId)
+    if (fromPage !== undefined) add(fromPage)
+    // A select's value is its chosen option; the names under it (a listbox's label, a group's
+    // name) are the page's open text, not a value, and searching for them masked headings such
+    // as "Suggestions for you" (round 5).
+    const stack = fromSelect ? [] : [...(field.childIds ?? [])]
     while (stack.length > 0) {
       const id = stack.pop()
       if (id === undefined || inside.has(id)) continue

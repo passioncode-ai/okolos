@@ -452,6 +452,48 @@ describe('a select wrapper holding the box people type into (ARIA 1.1 combobox, 
   })
 })
 
+describe('a password Chrome shows as dots (round 5, measured on Chromium)', () => {
+  const page = tree({
+    id: '1', role: 'RootWebArea', children: [
+      { id: '2', role: 'textbox', name: 'Password', value: '\u2022'.repeat(9) },
+      { id: '3', role: 'heading', name: 'Your password hunter22x is weak' },
+    ],
+  })
+  const secret = { secretFields: new Set([2]) }
+
+  it('masks the repeated password when the caller gives its value from the page', () => {
+    const given = { ...secret, domValues: new Map([[2, 'hunter22x']]) }
+    for (const s of everyAnswer(page, given)) expect(text(s)).not.toContain('hunter22x')
+    expect(text(snap(page, given))).toContain('Your password *** is weak')
+  })
+
+  it('masks nothing for the dots themselves, and refuses a domValues that is not a map', () => {
+    expect(text(snap(page, secret))).not.toContain('\u2022')
+    expect(() => snap(page, { ...secret, domValues: [[2, 'x']] as unknown as ReadonlyMap<number, string> })).toThrow(RangeError)
+  })
+})
+
+describe('the names under a select are open text, not its value (round 5)', () => {
+  const page = tree({
+    id: '1', role: 'RootWebArea', children: [
+      { id: '2', role: 'combobox', name: 'Destination', value: 'Lisbon', children: [
+        { id: '3', role: 'listbox', name: 'Suggestions', children: [
+          { id: '4', role: 'option', name: 'Lisbon' },
+          { id: '5', role: 'option', name: 'Porto' },
+        ] },
+      ] },
+      { id: '6', role: 'heading', name: 'Suggestions for you' },
+      { id: '7', role: 'heading', name: 'Flights to Lisbon' },
+    ],
+  })
+
+  it('leaves a heading that repeats the listbox label alone, and still masks the chosen value', () => {
+    const t = text(snap(page))
+    expect(t).toContain('Suggestions for you')
+    expect(t).toContain('Flights to ***')
+  })
+})
+
 describe('an ordinary select (round 2, product decision 2026-10-27)', () => {
   const country = tree({
     id: '1', role: 'RootWebArea', children: [
