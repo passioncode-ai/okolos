@@ -299,7 +299,7 @@ generator, and the sheet declares no colour of its own.
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
-  | loading | check running | - | per-source progress, partial results shown as they arrive |
+  | loading | check running | - | "Запрос к источникам…" until every source has answered or reached its 10-second limit; the result is drawn whole, never in part |
   | empty | no sources monitored | - | prompt to add an email or phone, naming what is sent — the address itself, not a hash |
   | idle, by key state | before a check | - | the sentence names every recipient: no key saved, Hudson Rock Cavalier only and the address not sent to Have I Been Pwned (`leaksIdleNoKey`); a key saved, both, with the key in the request header (`leaksIdleWithKey`); unreadable, Cavalier and Have I Been Pwned only if a key is saved (`leaksIdle`) |
   | key unreadable | a check ran and the saved key could not be read | - | the key line says Have I Been Pwned was not checked because the saved key could not be read, with no link |
