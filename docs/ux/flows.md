@@ -359,7 +359,8 @@ flowchart TD
   S -->|save with an empty field or a space| S_needs[State: refused - nothing saved, says why]
   S_needs --> S
   S_saved -->|remove key| S
-  S_saved -->|back to leaks, check again| A_load
+  S_saved -->|back to leaks| A_idle[State: idle, the sentence names the recipients for the key as it now is; the old no-key result is gone]
+  A_idle -->|check| A_load
   D -->|open entry| F[Entry: data classes, date, source, next steps]
   F -->|change password| G[Site change-password opened]
   F -->|check reuse| H[Local reuse list]
