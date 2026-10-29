@@ -243,6 +243,33 @@ describe('what the shipped extension is made of', () => {
     }
   })
 
+  it('carries the per-event test marks in the test build only', () => {
+    // A mark per focus and per look at the page is what lets an e2e spec assert "no
+    // warning" after the check rather than after a fixed wait (B-169). On a page a person
+    // works in for hours it would pile up in the timeline, so the shipped bundle must not
+    // write it. The test build is checked too, or a typo in the flag would pass here and
+    // leave the specs waiting for marks nothing writes.
+    const MARKS = ['okolos:focus-judged', 'okolos:trap-judged']
+    for (const browser of ['chrome', 'firefox']) {
+      const shipped = readFileSync(path.join(root, `apps/extension/dist/${browser}/content.js`), 'utf8')
+      for (const mark of MARKS) {
+        expect(shipped, `${browser} build carries the test mark ${mark}`).not.toContain(mark)
+      }
+    }
+    for (const build of ['chrome-e2e', 'firefox-e2e']) {
+      const file = path.join(root, `apps/extension/dist/${build}/content.js`)
+      // The test build is made by `pnpm build:e2e`, which `pnpm test` does not run; a tree
+      // that has never built it has nothing to check here.
+      let text: string
+      try {
+        text = readFileSync(file, 'utf8')
+      } catch {
+        continue
+      }
+      for (const mark of MARKS) expect(text, `${build} lacks ${mark}`).toContain(mark)
+    }
+  })
+
   it('ships nothing the product does not produce', () => {
     /**
      * The build copies `icons` and `_locales` wholesale, and wholesale includes

@@ -252,6 +252,54 @@ export const MARK_PARTIAL = 'okolos:scan-partial'
 export const MEASURE_TO_BANNER = 'okolos:banner'
 
 /**
+ * A scan, and everything it set in motion, has settled, measured from the scan's start.
+ *
+ * "Settled" is the point of the name: the verdict came back and the warning is drawn, or
+ * the frame's report reached the embedding page (or was given up), or there was nothing
+ * to ask about. Not written when the scan threw: that is `okolos:scan-failed`, and a
+ * check that did not finish must never read as one that found nothing.
+ *
+ * Two readers. The e2e report tells "the answer came back and the mount is what is
+ * missing" from "the answer never came" (B-78). And a test that asserts a page stays
+ * silent waits for this instead of a fixed time: under load the wait ran out before the
+ * scan did, and the assertion passed on a check that had not run (B-169).
+ */
+export const MEASURE_SCAN = 'okolos:scan'
+
+/**
+ * The address check has settled, from the navigation: the lookalike warning is drawn or
+ * was decided against. Not written when the check could not run (B-169).
+ */
+export const MEASURE_LOOKALIKE = 'okolos:lookalike'
+
+/**
+ * This document's question "does the tab hold a leak verdict nobody was shown?" has been
+ * answered, and a held verdict, if there was one, is drawn. Not written when the question
+ * failed (B-169).
+ */
+export const MEASURE_PENDING = 'okolos:pending'
+
+/**
+ * Test-hook marks: a focus judged by the password pause, and a look at the page by the
+ * trap watcher. Per event, so they would pile up in the timeline of a page a person
+ * works in for hours; written only in the build with test hooks, and
+ * `tools/gates/bundle-scan.test.ts` asserts the shipped bundle does not carry them.
+ */
+const MARK_FOCUS_JUDGED = 'okolos:focus-judged'
+const MARK_TRAP_JUDGED = 'okolos:trap-judged'
+
+declare const __OKOLOS_TEST_HOOKS__: boolean | undefined
+
+/**
+ * The scan has settled. Inside the scan's own fail-open wrapper on the paths that end
+ * there; the frame's path ends later and catches for itself.
+ */
+function scanSettled(started: number): void {
+  const end = performance.now()
+  performance.measure(MEASURE_SCAN, { start: started, end })
+}
+
+/**
  * The bridge to the MAIN-world watcher.
  *
  * It is armed only while this page carries a finding nobody has dealt with, so
@@ -335,6 +383,7 @@ async function scan(): Promise<void> {
         })
       })
     }
+    scanSettled(started)
     return
   }
 
@@ -345,7 +394,10 @@ async function scan(): Promise<void> {
   const response = await platform.runtime.send('page/candidates', page)
 
   const verdicts: Verdict[] = response?.verdicts ?? []
-  if (verdicts.length === 0) return
+  if (verdicts.length === 0) {
+    scanSettled(started)
+    return
+  }
 
   // Neutralise in every frame, including the ones that never show a banner: an
   // injection inside an iframe is read by an assistant just as readily as one
@@ -361,10 +413,15 @@ async function scan(): Promise<void> {
   armPageWatch(unresolved.length > 0)
 
   if (!isTopFrame) {
+    // Settled once the embedding page has it, or the report was given up: a frame's
+    // finding is not on screen until then.
     void tellEmbeddingPage(verdicts)
+      .then(() => scanSettled(started))
+      .catch(() => undefined)
     return
   }
   show(worst(verdicts), verdicts.length, page.truncated, neutralised)
+  scanSettled(started)
 }
 
 /**
@@ -988,10 +1045,20 @@ if (isTopFrame) {
       await platform.runtime.send('trust/add', { domain: host })
     },
     leave: () => history.back(),
-  }).catch(() => {
-    // An address that could not be checked is not an address declared safe;
-    // nothing is shown either way, and the page is left alone.
   })
+    .then(() => {
+      // From the navigation, which is what a person waited from. A page can have taken the
+      // API away; the measure is a fact for observers, never a reason to throw.
+      try {
+        performance.measure(MEASURE_LOOKALIKE)
+      } catch {
+        // Nothing to report.
+      }
+    })
+    .catch(() => {
+      // An address that could not be checked is not an address declared safe;
+      // nothing is shown either way, and the page is left alone.
+    })
 }
 
 /**
@@ -1012,6 +1079,9 @@ if (isTopFrame) {
       void platform.runtime
         .send('trap/warned', { kind, signals: signals.join(',') })
         .catch(() => undefined)
+    },
+    judged: () => {
+      if (__OKOLOS_TEST_HOOKS__) performance.mark(MARK_TRAP_JUDGED)
     },
     exitFullscreen: () => {
       void document.exitFullscreen?.().catch(() => {
@@ -1066,6 +1136,9 @@ watchCredentialFields({
     await platform.runtime.send('trust/add', { domain: host })
   },
   leave: () => history.back(),
+  judged: () => {
+    if (__OKOLOS_TEST_HOOKS__) performance.mark(MARK_FOCUS_JUDGED)
+  },
 })
 
 /**
@@ -1291,6 +1364,11 @@ if (isTopFrame) {
     .send('password/pending', {})
     .then((held) => {
       if (held) showPasswordVerdict(held.host, held.verdict, held.verdict.offline)
+      try {
+        performance.measure(MEASURE_PENDING)
+      } catch {
+        // Nothing to report: the verdict, if any, is drawn either way.
+      }
     })
     .catch(() => {
       // Nothing to show and nothing to say: the verdict, if there is one, is in the

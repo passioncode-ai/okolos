@@ -38,6 +38,15 @@ export interface TrapDeps {
    * supplies the slot.
    */
   mountWarning?: (props: BannerProps, handlers: BannerHandlers) => BannerHandle
+  /**
+   * Told when the page has been looked at: after every check, once the warning (if any)
+   * is drawn, and for a copy the user made themselves, which is judged by being ignored.
+   *
+   * It exists for the end-to-end tests, which used to assert "no warning" after a fixed
+   * wait and passed under load on a check that had not run yet (B-169). The entry point
+   * wires it to a mark only in the build with test hooks.
+   */
+  judged?: () => void
 }
 
 export interface TrapWatcher {
@@ -68,7 +77,10 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
   const recently = () => Date.now() - lastGesture < 1000
 
   const onCopy = (event: Event) => {
-    if (event.isTrusted) return
+    if (event.isTrusted) {
+      deps.judged?.()
+      return
+    }
     scriptedCopy = true
     try {
       copied = (event as ClipboardEvent).clipboardData?.getData('text/plain') ?? null
@@ -103,6 +115,11 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
   }
 
   function check(): void {
+    look()
+    deps.judged?.()
+  }
+
+  function look(): void {
     if (banner) return
     const text = deps.text()
 

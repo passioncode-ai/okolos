@@ -326,3 +326,92 @@ describe('when the warning has to leave the frame', () => {
     expect(banner()).toBeNull()
   })
 })
+
+/**
+ * The end of a judgement, said out loud.
+ *
+ * A test that asserts "no warning on an ordinary text field" has to know when the watcher
+ * has finished looking, and the only thing it had was a fixed wait: under load the wait
+ * ran out before the judgement did, and the assertion passed on a check that had not run
+ * (B-169). `judged` is that signal. It fires once the decision is on screen, and never for
+ * a judgement that could not be made, because "the facts could not be read" is not "the
+ * field was judged safe".
+ */
+describe('saying that a focus has been judged', () => {
+  it('says so at once for a field that asks for nothing sensitive', () => {
+    const judged = vi.fn()
+    watch({ judged })
+    field('<input id="u" type="text">').dispatchEvent(new Event('focusin', { bubbles: true }))
+
+    expect(judged).toHaveBeenCalledTimes(1)
+    expect(banner()).toBeNull()
+  })
+
+  it('says so for a password field only once the warning is on screen', async () => {
+    let drawn: Element | null = null
+    const judged = vi.fn(() => {
+      drawn = banner()
+    })
+    watch({ judged })
+    field().dispatchEvent(new Event('focusin', { bubbles: true }))
+
+    expect(judged).not.toHaveBeenCalled()
+    await settle()
+    expect(judged).toHaveBeenCalledTimes(1)
+    expect(drawn, 'judged fired before the warning was drawn').not.toBeNull()
+  })
+
+  it('says so after deciding to stay silent', async () => {
+    const judged = vi.fn()
+    watch({
+      judged,
+      facts: async () => ({
+        trusted: true,
+        firstSeen: null,
+        secure: true,
+        postsTo: null,
+        resembles: null,
+      }),
+    })
+    field().dispatchEvent(new Event('focusin', { bubbles: true }))
+    await settle()
+
+    expect(judged).toHaveBeenCalledTimes(1)
+    expect(banner()).toBeNull()
+  })
+
+  it('says so after a frame has handed the facts on', async () => {
+    const report = vi.fn()
+    const judged = vi.fn(() => expect(report).toHaveBeenCalledTimes(1))
+    watch({ report, judged })
+    field().dispatchEvent(new Event('focusin', { bubbles: true }))
+    await settle()
+
+    expect(judged).toHaveBeenCalledTimes(1)
+  })
+
+  it('says so for a password field focused again, which is not asked twice', async () => {
+    const judged = vi.fn()
+    watch({ judged })
+    const input = field()
+    input.dispatchEvent(new Event('focusin', { bubbles: true }))
+    await settle()
+    input.dispatchEvent(new Event('focusin', { bubbles: true }))
+
+    expect(judged).toHaveBeenCalledTimes(2)
+  })
+
+  it('stays quiet when the facts could not be read, because nothing was judged', async () => {
+    const judged = vi.fn()
+    watch({
+      judged,
+      facts: async () => {
+        throw new Error('worker asleep')
+      },
+    })
+    field().dispatchEvent(new Event('focusin', { bubbles: true }))
+    await settle()
+
+    expect(judged).not.toHaveBeenCalled()
+  })
+})

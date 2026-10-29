@@ -53,6 +53,17 @@ export interface CredentialDeps {
    * return value is the wrong seam.
    */
   report?: (finding: { severity: CredentialWarning['severity']; lines: FrameLine[] }) => void
+  /**
+   * Told when a focus has been judged: at once for a field that asks for nothing
+   * sensitive, and after the warning is drawn (or handed to the embedding page, or decided
+   * against) for one that does. Not told when the facts could not be read, because that is
+   * a judgement that was not made.
+   *
+   * It exists for the end-to-end tests, which used to assert "no warning" after a fixed
+   * wait and passed under load on a check that had not run yet (B-169). The entry point
+   * wires it to a mark only in the build with test hooks.
+   */
+  judged?: () => void
 }
 
 export interface CredentialWatcher {
@@ -86,16 +97,25 @@ export function watchCredentialFields(deps: CredentialDeps): CredentialWatcher {
 
   const onFocus = (event: Event) => {
     const target = event.target
-    if (!(target instanceof Element) || !isSensitive(target)) return
+    if (!(target instanceof Element) || !isSensitive(target)) {
+      deps.judged?.()
+      return
+    }
     // Once per page: focus moves in and out of a password field constantly
     // while someone types, and a warning that reappears is a warning that gets
     // clicked away without reading.
-    if (asked) return
+    if (asked) {
+      deps.judged?.()
+      return
+    }
     asked = true
-    void warn(target)
+    void warn(target).then((decided) => {
+      if (decided) deps.judged?.()
+    })
   }
 
-  async function warn(field: Element): Promise<void> {
+  /** Resolves to whether a decision was reached, which a failed read of the facts is not. */
+  async function warn(field: Element): Promise<boolean> {
     const host = deps.host()
     let context: CredentialContext
     try {
@@ -103,11 +123,11 @@ export function watchCredentialFields(deps: CredentialDeps): CredentialWatcher {
     } catch {
       // Unable to read what we know about this site. Staying silent is right:
       // a warning built from nothing would say nothing useful.
-      return
+      return false
     }
 
     const warning = guardCredentialEntry({ ...context, postsTo: postsTo(field, host) })
-    if (!warning) return
+    if (!warning) return true
 
     const lines = credentialLines(warning)
 
@@ -117,7 +137,7 @@ export function watchCredentialFields(deps: CredentialDeps): CredentialWatcher {
     // gets facts — the page that embeds this one words them.
     if (deps.report) {
       deps.report({ severity: warning.severity, lines })
-      return
+      return true
     }
 
     banner = mount(
@@ -138,6 +158,7 @@ export function watchCredentialFields(deps: CredentialDeps): CredentialWatcher {
         onDismiss: dismiss,
       },
     )
+    return true
   }
 
   function dismiss(): void {
