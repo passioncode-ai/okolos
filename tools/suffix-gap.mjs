@@ -35,7 +35,7 @@ function parse(text) {
   let section = null
   const icann = new Set()
   const priv = new Set()
-  for (const line of text.split('\n')) {
+  for (const line of text.split(/\r?\n/)) {
     const rule = line.trim()
     if (rule.startsWith('// ===BEGIN ICANN')) {
       section = 'icann'

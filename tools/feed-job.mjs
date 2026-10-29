@@ -28,6 +28,10 @@
  *   - least secret (F2): the Cloudflare token reaches only the publish step. The
  *     secret runner (`OKOLOS_SECRET_RUNNER`, a JSON argv the installer writes)
  *     wraps that step alone, and an inherited token is stripped from every other.
+ *   - started by a bootstrap outside the checkout (B-159): launchd runs
+ *     ~/.okolos/bin/feed-agent/bootstrap.mjs, which recreates a missing checkout and
+ *     then starts this file with OKOLOS_RUN_ID and OKOLOS_RECOVERED_CHECKOUT; both
+ *     land in the status record.
  *   - a login is not a publish: with --if-stale a run whose served feed is younger
  *     than its interval records "skipped" and ends. RunAtLoad used to publish a new
  *     version at every login.
@@ -36,13 +40,14 @@ import { existsSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-import { killAllGroups, runBounded } from './feed/bounded.mjs'
+import { killAllGroups, runBounded, withoutSecrets } from './feed/bounded.mjs'
 import { acquireLock, LockHeldError } from './feed/lock.mjs'
 import { capFile, cleanLine, openLog } from './feed/log.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { DEFAULT_WORKER, readServed } from './feed/served.mjs'
-import { writeStatus } from './feed/status.mjs'
+import { offMainFacts, writeStatus } from './feed/status.mjs'
 import { directoriesIn } from './tree.mjs'
+import { isMain } from './is-main.mjs'
 
 const REPO = path.resolve(import.meta.dirname, '..')
 
@@ -53,6 +58,16 @@ export const STALE_AFTER_MS = INTERVAL_MS - 60 * 60 * 1000
 /** The whole run, every retry included. Far under the interval, so launchd never skips a slot. */
 export const WATCHDOG_MS = 30 * 60 * 1000
 
+/**
+ * The watchdog for this run: WATCHDOG_MS, or less when the bootstrap says less is
+ * left of the run's one deadline (OKOLOS_WATCHDOG_MS; it repaired the checkout
+ * first). Never more, and an unreadable value is ignored.
+ */
+export function watchdogFrom(env) {
+  const asked = Number(env.OKOLOS_WATCHDOG_MS)
+  return Number.isFinite(asked) && asked > 0 ? Math.min(WATCHDOG_MS, asked) : WATCHDOG_MS
+}
+
 export const DEADLINES = {
   git: 90_000,
   install: 10 * 60_000,
@@ -62,15 +77,6 @@ export const DEADLINES = {
 
 /** Exit codes a host can tell apart. */
 export const EXIT = { ok: 0, failed: 1, lockHeld: 75, watchdog: 124, signal: 143 }
-
-/** Variables that carry the Cloudflare credential; never handed to a stage that does not publish. */
-const SECRET_VARIABLES = ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY']
-
-function withoutSecrets(env) {
-  const copy = { ...env }
-  for (const name of SECRET_VARIABLES) delete copy[name]
-  return copy
-}
 
 /**
  * Removes what older versions and dead runs left in the temp directory.
@@ -139,6 +145,21 @@ class StageFailure extends Error {
 }
 
 /**
+ * What the bootstrap (tools/feed/bootstrap.mjs, B-159) tells the run, for every
+ * record it writes: its id, whether it recreated the checkout first, and an
+ * install made past the origin/main check (--allow-branch). A manual run has none
+ * of them and records `recoveredCheckout: false`.
+ */
+function toldByBootstrap(env) {
+  return {
+    ...(env.OKOLOS_RUN_ID ? { runId: env.OKOLOS_RUN_ID } : {}),
+    recoveredCheckout: Boolean(env.OKOLOS_RECOVERED_CHECKOUT),
+    ...(env.OKOLOS_RECOVERED_CHECKOUT ? { recovery: env.OKOLOS_RECOVERED_CHECKOUT } : {}),
+    ...offMainFacts(env),
+  }
+}
+
+/**
  * One run. Returns the status record it wrote (or, for a refused lock, the record
  * it did not write). Every external effect is a parameter.
  */
@@ -159,6 +180,11 @@ export async function runJob({
   node = process.execPath,
   tmp = tmpdir(),
   onStage = () => {},
+  // The signal that is stopping this run, or null. A failure it causes (a stage
+  // child killed under it) is recorded as the stop, the rule the bootstrap keeps.
+  stopped = () => null,
+  // Told as soon as this run's record is written, so a stop does not write a second.
+  onRecord = () => {},
 } = {}) {
   const iso = () => new Date(now()).toISOString()
   const startedAt = iso()
@@ -186,13 +212,26 @@ export async function runJob({
 
   let stage = 'start'
   let aborted = false
-  const facts = { commit: null, pinned: true, version: undefined, entries: undefined }
+  // What the bootstrap (tools/feed/bootstrap.mjs, B-159) tells the run: its id, so it
+  // can tell this record from an older one, and whether it had to recreate the
+  // checkout first. A manual run has neither and records `recoveredCheckout: false`.
+  const facts = {
+    commit: null,
+    pinned: true,
+    version: undefined,
+    entries: undefined,
+    ...toldByBootstrap(env),
+  }
   const setStage = (next) => {
     stage = next
     onStage(next)
     write(`── ${next}`)
   }
-  const finish = (record) => writeStatus(paths.status, { startedAt, at: iso(), ...facts, ...record })
+  const finish = (record) => {
+    const written = writeStatus(paths.status, { startedAt, at: iso(), ...facts, ...record })
+    onRecord(written)
+    return written
+  }
 
   const stageEnv = { ...withoutSecrets(env), OKOLOS_FEED_LOCK: lock.token }
   const gitEnv = {
@@ -358,6 +397,11 @@ export async function runJob({
     if (outcome.cause) {
       const cause = outcome.cause
       const failedStage = cause instanceof StageFailure ? cause.stage : stage
+      const signal = stopped()
+      if (signal) {
+        write(`stopped by ${signal} in ${failedStage}`)
+        return finish({ outcome: 'failed', stage: failedStage, exit: EXIT.signal, reason: `stopped by ${signal}` })
+      }
       write(`failed in ${failedStage}: ${cause.message}`)
       return finish({ outcome: 'failed', stage: failedStage, exit: cause.exit ?? EXIT.failed, reason: cause.message })
     }
@@ -369,32 +413,47 @@ export async function runJob({
   }
 }
 
-/** Ends the run on SIGTERM/SIGINT the same way the watchdog does: children killed, status written. */
+/** The record of a run stopped by `signal`, with what the bootstrap told it, as every other record. */
+export function signalRecord(current, signal, at, env = process.env) {
+  return {
+    startedAt: current.startedAt,
+    at,
+    outcome: 'failed',
+    stage: current.stage,
+    exit: EXIT.signal,
+    reason: `stopped by ${signal}`,
+    ...toldByBootstrap(env),
+  }
+}
+
+/**
+ * Ends the run on SIGTERM/SIGINT the same way the watchdog does: children killed,
+ * status written once (runJob may already have recorded the stop it caused), exit
+ * 143. Returns the promise main waits on, so main never exits with its own code
+ * under it, as in the bootstrap.
+ */
 function onSignal(signal, current) {
-  void (async () => {
+  if (current.stopping) return current.stopping
+  current.signal = signal
+  current.stopping = (async () => {
     await killAllGroups(2000)
     try {
-      writeStatus(feedPaths().status, {
-        startedAt: current.startedAt,
-        at: new Date().toISOString(),
-        outcome: 'failed',
-        stage: current.stage,
-        exit: EXIT.signal,
-        reason: `stopped by ${signal}`,
-      })
+      if (!current.recorded) writeStatus(feedPaths().status, signalRecord(current, signal, new Date().toISOString()))
     } finally {
       process.exit(EXIT.signal)
     }
   })()
+  return current.stopping
 }
 
 async function main() {
   const argv = process.argv.slice(2)
   const agent = argv.includes('--agent')
-  const current = { stage: 'start', startedAt: new Date().toISOString() }
+  const current = { stage: 'start', startedAt: new Date().toISOString(), signal: null, stopping: null, recorded: false }
   process.on('SIGTERM', () => onSignal('SIGTERM', current))
   process.on('SIGINT', () => onSignal('SIGINT', current))
   const record = await runJob({
+    watchdogMs: watchdogFrom(process.env),
     flags: {
       ifStale: agent || argv.includes('--if-stale'),
       follow: agent || argv.includes('--follow'),
@@ -403,11 +462,17 @@ async function main() {
     onStage: (stage) => {
       current.stage = stage
     },
+    stopped: () => current.signal,
+    onRecord: () => {
+      current.recorded = true
+    },
   })
+  // A stop ends the process from onSignal, after the stage groups are gone.
+  if (current.stopping) await current.stopping
   process.exit(record.exit)
 }
 
-if (import.meta.filename === process.argv[1]) {
+if (isMain(import.meta.url)) {
   main().catch((cause) => {
     console.error(`feed-job: ${cause instanceof Error ? cause.stack : String(cause)}`)
     process.exit(EXIT.failed)

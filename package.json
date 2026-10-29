@@ -11,7 +11,7 @@
   },
   "packageManager": "pnpm@11.10.0",
   "engines": {
-    "node": ">=22"
+    "node": "^22.18.0 || >=23.6.0"
   },
   "scripts": {
     "build": "node tools/build.mjs",
@@ -21,7 +21,7 @@
     "bench": "vitest bench --run",
     "test:e2e": "pnpm build && pnpm build:e2e && playwright test",
     "lint": "eslint .",
-    "ux:lint": "python3 docs/ux/lint.py",
+    "ux:lint": "node tools/python.mjs docs/ux/lint.py",
     "brand:lint": "node tools/brand-gate.mjs",
     "gates": "pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm ux:lint && pnpm brand:lint && pnpm i18n:sweep && pnpm package:check",
     "build:e2e": "node tools/build.mjs --with-test-hooks",
@@ -30,7 +30,7 @@
     "public:style": "node tools/public-style.mjs",
     "graph:check": "node tools/graph-check.mjs",
     "suffix:gap": "node tools/suffix-gap.mjs",
-    "prepare": "git config core.hooksPath .githooks || true",
+    "prepare": "git config core.hooksPath .githooks || exit 0",
     "package": "node tools/package.mjs",
     "package:check": "node tools/package.mjs --check",
     "screenshots": "pnpm build && node tools/screenshots.mjs",

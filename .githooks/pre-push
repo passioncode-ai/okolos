@@ -12,7 +12,7 @@
 set -e
 
 if [ -n "$OKOLOS_SKIP_GATES" ]; then
-    echo "pre-push: SKIPPED by OKOLOS_SKIP_GATES — lint, typecheck, unit and ux were not run."
+    echo "pre-push: SKIPPED by OKOLOS_SKIP_GATES: lint, typecheck, build, unit, ux, brand, i18n and package were not run."
     echo "pre-push: whatever is being pushed has not been checked by this machine."
     exit 0
 fi
@@ -79,7 +79,7 @@ run typecheck 'pnpm -s run typecheck'
 # source was green (B-36).
 run build     'pnpm -s run build'
 run unit      'pnpm -s run test'
-run ux        'python3 docs/ux/lint.py'
+run ux        'node tools/python.mjs docs/ux/lint.py'
 run brand     'node tools/brand-gate.mjs'
 run i18n      'node tools/i18n-sweep.mjs'
 # After the build, for the same reason the unit step is: it reads what `dist/`
@@ -89,6 +89,7 @@ run package   'node tools/package.mjs --check'
 
 if [ "$fail" -ne 0 ]; then
     echo
-    echo 'pre-push: refusing to push. Fix the above, or OKOLOS_SKIP_GATES=1 git push to override.'
+    echo 'pre-push: refusing to push. Fix the above, or OKOLOS_SKIP_GATES=1 git push to override'
+    echo '          (PowerShell: $env:OKOLOS_SKIP_GATES=1; git push; Remove-Item Env:OKOLOS_SKIP_GATES).'
     exit 1
 fi

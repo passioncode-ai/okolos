@@ -6,6 +6,8 @@ import path from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import { KNOWN_HASHES, routeFor } from '../../apps/extension/src/options/views.js'
+import { binInvocation } from '../bin.mjs'
+import { posixRelative } from '../tree.mjs'
 import { buildTooOld } from '../build-age.mjs'
 
 /**
@@ -48,8 +50,11 @@ const run = promisify(execFile)
 async function build(): Promise<void> {
   // tsc -b emits every package's dist; the extension bundles come from vite.
   try {
-    await run('pnpm', ['typecheck'], { cwd: root, maxBuffer: 64 * 1024 * 1024 })
-    await run('pnpm', ['build'], { cwd: root, maxBuffer: 64 * 1024 * 1024 })
+    // pnpm is pnpm.cmd on Windows, which Node spawns only through a shell (B-163, B-164).
+    for (const script of ['typecheck', 'build']) {
+      const pnpm = binInvocation('pnpm', [script])
+      await run(pnpm.command, pnpm.args, { cwd: root, shell: pnpm.shell, maxBuffer: 64 * 1024 * 1024 })
+    }
   } catch (cause) {
     // Caught rather than thrown: a throw in beforeAll marks these tests
     // *skipped*, and a gate that reports "skipped" when the thing it guards is
@@ -104,7 +109,8 @@ function offenders(files: string[], tokens: string[]): Array<{ file: string; tok
   for (const file of files) {
     const source = executable(readFileSync(file, 'utf8'))
     for (const token of tokens) {
-      if (source.includes(token)) hits.push({ file: path.relative(root, file), token })
+      // Repository spelling, `/`, so the names compare with TRANSPORT_SOURCE on Windows too.
+      if (source.includes(token)) hits.push({ file: posixRelative(root, file), token })
     }
   }
   return hits
@@ -155,7 +161,7 @@ describe('REQ-08 — exactly one module may reach the network', () => {
     // And it must still be there: an exemption for a file that no longer exists
     // silently becomes an exemption for nothing. `sources` holds absolute
     // paths, `offenders` reports repo-relative ones — compared like with like.
-    expect(sources.map((f) => path.relative(root, f))).toContain(PAGE_WATCH)
+    expect(sources.map((f) => posixRelative(root, f))).toContain(PAGE_WATCH)
   })
 
   it('leaves no stray network call in the shipped extension bundles', () => {

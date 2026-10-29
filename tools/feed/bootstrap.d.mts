@@ -1,0 +1,75 @@
+/** Types for `bootstrap.mjs` (see `bounded.d.mts` for why these are hand-written). */
+import type { BoundedOptions, BoundedResult } from './bounded.mjs'
+import type { FeedPaths } from './paths.mjs'
+import type { RunRecord, StatusRecord } from './status.mjs'
+
+type Tool = (command: string, args: string[], options: BoundedOptions) => Promise<BoundedResult>
+
+export const BOOTSTRAP_FILES: readonly string[]
+/** Each installed file's source, relative to tools/. */
+export const BOOTSTRAP_SOURCES: Readonly<Record<string, string>>
+export const EXIT: { ok: number; failed: number; lockHeld: number; watchdog: number; signal: number }
+export const RECOVERY_DEADLINES: { git: number; worktree: number; clone: number; install: number }
+export const RUN_DEADLINE_MS: number
+export const JOB_GRACE_MS: number
+export const JOB_TAIL_LINES: number
+
+/** The first line that reads as an error, else the last non-empty one. */
+export function reasonFrom(lines: readonly string[]): string
+
+export type CheckoutHealth =
+  | { readonly state: 'ok' }
+  | { readonly state: 'missing' | 'broken'; readonly reason: string }
+
+export function checkoutHealth(options: {
+  checkout: string
+  tool?: Tool
+  env?: Record<string, string | undefined>
+}): Promise<CheckoutHealth>
+
+export function recoverCheckout(options: {
+  checkout: string
+  sourceRepo?: string
+  origin?: string
+  tool?: Tool
+  env?: Record<string, string | undefined>
+}): Promise<{ how: string; commit: string }>
+
+export function signalRecord(
+  current: { stage: string; runId: string; startedAt: string; recovered: string | null },
+  signal: string,
+  at: string,
+  env?: Record<string, string | undefined>,
+): {
+  startedAt: string
+  at: string
+  outcome: 'failed'
+  stage: string
+  exit: number
+  reason: string
+  runId: string
+  recoveredCheckout: boolean
+  recovery?: string
+  installedOffMain?: string
+}
+
+/** The record of the bootstrap's own crash (stage bootstrap). */
+export function crashRecord(cause: unknown, at?: string, env?: Record<string, string | undefined>): RunRecord
+
+export function runAgent(options?: {
+  paths?: FeedPaths
+  env?: Record<string, string | undefined>
+  tool?: Tool
+  run?: Tool
+  node?: string
+  now?: () => number
+  log?: (line: string) => void
+  runId?: string
+  runDeadlineMs?: number
+  onStage?: (stage: string) => void
+  onRecovered?: (what: string) => void
+  /** The signal stopping the run, or null: a failure it causes is recorded as the stop. */
+  stopped?: () => string | null
+  relay?: (line: string) => void
+  [key: string]: unknown
+}): Promise<{ exit: number; record: StatusRecord | null }>

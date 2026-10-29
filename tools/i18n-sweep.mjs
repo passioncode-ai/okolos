@@ -47,7 +47,7 @@ import { readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 import { isComment, sentencesIn } from './i18n-pattern.mjs'
-import { filesUnder } from './tree.mjs'
+import { filesUnder, posixRelative } from './tree.mjs'
 
 /**
  * Copy that is known, counted and not yet moved — with an owner.
@@ -142,8 +142,9 @@ for (const base of ROOTS) {
     continue
   }
   for (const file of walk(dir)) {
-    const lines = readFileSync(file, 'utf8').split('\n')
-    const relative = path.relative(root, file)
+    const lines = readFileSync(file, 'utf8').split(/\r?\n/)
+    // The baseline names files with `/`; so does this, on Windows too (B-164).
+    const relative = posixRelative(root, file)
     /** Which marker lines were used by a hit, so the unused ones can be named. */
     const used = new Set()
 

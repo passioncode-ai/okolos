@@ -64,10 +64,17 @@ Full vector coverage: [docs/coverage-matrix.md](docs/coverage-matrix.md).
 GitHub release. Build it and load the unpacked extension:
 
 ```bash
-corepack enable && pnpm install     # Node and pnpm; also installs the pre-push hook
+corepack enable && pnpm install     # Node 22.18+ or 23.6 to 24; also installs the pre-push hook
 pnpm build                          # apps/extension/dist/chrome and apps/extension/dist/firefox
 pnpm package                        # the store zips, checked, in apps/extension/dist/release/
 ```
+
+Corepack ships with Node 22 to 24 only, on every OS, Windows included (where `corepack enable` usually
+needs an administrator shell when Node is under Program Files). On Node 25 and later,
+install pnpm as the [development runbook](docs/runbooks/development.md#windows) says (`npm i -g
+pnpm` or the pnpm.io installer; `packageManager` still pins the version). On Windows,
+`pnpm package` writes the zips with `tar.exe` from System32; no store has yet been sent a zip
+built on Windows, so build release archives on macOS or Linux.
 
 Chrome: `chrome://extensions` → Developer mode → **Load unpacked** →
 `apps/extension/dist/chrome`. Firefox: `about:debugging` → This Firefox → **Load Temporary

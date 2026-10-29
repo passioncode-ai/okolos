@@ -33,6 +33,7 @@ import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { isMain } from './is-main.mjs'
 
 /** The Native Messaging ceiling for one host → extension message (Chrome docs). */
 export const NATIVE_MESSAGE_LIMIT = 1024 * 1024
@@ -504,7 +505,8 @@ async function main() {
   process.stdout.write(json)
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Real paths: the `file://` + argv[1] comparison never held on Windows or through a link.
+if (isMain(import.meta.filename)) {
   main().catch((cause) => {
     process.stderr.write(`agent-window-spike: ${cause instanceof Error ? cause.stack : String(cause)}\n`)
     process.exit(1)

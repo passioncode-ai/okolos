@@ -4,6 +4,8 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { binInvocation } from './bin.mjs'
+
 /**
  * A script name pnpm owns is a command nobody can run.
  *
@@ -74,8 +76,12 @@ describe('every script can actually be run by name', () => {
      */
     let output = ''
     try {
-      output = execFileSync('pnpm', ['access'], {
+      // pnpm is pnpm.cmd on Windows: without a shell the spawn fails and prints nothing,
+      // which read as pnpm saying nothing about `access` (B-164).
+      const pnpm = binInvocation('pnpm', ['access'])
+      output = execFileSync(pnpm.command, pnpm.args, {
         cwd: root,
+        shell: pnpm.shell,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
       })

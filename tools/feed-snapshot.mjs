@@ -16,6 +16,7 @@ import path from 'node:path'
 
 import { FEED_PATH } from './feed-age.mjs'
 import { feedPaths } from './feed/paths.mjs'
+import { isMain } from './is-main.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
 
@@ -43,7 +44,7 @@ export function snapshot({ from = feedPaths().feed, to = path.join(root, FEED_PA
   return { copied: true, version: fresh }
 }
 
-if (import.meta.filename === process.argv[1]) {
+if (isMain(import.meta.filename)) {
   try {
     const { copied, version } = snapshot()
     console.log(copied ? `${FEED_PATH} is now v${version} — commit it` : `${FEED_PATH} is already v${version}; nothing to do`)

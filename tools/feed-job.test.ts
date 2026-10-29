@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { acquireLock } from './feed/lock.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { readStatus } from './feed/status.mjs'
-import { runJob, STALE_AFTER_MS, sweepLeftovers } from './feed-job.mjs'
+import { runJob, signalRecord, STALE_AFTER_MS, sweepLeftovers, WATCHDOG_MS, watchdogFrom } from './feed-job.mjs'
 
 /**
  * The feed agent's run: bounded, exclusive, observable (LC-03), pinned (F2), with
@@ -274,6 +274,105 @@ describe('a failure is retried inside the run, then recorded (F3)', () => {
       commit: 'a'.repeat(40),
       consecutiveFailures: 0,
     })
+  })
+})
+
+describe('the record carries what the bootstrap knows (B-159, B-150)', () => {
+  it('records that the checkout was recreated before this run, and the bootstrap’s run id', async () => {
+    const w = world()
+    await job(w, {}, { OKOLOS_RUN_ID: 'run-1', OKOLOS_RECOVERED_CHECKOUT: 'missing' }).promise
+    expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'published', runId: 'run-1', recoveredCheckout: true, recovery: 'missing' })
+  })
+
+  it('says so on a failed run too', async () => {
+    const w = world()
+    await job(w, {}, { OKOLOS_RUN_ID: 'run-2', OKOLOS_RECOVERED_CHECKOUT: 'missing', FAKE_PUBLISH: 'fail' }).promise
+    expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'failed', runId: 'run-2', recoveredCheckout: true })
+  })
+
+  it('carries an install made off origin/main into every record (--allow-branch)', async () => {
+    const w = world()
+    await job(w, {}, { OKOLOS_INSTALLED_OFF_MAIN: 'sw/x at bbbbbbb, origin/main aaaaaaa (--allow-branch, t)' }).promise
+    expect(readStatus(w.paths.status)).toMatchObject({ installedOffMain: 'sw/x at bbbbbbb, origin/main aaaaaaa (--allow-branch, t)' })
+  })
+
+  it('carries what the bootstrap told it into the record of a stop by signal, too', () => {
+    const env = { OKOLOS_RUN_ID: 'run-3', OKOLOS_RECOVERED_CHECKOUT: 'missing', OKOLOS_INSTALLED_OFF_MAIN: 'sw/x at b, origin/main a' }
+    expect(signalRecord({ stage: 'publish', startedAt: 's' }, 'SIGTERM', 'now', env)).toEqual({
+      startedAt: 's',
+      at: 'now',
+      outcome: 'failed',
+      stage: 'publish',
+      exit: 143,
+      reason: 'stopped by SIGTERM',
+      runId: 'run-3',
+      recoveredCheckout: true,
+      recovery: 'missing',
+      installedOffMain: 'sw/x at b, origin/main a',
+    })
+    expect(signalRecord({ stage: 'start', startedAt: 's' }, 'SIGINT', 'now', {})).toEqual({
+      startedAt: 's',
+      at: 'now',
+      outcome: 'failed',
+      stage: 'start',
+      exit: 143,
+      reason: 'stopped by SIGINT',
+      recoveredCheckout: false,
+    })
+  })
+
+  it('records false when nothing was recovered', async () => {
+    const w = world()
+    await job(w).promise
+    expect(readStatus(w.paths.status)).toMatchObject({ recoveredCheckout: false })
+    expect(readStatus(w.paths.status)?.recovery).toBeUndefined()
+  })
+})
+
+describe('a stop is recorded as the stop, as the bootstrap records it (B-159)', () => {
+  it('records a pin-stage child killed by SIGTERM as the stop: exit 143, once', async () => {
+    const w = world()
+    let signal: string | null = null
+    const base = fakeTool().tool
+    const record = await job(
+      w,
+      {
+        stopped: () => signal,
+        // git status, a pin-stage child without retries, is killed under the stop.
+        tool: async (command: string, args: string[]) => {
+          if (args.includes('status')) {
+            signal = 'SIGTERM'
+            return { code: null, signal: 'SIGTERM', stdout: '', stderr: '', timedOut: false }
+          }
+          return base(command, args)
+        },
+      },
+      { OKOLOS_RUN_ID: 'run-stop' },
+    ).promise
+    expect(record).toMatchObject({ outcome: 'failed', stage: 'pin', exit: 143, reason: 'stopped by SIGTERM', runId: 'run-stop' })
+    expect(readStatus(w.paths.status)).toMatchObject({ exit: 143, reason: 'stopped by SIGTERM', consecutiveFailures: 1 })
+    expect(calls(w.fake, 'ingest')).toEqual([])
+  })
+
+  it('records an ordinary failure as before when nothing is stopping it', async () => {
+    const w = world()
+    const record = await job(w, { stopped: () => null, tool: fakeTool({ head: 'b'.repeat(40) }).tool }).promise
+    expect(record).toMatchObject({ outcome: 'failed', stage: 'pin', exit: 1 })
+  })
+})
+
+describe('the watchdog the bootstrap hands down (one deadline per run)', () => {
+  it('is thirty minutes when nobody shortens it', () => {
+    expect(watchdogFrom({})).toBe(WATCHDOG_MS)
+  })
+
+  it('takes a shorter one from OKOLOS_WATCHDOG_MS, never a longer one', () => {
+    expect(watchdogFrom({ OKOLOS_WATCHDOG_MS: '600000' })).toBe(600_000)
+    expect(watchdogFrom({ OKOLOS_WATCHDOG_MS: String(WATCHDOG_MS * 2) })).toBe(WATCHDOG_MS)
+  })
+
+  it('ignores a value it cannot read', () => {
+    for (const value of ['', 'soon', '-5', '0']) expect(watchdogFrom({ OKOLOS_WATCHDOG_MS: value }), value).toBe(WATCHDOG_MS)
   })
 })
 
