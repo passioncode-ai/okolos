@@ -186,6 +186,18 @@ function jobs(yaml: string): Map<string, string> {
   return found
 }
 
+/**
+ * Lines that let a gates job pass while a gate fails or never runs: a condition, a
+ * `continue-on-error`, or a command whose failure is swallowed (round 2 of the N-105
+ * certification: each of these left the per-job check green).
+ */
+function softenersIn(job: string): string[] {
+  return job
+    .split('\n')
+    .filter((line) => /^\s+(?:- )?(?:if|continue-on-error):/.test(line) || /^\s+(?:- )?run: .*(?:\|\||;\s*exit|^\s*echo)/.test(line) || /^\s+(?:- )?run: echo\b/.test(line))
+    .map((line) => line.trim())
+}
+
 /** Which gate steps a job body does not run. */
 function gatesMissingFrom(job: string): string[] {
   const runs = commandsIn(job)
@@ -204,17 +216,28 @@ describe('each gates job runs the whole chain on its own system', () => {
       expect(job, `the workflow has no "${key}" job`).toBeDefined()
       expect(job).toMatch(new RegExp(`^\\s+runs-on: ${system}\\s*$`, 'm'))
       expect(gatesMissingFrom(job ?? ''), `the "${key}" job skips these gates`).toEqual([])
+      expect(softenersIn(job ?? ''), `the "${key}" job can pass with a gate failing`).toEqual([])
     })
   }
 
-  it('would notice a Windows job cut down, moved or removed', () => {
+  it('would notice a Windows job cut down, moved, softened or removed', () => {
     const windows = jobs(workflow).get('windows') ?? ''
-    expect(gatesMissingFrom(windows.replace('run: pnpm test\n', 'run: echo skipped\n'))).toEqual(['test'])
-    expect(windows.replace('runs-on: windows-latest', 'runs-on: ubuntu-latest')).not.toMatch(/^\s+runs-on: windows-latest\s*$/m)
-    const without = workflow.replace(windows, '')
-    expect(jobs(without).get('windows')).toBeUndefined()
+    /** A plant that no longer finds its anchor proves nothing: refuse it instead of passing. */
+    const plant = (from: string, to: string): string => {
+      expect(windows, `the plant's anchor "${from}" is gone from the Windows job`).toContain(from)
+      return windows.replace(from, to)
+    }
+    expect(gatesMissingFrom(plant('run: pnpm test\n', 'run: echo skipped\n'))).toEqual(['test'])
+    expect(plant('runs-on: windows-latest', 'runs-on: ubuntu-latest')).not.toMatch(/^\s+runs-on: windows-latest\s*$/m)
+    expect(jobs(workflow.replace(windows, '')).get('windows')).toBeUndefined()
     // A gate dropped from the Windows job and kept in the Linux one.
-    expect(gatesMissingFrom(windows.replace('run: pnpm i18n:sweep\n', ''))).toEqual(['i18n:sweep'])
+    expect(gatesMissingFrom(plant('run: pnpm i18n:sweep\n', ''))).toEqual(['i18n:sweep'])
+    // A gate that still runs but can no longer fail the job.
+    expect(softenersIn(plant('runs-on: windows-latest', 'runs-on: windows-latest\n    continue-on-error: true'))).not.toEqual([])
+    expect(softenersIn(plant('      - name: lint\n', '      - name: lint\n        if: false\n'))).not.toEqual([])
+    expect(softenersIn(plant('run: pnpm lint\n', 'run: pnpm lint || exit 0\n'))).not.toEqual([])
+    expect(softenersIn(plant('run: pnpm typecheck\n', 'run: pnpm typecheck; exit 0\n'))).not.toEqual([])
+    expect(softenersIn(plant('run: pnpm brand:lint\n', 'run: echo pnpm brand:lint\n'))).not.toEqual([])
   })
 })
 
