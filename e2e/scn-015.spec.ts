@@ -260,6 +260,10 @@ test('a saved key is asked with, sent only in its header, never shown back, and 
   expect(await page.content(), 'the key is back on the page after saving').not.toContain(FAKE_KEY)
 
   await page.goto(`chrome-extension://${extensionId}/options.html#leaks`)
+  // Before anything is sent, both recipients are named, and the key is said to go along.
+  const idle = page.locator('[data-role=leaks] [data-role=idle]')
+  await expect(idle).toContainText('Hudson Rock Cavalier and Have I Been Pwned')
+  await expect(idle).toContainText('your key goes to Have I Been Pwned in the request header')
   await fillAddress(page, 'someone@example.test')
   await page.locator('[data-role=leaks] [data-role=check]').click()
 
@@ -272,12 +276,18 @@ test('a saved key is asked with, sent only in its header, never shown back, and 
   await expect(coverage).toHaveText(/^Checked against .*Hudson Rock Cavalier/)
   await expect(coverage).not.toContainText('Not checked')
   await expect(page.locator('[data-role=leaks] [data-role=leak][data-leak=ExampleBreach]')).toHaveCount(1)
+  // CC BY 4.0 asks for the credit wherever the data appears, and here it does.
+  const attribution = page.locator('[data-role=leaks] [data-role=attribution]')
+  await expect(attribution).toContainText('Have I Been Pwned')
+  await expect(attribution).toContainText('CC BY 4.0')
   await expect(page.locator('[data-role=leaks] [data-role=source-key]')).toHaveCount(0)
   expect(hibpKeys, 'the key travels in the header the API asks for').toEqual([FAKE_KEY])
 
   // The outbound log names the request and keeps the key out of every field it shows.
   await page.goto(`chrome-extension://${extensionId}/options.html#audit`)
   await expect(page.locator('body')).toContainText('haveibeenpwned.com')
+  // Its "what left" line says the key left, by the header's name and never its value.
+  await expect(page.locator('[data-role=entry-payload]').filter({ hasText: 'header:hibp-api-key' })).toHaveCount(1)
   expect(await page.content()).not.toContain(FAKE_KEY)
 
   await page.goto(`chrome-extension://${extensionId}/options.html#data`)
@@ -315,16 +325,33 @@ test('a key the source refuses is named as refused, with the way to replace it',
   expect(await page.content()).not.toContain(FAKE_KEY)
 })
 
-test('the credit for the data is on the page that shows it', async ({ context, extensionId }) => {
-  // CC BY 4.0 asks for attribution wherever the data appears. This is where it
-  // appears; a README is not.
+test('with no key saved, the screen names only the source it will ask, and credits nobody', async ({
+  context,
+  extensionId,
+}) => {
+  test.slow()
+  // B-125 round 2. The idle sentence said "the sources named below", and the only one below
+  // was the credit line naming Have I Been Pwned: the source that is not asked without a key.
   const page = await context.newPage()
   watchNavigation(page)
   await page.goto(`chrome-extension://${extensionId}/options.html#leaks`)
 
+  const idle = page.locator('[data-role=leaks] [data-role=idle]')
+  await expect(idle).toContainText('sends your address to Hudson Rock Cavalier')
+  await expect(idle).toContainText('Have I Been Pwned is not asked until you save a key')
   const attribution = page.locator('[data-role=leaks] [data-role=attribution]')
-  await expect(attribution).toContainText('Have I Been Pwned')
-  await expect(attribution).toContainText('CC BY 4.0')
+  await expect(attribution).toHaveCount(0)
+
+  await fillAddress(page, 'someone@example.test')
+  await page.locator('[data-role=leaks] [data-role=check]').click()
+  await expectWithDiagnosis(
+    page,
+    expect(page.locator('[data-role=leaks] [data-role=coverage]')).toBeVisible({
+      timeout: RECORD_VISIBLE_MS,
+    }),
+  )
+  // Have I Been Pwned gave nothing to this screen, so it is not credited on it.
+  await expect(attribution).toHaveCount(0)
 })
 
 test('a recent infection is separated from an old breach, and each carries its repair', async ({

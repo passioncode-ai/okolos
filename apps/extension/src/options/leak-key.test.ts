@@ -73,3 +73,18 @@ describe('the Have I Been Pwned key, as the settings screen stores it (B-125)', 
     await removeLeakKey(db)
   })
 })
+
+describe('erasing everything says the saved key goes too (B-125 round 2)', () => {
+  it('names the key in the confirmation, in every language', async () => {
+    const { DATA_KIND_KEY } = await import('@okolos/storage')
+    for (const locale of ['ru', 'en']) {
+      const catalogue = JSON.parse(
+        readFileSync(
+          path.resolve(import.meta.dirname, `../../_locales/${locale}/messages.json`),
+          'utf8',
+        ),
+      ) as Record<string, { message: string }>
+      expect(catalogue[DATA_KIND_KEY.settings]?.message, locale).toContain('Have I Been Pwned')
+    }
+  })
+})

@@ -1,5 +1,6 @@
 import { t } from '@okolos/i18n'
 import {
+  HIBP_SOURCE,
   mergeLeaks,
   type KeyRemedy,
   type Leak,
@@ -48,9 +49,10 @@ export interface LeakSource {
  */
 class KeyRefused extends Error {}
 
-/** The two remedies, named once. */
+/** The key remedies, named once. */
 const KEY_MISSING: KeyRemedy = 'missing'
 const KEY_REFUSED: KeyRemedy = 'refused'
+const KEY_UNREADABLE: KeyRemedy = 'unreadable'
 
 export const CAVALIER: LeakSource = {
   name: 'Hudson Rock Cavalier',
@@ -91,7 +93,7 @@ export const CAVALIER: LeakSource = {
  * choke point writes carries no headers, and nothing here logs it.
  */
 export function hibp(apiKey: string | null): LeakSource {
-  const name = 'Have I Been Pwned'
+  const name = HIBP_SOURCE
   return {
     name,
     // Not caught by the sweep — a capital letter inside the run defeats its anchor, the
@@ -105,7 +107,9 @@ export function hibp(apiKey: string | null): LeakSource {
           url: `https://haveibeenpwned.com/api/v3/breachedaccount/${encodeURIComponent(address)}?truncateResponse=false`,
           method: 'GET',
           purpose: 'leak-lookup',
-          payloadShape: `email:${redact(address)}`,
+          // The header is named, never its value: the self-audit's "what left" line has to say a
+          // key left, and this log is exportable (B-125 round 2).
+          payloadShape: `email:${redact(address)}, header:hibp-api-key`,
           triggeredBy: 'user:leak-check',
           headers: { 'hibp-api-key': apiKey ?? '' },
           // The address is a path segment here, which the guard did not
@@ -136,6 +140,28 @@ export function hibp(apiKey: string | null): LeakSource {
       }))
     },
   }
+}
+
+/**
+ * The breached-account source, built from whatever the store says about the saved key.
+ *
+ * Three answers, and the third is why this exists: a key, no key, or a store that could not
+ * be read. The last used to read as "no key saved", so a storage failure told the person to
+ * add a key they may already have, and linked to a field that is not drawn when storage
+ * fails. It is still not asked, and the reason says what actually happened.
+ */
+export async function hibpFromStore(read: () => Promise<unknown>): Promise<LeakSource> {
+  let stored: unknown
+  try {
+    stored = await read()
+  } catch {
+    return {
+      ...hibp(null),
+      unavailable: t('leakSourceKeyUnreadable', HIBP_SOURCE),
+      needsKey: KEY_UNREADABLE,
+    }
+  }
+  return hibp(typeof stored === 'string' && stored !== '' ? stored : null)
 }
 
 export async function lookupLeaks(

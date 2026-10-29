@@ -33,12 +33,18 @@ export interface LeakKeyPanel {
  * Why a pasted key is refused before it is stored, or null when it may be.
  *
  * Deliberately loose: the provider's key format is theirs to change, so this refuses only
- * what can never be a header value, an empty field and a space or control character inside
- * one, which is what a careless paste brings with it.
+ * what can never be a header value: an empty field, a space or control character inside one
+ * (what a careless paste brings), and a character outside printable ASCII (what retyping in
+ * another keyboard layout brings). The last two are told apart because the remedy differs:
+ * a person told to look for a space will not find a Cyrillic letter.
  */
-export function leakKeyProblem(key: string): 'empty' | 'shape' | null {
+export function leakKeyProblem(key: string): 'empty' | 'shape' | 'latin' | null {
   if (key === '') return 'empty'
-  return /^[\x21-\x7e]+$/.test(key) ? null : 'shape'
+  // A space, a control character or any other blank: code points up to U+0020, DEL, and \s.
+  if (/\s/.test(key) || [...key].some((ch) => ch.charCodeAt(0) <= 0x20 || ch.charCodeAt(0) === 0x7f)) {
+    return 'shape'
+  }
+  return /^[\x21-\x7e]+$/.test(key) ? null : 'latin'
 }
 
 export interface DataControlsHandlers {
@@ -269,7 +275,15 @@ function renderLeakKey(doc: Document, panel: LeakKeyPanel): HTMLElement {
     block.querySelector('[data-role=leak-key-needs]')?.remove()
     if (problem !== null) {
       actions.before(
-        text(doc, 'leak-key-needs', problem === 'empty' ? t('leakKeyEmpty') : t('leakKeyShape')),
+        text(
+          doc,
+          'leak-key-needs',
+          problem === 'empty'
+            ? t('leakKeyEmpty')
+            : problem === 'shape'
+              ? t('leakKeyShape')
+              : t('leakKeyLatin'),
+        ),
       )
       return
     }

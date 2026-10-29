@@ -121,7 +121,13 @@ const addressField = (() => {
   return field
 })()
 
-function leaksSection(): HTMLElement {
+async function leaksSection(): Promise<HTMLElement> {
+  // Which recipients the idle sentence names depends on whether a key is saved; `null` when
+  // that cannot be read, so the sentence names Have I Been Pwned conditionally rather than
+  // guessing (B-125 round 2).
+  const keySaved = await openDb()
+    .then((db) => hasLeakKey(db))
+    .catch(() => null)
   const container = document.createElement('div')
   // Named so the stylesheet can treat the field and the panel as one block.
   // Without it the address input floats between two cards, which is what the
@@ -134,7 +140,7 @@ function leaksSection(): HTMLElement {
   // moving the live input into a tree that has not been swapped in yet takes it
   // out of the document for as long as the remaining sections take to load.
   container.append(
-    renderLeaks(document, leaks, {
+    renderLeaks(document, leaks.kind === 'idle' ? { ...leaks, keySaved } : leaks, {
       onCheck: () => {
         void (async () => {
           // Silence was the old answer here, and it is the worst one: the

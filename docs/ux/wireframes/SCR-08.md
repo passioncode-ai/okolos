@@ -35,8 +35,13 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 
 - **loading** — check running
 - **empty** — no sources monitored
+- **idle, by key state** — before a check
+- **key unreadable** — a check ran and the saved key could not be read
+- **refused** — Check now pressed with no usable address
 - **error** — a source failed
 - **success** — results present
+- **no key** — a check ran with no Have I Been Pwned key saved
+- **key refused** — Have I Been Pwned answered 401 to the saved key
 
 **Source of truth:** `packages/ui/src/leaks/leaks.ts`. This file is derived from it; if the two
 disagree, the renderer is right and this file is stale.

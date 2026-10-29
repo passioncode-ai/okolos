@@ -201,3 +201,18 @@ describe('the extractor knows about every shape the sources use', () => {
     ).toEqual([])
   })
 })
+
+describe('a wireframe lists every state its screen record declares', () => {
+  it('carries states beyond the four generic ones', async () => {
+    // It read only rows named loading, empty, error or success, so the key states of
+    // SCR-08 and SCR-12 (B-125) were in the record and missing from the wireframe the
+    // record is drawn into.
+    const { statesOf } = await import('./wireframes.mjs')
+    const names = (id: string) => statesOf(id).map((entry: { state: string }) => entry.state)
+    expect(names('SCR-08')).toEqual(expect.arrayContaining(['loading', 'success', 'key unreadable', 'idle, by key state']))
+    expect(names('SCR-12')).toEqual(expect.arrayContaining(['no key', 'key saved', 'refused', 'success']))
+    for (const id of ['SCR-08', 'SCR-12']) {
+      expect(names(id), 'the header row is not a state').not.toContain('State')
+    }
+  })
+})

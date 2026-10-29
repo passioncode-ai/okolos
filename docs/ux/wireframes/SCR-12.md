@@ -35,6 +35,9 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 
 - **success** — default
 - **error** — export or wipe failed
+- **no key** — no Have I Been Pwned key saved, the state every install starts in
+- **key saved** — a key is stored
+- **refused** — "Сохранить ключ" pressed with an empty field, a key holding a space or a non-printing character, or one holding a letter outside the Latin alphabet
 - **error** — saving or removing the key failed
 
 **Source of truth:** `packages/ui/src/settings/data-controls.ts`. This file is derived from it; if the two

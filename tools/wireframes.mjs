@@ -133,9 +133,28 @@ function argumentAt(text, from, index) {
 export function statesOf(id) {
   const screens = readFileSync(path.join(root, 'docs/ux/screens.md'), 'utf8')
   const block = screens.split(new RegExp(`^### ${id}:`, 'm'))[1]?.split(/^### SCR-/m)[0] ?? ''
-  return [...block.matchAll(/^\s*\|\s*(loading|empty|error|success)\s*\|\s*([^|]+)\|/gim)].map(
-    (match) => ({ state: match[1].trim(), trigger: match[2].trim() }),
-  )
+  /**
+   * Every row of the record's state table, not only the four generic names. It matched
+   * `loading|empty|error|success`, so a screen whose states are its own (SCR-12's "key
+   * saved", SCR-08's "key unreadable", B-125) had them in the record and not here.
+   */
+  const states = []
+  let inTable = false
+  for (const line of block.split('\n')) {
+    if (/^\s*\|\s*State\s*\|/i.test(line)) {
+      inTable = true
+      continue
+    }
+    if (!inTable) continue
+    if (!/^\s*\|/.test(line)) {
+      inTable = false
+      continue
+    }
+    const cells = line.split('|').slice(1, -1).map((cell) => cell.trim())
+    if (cells.length < 2 || /^-+$/.test(cells[0] ?? '')) continue
+    states.push({ state: cells[0], trigger: cells[1] })
+  }
+  return states
 }
 
 export function purposeOf(id) {

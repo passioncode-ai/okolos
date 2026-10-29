@@ -55,6 +55,13 @@ describe('what the number counts', () => {
     expect(inventory.sources[2]).not.toHaveProperty('needsKey')
   })
 
+  it('keeps an unreadable key apart from a missing one', () => {
+    const inventory = mergeLeaks([
+      { name: 'Have I Been Pwned', answered: false, why: 'unreadable', needsKey: 'unreadable' },
+    ])
+    expect(inventory.sources[0]?.needsKey).toBe('unreadable')
+  })
+
   it('does not pretend an empty result is a complete one when nothing answered', () => {
     const inventory = mergeLeaks([silent('HIBP', 'offline'), silent('Cavalier', 'offline')])
     expect(inventory.leaks).toEqual([])

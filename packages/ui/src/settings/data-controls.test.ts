@@ -474,6 +474,21 @@ describe('the Have I Been Pwned key', () => {
     expect(field(el).value).toBe('abc def')
   })
 
+  it('names a letter outside the Latin layout as what it is, not as a space', () => {
+    // A key retyped in the Russian layout carries a Cyrillic letter; telling that person
+    // to look for a space sends them hunting for something that is not there.
+    const panel = keyPanel(false)
+    const el = mountKey(panel)
+    field(el).value = 'abcdеf0123' // the "е" is Cyrillic
+    role(el, 'leak-key-save')?.click()
+
+    expect(panel.onSave).not.toHaveBeenCalled()
+    expect(role(el, 'leak-key-needs')?.textContent).toBe(message('leakKeyLatin'))
+    field(el).value = 'abc\tdef'
+    role(el, 'leak-key-save')?.click()
+    expect(role(el, 'leak-key-needs')?.textContent).toBe(message('leakKeyShape'))
+  })
+
   it('clears an earlier refusal once a key is accepted', () => {
     const el = mountKey(keyPanel(false))
     role(el, 'leak-key-save')?.click()

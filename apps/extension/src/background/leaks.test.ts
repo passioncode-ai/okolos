@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AuditEntry } from '@okolos/contracts'
 
-import { CAVALIER, hibp, lookupLeaks, type LeakSource } from './leaks.js'
+import { CAVALIER, hibp, hibpFromStore, lookupLeaks, type LeakSource } from './leaks.js'
 
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -177,6 +177,8 @@ describe('a source that needs the person\'s key', () => {
     expect(spec?.url).not.toContain(FAKE_KEY)
     // The outbound log is exportable and shown on a screen: the key is in no field of it.
     expect(JSON.stringify(audit)).not.toContain(FAKE_KEY)
+    // But its "what left" line says a key left, by the header's name (B-125 round 2).
+    expect(audit[0]?.payloadShape).toBe('email:a***@b.test, header:hibp-api-key')
   })
 
   it('says the key was refused, and marks it as the key\'s fault, on a 401', async () => {
@@ -201,5 +203,39 @@ describe('a source that needs the person\'s key', () => {
     expect(inventory.sources[0]?.why).toContain('429')
     expect(inventory.sources[0]?.why).toContain('Have I Been Pwned')
     expect(inventory.sources[0]).not.toHaveProperty('needsKey')
+  })
+})
+
+/**
+ * B-125 round 2: "no key saved" and "the store could not be read" were one answer, so a
+ * storage failure told the person to add a key they may already have.
+ */
+describe('reading the saved key', () => {
+  it('uses the key that is there', async () => {
+    const source = await hibpFromStore(async () => FAKE_KEY)
+    expect(source.unavailable).toBeNull()
+  })
+
+  it('says no key is saved when none is, and points at the field', async () => {
+    for (const stored of [null, '', 42]) {
+      const source = await hibpFromStore(async () => stored)
+      expect(source.needsKey).toBe('missing')
+    }
+  })
+
+  it('says the key could not be read when the store failed, and offers no field', async () => {
+    const source = await hibpFromStore(async () => {
+      throw new Error('IDBDatabase closed')
+    })
+    expect(source.unavailable).toBe(
+      message('leakSourceKeyUnreadable').replace('$NAME$', 'Have I Been Pwned'),
+    )
+    expect(source.needsKey).toBe('unreadable')
+
+    const transport = vi.fn()
+    const { deps: d } = deps(transport as unknown as () => Promise<Response>)
+    const inventory = await lookupLeaks('a@b.test', [source], d)
+    expect(transport, 'a source with no key it can read must not be asked').not.toHaveBeenCalled()
+    expect(inventory.sources[0]).toMatchObject({ answered: false, needsKey: 'unreadable' })
   })
 })

@@ -1,6 +1,6 @@
 /** @vitest-environment happy-dom */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mergeLeaks } from '@okolos/core-leaks'
+import { HIBP_SOURCE, mergeLeaks } from '@okolos/core-leaks'
 
 import { renderLeaks, type LeaksHandlers, type LeaksState } from './leaks.js'
 
@@ -92,6 +92,29 @@ describe('before and during', () => {
     expect(idle, 'while keeping the password check distinct').toMatch(/по префиксу хеша/i)
   })
 
+  /**
+   * B-125 round 2: "to the sources named below" named only the credit line, which named
+   * Have I Been Pwned, so the source that always receives the address was never named and,
+   * with no key saved, the one source named was the one not asked.
+   */
+  it('names every recipient for the key state, and no other', () => {
+    const msg = (key: string): string => (CATALOGUE[key] as { message: string }).message
+    const idleFor = (keySaved: boolean | null): string => {
+      document.body.innerHTML = ''
+      return role(render({ kind: 'idle', keySaved }), 'idle')?.textContent ?? ''
+    }
+
+    expect(idleFor(false)).toBe(msg('leaksIdleNoKey'))
+    expect(idleFor(true)).toBe(msg('leaksIdleWithKey'))
+    expect(idleFor(null)).toBe(msg('leaksIdle'))
+    for (const keySaved of [false, true, null]) {
+      expect(idleFor(keySaved), 'Cavalier always receives the address').toContain('Hudson Rock Cavalier')
+      expect(idleFor(keySaved)).toContain(HIBP_SOURCE)
+    }
+    expect(msg('leaksIdleNoKey')).toMatch(/не спрашивается/)
+    expect(msg('leaksIdleWithKey')).toMatch(/в заголовке запроса/)
+  })
+
   it('says it is working rather than showing an empty list', () => {
     const el = render({ kind: 'checking' })
     expect(role(el, 'status')).not.toBeNull()
@@ -111,22 +134,39 @@ describe('the credit the data carries with it', () => {
   it('names Have I Been Pwned and CC BY 4.0 on the screen that shows its data', () => {
     // The licence requires attribution wherever the data appears. A README a
     // user never opens is not where it appears.
-    const inventory = mergeLeaks([{ name: 'HIBP', answered: true, leaks: [LEAK] }])
+    const inventory = mergeLeaks([{ name: HIBP_SOURCE, answered: true, leaks: [LEAK] }])
     const el = render({ kind: 'ready', inventory, now: NOW })
     expect(role(el, 'attribution')?.textContent).toContain('Have I Been Pwned')
     expect(role(el, 'attribution')?.textContent).toContain('CC BY 4.0')
   })
 
-  it('carries it in every state, including the one that found nothing', () => {
+  it('carries it when Have I Been Pwned answered, including with nothing found', () => {
     // "Nothing found" is still a result computed from someone else's work.
+    const inventory = mergeLeaks([{ name: HIBP_SOURCE, answered: true, leaks: [] }])
+    expect(role(render({ kind: 'ready', inventory, now: NOW }), 'attribution')).not.toBeNull()
+  })
+
+  it('draws no credit for data Have I Been Pwned did not give', () => {
+    /**
+     * Drawn in every state until B-125 round 2. Before a check it was the only source the
+     * screen named, and after a check without a key it credited a source the coverage line
+     * had just called not checked.
+     */
     for (const state of [
       { kind: 'idle' } as const,
       { kind: 'checking' } as const,
       { kind: 'error', message: 'offline' } as const,
-      { kind: 'ready', inventory: mergeLeaks([{ name: 'HIBP', answered: true, leaks: [] }]), now: NOW } as const,
+      {
+        kind: 'ready',
+        inventory: mergeLeaks([
+          { name: 'Hudson Rock Cavalier', answered: true, leaks: [] },
+          { name: HIBP_SOURCE, answered: false, why: 'x', needsKey: 'missing' },
+        ]),
+        now: NOW,
+      } as const,
     ]) {
       document.body.innerHTML = ''
-      expect(role(render(state), 'attribution')).not.toBeNull()
+      expect(role(render(state), 'attribution'), state.kind).toBeNull()
     }
   })
 })
@@ -293,6 +333,17 @@ describe('the key line under the coverage line', () => {
     ])
     const el = render({ kind: 'ready', inventory, now: NOW }, handlers({ keyHref: KEY_HREF }))
     expect(el.querySelector('[data-role=add-key]')?.textContent).toBe(message('leakKeyReplace'))
+  })
+
+  it('says a key that could not be read was not read, and offers no link', () => {
+    // "No key is saved" with "Add key" would be a false statement about a key that may be
+    // there, and the field it links to is not drawn when storage cannot be read.
+    const inventory = mergeLeaks([
+      { name: HIBP_SOURCE, answered: false, why: 'ключ не удалось прочитать', needsKey: 'unreadable' },
+    ])
+    const el = render({ kind: 'ready', inventory, now: NOW }, handlers({ keyHref: KEY_HREF }))
+    expect(role(el, 'source-key')?.textContent).toBe('ключ не удалось прочитать')
+    expect(el.querySelector('[data-role=add-key]')).toBeNull()
   })
 
   it('stays away when the reason is not a key', () => {

@@ -31,7 +31,7 @@ import {
   journalChanges,
   type InventoryDeps,
 } from './extensions.js'
-import { CAVALIER, hibp, lookupLeaks } from './leaks.js'
+import { CAVALIER, hibpFromStore, lookupLeaks } from './leaks.js'
 import { checkSubmittedPassword } from './password.js'
 import { ensureRules, runIfDue, WAKE_ALARMS, type DueStore } from './wake.js'
 
@@ -711,12 +711,10 @@ async function answerPendingVerdict(
 }
 
 async function handleLeakCheck(payload: { address: string }) {
-  const key = await readSetting('hibp:apiKey')
-  const inventory = await lookupLeaks(
-    payload.address,
-    [hibp(typeof key === 'string' && key ? key : null), CAVALIER],
-    await auditDeps(),
-  )
+  // The read is handed over rather than awaited here, so a failed read stays a failed read
+  // and does not become "no key saved" (B-125 round 2).
+  const breaches = await hibpFromStore(() => readSetting('hibp:apiKey'))
+  const inventory = await lookupLeaks(payload.address, [breaches, CAVALIER], await auditDeps())
   return {
     leaks: inventory.leaks.map((leak) => ({ ...leak, classes: [...leak.classes] })),
     sources: inventory.sources.map((source) => ({ ...source })),
@@ -724,13 +722,13 @@ async function handleLeakCheck(payload: { address: string }) {
   }
 }
 
+/**
+ * A stored setting, or null when there is none. A store that cannot be read throws: it
+ * used to answer null, which made "could not read" and "not set" one answer.
+ */
 async function readSetting(key: string): Promise<unknown> {
-  try {
-    const db = await openDb()
-    return (await db.get('settings', key))?.value ?? null
-  } catch {
-    return null
-  }
+  const db = await openDb()
+  return (await db.get('settings', key))?.value ?? null
 }
 
 async function extensionsState() {

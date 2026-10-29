@@ -29,11 +29,19 @@ export interface Leak {
 }
 
 /**
- * Why a source was not checked, when the remedy is the person's own key: none is saved,
- * or the source refused the one that is. Absent for every other reason, whose remedy is
- * waiting rather than a setting (B-125).
+ * Why a source was not checked, when the reason is the person's own key: none is saved,
+ * the source refused the one that is, or the one that is could not be read from the
+ * device. Absent for every other reason, whose remedy is waiting rather than the key
+ * (B-125). Only `missing` and `refused` have the key field as their remedy.
  */
-export type KeyRemedy = 'missing' | 'refused'
+export type KeyRemedy = 'missing' | 'refused' | 'unreadable'
+
+/**
+ * The breached-account source's name, as it calls itself. One constant because the screen
+ * credits this source's data only when this source answered, and a second spelling would
+ * make the credit vanish without a test noticing.
+ */
+export const HIBP_SOURCE = 'Have I Been Pwned'
 
 export type SourceStatus =
   | { readonly name: string; readonly answered: true; readonly leaks: readonly Leak[] }

@@ -475,7 +475,7 @@
     "message": "the password-reuse index"
   },
   "dataKindSettings": {
-    "message": "settings"
+    "message": "settings, including a saved Have I Been Pwned key"
   },
   "dataKindSnapshots": {
     "message": "snapshots of your installed extensions"
@@ -594,12 +594,24 @@
     }
   },
   "exportWithheldNote": {
-    "message": "Withheld from this file: $WHAT$. A key that makes the rest of this file readable is not a fact about you — exported beside the data it protects it would let whoever holds this file recover what the data is for. Model weights are named by size rather than included: they are a download, not something the product learned about you.",
+    "message": "Withheld from this file: $WHAT$.",
     "placeholders": {
       "what": {
         "content": "$1"
       }
     }
+  },
+  "exportWithheldOwnKey": {
+    "message": "your own Have I Been Pwned key, which stays on this device"
+  },
+  "exportWhyReuseKey": {
+    "message": "A key that makes the rest of this file readable is not a fact about you: exported beside the data it protects, it would let whoever holds this file recover what the data is for."
+  },
+  "exportWhyOwnKey": {
+    "message": "Your Have I Been Pwned key is yours: a file you hand to someone does not carry it."
+  },
+  "exportWhyBytes": {
+    "message": "Model weights are named by size rather than included: they are a download, not something the product learned about you."
   },
   "exportWithheldSecret": {
     "message": "this value is what makes the rest reversible"
@@ -1277,6 +1289,9 @@
   "leakKeyField": {
     "message": "Paste the key"
   },
+  "leakKeyLatin": {
+    "message": "The key has a character outside the Latin keyboard layout, such as a Cyrillic letter, so nothing was saved."
+  },
   "leakKeySave": {
     "message": "Save key"
   },
@@ -1297,6 +1312,14 @@
   },
   "leakSourceKeyRefused": {
     "message": "$NAME$ refused the saved key.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "leakSourceKeyUnreadable": {
+    "message": "$NAME$ was not checked: the saved key could not be read on this device.",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -1410,7 +1433,13 @@
     "message": "A service you used was breached. Change the password there, and anywhere you reused it."
   },
   "leaksIdle": {
-    "message": "Nothing has been looked up yet. Checking sends your address to the sources named below — they answer to nothing less. Your passwords are never sent: that check uses a partial hash and is separate."
+    "message": "Nothing has been looked up yet. Checking sends your address to Hudson Rock Cavalier and, if a key is saved, to Have I Been Pwned with the key in the request header. These sources answer to nothing less. Your passwords are never sent: that check uses a partial hash and is separate."
+  },
+  "leaksIdleNoKey": {
+    "message": "Nothing has been looked up yet. Checking sends your address to Hudson Rock Cavalier, which answers to nothing less. Have I Been Pwned is not asked until you save a key. Your passwords are never sent: that check uses a partial hash and is separate."
+  },
+  "leaksIdleWithKey": {
+    "message": "Nothing has been looked up yet. Checking sends your address to Hudson Rock Cavalier and Have I Been Pwned, which answer to nothing less, and your key goes to Have I Been Pwned in the request header. Your passwords are never sent: that check uses a partial hash and is separate."
   },
   "leaksMarkResolved": {
     "message": "Mark resolved"
@@ -1942,7 +1971,7 @@
     "message": "Clear the local data"
   },
   "storageResetNote": {
-    "message": "Clearing removes everything Okolos kept on this device: findings, the journal, the network audit, exceptions, settings, extension snapshots, the model, the feeds and the password-reuse index. It cannot be undone."
+    "message": "Clearing removes everything Okolos kept on this device: findings, the journal, the network audit, exceptions, settings with a saved Have I Been Pwned key, extension snapshots, the model, the feeds and the password-reuse index. It cannot be undone."
   },
   "storageRetry": {
     "message": "Try again"
@@ -2326,7 +2355,7 @@
     "message": "The first five characters of the password’s SHA-1 hash. The password itself and its full hash are never sent and are not kept here."
   },
   "auditKeptLeakLookup": {
-    "message": "The email address you asked us to check. This log shortens it to its first letter — the whole address is not kept here."
+    "message": "The email address you asked us to check and, in a request to Have I Been Pwned, your key in the request header. This log shortens the address to its first letter and does not keep the key at all."
   },
   "auditKeptFileHash": {
     "message": "The file’s hash. Not its name, not its contents."

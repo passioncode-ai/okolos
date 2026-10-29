@@ -1,6 +1,6 @@
 import { t } from '@okolos/i18n'
 
-import { groupLeaks, type Leak, type LeakInventory } from '@okolos/core-leaks'
+import { groupLeaks, HIBP_SOURCE, type Leak, type LeakInventory } from '@okolos/core-leaks'
 
 /**
  * SCR-08 — what is known to have leaked, and what was not checked.
@@ -30,8 +30,12 @@ import { groupLeaks, type Leak, type LeakInventory } from '@okolos/core-leaks'
 export const hibpAttribution = (): string => t('leaksAttribution')
 
 export type LeaksState =
-  /** `needs` carries a refusal to state, so pressing the button is never silent. */
-  | { readonly kind: 'idle'; readonly needs?: string }
+  /**
+   * `needs` carries a refusal to state, so pressing the button is never silent.
+   * `keySaved` decides which recipients the sentence names: the page reads it, and `null`
+   * (or absent) means it could not, so the sentence names Have I Been Pwned conditionally.
+   */
+  | { readonly kind: 'idle'; readonly needs?: string; readonly keySaved?: boolean | null }
   | { readonly kind: 'checking' }
   | { readonly kind: 'ready'; readonly inventory: LeakInventory; readonly now: string }
   | { readonly kind: 'error'; readonly message: string }
@@ -64,10 +68,19 @@ export function renderLeaks(doc: Document, state: LeaksState, handlers: LeaksHan
       // to a full address, and both receive one. The sentence a user reads
       // before choosing must be the one that is true — the hashed check is the
       // password one, and conflating the two was the whole error.
+      //
+      // Every recipient is named, for the key state the page read (B-125 round 2). It said
+      // "the sources named below" and the only one below was the credit line, so Hudson Rock
+      // Cavalier, which always receives the address, was never named, and with no key the
+      // one source named was the one not asked.
       text(
         doc,
         'idle',
-        t('leaksIdle'),
+        state.keySaved === true
+          ? t('leaksIdleWithKey')
+          : state.keySaved === false
+            ? t('leaksIdleNoKey')
+            : t('leaksIdle'),
       ),
       // A button that does nothing is worse than one that refuses. Pressing
       // "Check now" without a usable address used to return in silence, which
@@ -88,13 +101,12 @@ export function renderLeaks(doc: Document, state: LeaksState, handlers: LeaksHan
       // reads it.
       addressSlot(doc),
       button(doc, 'check', t('leaksCheck'), handlers.onCheck, true),
-      attribution(doc),
     )
     return root
   }
 
   if (state.kind === 'checking') {
-    root.append(text(doc, 'status', t('leaksChecking')), addressSlot(doc), attribution(doc))
+    root.append(text(doc, 'status', t('leaksChecking')), addressSlot(doc))
     return root
   }
 
@@ -104,7 +116,6 @@ export function renderLeaks(doc: Document, state: LeaksState, handlers: LeaksHan
       text(doc, 'error-note', t('leaksErrorNote')),
       addressSlot(doc),
       button(doc, 'check', t('leaksRetry'), handlers.onCheck),
-      attribution(doc),
     )
     return root
   }
@@ -140,7 +151,12 @@ export function renderLeaks(doc: Document, state: LeaksState, handlers: LeaksHan
     root.append(section)
   }
 
-  root.append(button(doc, 'check', t('leaksCheckAgain'), handlers.onCheck), attribution(doc))
+  root.append(button(doc, 'check', t('leaksCheckAgain'), handlers.onCheck))
+  // The credit is for data on the screen, so it follows the data: drawn when Have I Been
+  // Pwned answered, including with nothing found, and not otherwise (B-125 round 2).
+  if (inventory.sources.some((source) => source.answered && source.name === HIBP_SOURCE)) {
+    root.append(attribution(doc))
+  }
   return root
 }
 
@@ -199,7 +215,9 @@ function keyLines(doc: Document, inventory: LeakInventory, keyHref: string | und
   return inventory.sources.flatMap((source) => {
     if (source.answered || source.needsKey === undefined || !source.why) return []
     const line = text(doc, 'source-key', source.why)
-    if (keyHref !== undefined) {
+    // A key that could not be read has no fix in the field: the field is not drawn when the
+    // store fails, and "add a key" would contradict a key that may be there.
+    if (keyHref !== undefined && source.needsKey !== 'unreadable') {
       const link = doc.createElement('a')
       link.setAttribute('data-role', 'add-key')
       link.href = keyHref
