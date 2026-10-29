@@ -81,6 +81,34 @@ That one line carried four defects the audit measured:
    recorded nowhere. No alarm reads the record yet: that alarm is OBS-32 in
    `passioncode-ai/project-observatory-dashboard` (B-135, done, filed it), and it does not read
    `feed-status.json` yet.
+8. **The agent commits the snapshot, through a pull request (B-158, 2026-10-29).** Point 2 left the
+   commit to a person, and nobody made it: CI on main went red on 2026-10-19 (`package:check`, the
+   snapshot 15.6 days old against the 14-day ceiling of `tools/feed-age.mjs`) and would again on
+   2026-11-09. Now a run that published (`--snapshot-pr`, part of `--agent`) reads
+   `feeds/phishing.json` on origin/main; when it is 7 days old or older and an older version, the
+   run checks that the worker serves exactly the feed it published (point 1: what is served is the
+   truth), and commits that file's bytes, with the newline `pnpm feed:snapshot` adds, and nothing
+   else. The commit is built from origin/main's tree through a private index, so the checkout's
+   HEAD, index and files stay at origin/main for the next run's pin check. It goes to one reused
+   branch, `chore/feed-snapshot-auto`, never forced: the new commit descends from the branch's tip
+   (its only parent when the tip contains main, main alone when the tip was merged, both when main
+   moved past it), so every push is a fast-forward and the pull request stays up to date with main.
+   A branch carrying any other change is left for a person. A branch per version, with the stale
+   pull request closed, was the alternative: it needs a close and a branch deletion each time and
+   leaves a dead branch behind every refusal, where one branch keeps one pull request. The run then
+   opens the pull request or updates the open one, and asks GitHub to merge it with a merge commit
+   once main's required checks pass (`gh pr merge --auto --merge --match-head-commit`). It does not
+   ask when the repository does not allow auto-merge, or when main requires no status check
+   (auto-merge would merge before CI ran), and it never merges by hand or as an administrator; the
+   pull request then waits for a person and the record says why. The push sets
+   `OKOLOS_SKIP_GATES=1`, the pre-push hook's documented escape, which prints what it skipped:
+   the agent's checkout has only the publish tools installed, and the gate for this commit is the
+   pull request's checks. gh runs on its own stored login; `GH_TOKEN`, `GITHUB_TOKEN` and the
+   Cloudflare credential are removed from its environment and git's. The step's outcome is
+   `snapshotPr` in the record and one `snapshot PR:` line in `feed.log`; a failure there (gh
+   missing or not logged in is `failed: gh unavailable`) leaves the run `published` and the
+   failure count alone. Each child has its deadline (git 90 s, gh 60 s), the step five minutes in
+   all, never past what the run's watchdog leaves.
 
 ## Цена
 
@@ -90,7 +118,14 @@ That one line carried four defects the audit measured:
 - A second checkout of the repository lives on the publishing machine, with only the publish
   tools installed (`pnpm install --filter @okolos/proxy`).
 - The committed snapshot no longer follows the agent on its own; CI's release gate reads it, so it
-  has to be committed from `pnpm feed:snapshot` within the fourteen-day freshness ceiling.
+  has to be committed within the fourteen-day freshness ceiling. Since point 8 the agent proposes
+  it after seven days; the merge is automatic only once the repository allows auto-merge and main's
+  ruleset requires a status check. On 2026-10-29 neither holds (`allow_auto_merge: false`; ruleset
+  `protect-default-branch` has only `deletion` and `non_fast_forward`), so the pull request waits
+  for a person, who has a week before the gate turns red.
+- The machine that publishes now also pushes a branch and opens pull requests: its git remote
+  credential needs write access to the repository, and gh a stored login. Without them the step
+  records why and the publish is unaffected.
 - A change to the feed tools reaches production only once it lands on main — including an urgent
   fix, unless someone runs `--unpinned` and accepts the record it leaves.
 - The bootstrap copy changes only when a person reinstalls: a change to `tools/feed/bootstrap.mjs`
@@ -118,3 +153,4 @@ That one line carried four defects the audit measured:
 | A stop by signal is recorded as the stop (exit 143), not as the job's crash it caused | `tools/feed/bootstrap.test.ts` |
 | State paths outside the working tree | `tools/feed/paths.test.ts` |
 | Release gate reads the newer of snapshot and state | `tools/feed-age.test.ts` |
+| The snapshot pull request: only after a publish and only with `--snapshot-pr`; skipped while main's snapshot is under 7 days; gh missing or logged out recorded as `gh unavailable`; served bytes checked; one branch, never forced, fast-forward over main; open or update; auto-merge only where allowed and gated by checks; bounded, no token in any child; a failure leaves the run `published` | `tools/feed/snapshot-pr.test.ts` (doubles and real git against a bare origin), `tools/feed-job.test.ts` "after a publish the agent proposes the committed snapshot (B-158)" |

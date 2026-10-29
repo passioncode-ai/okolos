@@ -253,7 +253,7 @@ pnpm i18n:sweep              # входит в gates: отказывает, ес
 pnpm feed:ingest             # собрать блок-лист из OpenPhish в ~/.okolos/state/feeds/phishing.json
 pnpm feed:refresh            # собрать и опубликовать одной командой (ключ подписи, чекаут на origin/main)
 pnpm feed:agent              # поставить launchd-агента: обновляет фид каждые 12 часов
-pnpm feed:snapshot           # скопировать опубликованный фид в feeds/phishing.json — для коммита
+pnpm feed:snapshot           # скопировать опубликованный фид в feeds/phishing.json для коммита; агент сам открывает PR со снимком через 7 дней (B-158)
 node tools/i18n-sweep.mjs --list   # каждая, с файлом и строкой
 ```
 
