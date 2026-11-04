@@ -4,10 +4,11 @@
  * exclusive, observable and pinned.
  *
  *   node tools/feed-job.mjs              # a manual refresh: publish now, from origin/main
- *   node tools/feed-job.mjs --agent      # what launchd runs: --if-stale --follow
+ *   node tools/feed-job.mjs --agent      # what launchd runs: --if-stale --follow --snapshot-pr
  *   node tools/feed-job.mjs --if-stale   # publish only when the served feed is older than its interval
  *   node tools/feed-job.mjs --follow     # fast-forward this (agent-owned) checkout to origin/main first
  *   node tools/feed-job.mjs --unpinned   # emergency: publish from a checkout not at origin/main (recorded)
+ *   node tools/feed-job.mjs --snapshot-pr  # after a publish, propose feeds/phishing.json as a pull request
  *
  * What each property answers (the lifecycle audit, raw/okolos.md):
  *
@@ -35,6 +36,15 @@
  *   - a login is not a publish: with --if-stale a run whose served feed is younger
  *     than its interval records "skipped" and ends. RunAtLoad used to publish a new
  *     version at every login.
+ *   - the committed snapshot follows the agent (B-158): with --snapshot-pr a run that
+ *     published opens or updates one pull request with feeds/phishing.json when the
+ *     snapshot on origin/main is a week old, and asks GitHub to merge it once the
+ *     checks pass (tools/feed/snapshot-pr.mjs). Its outcome is `snapshotPr` in the
+ *     record and one line in the log, the push's own lines (the hook's skip notice)
+ *     beside it; it never turns a publish into a failed run, a stop during it
+ *     included, and it runs inside what the watchdog leaves. The last step is kept
+ *     in ~/.okolos/state/snapshot-pr.json and carried into every later record, so a
+ *     pull request waiting for a person stays in view until a newer step replaces it.
  */
 import { existsSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -45,6 +55,15 @@ import { acquireLock, LockHeldError } from './feed/lock.mjs'
 import { capFile, cleanLine, openLog } from './feed/log.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { DEFAULT_WORKER, readServed } from './feed/served.mjs'
+import {
+  proposeSnapshot,
+  readSnapshotPr,
+  SNAPSHOT_BRANCH,
+  SNAPSHOT_BUDGET_MS,
+  snapshotPrFile,
+  withSince,
+  writeSnapshotPr,
+} from './feed/snapshot-pr.mjs'
 import { offMainFacts, writeStatus } from './feed/status.mjs'
 import { directoriesIn } from './tree.mjs'
 import { isMain } from './is-main.mjs'
@@ -185,9 +204,12 @@ export async function runJob({
   stopped = () => null,
   // Told as soon as this run's record is written, so a stop does not write a second.
   onRecord = () => {},
+  // Told once the publish succeeded, so a stop after it is recorded as the publish it was.
+  onPublished = () => {},
 } = {}) {
   const iso = () => new Date(now()).toISOString()
   const startedAt = iso()
+  const begun = now()
 
   // The log first, so even a refused lock leaves a line.
   let write = log
@@ -212,6 +234,9 @@ export async function runJob({
 
   let stage = 'start'
   let aborted = false
+  // The last snapshot step (B-158), carried into this run's record whatever it does.
+  const snapshotFile = snapshotPrFile(paths)
+  const lastSnapshot = readSnapshotPr(snapshotFile)
   // What the bootstrap (tools/feed/bootstrap.mjs, B-159) tells the run: its id, so it
   // can tell this record from an older one, and whether it had to recreate the
   // checkout first. A manual run has neither and records `recoveredCheckout: false`.
@@ -221,6 +246,7 @@ export async function runJob({
     version: undefined,
     entries: undefined,
     ...toldByBootstrap(env),
+    ...(lastSnapshot ? { snapshotPr: lastSnapshot } : {}),
   }
   const setStage = (next) => {
     stage = next
@@ -372,6 +398,48 @@ export async function runJob({
       }),
     )
     if (published?.code !== 0) throw new StageFailure('publish', describeFailure(published ?? {}))
+    onPublished({ version: facts.version, entries: facts.entries, commit: facts.commit, pinned: facts.pinned })
+
+    if (flags.snapshotPr) {
+      setStage('snapshot')
+      // Inside what the watchdog leaves, with room for its grace: this step must never
+      // be what turns a publish into a watchdog failure. It never throws.
+      const deadline = Math.min(now() + SNAPSHOT_BUDGET_MS, begun + watchdogMs - graceMs - 30_000)
+      let step
+      try {
+        step = await proposeSnapshot({
+          root,
+          feedFile: paths.feed,
+          readServedFeed: () => readServed({ base: env.OKOLOS_WORKER_URL ?? DEFAULT_WORKER, fetchImpl }),
+          tool,
+          env,
+          now,
+          deadline,
+          tmp,
+          log: write,
+          stopped,
+          previous: lastSnapshot,
+          sleep,
+        })
+      } catch (cause) {
+        step = { outcome: 'failed', reason: cause instanceof Error ? cause.message : String(cause), branch: SNAPSHOT_BRANCH }
+      }
+      const signal = stopped()
+      // A step the stop cut short (a child killed under it) is recorded as the stop; one that
+      // finished before the stop came is kept as it finished, its pull request included.
+      if (signal && step.outcome === 'failed' && !String(step.reason).startsWith('stopped by')) {
+        step = { ...step, reason: `stopped by ${signal}` }
+      }
+      // withSince carries a waiting pull request through a step that never reached it.
+      facts.snapshotPr = withSince(lastSnapshot, step, iso())
+      try {
+        writeSnapshotPr(snapshotFile, facts.snapshotPr)
+      } catch (cause) {
+        write(`   could not keep the snapshot step in ${snapshotFile}: ${cause.message}`)
+      }
+      const pr = facts.snapshotPr
+      write(`snapshot PR: ${pr.outcome}${pr.reason ? `: ${pr.reason}` : ''}${pr.pr ? ` (${pr.pr.url})` : ''}`)
+    }
 
     return { outcome: 'published', stage: 'done', exit: EXIT.ok }
   }
@@ -413,8 +481,25 @@ export async function runJob({
   }
 }
 
-/** The record of a run stopped by `signal`, with what the bootstrap told it, as every other record. */
-export function signalRecord(current, signal, at, env = process.env) {
+/**
+ * The record of a run stopped by `signal`, with what the bootstrap told it, as every other
+ * record, and the last snapshot step (`lastSnapshot`). A stop after the publish succeeded
+ * (`current.published`, during the snapshot step) is the publish it was: outcome
+ * published, the step recorded as stopped. The process still exits 143.
+ */
+export function signalRecord(current, signal, at, env = process.env, lastSnapshot = null) {
+  if (current.published) {
+    return {
+      startedAt: current.startedAt,
+      at,
+      outcome: 'published',
+      stage: 'done',
+      exit: EXIT.ok,
+      ...current.published,
+      ...toldByBootstrap(env),
+      snapshotPr: withSince(lastSnapshot, { outcome: 'failed', reason: `stopped by ${signal}`, branch: SNAPSHOT_BRANCH }, at),
+    }
+  }
   return {
     startedAt: current.startedAt,
     at,
@@ -423,6 +508,7 @@ export function signalRecord(current, signal, at, env = process.env) {
     exit: EXIT.signal,
     reason: `stopped by ${signal}`,
     ...toldByBootstrap(env),
+    ...(lastSnapshot ? { snapshotPr: lastSnapshot } : {}),
   }
 }
 
@@ -438,7 +524,10 @@ function onSignal(signal, current) {
   current.stopping = (async () => {
     await killAllGroups(2000)
     try {
-      if (!current.recorded) writeStatus(feedPaths().status, signalRecord(current, signal, new Date().toISOString()))
+      if (!current.recorded) {
+        const paths = feedPaths()
+        writeStatus(paths.status, signalRecord(current, signal, new Date().toISOString(), process.env, readSnapshotPr(snapshotPrFile(paths))))
+      }
     } finally {
       process.exit(EXIT.signal)
     }
@@ -449,7 +538,7 @@ function onSignal(signal, current) {
 async function main() {
   const argv = process.argv.slice(2)
   const agent = argv.includes('--agent')
-  const current = { stage: 'start', startedAt: new Date().toISOString(), signal: null, stopping: null, recorded: false }
+  const current = { stage: 'start', startedAt: new Date().toISOString(), signal: null, stopping: null, recorded: false, published: null }
   process.on('SIGTERM', () => onSignal('SIGTERM', current))
   process.on('SIGINT', () => onSignal('SIGINT', current))
   const record = await runJob({
@@ -458,6 +547,7 @@ async function main() {
       ifStale: agent || argv.includes('--if-stale'),
       follow: agent || argv.includes('--follow'),
       unpinned: argv.includes('--unpinned'),
+      snapshotPr: agent || argv.includes('--snapshot-pr'),
     },
     onStage: (stage) => {
       current.stage = stage
@@ -465,6 +555,9 @@ async function main() {
     stopped: () => current.signal,
     onRecord: () => {
       current.recorded = true
+    },
+    onPublished: (facts) => {
+      current.published = facts
     },
   })
   // A stop ends the process from onSignal, after the stage groups are gone.

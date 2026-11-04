@@ -19,6 +19,35 @@ export interface RunRecord {
   readonly recovery?: string
   /** Set when the agent was installed off origin/main with --allow-branch: branch and commits. */
   readonly installedOffMain?: string
+  /** After a publish with --snapshot-pr: the snapshot pull request step (B-158). */
+  readonly snapshotPr?: SnapshotPrRecord
+}
+
+/**
+ * What the snapshot pull request step did (`feed/snapshot-pr.mjs`). The job keeps the last
+ * one in every later record and in `snapshot-pr.json` until a newer step replaces it.
+ * `opened` is never an outcome: it is `pr.action`.
+ */
+export interface SnapshotPrRecord {
+  readonly outcome: 'skipped-fresh' | 'updated' | 'auto-merge-requested' | 'auto-merge-unavailable' | 'failed'
+  readonly reason?: string
+  readonly branch?: string
+  readonly version?: number
+  readonly committed?: { readonly version: number; readonly ageDays: number | null }
+  readonly commit?: string
+  readonly pr?: { readonly number: number; readonly url: string; readonly action: 'opened' | 'updated' }
+  /** When this step ran. */
+  readonly at?: string
+  /** When the pull request in `pr` was first recorded. */
+  readonly since?: string
+  /** When the pull request in `pr` was last seen; older than `at` when this step never reached it. */
+  readonly prAt?: string
+  /** What the step that last saw the pull request made of it. */
+  readonly prOutcome?: SnapshotPrRecord['outcome']
+  /** The earlier pull request as this step saw it: gone unless OPEN (NOT_OPEN: no longer among the open ones). */
+  readonly previousPr?: { readonly number: number; readonly url: string; readonly state: 'OPEN' | 'MERGED' | 'CLOSED' | 'NOT_OPEN' }
+  /** origin/main already carries the published version. */
+  readonly mainCarries?: boolean
 }
 
 export interface StatusRecord extends RunRecord {
