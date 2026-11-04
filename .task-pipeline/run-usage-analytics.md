@@ -153,3 +153,13 @@ Next: A1, test first.
 - 2026-11-04: scenarios renumbered SCN-050..SCN-053: SCN-049 is taken on `sw/sw-07` («A link would open a program
   outside the browser», N-107), found when its spec met main's fixed-waits gate. The draft range SCN-049..SCN-052
   in this ledger above now reads SCN-050..SCN-053.
+- 2026-11-04 ~20:55 UTC: this ledger moved from `.task-pipeline/run.md` to `.task-pipeline/run-usage-analytics.md`:
+  main now carries the stability run's ledger under the old name (it came with wave 1). Node A1 done (`826cca4`):
+  purpose `usage-data`, one host `analytics.passioncode.ai`, audit wording ru and en (Copylot da83a161, 693fb1c7),
+  tests seen red first. Node A2 done (`d0fcc17`): `apps/extension/src/background/usage/` (catalogue, sink, sender),
+  49 sink tests plus the sender's through the real `request`; five plants turned them red. `pnpm gates` on
+  `d0fcc17`: six red, all owed by the nodes still open, so pushed with the pre-push skipped, on this feature
+  branch only: `tools/coverage-shape` (a test beside `catalogue.ts`), three in `tools/docs.test.ts` (facts.md and
+  privacy.md must name `usage-data` and `analytics.passioncode.ai`: node A7), `tools/listing.test.ts` (store
+  screenshots from code that changed: retake), `tools/reachable.test.ts` (the sink is imported by nothing that
+  ships: node A3). Next: A3 (wiring in the worker, consent per browser, Firefox manifest), then A7 and the retake.
