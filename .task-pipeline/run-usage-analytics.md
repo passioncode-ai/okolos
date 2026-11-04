@@ -163,3 +163,12 @@ Next: A1, test first.
   privacy.md must name `usage-data` and `analytics.passioncode.ai`: node A7), `tools/listing.test.ts` (store
   screenshots from code that changed: retake), `tools/reachable.test.ts` (the sink is imported by nothing that
   ships: node A3). Next: A3 (wiring in the worker, consent per browser, Firefox manifest), then A7 and the retake.
+- 2026-11-04 ~23:00 UTC: node A3 done (`49bb7b1`): wiring in the worker, consent by browser, Firefox manifest
+  `data_collection_permissions`, build define. Design change, recorded here: events go one a request to
+  Aptabase's single-event route `/api/v0/event` with `osName` empty, so the server reads OS and browser from the
+  request's User-Agent and the extension never reads the OS (B-166's promise and its gate). The OS gate in
+  `tools/docs.test.ts` was narrowed for exactly `platform:"browser_extension"` and `appVersion:<x>.extensionVersion`,
+  with its reason; planted `navigator.platform` and `navigator.appVersion` reads still turn it red. Note for A4: in
+  Firefox `permissions.request` works only inside a user gesture, so the settings page asks Firefox itself and
+  then tells the worker. Remaining red on `pnpm gates`: four `tools/docs.test.ts` rows (facts.md and privacy.md
+  must name `usage-data` and its host: A7) and `tools/listing.test.ts` (store screenshots: retake).
