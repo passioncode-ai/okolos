@@ -101,27 +101,96 @@ pnpm feed:snapshot                                         # перенести 
 ## Агент обновления
 
 ```bash
-pnpm feed:agent                                        # чекаут агента, plist, загрузка
-node tools/install-feed-agent.mjs --status             # plist, состояние launchd, последний прогон
-node tools/install-feed-agent.mjs --uninstall          # bootout, удалить plist, проверить launchctl print
+pnpm feed:agent                                        # чекаут агента, загрузчик, plist, загрузка (только HEAD = origin/main)
+node tools/install-feed-agent.mjs --allow-branch       # с другого HEAD или с правками ставящихся файлов: обход ADR-0017; пишется в feed.log и в installedOffMain
+node tools/install-feed-agent.mjs --status             # plist, загрузчик и его расхождение с чекаутом, launchd, последний прогон
+node tools/install-feed-agent.mjs --uninstall          # bootout, удалить plist и загрузчик, проверить launchctl print
 node tools/install-feed-agent.mjs --uninstall --purge  # и чекаут, состояние, логи
 ```
 
-- **Где работает:** собственный чекаут `~/.okolos/agent-checkout` (detached worktree на
-  `origin/main`); перед каждым прогоном агент перематывает его на `origin/main` и, если
-  сдвинулся lockfile, ставит только инструменты публикации. Ручной `pnpm feed:refresh` из
-  клона не на `origin/main` отказывает; `--unpinned` — аварийный обход, он записывается в статус.
+- **Что запускает launchd:** строку `/bin/sh`, которая запускает загрузчик
+  `~/.okolos/bin/feed-agent/bootstrap.mjs` (копию `tools/feed/bootstrap.mjs` и шести модулей,
+  которые он импортирует: пять из `tools/feed/`, а `is-main.mjs` из `tools/is-main.mjs`; список
+  в `BOOTSTRAP_SOURCES`), а не `cd` в чекаут (B-159). С 2026-10-09 по 2026-10-26 чекаута не было,
+  каждый запуск падал в оболочке, статус не писался и `consecutiveFailures` оставался 0 (B-149).
+  Загрузчик проверяет чекаут; отсутствующий пересоздаёт на `origin/main` (worktree клона, из
+  которого ставили агента, после `git worktree prune`; если клона нет, `git clone` его origin),
+  сломанный сначала переносит в `~/.okolos/agent-checkout.broken`. Затем запускает
+  `tools/feed-job.mjs --agent` из чекаута.
+- **Что и где записано при сбое.** Каждая строка ниже пишет `outcome: failed` в
+  `~/.okolos/state/feed-status.json` и считается в `consecutiveFailures`:
+  - `stage: launch`: `node` не найден, копии загрузчика нет, или `node` вышел с ненулевым кодом,
+    а статуса с `runId` этого запуска нет. Загрузчик вписывает этот `runId` и в статус, который
+    задача записала без него, так что один сбой считается один раз. Пишет сама строка `/bin/sh` из plist (через временный файл и
+    `mv`, `lastPublished` сохраняется, `runId` в записи один, её собственный), плюс строка в
+    `feed.log` и в `feed.launchd.log`;
+  - `stage: checkout`: чекаут не удалось пересоздать или починка не уложилась в срок прогона;
+  - `stage: job`: задача умерла, не записав статус; её stderr (ошибка и стек) уходит в `feed.log`
+    и `feed.launchd.log`, а `reason` берётся из первой строки с ошибкой. Если задачу убил срок
+    прогона, код 124 и `reason` всегда одна фраза: «the run's deadline (2700 s) passed during the job; its process group was killed»;
+  - стадии самой задачи (`config`, `pin`, `ingest`, `publish`, сторож, сигнал);
+  - загрузчик остановлен сигналом (SIGTERM, SIGINT), а задача не записала статус этого прогона:
+    стадия, на которой застала остановка, код 143, `reason: stopped by <signal>`. Починка или
+    задача, убитые остановкой, не записываются как падение;
+  - `stage: bootstrap`: упал сам загрузчик (стек в `feed.launchd.log`).
+
+  Если агента ставили с `--allow-branch`, каждая из этих записей несёт `installedOffMain`: и
+  строки `/bin/sh`, и загрузчика, и задачи, включая остановку сигналом.
+
+  Другой прогон держит блокировку (код 75): статус не пишется, он принадлежит идущему прогону.
+  Нигде не записано: launchd вообще не запускает агента (plist нет, агент выгружен или отключён)
+  или не стартует сам `/bin/sh`; это видно только в `--status` и `launchctl print`.
+- **После слияния B-159, один раз, руками.** Пока агента не переустановили, Mac запускает старый
+  plist с `cd` в чекаут. Из основного клона на `origin/main`:
+
+  ```bash
+  pnpm feed:agent
+  node tools/install-feed-agent.mjs --status   # "bootstrap": true, "plistStartsBootstrap": true, "loaded": true
+  plutil -extract ProgramArguments.2 raw -o - ~/Library/LaunchAgents/app.okolos.feed.plist
+  # строка должна называть ~/.okolos/bin/feed-agent/bootstrap.mjs
+  ```
+
+  B-159 закрывается только после этой проверки.
+- **Откуда ставить.** `pnpm feed:agent` ставит агента, только если HEAD клона равен только что
+  полученному `origin/main` (сверяется коммит, не имя ветки) и файлы, которые установщик берёт из
+  рабочего дерева (исходники загрузчика и шаблон plist, `INSTALLED_SOURCES`), совпадают с HEAD:
+  без правок, индекса, удалений и неотслеживаемых файлов. Иначе отказ одной строкой с именами
+  файлов. `--allow-branch` обходит отказ; запись об этом, с именами файлов, уходит в `feed.log` и
+  в `installedOffMain`.
+- **Где работает:** собственный чекаут `~/.okolos/agent-checkout` на `origin/main`: worktree
+  клона, из которого ставили агента, или, если того клона нет, клон его origin. Перед каждым
+  прогоном агент перематывает его на `origin/main` и, если сдвинулся lockfile, ставит только
+  инструменты публикации. Загрузчик обновляется только переустановкой: после изменения
+  `tools/feed/bootstrap.mjs` или его модулей на `main` снова `pnpm feed:agent`; `--status`
+  показывает расхождение (`bootstrapMatchesCheckout`, `bootstrapDiffers`). Ручной
+  `pnpm feed:refresh` из клона не на `origin/main` отказывает; `--unpinned` — аварийный обход, он
+  записывается в статус.
 - **Когда:** каждые 12 часов и при входе в систему; при входе прогон смотрит на возраст
   отданного фида и, если тот моложе 11 часов, записывает «skipped» и выходит.
-- **Границы:** каждая стадия — дочерний процесс в своей группе с дедлайном; весь прогон —
-  под сторожем на 30 минут; один прогон за раз (`~/.okolos/state/feed.lock`, общий с ручным
-  запуском); три попытки с паузами 30 с и 2 мин.
+- **Границы:** каждая стадия — дочерний процесс в своей группе с дедлайном. Один срок на весь
+  прогон, починка чекаута включительно: 45 минут от старта загрузчика. Починка, не закончившаяся к
+  сроку, прерывается и записывается (`stage: checkout`, код 124); сторож задачи равен остатку минус
+  2 минуты, но не больше её 30 минут; в срок загрузчик убивает группу задачи. Худший случай:
+  45 минут и 5 с на завершение. Починка сама длится не дольше 21 минуты (путь через клон). Один
+  прогон за раз (`~/.okolos/state/feed.lock`, общий с ручным запуском); три попытки с паузами
+  30 с и 2 мин.
 - **Где смотреть:** лог `~/Library/Logs/Okolos/feed.log` (5 × 5 МБ, `0600`), статус
-  `~/.okolos/state/feed-status.json` — `outcome`, `stage`, `exit`, `version`, `entries`,
-  `consecutiveFailures`, `lastPublished`. Две неудачи подряд или `lastPublished` старше 26 часов —
-  повод разбираться.
+  `~/.okolos/state/feed-status.json`: `outcome`, `stage`, `exit`, `version`, `entries`,
+  `consecutiveFailures`, `lastPublished`, `recoveredCheckout` (`true`, если перед прогоном
+  чекаут пришлось пересоздать; `recovery` говорит, что с ним было), `installedOffMain` (агента
+  поставили в обход проверки origin/main). Две неудачи подряд или
+  `lastPublished` старше 26 часов — повод разбираться. **Внешней тревоги пока нет:**
+  `feed-status.json` никто не читает. Тревога заведена как OBS-32 в
+  `passioncode-ai/project-observatory-dashboard` (B-135 закрыт: он её завёл), и этот файл она пока
+  не читает. Смотрит человек, через
+  `--status`. `recoveredCheckout: true` значит, что чекаут кто-то удалил: ищите, кто (B-150).
 - **Токен** получает только стадия публикации: раннер секрета (`OKOLOS_SECRET_RUNNER` в plist,
-  argv без значения) оборачивает её одну.
+  argv без значения) оборачивает её одну. `CLOUDFLARE_API_TOKEN` и `CLOUDFLARE_API_KEY`
+  убираются из окружения всех остальных дочерних процессов задачи, загрузчика и установщика
+  (один список, `SECRET_VARIABLES` в `tools/feed/bounded.mjs`; каждый дочерний процесс
+  установщика, git, pnpm, launchctl и поиск Observatory, идёт через `installerTool` или
+  `installerRun` в `tools/install-feed-agent.mjs`). Исключение одно: загрузчик отдаёт самой
+  задаче окружение целиком, потому что публикация наследует его через неё.
 
 Входной файл — обновление без подписи:
 

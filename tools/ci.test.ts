@@ -1,7 +1,10 @@
-import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+
+import { shCandidates } from './bin.mjs'
 
 /**
  * What CI claims about itself.
@@ -29,6 +32,9 @@ function gateSteps(): string[] {
   return steps
 }
 
+/** Files that start another file and check nothing themselves. */
+const LAUNCHERS = new Set(['tools/python.mjs'])
+
 /** Fails with the script's name rather than on `undefined` three lines later. */
 function script(name: string): string {
   const value = scripts[name]
@@ -49,8 +55,12 @@ function shares(body: string, command: string): boolean {
   if (body.includes(command)) return true
   // `python3 docs/ux/lint.py` and `node tools/i18n-sweep.mjs` are the same gate
   // whether reached through pnpm or called directly; the file is the identity.
-  const file = /([\w./-]+\.(?:py|mjs|js|ts))/.exec(command)
-  return file !== null && body.includes(file[1] as string)
+  // A launcher is not the gate: `node tools/python.mjs docs/ux/lint.py` runs the
+  // linter through the Python finder (B-162), and the linter is what CI must run.
+  const file = [...command.matchAll(/([\w./-]+\.(?:py|mjs|js|ts))/g)]
+    .map((match) => match[1] as string)
+    .find((name) => !LAUNCHERS.has(name))
+  return file !== undefined && body.includes(file)
 }
 
 /** The `run:` values of a workflow — what it executes, without what it says about it. */
@@ -134,6 +144,15 @@ describe('the workflow runs what the project has', () => {
     expect(stale, 'these exemptions no longer describe anything CI does').toEqual([])
   })
 
+  it('starts Python only through tools/python.mjs, as the hook and pnpm gates do (B-162)', () => {
+    // One wiring per gate: a step that calls python3 itself never runs the finder,
+    // so CI could stay green on the path a Windows contributor takes.
+    const direct = commandsIn(workflow)
+      .split('\n')
+      .filter((line) => /(?:^|[\s;&|])(?:python3?|py)(?:\s|$)/.test(line))
+    expect(direct, 'these steps start Python without the finder').toEqual([])
+  })
+
   it('does not pin a Playwright build number', () => {
     // A path carrying one turns an unrelated dependency bump into a red Firefox
     // job, which is the pressure that gets a browser dropped from CI.
@@ -145,6 +164,80 @@ describe('the workflow runs what the project has', () => {
     for (const name of stepNames) {
       expect(name, `step "${name}" names a scenario`).not.toMatch(/SCN-\d+/)
     }
+  })
+})
+
+/**
+ * The jobs of the workflow, each by its key, with its own lines only.
+ *
+ * Reading the workflow as one text let the Linux job answer for the Windows one: the
+ * Windows job could be deleted, moved to ubuntu, or cut to `echo skipped` and every
+ * check above stayed green (round 1 of the N-105 certification, four plants).
+ */
+function jobs(yaml: string): Map<string, string> {
+  const body = yaml.slice(yaml.indexOf('\njobs:\n') + '\njobs:\n'.length)
+  const found = new Map<string, string>()
+  const starts = [...body.matchAll(/^ {2}([\w-]+):\s*$/gm)]
+  starts.forEach((start, i) => {
+    const from = start.index ?? 0
+    const to = starts[i + 1]?.index ?? body.length
+    found.set(start[1] as string, body.slice(from, to))
+  })
+  return found
+}
+
+/**
+ * Lines that let a gates job pass while a gate fails or never runs: a condition, a
+ * `continue-on-error`, or a command whose failure is swallowed (round 2 of the N-105
+ * certification: each of these left the per-job check green).
+ */
+function softenersIn(job: string): string[] {
+  return job
+    .split('\n')
+    .filter((line) => /^\s+(?:- )?(?:if|continue-on-error):/.test(line) || /^\s+(?:- )?run: .*(?:\|\||;\s*exit|^\s*echo)/.test(line) || /^\s+(?:- )?run: echo\b/.test(line))
+    .map((line) => line.trim())
+}
+
+/** Which gate steps a job body does not run. */
+function gatesMissingFrom(job: string): string[] {
+  const runs = commandsIn(job)
+  return gateSteps().filter((step) => {
+    const resolved = scripts[step] ?? ''
+    return !(runs.includes(`pnpm ${step}`) || (resolved !== '' && shares(runs, resolved)))
+  })
+}
+
+describe('each gates job runs the whole chain on its own system', () => {
+  const GATE_JOBS: Readonly<Record<string, string>> = { gates: 'ubuntu-latest', windows: 'windows-latest' }
+
+  for (const [key, system] of Object.entries(GATE_JOBS)) {
+    it(`the "${key}" job runs on ${system} and runs every step of \`pnpm gates\``, () => {
+      const job = jobs(workflow).get(key)
+      expect(job, `the workflow has no "${key}" job`).toBeDefined()
+      expect(job).toMatch(new RegExp(`^\\s+runs-on: ${system}\\s*$`, 'm'))
+      expect(gatesMissingFrom(job ?? ''), `the "${key}" job skips these gates`).toEqual([])
+      expect(softenersIn(job ?? ''), `the "${key}" job can pass with a gate failing`).toEqual([])
+    })
+  }
+
+  it('would notice a Windows job cut down, moved, softened or removed', () => {
+    const windows = jobs(workflow).get('windows') ?? ''
+    /** A plant that no longer finds its anchor proves nothing: refuse it instead of passing. */
+    const plant = (from: string, to: string): string => {
+      expect(windows, `the plant's anchor "${from}" is gone from the Windows job`).toContain(from)
+      return windows.replace(from, to)
+    }
+    expect(gatesMissingFrom(plant('run: pnpm test\n', 'run: echo skipped\n'))).toEqual(['test'])
+    expect(plant('runs-on: windows-latest', 'runs-on: ubuntu-latest')).not.toMatch(/^\s+runs-on: windows-latest\s*$/m)
+    expect(jobs(workflow.replace(windows, '')).get('windows')).toBeUndefined()
+    // A gate dropped from the Windows job and kept in the Linux one.
+    expect(gatesMissingFrom(plant('run: pnpm i18n:sweep\n', ''))).toEqual(['i18n:sweep'])
+    // A gate that still runs but can no longer fail the job.
+    expect(softenersIn(plant('runs-on: windows-latest', 'runs-on: windows-latest\n    continue-on-error: true'))).not.toEqual([])
+    expect(softenersIn(plant('      - name: lint\n', '      - name: lint\n        if: false\n'))).not.toEqual([])
+    expect(softenersIn(plant('run: pnpm lint\n', 'run: pnpm lint || exit 0\n'))).not.toEqual([])
+    expect(softenersIn(plant('run: pnpm typecheck\n', 'run: pnpm typecheck; exit 0\n'))).not.toEqual([])
+    expect(softenersIn(plant('run: pnpm brand:lint\n', 'run: echo pnpm brand:lint\n'))).not.toEqual([])
   })
 })
 
@@ -183,6 +276,119 @@ describe('the repository tracks no test-run artefacts', () => {
   })
 })
 
+describe('line endings are LF on every checkout', () => {
+  /**
+   * A Windows clone with `core.autocrlf=true` checked every file out with CRLF, and
+   * the gates that read docs line by line, and the hook Git for Windows runs with
+   * its own sh, read a `\r` at the end of every line (B-162). `.gitattributes`
+   * pins LF for text and marks binaries; this reads what Git itself decided.
+   */
+  const entries = execFileSync('git', ['ls-files', '--eol'], { cwd: root, encoding: 'utf8' })
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => {
+      const m = /^i\/(\S*)\s+w\/\S*\s+attr\/(.*?)\s*\t(.+)$/.exec(line)
+      if (!m) throw new Error(`unexpected git ls-files --eol line: ${line}`)
+      return { index: m[1] as string, attr: m[2] as string, file: m[3] as string }
+    })
+
+  it('reads the index, so an empty list cannot pass', () => {
+    expect(entries.length).toBeGreaterThan(50)
+  })
+
+  it('pins text to LF for every checkout', () => {
+    const attributes = readFileSync(path.join(root, '.gitattributes'), 'utf8')
+    expect(attributes).toMatch(/^\* text=auto eol=lf$/m)
+  })
+
+  it('holds no CRLF in the index', () => {
+    const crlf = entries.filter((e) => e.index === 'crlf' || e.index === 'mixed').map((e) => e.file)
+    expect(crlf, `these would check out with \\r on every line: ${crlf.join(', ')}`).toEqual([])
+  })
+
+  it('marks every binary file as binary, so nothing converts its bytes', () => {
+    // `-text` in the index column is Git's own reading: the content is not text.
+    const unmarked = entries.filter((e) => e.index === '-text' && !e.attr.includes('-text')).map((e) => e.file)
+    expect(unmarked, `add their extension to .gitattributes as binary: ${unmarked.join(', ')}`).toEqual([])
+  })
+})
+
+describe('a clone made before .gitattributes is converted by the runbook\'s own commands', () => {
+  /**
+   * `git add --renormalize .` rewrites the index only: a clone checked out with
+   * `core.autocrlf=true` kept `\r` on every line of its hook and docs while git status
+   * read clean (B-162, fix round 2). This runs the commands the runbook prints, read
+   * from its block rather than copied here, in a throwaway repository in that state.
+   */
+  const runbook = readFileSync(path.join(root, 'docs/runbooks/development.md'), 'utf8')
+  const anchor = runbook.indexOf('Клон, сделанный до появления `.gitattributes`')
+  const block = /```bash\r?\n([\s\S]*?)```/.exec(runbook.slice(anchor))?.[1] ?? ''
+  const lines = block
+    .split(/\r?\n/)
+    .map((line) => line.replace(/#.*$/, '').trim())
+    .filter(Boolean)
+
+  /** `git …`, `a && b`, and `git … | grep <word>`: all the block may use, run without a shell. */
+  function run(line: string, cwd: string): string {
+    return line
+      .split('&&')
+      .map((part) => {
+        const [command, filter] = part.split('|').map((piece) => piece.trim())
+        const words = (command as string).split(/\s+/)
+        if (words[0] !== 'git') throw new Error(`the block runs something other than git: ${command}`)
+        const out = execFileSync('git', words.slice(1), { cwd, encoding: 'utf8' })
+        if (filter === undefined) return out
+        const grep = /^grep\s+(\S+)$/.exec(filter)
+        if (!grep) throw new Error(`the block filters with something other than grep <word>: ${filter}`)
+        return out
+          .split(/\r?\n/)
+          .filter((entry) => entry.includes(grep[1] as string))
+          .join('\n')
+      })
+      .join('')
+  }
+
+  it('finds the block after its paragraph', () => {
+    expect(anchor, 'the paragraph about a clone made before .gitattributes is gone').toBeGreaterThan(-1)
+    expect(lines.length).toBeGreaterThan(0)
+  })
+
+  it('leaves no CRLF on disk, and every line it prints is empty, as the runbook says', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-crlf-'))
+    try {
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-c', 'user.email=t@example.test', '-c', 'user.name=t', ...args], { cwd: dir, encoding: 'utf8' })
+    const hook = path.join(dir, '.githooks', 'pre-push')
+    git('init', '--quiet')
+    git('config', 'core.autocrlf', 'true')
+    mkdirSync(path.dirname(hook))
+    writeFileSync(hook, readFileSync(path.join(root, '.githooks/pre-push'), 'utf8').replaceAll('\r\n', '\n'))
+    writeFileSync(path.join(dir, 'README.md'), 'a\nb\n')
+    git('add', '.')
+    git('commit', '--quiet', '-m', 'before .gitattributes')
+    // Checked out with autocrlf=true and no attributes: CRLF on disk, LF in the index.
+    rmSync(path.dirname(hook), { recursive: true })
+    rmSync(path.join(dir, 'README.md'))
+    git('checkout', '--', '.')
+    expect(readFileSync(hook, 'utf8'), 'the fixture did not produce a CRLF checkout').toContain('\r\n')
+    // .gitattributes arrives, as a pull brings it; the files on disk stay as they were.
+    writeFileSync(path.join(dir, '.gitattributes'), readFileSync(path.join(root, '.gitattributes')))
+    git('add', '.gitattributes')
+    git('commit', '--quiet', '-m', 'attributes')
+    expect(readFileSync(hook, 'utf8')).toContain('\r\n')
+
+    const printed = lines.map((line) => [line, run(line, dir).trim()] as const).filter(([, out]) => out !== '')
+    expect(printed, 'the runbook says these print nothing').toEqual([])
+    expect(readFileSync(hook, 'utf8').includes('\r'), 'the hook still has CR on disk').toBe(false)
+    expect(readFileSync(path.join(dir, 'README.md'), 'utf8')).toBe('a\nb\n')
+    expect(git('ls-files', '--eol')).not.toMatch(/w\/crlf/)
+    } finally {
+      // Every pre-push runs this; a repository left per run piles up in TMPDIR (N-105, round 1).
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('the pre-push hook exists and runs the gates', () => {
   /**
    * The one standing instruction that cannot be followed by reading it. A rule
@@ -191,10 +397,22 @@ describe('the pre-push hook exists and runs the gates', () => {
    */
   const hook = path.join(root, '.githooks/pre-push')
 
-  it('is present and executable', () => {
+  it('is present', () => {
     expect(existsSync(hook), '.githooks/pre-push is missing').toBe(true)
+  })
+
+  it('is committed executable, so every clone gets the bit', () => {
     // A hook without the bit set is a hook git silently never runs — the exact
-    // failure mode this is meant to remove.
+    // failure mode this is meant to remove. The index is read rather than the disk:
+    // it is what a clone checks out, on every platform, Windows included.
+    const staged = execFileSync('git', ['ls-files', '-s', '.githooks/pre-push'], { cwd: root, encoding: 'utf8' })
+    expect(staged.split(' ')[0]).toBe('100755')
+  })
+
+  // Windows has no execute bit on disk (`stat().mode & 0o111` is 0 there, and Git
+  // for Windows runs a hook by its shebang), so the working-tree check runs on macOS
+  // and Linux and is skipped on win32; the index check above covers it there (B-162).
+  it.skipIf(process.platform === 'win32')('is executable in this working tree', () => {
     expect(statSync(hook).mode & 0o111).toBeGreaterThan(0)
   })
 
@@ -240,8 +458,16 @@ describe('the pre-push hook exists and runs the gates', () => {
   describe('decides from what is pushed', () => {
     const zero = '0'.repeat(40)
     const sha = 'a'.repeat(40)
+    // Git runs the hook with its own sh; on Windows outside Git Bash that sh is not on
+    // PATH, so it is looked for beside git (B-162). On macOS and Linux it is `sh`.
+    const gitExecPath =
+      process.platform === 'win32' ? execFileSync('git', ['--exec-path'], { encoding: 'utf8' }).trim() : ''
+    const sh =
+      shCandidates(process.platform, gitExecPath).find(
+        (candidate) => spawnSync(candidate, ['-c', 'exit 0']).status === 0,
+      ) ?? 'sh'
     const decide = (stdin: string): string =>
-      execFileSync('sh', [hook], {
+      execFileSync(sh, [hook], {
         cwd: root,
         input: stdin,
         env: { ...process.env, OKOLOS_PREPUSH_DECIDE: '1', OKOLOS_SKIP_GATES: '' },
@@ -280,6 +506,16 @@ describe('the pre-push hook exists and runs the gates', () => {
       scripts: Record<string, string>
     }
     expect(pkg.scripts.prepare ?? '').toContain('core.hooksPath')
+  })
+
+  it('wires it on Windows too, where pnpm runs scripts with cmd.exe', () => {
+    // `|| true` has no `true` to run in cmd.exe, so a checkout outside Git made
+    // `pnpm install` fail there; `|| exit 0` means the same in sh and in cmd (B-162).
+    const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>
+    }
+    expect(pkg.scripts.prepare ?? '').not.toMatch(/\|\|\s*true\b/)
+    expect(pkg.scripts.prepare ?? '').toMatch(/\|\| exit 0$/)
   })
 })
 

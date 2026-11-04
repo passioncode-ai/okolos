@@ -1,16 +1,30 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { spawn, spawnSync } from 'node:child_process'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { feedPaths } from './feed/paths.mjs'
+import { readStatus, stampRunId, writeStatus } from './feed/status.mjs'
+import { filesIn } from './tree.mjs'
+// @ts-expect-error: a plain .mjs tool, typed by its use here (as in feed-agent-credential.test.ts)
+import { discover } from './feed-agent-credential.mjs'
+import { BOOTSTRAP_FILES, BOOTSTRAP_SOURCES } from './feed/bootstrap.mjs'
 import {
   LABEL,
   agentStatus,
+  bootstrapDrift,
+  checkBranch,
+  INSTALLED_SOURCES,
+  offMainNote,
   ensureCheckout,
   installAgent,
+  installBootstrap,
+  installerRun,
   isDisabled,
+  originUrl,
   rendered,
+  stableNode,
   uninstallAgent,
 } from './install-feed-agent.mjs'
 
@@ -55,12 +69,15 @@ function fakeLaunchd({ loaded = true, disabled = false, staysLoaded = false } = 
   return { launchctl, calls, state }
 }
 
+/** A throwaway HOME: every path the installer writes resolves under it, never the real one. */
 function home() {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-agent-home-'))
   const target = path.join(dir, 'Library/LaunchAgents', `${TEST_LABEL}.plist`)
   mkdirSync(path.dirname(target), { recursive: true })
   return { dir, target, paths: feedPaths({}, dir) }
 }
+
+const ok = (stdout = '') => ({ code: 0, signal: null, stdout, stderr: '', timedOut: false })
 
 const quiet = () => undefined
 const base = { label: TEST_LABEL, domain: 'gui/501', log: quiet }
@@ -75,6 +92,39 @@ describe('uninstall is symmetric (F5, LC-14)', () => {
     expect(existsSync(h.target), 'the plist stays, and launchd loads it again at the next login').toBe(false)
     expect(launchd.calls.map((c) => c[0])).toEqual(['bootout', 'print'])
     expect(launchd.calls[0]).toEqual(['bootout', `gui/501/${TEST_LABEL}`])
+  })
+
+  it('removes the bootstrap it installed beside launchd, and nothing else without --purge (B-159)', async () => {
+    const h = home()
+    writeFileSync(h.target, '<plist/>')
+    installBootstrap({ dir: h.paths.agentBin })
+    for (const dir of [h.paths.agentCheckout, h.paths.state, h.paths.logs]) mkdirSync(dir, { recursive: true })
+    const launchd = fakeLaunchd({ loaded: true })
+    const result = await uninstallAgent({ ...base, target: h.target, bin: h.paths.agentBin, launchctl: launchd.launchctl })
+    expect(result.ok).toBe(true)
+    expect(existsSync(h.paths.agentBin), 'a bootstrap left behind is a half-installed agent').toBe(false)
+    for (const dir of [h.paths.agentCheckout, h.paths.state, h.paths.logs]) expect(existsSync(dir), dir).toBe(true)
+  })
+
+  it('removes an emptied ~/.okolos/bin and a staging folder an interrupted install left', async () => {
+    const h = home()
+    installBootstrap({ dir: h.paths.agentBin })
+    mkdirSync(`${h.paths.agentBin}.staging-4242`)
+    const launchd = fakeLaunchd({ loaded: false })
+    const result = await uninstallAgent({ ...base, target: h.target, bin: h.paths.agentBin, launchctl: launchd.launchctl })
+    expect(result.ok).toBe(true)
+    expect(existsSync(`${h.paths.agentBin}.staging-4242`)).toBe(false)
+    expect(existsSync(path.dirname(h.paths.agentBin)), '~/.okolos/bin held only the agent').toBe(false)
+    expect(existsSync(path.join(h.dir, '.okolos')), 'the rest of ~/.okolos is not the agent’s to remove').toBe(true)
+  })
+
+  it('keeps ~/.okolos/bin when something else lives there', async () => {
+    const h = home()
+    installBootstrap({ dir: h.paths.agentBin })
+    writeFileSync(path.join(path.dirname(h.paths.agentBin), 'someone-elses-tool'), '')
+    const launchd = fakeLaunchd({ loaded: false })
+    await uninstallAgent({ ...base, target: h.target, bin: h.paths.agentBin, launchctl: launchd.launchctl })
+    expect(existsSync(path.join(path.dirname(h.paths.agentBin), 'someone-elses-tool'))).toBe(true)
   })
 
   it('succeeds when the agent was never loaded — absence is the outcome asked for', async () => {
@@ -103,15 +153,20 @@ describe('uninstall is symmetric (F5, LC-14)', () => {
       tools.push([command, ...args])
       return { code: 0, signal: null, stdout: '', stderr: '', timedOut: false }
     }
+    mkdirSync(`${h.paths.agentCheckout}.broken`)
     const result = await uninstallAgent({
       ...base,
       target: h.target,
+      bin: h.paths.agentBin,
       launchctl: launchd.launchctl,
       purge: { repo: '/repo', paths: h.paths, tool },
     })
     expect(result.ok).toBe(true)
     expect(tools).toContainEqual(['git', '-C', '/repo', 'worktree', 'remove', '--force', h.paths.agentCheckout])
-    for (const dir of [h.paths.agentCheckout, h.paths.state, h.paths.logs]) expect(existsSync(dir), dir).toBe(false)
+    expect(tools).toContainEqual(['git', '-C', '/repo', 'worktree', 'prune'])
+    for (const dir of [h.paths.agentCheckout, `${h.paths.agentCheckout}.broken`, h.paths.state, h.paths.logs]) {
+      expect(existsSync(dir), dir).toBe(false)
+    }
   })
 })
 
@@ -153,10 +208,29 @@ describe('the agent runs from its own checkout at origin/main (F2)', () => {
     }
     await ensureCheckout({ repo: '/repo', checkout: h.paths.agentCheckout, tool, log: quiet })
     expect(tools).toEqual([
+      // A folder deleted under git leaves its worktree entry; `add` refuses that path until it is pruned (B-150).
+      ['git', '-C', '/repo', 'worktree', 'prune'],
       ['git', '-C', '/repo', 'fetch', '--quiet', 'origin', 'main'],
       ['git', '-C', '/repo', 'worktree', 'add', '--detach', h.paths.agentCheckout, 'origin/main'],
       ['pnpm', 'install', '--frozen-lockfile', '--filter', '@okolos/proxy'],
     ])
+  })
+
+  it('hands git and pnpm no Cloudflare credential, as the bootstrap does', async () => {
+    const h = home()
+    const envs: Array<Record<string, string | undefined> | undefined> = []
+    const tool = async (_command: string, _args: string[], options?: { env?: Record<string, string | undefined> }) => {
+      envs.push(options?.env)
+      return { code: 0, signal: null, stdout: '', stderr: '', timedOut: false }
+    }
+    const env = { PATH: '/bin', CLOUDFLARE_API_TOKEN: 't', CLOUDFLARE_API_KEY: 'k' }
+    await ensureCheckout({ repo: '/repo', checkout: h.paths.agentCheckout, tool, env, log: quiet })
+    expect(envs).toHaveLength(4)
+    for (const seen of envs) {
+      expect(seen).toMatchObject({ PATH: '/bin', GIT_TERMINAL_PROMPT: '0' })
+      expect(seen).not.toHaveProperty('CLOUDFLARE_API_TOKEN')
+      expect(seen).not.toHaveProperty('CLOUDFLARE_API_KEY')
+    }
   })
 
   it('leaves an existing checkout to the job, which fast-forwards it', async () => {
@@ -173,17 +247,63 @@ describe('the agent runs from its own checkout at origin/main (F2)', () => {
 })
 
 describe('the plist launchd reads', () => {
+  const where = {
+    checkout: '/Users/example/.okolos/agent-checkout',
+    logDir: '/Users/example/Library/Logs/Okolos',
+    bootstrap: '/Users/example/.okolos/bin/feed-agent/bootstrap.mjs',
+    node: '/Users/example/.fnm/node-versions/v24/bin/node',
+    sourceRepo: '/Users/example/DATA/okolos',
+    origin: 'git@github.com:passioncode-ai/okolos.git',
+    // Given, never read from this runner's HOME or OKOLOS_STATE_DIR: the render is the same everywhere.
+    stateDir: '/Users/example/.okolos/state',
+  }
   const plist = (runner: string[] | null = ['/opt/py/bin/python3', '/opt/obs/tools/use_secret.py', 'run', '--env', 'prod', 'okolos', 'CLOUDFLARE_API_TOKEN', '--']) =>
-    rendered({ template: template(), checkout: '/Users/example/.okolos/agent-checkout', runner, logDir: '/Users/example/Library/Logs/Okolos' })
+    rendered({ template: template(), runner, ...where })
+  const program = (text: string) => /<key>ProgramArguments<\/key>\s*<array>([\s\S]*?)<\/array>/.exec(text)?.[1] ?? ''
+  const variable = (text: string, name: string) => new RegExp(`<key>${name}</key>\\s*<string>([^<]*)</string>`).exec(text)?.[1]
 
-  it('runs the job from the agent checkout, in agent mode', () => {
-    expect(plist()).toContain("cd '/Users/example/.okolos/agent-checkout' &amp;&amp; exec node tools/feed-job.mjs --agent")
+  it('starts the bootstrap outside the checkout, never a cd into it (B-159)', () => {
+    const text = program(plist())
+    expect(text).toContain("b='/Users/example/.okolos/bin/feed-agent/bootstrap.mjs'")
+    expect(text).toContain('then n=node')
+    expect(text).toContain('&quot;$n&quot; &quot;$b&quot;'.replaceAll('&quot;', '"'))
+    expect(text).not.toContain('cd ')
+    expect(text).not.toContain('agent-checkout')
+  })
+
+  it('falls back to the node that installed it when the login shell has none', () => {
+    expect(program(plist())).toContain("else n='/Users/example/.fnm/node-versions/v24/bin/node'; fi")
+  })
+
+  it('tells the bootstrap where the checkout is and what to recreate it from', () => {
+    const text = plist()
+    expect(variable(text, 'OKOLOS_AGENT_CHECKOUT')).toBe('/Users/example/.okolos/agent-checkout')
+    expect(variable(text, 'OKOLOS_SOURCE_REPO')).toBe('/Users/example/DATA/okolos')
+    expect(variable(text, 'OKOLOS_ORIGIN_URL')).toBe('git@github.com:passioncode-ai/okolos.git')
+  })
+
+  it('hands launchd the state and log folders the launch line writes, so all three writers agree', () => {
+    const text = plist()
+    expect(variable(text, 'OKOLOS_STATE_DIR')).toBe('/Users/example/.okolos/state')
+    expect(variable(text, 'OKOLOS_LOG_DIR')).toBe('/Users/example/Library/Logs/Okolos')
+    expect(program(text)).toContain("st='/Users/example/.okolos/state'; lg='/Users/example/Library/Logs/Okolos';")
+  })
+
+  it('renders an empty origin when the clone has none, which the bootstrap reads as none', () => {
+    expect(variable(rendered({ template: template(), runner: null, ...where, origin: '' }), 'OKOLOS_ORIGIN_URL')).toBe('')
+  })
+
+  // plutil and launchd exist only on macOS; elsewhere there is nothing to load the plist.
+  it.skipIf(process.platform !== 'darwin')('is a plist plutil accepts', () => {
+    const file = path.join(mkdtempSync(path.join(os.tmpdir(), 'okolos-plist-')), 'agent.plist')
+    writeFileSync(file, plist())
+    const lint = spawnSync('plutil', ['-lint', file], { encoding: 'utf8' })
+    expect(lint.status, lint.stdout + lint.stderr).toBe(0)
   })
 
   it('keeps the secret runner out of the command line: it wraps only the publish step', () => {
     const text = plist()
-    const program = /<key>ProgramArguments<\/key>\s*<array>([\s\S]*?)<\/array>/.exec(text)?.[1] ?? ''
-    expect(program).not.toContain('use_secret')
+    expect(program(text)).not.toContain('use_secret')
     expect(text).toMatch(/<key>OKOLOS_SECRET_RUNNER<\/key>\s*<string>\[&quot;\/opt\/py\/bin\/python3&quot;/)
   })
 
@@ -194,6 +314,11 @@ describe('the plist launchd reads', () => {
   it('logs to ~/Library/Logs/Okolos, never /tmp', () => {
     expect(plist()).toContain('<string>/Users/example/Library/Logs/Okolos/feed.launchd.log</string>')
     expect(plist()).not.toContain('/tmp/')
+  })
+
+  it('holds no "--" inside a comment, which XML forbids', () => {
+    const bad = (template().match(/<!--([\s\S]*?)-->/g) ?? []).filter((comment) => comment.slice(4, -3).includes('--'))
+    expect(bad.map((comment) => comment.slice(0, 60))).toEqual([])
   })
 
   it('leaves no placeholder behind, and rewrites no comment', () => {
@@ -207,7 +332,8 @@ describe('the plist launchd reads', () => {
   })
 
   it('refuses a template that lost a placeholder rather than guessing', () => {
-    expect(() => rendered({ template: template().replace('{{CHECKOUT}}', '/x'), checkout: '/c', runner: null, logDir: '/l' })).toThrow(/CHECKOUT/)
+    expect(() => rendered({ template: template().replace('{{CHECKOUT}}', '/x'), runner: null, ...where })).toThrow(/CHECKOUT/)
+    expect(() => rendered({ template: template().replaceAll('{{BOOTSTRAP}}', '/x'), runner: null, ...where })).toThrow(/BOOTSTRAP/)
   })
 })
 
@@ -220,5 +346,668 @@ describe('what is the agent doing', () => {
     const launchd = fakeLaunchd({ loaded: true })
     const status = await agentStatus({ ...base, target: h.target, launchctl: launchd.launchctl, paths: h.paths })
     expect(status).toMatchObject({ plist: true, loaded: true, launchd: { state: 'not running', runs: 3, lastExit: 0 }, lastRun: { outcome: 'published', version: 52 } })
+    expect(status.bootstrap).toBe(false)
+  })
+})
+
+describe('the bootstrap launchd starts lives outside the checkout (B-159)', () => {
+  it('copies the bootstrap and every module it imports', () => {
+    const h = home()
+    installBootstrap({ dir: h.paths.agentBin })
+    for (const file of BOOTSTRAP_FILES) {
+      const copy = path.join(h.paths.agentBin, file)
+      expect(readFileSync(copy, 'utf8'), file).toBe(readFileSync(path.join(repo, 'tools', BOOTSTRAP_SOURCES[file] ?? ''), 'utf8'))
+    }
+    expect(existsSync(h.paths.bootstrap)).toBe(true)
+  })
+
+  // POSIX modes: Windows reports 0o666/0o444 whatever was asked. The agent is a
+  // launchd agent, macOS only (ADR-0017).
+  it.skipIf(process.platform === 'win32')('keeps the copy owner-only', () => {
+    const h = home()
+    installBootstrap({ dir: h.paths.agentBin })
+    expect(statSync(h.paths.agentBin).mode & 0o777).toBe(0o700)
+  })
+
+  it('replaces an older copy whole, so no stale module survives an update', () => {
+    const h = home()
+    mkdirSync(h.paths.agentBin, { recursive: true })
+    writeFileSync(path.join(h.paths.agentBin, 'retired.mjs'), '')
+    installBootstrap({ dir: h.paths.agentBin })
+    expect(existsSync(path.join(h.paths.agentBin, 'retired.mjs'))).toBe(false)
+    expect(filesIn(h.paths.agentBin, '')).toEqual([...BOOTSTRAP_FILES].sort())
+  })
+
+  it('runs from the installed copy alone: a missing checkout ends in a written status, not a shell error', () => {
+    const h = home()
+    installBootstrap({ dir: h.paths.agentBin })
+    const env: Record<string, string> = {
+      PATH: process.env.PATH ?? '',
+      HOME: h.dir,
+      OKOLOS_STATE_DIR: h.paths.state,
+      OKOLOS_LOG_DIR: h.paths.logs,
+      OKOLOS_AGENT_CHECKOUT: h.paths.agentCheckout,
+      OKOLOS_AGENT_BIN: h.paths.agentBin,
+      OKOLOS_SOURCE_REPO: path.join(h.dir, 'no-such-clone'),
+      OKOLOS_ORIGIN_URL: '',
+    }
+    const result = spawnSync(process.execPath, [h.paths.bootstrap], { env, encoding: 'utf8', timeout: 20_000 })
+    expect(result.status, result.stderr).toBe(1)
+    expect(result.stderr).toMatch(/feed-agent: failed in checkout: .*missing/)
+    expect(readStatus(h.paths.status)).toMatchObject({ outcome: 'failed', stage: 'checkout', consecutiveFailures: 1, recoveredCheckout: false })
+    expect(readFileSync(h.paths.log, 'utf8')).toMatch(/is missing; recreating it/)
+  })
+})
+
+/**
+ * The launch line: what launchd runs before any of our JavaScript (B-159, fix
+ * round 2). When node cannot start, the bootstrap copy is gone, or node exits
+ * non-zero before the bootstrap wrote a record, the line itself writes a minimal
+ * status (stage "launch") and a feed.log line, with /bin/sh and coreutils only.
+ * These tests run the rendered line, so they test the plist launchd reads.
+ */
+// /bin/sh and launchd: the feed agent is a launchd agent, macOS only (ADR-0017).
+describe.skipIf(process.platform === 'win32')('the launch line records what fails before the bootstrap', () => {
+  const unxml = (text: string) =>
+    text.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&amp;', '&')
+
+  /** The shell line launchd hands /bin/sh -lc. */
+  const launchLine = (text: string) =>
+    unxml(/<key>ProgramArguments<\/key>\s*<array>[\s\S]*?<string>[\s\S]*?<\/string>\s*<string>[\s\S]*?<\/string>\s*<string>([\s\S]*?)<\/string>/.exec(text)?.[1] ?? '')
+
+  /** What launchd gives the line: the plist's EnvironmentVariables, HOME and a PATH with node on it. */
+  function launchdEnv(text: string, homeDir: string) {
+    const dict = /<key>EnvironmentVariables<\/key>\s*<dict>([\s\S]*?)<\/dict>/.exec(text)?.[1] ?? ''
+    const env: Record<string, string> = {
+      HOME: homeDir,
+      PATH: [path.dirname(process.execPath), '/usr/bin', '/bin'].join(path.delimiter),
+    }
+    for (const [, key, value] of dict.matchAll(/<key>([^<]+)<\/key>\s*<string>([^<]*)<\/string>/g)) env[key as string] = unxml(value as string)
+    return env
+  }
+
+  function launch(
+    h: ReturnType<typeof home>,
+    { node = process.execPath, bootstrap, pathEnv, extraEnv = {} }: { node?: string; bootstrap?: string; pathEnv?: string; extraEnv?: Record<string, string> } = {},
+  ) {
+    const text = rendered({
+      template: template(),
+      runner: null,
+      checkout: h.paths.agentCheckout,
+      logDir: h.paths.logs,
+      stateDir: h.paths.state,
+      bootstrap: h.paths.bootstrap,
+      node,
+      sourceRepo: '/nowhere',
+      origin: '',
+    })
+    const line = unxml(/<key>ProgramArguments<\/key>\s*<array>[\s\S]*?<string>[\s\S]*?<\/string>\s*<string>[\s\S]*?<\/string>\s*<string>([\s\S]*?)<\/string>/.exec(text)?.[1] ?? '')
+    if (bootstrap !== undefined) {
+      mkdirSync(h.paths.agentBin, { recursive: true })
+      writeFileSync(h.paths.bootstrap, bootstrap)
+    }
+    const env = {
+      HOME: h.dir,
+      PATH: pathEnv ?? [path.dirname(process.execPath), '/usr/bin', '/bin'].join(path.delimiter),
+      OKOLOS_STATE_DIR: h.paths.state,
+      ...extraEnv,
+    }
+    return spawnSync('/bin/sh', ['-c', line], { env, encoding: 'utf8', timeout: 20_000 })
+  }
+
+  /** A stand-in bootstrap that writes the record the real one would, under the launch id. */
+  const writesItsRecord = (exit: number) => `
+import { mkdirSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+const file = path.join(process.env.OKOLOS_STATE_DIR, 'feed-status.json')
+mkdirSync(path.dirname(file), { recursive: true })
+writeFileSync(file, JSON.stringify({ outcome: 'failed', stage: 'checkout', exit: ${exit}, runId: process.env.OKOLOS_LAUNCH_ID, consecutiveFailures: 1, lastPublished: null }, null, 2) + '\\n')
+process.exit(${exit})
+`
+
+  it('records a missing bootstrap copy, counts it, and says so in feed.log and launchd’s log', () => {
+    const h = home()
+    const result = launch(h)
+    expect(result.status).toBe(1)
+    const status = readStatus(h.paths.status)
+    expect(status).toMatchObject({ outcome: 'failed', stage: 'launch', exit: 1, consecutiveFailures: 1, lastPublished: null })
+    expect(status?.reason).toMatch(/bootstrap .* is missing.*pnpm feed:agent/)
+    expect(status?.at).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/)
+    expect(readFileSync(h.paths.log, 'utf8')).toMatch(/failed in launch: the installed bootstrap/)
+    expect(result.stderr).toMatch(/feed-agent: failed in launch/)
+    expect(statSync(h.paths.status).mode & 0o777).toBe(0o600)
+  })
+
+  // On a host whose system folders carry a node, "no node on PATH" cannot be arranged.
+  it.skipIf(existsSync('/usr/bin/node') || existsSync('/bin/node'))('records a node that cannot be found', () => {
+    const h = home()
+    const result = launch(h, { node: path.join(h.dir, 'gone', 'node'), bootstrap: 'process.exit(0)\n', pathEnv: '/usr/bin:/bin' })
+    expect(result.status).toBe(127)
+    expect(readStatus(h.paths.status)).toMatchObject({ outcome: 'failed', stage: 'launch', exit: 127 })
+    expect(readStatus(h.paths.status)?.reason).toMatch(/no node/)
+  })
+
+  it('records node exiting non-zero before the bootstrap wrote anything', () => {
+    const h = home()
+    const result = launch(h, { bootstrap: 'process.exit(3)\n' })
+    expect(result.status).toBe(3)
+    expect(readStatus(h.paths.status)).toMatchObject({ outcome: 'failed', stage: 'launch', exit: 3 })
+  })
+
+  it('leaves a record the bootstrap wrote for this launch alone', () => {
+    const h = home()
+    const result = launch(h, { bootstrap: writesItsRecord(1) })
+    expect(result.status).toBe(1)
+    expect(readStatus(h.paths.status)).toMatchObject({ stage: 'checkout', consecutiveFailures: 1 })
+    expect(existsSync(h.paths.log)).toBe(false)
+  })
+
+  it('writes nothing for a success or for a run refused by the lock', () => {
+    for (const exit of [0, 75]) {
+      const h = home()
+      const result = launch(h, { bootstrap: `process.exit(${exit})\n` })
+      expect(result.status).toBe(exit)
+      expect(existsSync(h.paths.status), `exit ${exit}`).toBe(false)
+    }
+  })
+
+  /** A job as origin/main had it before B-159: its own record, no runId, then exit 1. */
+  const OLD_JOB = `
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+const file = path.join(process.env.OKOLOS_STATE_DIR ?? path.join(os.homedir(), '.okolos', 'state'), 'feed-status.json')
+let previous = null
+try { previous = JSON.parse(readFileSync(file, 'utf8')) } catch {}
+const at = new Date().toISOString()
+mkdirSync(path.dirname(file), { recursive: true })
+writeFileSync(file, JSON.stringify({ startedAt: at, at, outcome: 'failed', stage: 'publish', exit: 1, reason: 'Unauthorized 401',
+  consecutiveFailures: (previous?.consecutiveFailures ?? 0) + 1, lastPublished: previous?.lastPublished ?? null }, null, 2) + '\\n')
+process.exit(1)
+`
+
+  it('counts one failed job run once, through the real bootstrap, even from a job that writes no runId', () => {
+    const h = home()
+    installBootstrap({ dir: h.paths.agentBin })
+    mkdirSync(path.join(h.paths.agentCheckout, 'tools'), { recursive: true })
+    writeFileSync(path.join(h.paths.agentCheckout, 'tools/feed-job.mjs'), OLD_JOB)
+    expect(spawnSync('git', ['init', '--quiet', h.paths.agentCheckout]).status).toBe(0)
+
+    const result = launch(h)
+    expect(result.status, result.stderr).toBe(1)
+    const status = readStatus(h.paths.status)
+    expect(status).toMatchObject({ outcome: 'failed', stage: 'publish', consecutiveFailures: 1 })
+    // The bootstrap stamped the launch id into the record it adopted, so the launch line left it alone.
+    expect(status?.runId).toMatch(/^launch-\d+-\d+$/)
+    expect(readFileSync(h.paths.log, 'utf8')).not.toMatch(/failed in launch/)
+  }, 30_000)
+
+  it('writes its own run id alone after a record the bootstrap stamped', () => {
+    const h = home()
+    writeStatus(h.paths.status, { startedAt: 'a', at: 'a', outcome: 'published', stage: 'done', exit: 0, version: 65, entries: 220 })
+    writeStatus(h.paths.status, { startedAt: 'b', at: 'b', outcome: 'failed', stage: 'publish', exit: 1 })
+    stampRunId(h.paths.status, 'launch-1-1')
+    expect(launch(h, { bootstrap: 'process.exit(1)\n' }).status).toBe(1)
+    const text = readFileSync(h.paths.status, 'utf8')
+    expect(text.match(/"runId"/g)).toHaveLength(1)
+    const status = readStatus(h.paths.status)
+    expect(status?.runId).toMatch(/^launch-\d+-\d+$/)
+    expect(status?.runId).not.toBe('launch-1-1')
+    expect(status).toMatchObject({ stage: 'launch', consecutiveFailures: 2, lastPublished: { version: 65, entries: 220, at: 'a' } })
+  })
+
+  it('copies the last publish alone, whatever a record holds after it', () => {
+    const cases = [
+      { lastPublished: null, after: 'null' },
+      { lastPublished: { version: 65, entries: 220, at: 'a' }, after: '{\n    "version": 65,\n    "entries": 220,\n    "at": "a"\n  }' },
+    ]
+    for (const { lastPublished, after } of cases) {
+      const h = home()
+      mkdirSync(h.paths.state, { recursive: true })
+      writeFileSync(
+        h.paths.status,
+        `{\n  "outcome": "failed",\n  "consecutiveFailures": 4,\n  "lastPublished": ${after},\n  "runId": "launch-old-1",\n  "installedOffMain": "x"\n}\n`,
+      )
+      launch(h, { bootstrap: 'process.exit(1)\n' })
+      const text = readFileSync(h.paths.status, 'utf8')
+      expect(text.match(/"runId"/g), text).toHaveLength(1)
+      expect(text).not.toMatch(/installedOffMain/)
+      expect(readStatus(h.paths.status)).toMatchObject({ stage: 'launch', consecutiveFailures: 5, lastPublished })
+    }
+  })
+
+  it('marks an install made off origin/main, as every writer does, and nothing when there is none', () => {
+    const h = home()
+    // launchd sets the variable from the plist: empty, or the installer's note.
+    launch(h, { bootstrap: 'process.exit(1)\n', extraEnv: { OKOLOS_INSTALLED_OFF_MAIN: '' } })
+    expect(readStatus(h.paths.status)).not.toHaveProperty('installedOffMain')
+    const note = 'sw/"x"\\y at bbbbbbb, origin/main aaaaaaa (--allow-branch, 2026-10-27T12:00:00Z)'
+    launch(h, { bootstrap: 'process.exit(1)\n', extraEnv: { OKOLOS_INSTALLED_OFF_MAIN: note } })
+    expect(readStatus(h.paths.status)).toMatchObject({ stage: 'launch', installedOffMain: note, consecutiveFailures: 2 })
+  })
+
+  it('writes one record in the folders it was installed with, through the real bootstrap, whatever HOME says', () => {
+    // An install made with OKOLOS_STATE_DIR and OKOLOS_LOG_DIR set: launchd starts the
+    // line with the plist's variables and HOME only, never the installer's shell.
+    const h = home()
+    const custom = { state: path.join(h.dir, 'custom-state'), logs: path.join(h.dir, 'custom-logs') }
+    installBootstrap({ dir: h.paths.agentBin })
+    const text = rendered({
+      template: template(),
+      runner: null,
+      checkout: h.paths.agentCheckout,
+      logDir: custom.logs,
+      stateDir: custom.state,
+      bootstrap: h.paths.bootstrap,
+      node: process.execPath,
+      sourceRepo: path.join(h.dir, 'no-such-clone'),
+      origin: '',
+    })
+    const result = spawnSync('/bin/sh', ['-c', launchLine(text)], { env: launchdEnv(text, h.dir), encoding: 'utf8', timeout: 20_000 })
+    expect(result.status, result.stderr).toBe(1)
+    const status = readStatus(path.join(custom.state, 'feed-status.json'))
+    expect(status).toMatchObject({ outcome: 'failed', stage: 'checkout', consecutiveFailures: 1 })
+    expect(readFileSync(path.join(custom.logs, 'feed.log'), 'utf8')).not.toMatch(/failed in launch/)
+    expect(existsSync(path.join(h.dir, '.okolos', 'state')), 'a second record under HOME').toBe(false)
+    expect(existsSync(path.join(h.dir, 'Library', 'Logs', 'Okolos')), 'a second log under HOME').toBe(false)
+  })
+
+  /** A job that says who it and its parent (the bootstrap) are, then hangs until it is killed. */
+  const HANGING_JOB = `
+import { writeFileSync } from 'node:fs'
+writeFileSync(process.env.OKOLOS_TEST_PIDS, JSON.stringify({ job: process.pid, bootstrap: process.ppid }))
+setInterval(() => {}, 1000)
+`
+
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async function until(check: () => boolean, ms = 15_000) {
+    const end = Date.now() + ms
+    while (!check()) {
+      if (Date.now() > end) return false
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    return true
+  }
+
+  // /bin/sh is bash on macOS and dash on Ubuntu; the line must behave the same in both.
+  it.each(['/bin/sh', '/bin/dash'].filter((shell) => existsSync(shell)))('passes launchd\'s SIGTERM on to the bootstrap, which records the stop and ends the job (%s)', async (sh) => {
+    // launchd stops a job by signalling its main pid: the /bin/sh this line runs in.
+    const h = home()
+    installBootstrap({ dir: h.paths.agentBin })
+    mkdirSync(path.join(h.paths.agentCheckout, 'tools'), { recursive: true })
+    writeFileSync(path.join(h.paths.agentCheckout, 'tools/feed-job.mjs'), HANGING_JOB)
+    expect(spawnSync('git', ['init', '--quiet', h.paths.agentCheckout]).status).toBe(0)
+    const text = rendered({
+      template: template(),
+      runner: null,
+      checkout: h.paths.agentCheckout,
+      logDir: h.paths.logs,
+      stateDir: h.paths.state,
+      bootstrap: h.paths.bootstrap,
+      node: process.execPath,
+      sourceRepo: '/nowhere',
+      origin: '',
+    })
+    const pids = path.join(h.dir, 'pids.json')
+    const shell = spawn(sh, ['-c', launchLine(text)], { env: { ...launchdEnv(text, h.dir), OKOLOS_TEST_PIDS: pids }, stdio: 'ignore' })
+    const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) =>
+      shell.on('exit', (code, signal) => resolve({ code, signal })),
+    )
+    let started: { job: number; bootstrap: number } | null = null
+    /** The pids, once the job has written them whole: the file exists, empty, before its write lands. */
+    const readPids = () => {
+      try {
+        started = JSON.parse(readFileSync(pids, 'utf8'))
+      } catch {
+        started = null
+      }
+      return started !== null
+    }
+    try {
+      expect(await until(readPids), 'the job never started').toBe(true)
+      shell.kill('SIGTERM')
+      const end = await Promise.race([exited, new Promise<null>((resolve) => setTimeout(() => resolve(null), 15_000))])
+      expect(end, 'the launch line did not end').toEqual({ code: 143, signal: null })
+      expect(readStatus(h.paths.status)).toMatchObject({ outcome: 'failed', stage: 'job', exit: 143, reason: 'stopped by SIGTERM' })
+      expect(readStatus(h.paths.status)?.runId).toMatch(/^launch-\d+-\d+$/)
+      expect(readFileSync(h.paths.log, 'utf8')).not.toMatch(/failed in launch/)
+      expect(await until(() => !alive(started!.job) && !alive(started!.bootstrap), 10_000), 'the bootstrap or the job outlived the stop').toBe(true)
+    } finally {
+      // Only what this test started: the shell, and the two node processes it named
+      // (read again, so a failure before the first read still ends them).
+      shell.kill('SIGKILL')
+      if (!started) readPids()
+      const named = started as { job: number; bootstrap: number } | null
+      for (const pid of named ? [named.job, named.bootstrap] : []) if (alive(pid)) process.kill(pid, 'SIGKILL')
+    }
+  }, 45_000)
+
+  it('counts on from the previous record and keeps the last publish, as JSON the host can read', () => {
+    const h = home()
+    writeStatus(h.paths.status, { startedAt: 'a', at: 'a', outcome: 'published', stage: 'done', exit: 0, version: 65, entries: 220 })
+    writeStatus(h.paths.status, { startedAt: 'b', at: 'b', outcome: 'failed', stage: 'publish', exit: 1 })
+    launch(h)
+    launch(h)
+    const status = readStatus(h.paths.status)
+    expect(status).toMatchObject({ stage: 'launch', consecutiveFailures: 3, lastPublished: { version: 65, entries: 220, at: 'a' } })
+  })
+})
+
+describe('the node the plist falls back to', () => {
+  /** A Homebrew-like layout: a versioned binary and a stable link to it on PATH. */
+  function brew() {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-node-'))
+    const versioned = path.join(dir, 'Cellar/node/26.10.0_2/bin/node')
+    mkdirSync(path.dirname(versioned), { recursive: true })
+    writeFileSync(versioned, '#!/bin/sh\n')
+    chmodSync(versioned, 0o755)
+    mkdirSync(path.join(dir, 'bin'))
+    symlinkSync(versioned, path.join(dir, 'bin/node'))
+    const other = path.join(dir, 'other/node')
+    mkdirSync(path.dirname(other))
+    writeFileSync(other, '#!/bin/sh\n')
+    chmodSync(other, 0o755)
+    return { dir, versioned, link: path.join(dir, 'bin/node'), other }
+  }
+
+  // Symbolic links need a privilege on Windows; the plist that uses this is a launchd agent, macOS only.
+  it.skipIf(process.platform === 'win32')('is the PATH entry that leads to the running node, not its versioned realpath (a brew upgrade removes that)', () => {
+    const b = brew()
+    const pathEnv = [path.dirname(b.other), path.join(b.dir, 'bin')].join(path.delimiter)
+    expect(stableNode({ execPath: b.versioned, pathEnv })).toBe(b.link)
+  })
+
+  it.skipIf(process.platform === 'win32')('skips a different node earlier on PATH', () => {
+    const b = brew()
+    expect(stableNode({ execPath: b.versioned, pathEnv: path.dirname(b.other) })).toBe(b.versioned)
+  })
+
+  it('is the running node itself when PATH has no way to it', () => {
+    expect(stableNode({ execPath: '/opt/node/bin/node', pathEnv: '' })).toBe('/opt/node/bin/node')
+  })
+})
+
+describe('whether the installed bootstrap is the checkout’s', () => {
+  function installed() {
+    const h = home()
+    installBootstrap({ dir: h.paths.agentBin })
+    const from = path.join(h.paths.agentCheckout, 'tools')
+    mkdirSync(path.join(from, 'feed'), { recursive: true })
+    for (const file of BOOTSTRAP_FILES) {
+      const source = BOOTSTRAP_SOURCES[file] ?? ''
+      writeFileSync(path.join(from, source), readFileSync(path.join(repo, 'tools', source)))
+    }
+    return { h, from }
+  }
+
+  it('matches when every module hashes the same', () => {
+    const { h, from } = installed()
+    expect(bootstrapDrift({ bin: h.paths.agentBin, from })).toEqual({ matches: true, differs: [] })
+  })
+
+  it('names the modules that changed on main since the install', () => {
+    const { h, from } = installed()
+    writeFileSync(path.join(from, 'feed/status.mjs'), '// changed on main\n')
+    writeFileSync(path.join(from, 'feed/newer.mjs'), '')
+    writeFileSync(path.join(h.paths.agentBin, 'newer.mjs'), 'older')
+    expect(bootstrapDrift({ bin: h.paths.agentBin, from })).toEqual({ matches: false, differs: ['newer.mjs', 'status.mjs'] })
+  })
+
+  it('cannot say when there is no checkout to compare with', () => {
+    const h = home()
+    installBootstrap({ dir: h.paths.agentBin })
+    expect(bootstrapDrift({ bin: h.paths.agentBin, from: path.join(h.paths.agentCheckout, 'tools') })).toEqual({ matches: null, differs: [] })
+  })
+
+  it('reports drift, and whether the plist starts the bootstrap, in --status', async () => {
+    const { h, from } = installed()
+    writeFileSync(path.join(from, 'feed/log.mjs'), '// changed\n')
+    writeFileSync(h.target, rendered({ template: template(), runner: null, checkout: h.paths.agentCheckout, logDir: h.paths.logs, bootstrap: h.paths.bootstrap }))
+    const status = await agentStatus({ ...base, target: h.target, launchctl: fakeLaunchd({ loaded: true }).launchctl, paths: h.paths })
+    expect(status).toMatchObject({ bootstrap: true, plistStartsBootstrap: true, bootstrapMatchesCheckout: false, bootstrapDiffers: ['log.mjs'] })
+    expect(status.note).toMatch(/differs .* pnpm feed:agent/)
+  })
+
+  it('says when the plist is the old one that cd’d into the checkout', async () => {
+    const h = home()
+    writeFileSync(h.target, '<plist><key>ProgramArguments</key><array><string>/bin/sh</string><string>-lc</string><string>cd x &amp;&amp; exec node tools/feed-job.mjs --agent</string></array></plist>')
+    const status = await agentStatus({ ...base, target: h.target, launchctl: fakeLaunchd({ loaded: true }).launchctl, paths: h.paths })
+    expect(status.plistStartsBootstrap).toBe(false)
+    expect(status.note).toMatch(/old plist/)
+  })
+})
+
+describe('the installer installs from origin/main only (ADR-0017)', () => {
+  const git = (answers: Record<string, string>) => async (_command: string, args: string[]) => {
+    const key = args.slice(2).join(' ')
+    return key in answers ? ok(`${answers[key]}\n`) : { ...ok(), code: 128, stderr: `unexpected ${key}` }
+  }
+  const sha = (c: string) => c.repeat(40)
+  const STATUS = `status --porcelain --untracked-files=all -- ${INSTALLED_SOURCES.join(' ')}`
+  const at = (branch: string, head: string, target: string, fetch = '', status = '') => ({
+    'fetch --quiet origin main': fetch,
+    'rev-parse --abbrev-ref HEAD': branch,
+    'rev-parse HEAD': head,
+    'rev-parse origin/main': target,
+    [STATUS]: status,
+  })
+
+  it('accepts main at origin/main, after fetching it', async () => {
+    const seen: string[] = []
+    const answers = git(at('main', sha('a'), sha('a')))
+    const tool = async (command: string, args: string[]) => (seen.push(args.slice(2).join(' ')), answers(command, args))
+    expect(await checkBranch({ repo: '/r', tool })).toMatchObject({ ok: true, branch: 'main', head: sha('a') })
+    // Compared with a freshly fetched origin/main, not whatever the clone last saw.
+    expect(seen.indexOf('fetch --quiet origin main')).toBeGreaterThanOrEqual(0)
+    expect(seen.indexOf('fetch --quiet origin main')).toBeLessThan(seen.indexOf('rev-parse origin/main'))
+  })
+
+  it('accepts a detached HEAD at origin/main', async () => {
+    expect(await checkBranch({ repo: '/r', tool: git(at('HEAD', sha('a'), sha('a'))) })).toMatchObject({ ok: true })
+  })
+
+  it('refuses main that is behind or ahead of origin/main: the name is not the commit', async () => {
+    const result = await checkBranch({ repo: '/r', tool: git(at('main', sha('b'), sha('a'))) })
+    expect(result.ok).toBe(false)
+    expect(result.reason).toMatch(/main at bbbbbbb.*origin\/main aaaaaaa.*--allow-branch/)
+  })
+
+  it('refuses a feature branch, naming it and the override', async () => {
+    const result = await checkBranch({ repo: '/r', tool: git(at('sw/sw-03', sha('b'), sha('a'))) })
+    expect(result.ok).toBe(false)
+    expect(result.reason).toMatch(/sw\/sw-03.*origin\/main.*--allow-branch/)
+  })
+
+  it('refuses when origin/main cannot be fetched to compare, and a clone git cannot read', async () => {
+    const offline = { ...at('main', sha('a'), sha('a')) } as Record<string, string>
+    delete offline['fetch --quiet origin main']
+    expect(await checkBranch({ repo: '/r', tool: git(offline) })).toMatchObject({ ok: false })
+    expect((await checkBranch({ repo: '/r', tool: git(offline) })).reason).toMatch(/could not fetch origin\/main/)
+    expect((await checkBranch({ repo: '/r', tool: git({}) })).ok).toBe(false)
+  })
+
+  it('names every file it installs from the working tree: the bootstrap’s sources and the plist template', () => {
+    expect(INSTALLED_SOURCES).toEqual([...BOOTSTRAP_FILES.map((file) => `tools/${BOOTSTRAP_SOURCES[file]}`), 'tools/launchd/app.okolos.feed.plist'])
+  })
+
+  it('refuses HEAD at origin/main when what it installs differs from HEAD, naming the files', async () => {
+    const result = await checkBranch({
+      repo: '/r',
+      tool: git(at('main', sha('a'), sha('a'), '', ' M tools/feed/status.mjs\n?? tools/is-main.mjs\nM  tools/launchd/app.okolos.feed.plist')),
+    })
+    expect(result.ok).toBe(false)
+    expect(result.changed).toEqual(['tools/feed/status.mjs', 'tools/is-main.mjs', 'tools/launchd/app.okolos.feed.plist'])
+    expect(result.reason).toMatch(/tools\/feed\/status\.mjs, tools\/is-main\.mjs, tools\/launchd\/app\.okolos\.feed\.plist.*--allow-branch/)
+    expect(result.reason).not.toMatch(/\n/)
+    expect(offMainNote(result, 't')).toBe(
+      'main at aaaaaaa, origin/main aaaaaaa, uncommitted: tools/feed/status.mjs, tools/is-main.mjs, tools/launchd/app.okolos.feed.plist (--allow-branch, t)',
+    )
+  })
+
+  it('refuses when git cannot say whether what it installs is HEAD’s', async () => {
+    const answers = at('main', sha('a'), sha('a')) as Record<string, string>
+    delete answers[STATUS]
+    const result = await checkBranch({ repo: '/r', tool: git(answers) })
+    expect(result.ok).toBe(false)
+    expect(result.reason).toMatch(/uncommitted.*--allow-branch/)
+  })
+
+  it('records an install past the refusal in the plist, for every run to carry', () => {
+    const text = rendered({
+      template: template(),
+      runner: null,
+      checkout: '/c',
+      logDir: '/l',
+      bootstrap: '/b/bootstrap.mjs',
+      offMain: 'sw/sw-03 at bbbbbbb, origin/main aaaaaaa (--allow-branch, 2026-10-27T12:00:00Z)',
+    })
+    expect(text).toMatch(/<key>OKOLOS_INSTALLED_OFF_MAIN<\/key>\s*<string>sw\/sw-03 at bbbbbbb, origin\/main aaaaaaa \(--allow-branch, 2026-10-27T12:00:00Z\)<\/string>/)
+    expect(rendered({ template: template(), runner: null, checkout: '/c', logDir: '/l', bootstrap: '/b/bootstrap.mjs' })).toMatch(
+      /<key>OKOLOS_INSTALLED_OFF_MAIN<\/key>\s*<string><\/string>/,
+    )
+  })
+
+  it('says it in one line', () => {
+    expect(offMainNote({ ok: false, branch: 'sw/sw-03', head: 'b'.repeat(40), target: 'a'.repeat(40) }, '2026-10-27T12:00:00Z')).toBe(
+      'sw/sw-03 at bbbbbbb, origin/main aaaaaaa (--allow-branch, 2026-10-27T12:00:00Z)',
+    )
+  })
+})
+
+describe('the installer compares what it installs with HEAD, with real git', () => {
+  const run = (...args: string[]) => {
+    const result = spawnSync('git', ['-c', 'user.email=t@example.test', '-c', 'user.name=t', ...args], { encoding: 'utf8' })
+    if (result.status !== 0) throw new Error(`git ${args.join(' ')}: ${result.stderr}`)
+    return result.stdout.trim()
+  }
+
+  /** A clone at a freshly pushed origin/main holding every installed source, and one file that is not installed. */
+  function clone() {
+    const base = mkdtempSync(path.join(os.tmpdir(), 'okolos-install-git-'))
+    const origin = path.join(base, 'origin.git')
+    const repo = path.join(base, 'clone')
+    run('init', '--quiet', '--bare', '--initial-branch=main', origin)
+    run('init', '--quiet', '--initial-branch=main', repo)
+    for (const file of [...INSTALLED_SOURCES, 'README.md']) {
+      mkdirSync(path.dirname(path.join(repo, file)), { recursive: true })
+      writeFileSync(path.join(repo, file), `${file}\n`)
+    }
+    run('-C', repo, 'add', '.')
+    run('-C', repo, 'commit', '--quiet', '-m', 'seed')
+    run('-C', repo, 'remote', 'add', 'origin', origin)
+    run('-C', repo, 'push', '--quiet', 'origin', 'main')
+    return repo
+  }
+
+  it('accepts a clean clone, and an edit to a file it does not install', async () => {
+    const repo = clone()
+    expect(await checkBranch({ repo })).toMatchObject({ ok: true, changed: [] })
+    writeFileSync(path.join(repo, 'README.md'), 'edited\n')
+    expect(await checkBranch({ repo })).toMatchObject({ ok: true })
+  })
+
+  it('refuses an edited, a staged, a deleted and an untracked installed source', async () => {
+    const repo = clone()
+    writeFileSync(path.join(repo, 'tools/feed/status.mjs'), 'edited\n')
+    writeFileSync(path.join(repo, 'tools/launchd/app.okolos.feed.plist'), 'staged\n')
+    run('-C', repo, 'add', 'tools/launchd/app.okolos.feed.plist')
+    rmSync(path.join(repo, 'tools/feed/lock.mjs'))
+    run('-C', repo, 'rm', '--quiet', '--cached', 'tools/is-main.mjs')
+    const result = await checkBranch({ repo })
+    expect(result.ok).toBe(false)
+    expect([...(result.changed ?? [])].sort()).toEqual(
+      ['tools/feed/lock.mjs', 'tools/feed/status.mjs', 'tools/is-main.mjs', 'tools/launchd/app.okolos.feed.plist'].sort(),
+    )
+    expect(result.reason).toMatch(/--allow-branch/)
+  })
+})
+
+describe('where the agent recreates its checkout from', () => {
+  it('reads the origin URL of the clone the installer runs in', async () => {
+    const seen: string[][] = []
+    const url = await originUrl({ repo: '/repo', tool: async (command: string, args: string[]) => (seen.push([command, ...args]), ok('git@github.com:passioncode-ai/okolos.git\n')) })
+    expect(url).toBe('git@github.com:passioncode-ai/okolos.git')
+    expect(seen).toEqual([['git', '-C', '/repo', 'remote', 'get-url', 'origin']])
+  })
+
+  it('answers empty when there is no origin, and the bootstrap then uses the clone alone', async () => {
+    expect(await originUrl({ repo: '/repo', tool: async () => ({ ...ok(), code: 2, stderr: 'No such remote' }) })).toBe('')
+  })
+})
+
+/**
+ * Nothing the installer starts publishes, so none of its children may hold the
+ * Cloudflare credential (B-159, fix round 5): the same list the job and the bootstrap
+ * drop. These run the real spawn paths (runBounded, execFileSync, the default
+ * launchctl) against stand-ins on a PATH that holds nothing else, so the operator's
+ * launchctl and git cannot be reached; each stand-in writes the environment it got.
+ */
+describe.skipIf(process.platform === 'win32')('no installer child gets the Cloudflare credential', () => {
+  function standIns() {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-installer-env-'))
+    const bin = path.join(dir, 'bin')
+    const dumps = path.join(dir, 'dumps')
+    mkdirSync(bin)
+    mkdirSync(dumps)
+    const dump = '/usr/bin/env > "$OKOLOS_TEST_DUMPS/$(/usr/bin/basename "$0")-$$.env"\n'
+    const script = (name: string, body = '') => {
+      writeFileSync(path.join(bin, name), `#!/bin/sh\n${dump}${body}`)
+      chmodSync(path.join(bin, name), 0o755)
+    }
+    // The Observatory probe: which finds the launcher, the launcher names a root, and
+    // the launcher's interpreter (here /bin/sh) runs the root's use_secret.py.
+    const root = path.join(dir, 'observatory')
+    mkdirSync(path.join(root, 'tools'), { recursive: true })
+    writeFileSync(path.join(root, 'tools/use_secret.py'), `${dump}`)
+    // `worktree add` makes the folder, as git would: pnpm install runs in it.
+    script('git', '[ "$3 $4" = "worktree add" ] && /bin/mkdir -p "$6"\nexit 0\n')
+    script('pnpm')
+    script('launchctl')
+    script('which', `echo ${path.join(bin, 'project-observatory')}\n`)
+    script('project-observatory', `echo ${root}\n`)
+    return { dir, bin, dumps }
+  }
+
+  it('strips CLOUDFLARE_API_TOKEN and CLOUDFLARE_API_KEY from git, launchctl and the Observatory probe', async () => {
+    const s = standIns()
+    const h = home()
+    vi.stubEnv('PATH', s.bin)
+    vi.stubEnv('OKOLOS_TEST_DUMPS', s.dumps)
+    vi.stubEnv('CLOUDFLARE_API_TOKEN', 'token-from-the-shell')
+    vi.stubEnv('CLOUDFLARE_API_KEY', 'key-from-the-shell')
+    try {
+      await checkBranch({ repo: '/repo' })
+      await originUrl({ repo: '/repo' })
+      await ensureCheckout({ repo: '/repo', checkout: path.join(h.dir, 'checkout'), log: quiet })
+      await installAgent({ ...base, target: h.target, plist: '<plist/>' })
+      await agentStatus({ ...base, target: h.target, paths: h.paths })
+      mkdirSync(h.paths.agentCheckout, { recursive: true })
+      await uninstallAgent({ ...base, target: h.target, bin: h.paths.agentBin, purge: { repo: '/repo', paths: h.paths } })
+      discover({ run: installerRun, log: quiet })
+    } finally {
+      vi.unstubAllEnvs()
+    }
+    const seen = filesIn(s.dumps, '.env')
+    const by = (name: string) => seen.filter((file) => file.startsWith(`${name}-`)).length
+    // Every path ran: checkBranch 5, originUrl 1, ensureCheckout 3, the purge 2.
+    expect(by('git')).toBe(11)
+    expect(by('pnpm')).toBe(1)
+    // install 3, status 1, uninstall 2.
+    expect(by('launchctl')).toBe(6)
+    expect([by('which'), by('project-observatory'), by('use_secret.py')]).toEqual([1, 1, 1])
+    for (const file of seen) {
+      const text = readFileSync(path.join(s.dumps, file), 'utf8')
+      // Booleans, so a failure names the file and never prints an environment.
+      expect(/^CLOUDFLARE_API_(TOKEN|KEY)=/m.test(text), `${file} holds the credential`).toBe(false)
+      expect(/^OKOLOS_TEST_DUMPS=/m.test(text), `${file} lost the rest of the environment`).toBe(true)
+    }
   })
 })

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
@@ -52,7 +52,23 @@ const link = (target: string, at: string): void => {
   symlinkSync(target, at, process.platform === 'win32' ? 'junction' : 'dir')
 }
 link(src, path.join(mirror, 'apps/mail-cli/src'))
-link(path.join(app, 'node_modules'), path.join(mirror, 'apps/mail-cli/node_modules'))
+/**
+ * Each dependency linked to its real directory, not the whole `node_modules` as one link:
+ * pnpm's entries are links themselves, and on Windows a junction reached through another
+ * junction did not resolve, so the build could not find `@okolos/i18n` there (CI
+ * `gates (windows)` on PR #20, 2026-11-04). A scope (`@okolos`) is a real directory of links.
+ */
+const deps = path.join(app, 'node_modules')
+for (const name of readdirSync(deps)) {
+  if (name.startsWith('.')) continue
+  if (name.startsWith('@')) {
+    for (const scoped of readdirSync(path.join(deps, name))) {
+      link(realpathSync(path.join(deps, name, scoped)), path.join(mirror, 'apps/mail-cli/node_modules', name, scoped))
+    }
+  } else {
+    link(realpathSync(path.join(deps, name)), path.join(mirror, 'apps/mail-cli/node_modules', name))
+  }
+}
 link(path.join(root, 'apps/extension'), path.join(mirror, 'apps/extension'))
 const built = path.join(mirror, 'apps/mail-cli/dist')
 mkdirSync(built)

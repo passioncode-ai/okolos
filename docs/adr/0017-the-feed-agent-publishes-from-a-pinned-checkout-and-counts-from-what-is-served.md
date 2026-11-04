@@ -40,17 +40,47 @@ That one line carried four defects the audit measured:
 3. **Production publishes run only from a clean checkout at origin/main.** The agent owns a
    detached worktree at `~/.okolos/agent-checkout` and fast-forwards it before each run; a manual
    run from a clone that is not at origin/main is refused unless `--unpinned` is given, which is
-   recorded. wrangler is a pinned devDependency of `apps/proxy`, run through `pnpm exec` with the
+   recorded. The installer itself refuses to install unless the clone's HEAD equals a freshly
+   fetched origin/main (the commit is checked, not the branch name) and every file it installs
+   from the working tree (the bootstrap's sources and the plist template, `INSTALLED_SOURCES`)
+   is HEAD's: nothing edited, staged, deleted or untracked. `--allow-branch` overrides, and is
+   recorded in `feed.log` and as `installedOffMain` in every record of a run: the launch line's,
+   the bootstrap's and the job's, a stop by signal and a record adopted from an older job
+   included. wrangler is a pinned devDependency of `apps/proxy`, run through `pnpm exec` with the
    install-before-run check off and telemetry off.
 4. **Every run is bounded, exclusive and observable**: each stage a child in its own process
    group with a deadline, a thirty-minute watchdog over the run, a lock shared with every manual
    entry point, retries with backoff, and a status record per run that counts failures in a row.
-   The Cloudflare token reaches only the publish step.
+   The Cloudflare token reaches only the publish step: one list of credential variables
+   (`tools/feed/bounded.mjs`) is dropped from every other child of the job, the bootstrap and the
+   installer; the job itself gets the bootstrap's whole environment, because publish inherits it
+   through the job. Since B-159 one deadline covers the whole
+   run, the checkout repair included (45 minutes; the job's watchdog is what is left minus two
+   minutes, at most thirty).
 5. **A login is not a publish**: the agent's run skips when the served feed is younger than its
    interval (eleven hours, one under the twelve-hour schedule).
-6. **Uninstall is symmetric**: bootout, delete the plist, verify with `launchctl print`; `--purge`
-   also removes the checkout, the state and the logs. An install never re-enables an agent the
-   operator disabled.
+6. **Uninstall is symmetric**: bootout, delete the plist and `~/.okolos/bin/feed-agent/` (and
+   `~/.okolos/bin` when that was all it held, and any staging folder an interrupted install left),
+   verify with `launchctl print`; `--purge` also removes the checkout,
+   `~/.okolos/agent-checkout.broken`, the state and the logs, and prunes the clone's worktree entry.
+   An install never re-enables an agent the operator disabled.
+7. **launchd starts a bootstrap outside the checkout, never a `cd` into it (B-159, 2026-10-27).**
+   From 2026-10-09 to 2026-10-26 the checkout was gone; every run died in `cd`, nothing wrote the
+   status record, and the failure count read 0 for seventeen days (B-149). The installer now copies
+   `tools/feed/bootstrap.mjs` and the modules it imports to `~/.okolos/bin/feed-agent/`, and the
+   plist runs it through a `/bin/sh` launch line. The bootstrap checks the checkout; it moves a
+   broken one to `~/.okolos/agent-checkout.broken` (one kept, as evidence for B-150) and recreates
+   a missing one at origin/main: a detached worktree of the clone the installer ran from (after
+   `git worktree prune`, since a deleted folder stays registered), or, when that clone is gone too,
+   a clone of its origin. The run's record carries `recoveredCheckout`. Every failure that reaches
+   the bootstrap is recorded (`stage: checkout`, `stage: job`, the job's stages); one that fails
+   before it (no `node`, the copy gone, `node` exiting without a record for this launch) is
+   recorded by the launch line itself with `/bin/sh` only (`stage: launch`). A record is a run's
+   when it carries that launch's `runId`; the bootstrap stamps it into a record adopted from a job
+   that writes none, so one failure is counted once. launchd not starting the agent at all is
+   recorded nowhere. No alarm reads the record yet: that alarm is OBS-32 in
+   `passioncode-ai/project-observatory-dashboard` (B-135, done, filed it), and it does not read
+   `feed-status.json` yet.
 
 ## Цена
 
@@ -63,6 +93,9 @@ That one line carried four defects the audit measured:
   has to be committed from `pnpm feed:snapshot` within the fourteen-day freshness ceiling.
 - A change to the feed tools reaches production only once it lands on main — including an urgent
   fix, unless someone runs `--unpinned` and accepts the record it leaves.
+- The bootstrap copy changes only when a person reinstalls: a change to `tools/feed/bootstrap.mjs`
+  or its modules on main needs `pnpm feed:agent` again; `--status` reports the drift. The launch
+  line's own record is minimal (no version, no commit).
 
 ## Чем держится
 
@@ -75,5 +108,13 @@ That one line carried four defects the audit measured:
 | Watchdog, lock, retries, status, token only on publish, origin/main only, login skip | `tools/feed-job.test.ts` |
 | Logs rotated and owner-only; status record shape | `tools/feed/log.test.ts`, `tools/feed/status.test.ts` |
 | Uninstall verified; disabled stays disabled; plist placeholders | `tools/install-feed-agent.test.ts` |
+| Bootstrap outside the checkout: recreate (worktree or clone), `.broken`, a record on every failure that reaches it, one run deadline, the job's stderr relayed (B-159) | `tools/feed/bootstrap.test.ts` |
+| The launch line records `stage: launch` with `/bin/sh` alone; bootstrap copy installed and removed; drift in `--status`; install from main only | `tools/install-feed-agent.test.ts` |
+| The run id and `recoveredCheckout` in the job's record; the watchdog handed down | `tools/feed-job.test.ts` |
+| A tool or job started through a linked path still runs (one check, `tools/is-main.mjs`) | `tools/is-main.test.ts` |
+| One failed job run counts once: the launch line and the bootstrap agree on `runId`; a launch record holds one `runId`, its own, after a stamped one | `tools/install-feed-agent.test.ts`, `tools/feed/status.test.ts` |
+| The installer refuses uncommitted edits to what it installs, named in one line (a git double and real git) | `tools/install-feed-agent.test.ts` |
+| `installedOffMain` in every writer: launch line, bootstrap failure, crash and signal records, the job's records and signal record, an adopted record | `tools/install-feed-agent.test.ts`, `tools/feed/bootstrap.test.ts`, `tools/feed-job.test.ts` |
+| A stop by signal is recorded as the stop (exit 143), not as the job's crash it caused | `tools/feed/bootstrap.test.ts` |
 | State paths outside the working tree | `tools/feed/paths.test.ts` |
 | Release gate reads the newer of snapshot and state | `tools/feed-age.test.ts` |

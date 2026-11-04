@@ -49,6 +49,15 @@ describe('the failure code', () => {
   })
 })
 
+describe('the floors and the root engines', () => {
+  it('say the same versions, so a node engines allows can run the command', () => {
+    const engines = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')).engines.node
+    expect(engines).toBe('^22.18.0 || >=23.6.0')
+    for (const node of ['22.18.0', '23.6.0', '24.0.0']) expect(runsFromSources(node, 'strip'), node).toBe(true)
+    for (const node of ['22.17.9', '23.5.0']) expect(runsFromSources(node, 'strip'), node).toBe(false)
+  })
+})
+
 describe('the launcher, with the node it runs on injected', () => {
   const quiet = () => {
     const lines: string[] = []

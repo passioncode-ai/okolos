@@ -45,7 +45,8 @@
   design system of its own (recommended, not required). Inventing a palette,
   type pairing, or motion per screen is visual drift.
 - After any UX change and before calling the work done, run the linter
-  `python3 docs/ux/lint.py` — it must pass (errors are drift/broken
+  `pnpm ux:lint` (`docs/ux/lint.py` through `tools/python.mjs`, which finds
+  Python 3 on Windows too) — it must pass (errors are drift/broken
   structure; wire it into CI/pre-commit).
 - Use `/ux` as the entry point; skills: `ux-foundation`, `ux-flows`
   (flows + Figma mockups), `ux-scenarios` for maintenance, `ux-audit` for

@@ -68,8 +68,10 @@ describe('pruning old release archives', () => {
 
   it('is called by the release command after it writes an archive', () => {
     const release = readFileSync(path.join(root, 'tools/package.mjs'), 'utf8')
-    const written = release.indexOf("execFileSync('zip'")
+    // The archive is written by whatever archivePlan picks: zip, or tar.exe on Windows (B-163).
+    const written = release.indexOf('execFileSync(plan.command')
     const pruned = release.indexOf('pruneReleases(out)')
+    expect(written, 'the release command no longer writes its archive where this looks').toBeGreaterThan(0)
     expect(pruned, 'the release command never prunes').toBeGreaterThan(0)
     expect(pruned).toBeGreaterThan(written)
   })
