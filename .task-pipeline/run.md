@@ -125,3 +125,8 @@ catalogue, and checked then. Next: stage 4 plan.
   D8 App-Key slot `passioncode-platform/prod/APTABASE_APP_KEY_OKOLOS`, made by growth with
   passioncode-platform `scripts/app.sh create` (asked, answer pending). `docs/brand/facts.md` and
   `packages/net/src/destinations.ts` will name `analytics.passioncode.ai`.
+- 2026-11-04 17:43 UTC, sshlg-growth: Aptabase app «Okolos» `U2Q3Qa4oUyq3AE7U7qYPnB` on
+  `https://analytics.passioncode.ai`, App Key in `passioncode-platform/prod/APTABASE_APP_KEY_OKOLOS` (never
+  printed), a Debug test event accepted (200). growth-onboarding steps 1..3 hold; growth registration and reading this
+  server wait for RB-108 on growth's side (a reader password from the operator). Resource proposed to Observatory as
+  `prop:6aa77ea2725844ea`. Revision 34 with `browser_extension` rolls out today.
