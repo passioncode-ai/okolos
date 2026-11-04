@@ -137,7 +137,7 @@ pnpm i18n:sweep
 Число ключей в каталоге меряется, а не переписывается:
 
 ```bash
-python3 -c "import json;print(len(json.load(open('apps/extension/_locales/ru/messages.json'))))"
+node -e "console.log(Object.keys(JSON.parse(require('fs').readFileSync('apps/extension/_locales/ru/messages.json','utf8'))).length)"
 ```
 
 ## Знак

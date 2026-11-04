@@ -46,7 +46,9 @@ const KNOWN: Record<string, { sites: number; why: string }> = {
 }
 
 function specs(): string[] {
-  return globSync('e2e/*.spec.ts', { cwd: root })
+  // globSync answers with the platform's separator; the allowed list is written with '/', so
+  // Windows read e2e\\scn-007.spec.ts and failed a list that was right (CI, gates (windows)).
+  return globSync('e2e/*.spec.ts', { cwd: root }).map((file) => file.split(path.sep).join('/'))
 }
 
 /** The Gecko harness has its own spelling of the same wait. */

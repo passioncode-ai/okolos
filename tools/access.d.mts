@@ -26,7 +26,10 @@ export declare const FEED_KEY_ACCESS: Access
 
 export declare function parseEnv(text: string): Record<string, string>
 export declare function normaliseValue(raw: string): string
-export declare function permissionProblem(file: string): string | null
+/** Whether POSIX mode bits mean anything on the platform (not on win32). */
+export declare function modesApply(platform?: string): boolean
+/** The mode problem of a secrets file, or null; null too where modes do not apply. */
+export declare function permissionProblem(file: string, platform?: string): string | null
 export declare function compiledPublicKey(): string | null
 export declare function feedKeyMatches(pem: string, expectedBase64: string | null): Probe
 export declare function verdictOf(input: {

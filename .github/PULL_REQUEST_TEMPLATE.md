@@ -3,7 +3,7 @@
 ## Checks
 
 - [ ] `pnpm gates` (the pre-push hook runs the same chain)
-- [ ] `python3 docs/ux/lint.py` after any change to user-facing behaviour
+- [ ] `pnpm ux:lint` after any change to user-facing behaviour
 - [ ] A new `package.json` carries the organisation's licence expression — `tools/licensing.test.ts`
 
 No credential values, local paths or personal data in code, tests, fixtures or this description.

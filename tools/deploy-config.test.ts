@@ -30,7 +30,7 @@ describe('rendering the deploy config', () => {
     const out = renderConfig(template, ID)
     expect(out).toContain(`database_id = "${ID}"`)
     expect(out).not.toContain(PLACEHOLDER)
-    expect(out.split('\n')).toHaveLength(template.split('\n').length)
+    expect(out.split(/\r?\n/)).toHaveLength(template.split(/\r?\n/).length)
   })
 
   it('refuses an id that is not a uuid, rather than deploying against it', () => {

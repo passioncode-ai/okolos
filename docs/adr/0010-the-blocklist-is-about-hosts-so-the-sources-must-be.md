@@ -93,9 +93,13 @@ OpenPhish обновляется примерно раз в 12 часов. Ав�
 pnpm feed:refresh   # собрать и опубликовать, одной командой
 ```
 
-Поставить по расписанию на этой машине (раз в 12 часов):
+Поставить по расписанию на этой машине (раз в 12 часов). Форма ниже историческая: с B-159
+launchd запускает бутстрап вне рабочей копии, а не `cd` в неё; как ставится агент сейчас,
+записано в [ADR-0017](0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md)
+и делается командой `pnpm feed:agent`.
 
 ```bash
+# историческая форма, до B-159:
 # launchd: ~/Library/LaunchAgents/app.okolos.feed.plist
 # StartInterval 43200, ProgramArguments: /bin/sh -lc 'cd <repo> && pnpm feed:refresh'
 ```

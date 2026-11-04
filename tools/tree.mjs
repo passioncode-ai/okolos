@@ -80,5 +80,37 @@ export function filesUnder(dir, suffix, { skip = ['node_modules', 'dist'] } = {}
     }
   }
   walk(dir)
-  return out.sort()
+  return out.sort(byPosixPath)
+}
+
+/**
+ * `file` with the platform's separator turned into `/`.
+ *
+ * Every gate names files the way the repository does, `packages/ui/src/x.ts`, and on
+ * macOS and Linux `path.relative` already answers in that form, so a comparison with a
+ * literal held there. On Windows it answers `packages\ui\src\x.ts`, and the same
+ * comparison failed, or worse, passed: `startsWith('node_modules/')` is never true of a
+ * backslashed path, so the check that `node_modules` was skipped held vacuously (B-164).
+ * On macOS and Linux this returns its argument unchanged.
+ *
+ * @param {string} file
+ * @param {string} [sep] the separator to replace; the platform's by default
+ */
+export function toPosix(file, sep = path.sep) {
+  return sep === '/' ? file : file.split(sep).join('/')
+}
+
+/** `path.relative(from, to)` in the repository's spelling, `/` on every platform. */
+export function posixRelative(from, to) {
+  return toPosix(path.relative(from, to))
+}
+
+/**
+ * Sorts as the POSIX spelling would, so two machines list the same tree in one order:
+ * a backslash sorts after the capitals and digits, where `/` sorts before them.
+ */
+function byPosixPath(a, b) {
+  const left = toPosix(a)
+  const right = toPosix(b)
+  return left < right ? -1 : left > right ? 1 : 0
 }

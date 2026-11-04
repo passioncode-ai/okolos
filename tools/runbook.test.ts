@@ -42,7 +42,7 @@ const PNPM_BUILTINS = new Set(['install', 'exec', 'add', 'remove', 'dlx', 'why',
 
 /** Every line inside a fenced block, comments and prompts stripped. */
 const commands = [...text.matchAll(/```bash\n([\s\S]*?)```/g)]
-  .flatMap((m) => (m[1] as string).split('\n'))
+  .flatMap((m) => (m[1] as string).split(/\r?\n/))
   .map((line) => line.replace(/#.*$/, '').trim())
   .filter(Boolean)
 

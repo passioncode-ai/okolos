@@ -35,8 +35,10 @@ describe('the model stage stays out of what ships', () => {
   })
 
   it('leaves no shipped source importing the model package', () => {
-    const importers = filesUnder(path.join(root, 'apps'), '.ts')
-      .filter((file) => !file.endsWith('.test.ts') && !file.endsWith('.bench.ts'))
+    // Sources only: `.tsc` holds the type checker's output, which outlives a deleted source
+    // (a stale `.tsc/background/inference.d.ts` failed this on a checkout built before B-131).
+    const importers = filesUnder(path.join(root, 'apps'), '.ts', { skip: ['node_modules', 'dist', '.tsc'] })
+      .filter((file) => !file.endsWith('.test.ts') && !file.endsWith('.bench.ts') && !file.endsWith('.d.ts'))
       .filter((file) => /from '@okolos\/model'/.test(readFileSync(file, 'utf8')))
       .map((file) => path.relative(root, file))
     expect(importers, 'ADR-0006: the model stage is not shipped, so nothing that ships imports it').toEqual([])

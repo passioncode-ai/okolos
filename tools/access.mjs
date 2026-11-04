@@ -30,6 +30,7 @@ import { createPrivateKey, createPublicKey } from 'node:crypto'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { isMain } from './is-main.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 export const STORE = path.join(homedir(), '.okolos')
@@ -53,7 +54,7 @@ const FEED_KEY = path.join(STORE, 'feed-signing-key.pem')
 export function parseEnv(text) {
   /** @type {Record<string, string>} */
   const out = {}
-  for (const line of text.split('\n')) {
+  for (const line of text.split(/\r?\n/)) {
     const m = /^\s*(?:export\s+)?([A-Za-z0-9_]+)=(?:'([^']*)'|"([^"]*)"|(.*?))\s*$/.exec(line)
     if (m) out[m[1]] = m[2] ?? m[3] ?? m[4] ?? ''
   }
@@ -96,13 +97,27 @@ function stored() {
 }
 
 /**
+ * Whether POSIX mode bits mean anything on `platform`.
+ *
+ * Windows has none: `stat().mode & 0o777` reads 0o666 for every writable file there,
+ * so a check reading it reported every secrets file BAD and told the reader to run
+ * `chmod`, which Windows does not have (B-163). Access there is the user profile's ACL.
+ *
+ * @param {string} [platform]
+ */
+export function modesApply(platform = process.platform) {
+  return platform !== 'win32'
+}
+
+/**
  * A file holding a secret must not be readable by anyone else.
  *
  * @param {string} file
- * @returns {string | null} the problem, or null
+ * @param {string} [platform]
+ * @returns {string | null} the problem, or null; null too where modes do not apply
  */
-export function permissionProblem(file) {
-  if (!existsSync(file)) return null
+export function permissionProblem(file, platform = process.platform) {
+  if (!modesApply(platform) || !existsSync(file)) return null
   const mode = statSync(file).mode & 0o777
   return mode & 0o077 ? `mode ${mode.toString(8)} — readable by others, should be 600` : null
 }
@@ -356,6 +371,12 @@ async function status({ probe = true } = {}) {
   console.log(`  ${' '.repeat(14)} ${DIM}${key.unblocks} · read by ${key.readBy}${OFF}`)
   if (state === 'missing') console.log(`  ${' '.repeat(14)} ${DIM}get it: ${key.howToGet}${OFF}`)
 
+  if (!modesApply()) {
+    console.log(
+      `\n  n/a  file modes: not checked on Windows, which has no POSIX mode bits; ` +
+        `the files under ${STORE} are guarded by your user profile's permissions`,
+    )
+  }
   const problems = [CLOUDFLARE_ENV, TOOLS_ENV, FEED_KEY].map((f) => [f, permissionProblem(f)])
   for (const [file, problem] of problems) {
     if (problem) {
@@ -445,7 +466,8 @@ function die(message) {
  * ran the whole tool — network probes and all — which is a test that reaches
  * the internet because it mentioned a module.
  */
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Real paths, so a run through a symlink or a junction still runs (tools/is-main.mjs).
+if (isMain(import.meta.filename)) {
   const [command, argument] = process.argv.slice(2)
   if (command === 'set') setAccess(argument ?? die('name an access to set'))
   else if (command === 'permissions') permissions()

@@ -8,15 +8,21 @@
  * distinguish "broken" from "unverified" at all.
  */
 
+import { spawnSync } from 'node:child_process'
 import { generateKeyPairSync } from 'node:crypto'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import {
   ACCESSES,
   compiledPublicKey,
   feedKeyMatches,
+  modesApply,
   normaliseValue,
   parseEnv,
+  permissionProblem,
   verdictOf,
 } from './access.mjs'
 
@@ -31,6 +37,12 @@ describe('reading a secrets file', () => {
     // answered "Could not route" — present, and wrong.
     expect(parseEnv("X='abc'").X).toBe('abc')
     expect(parseEnv('X="abc"').X).toBe('abc')
+  })
+
+  it('reads a file saved with Windows line endings the same way', () => {
+    // Notepad writes CRLF; a `\r` kept on a value is a credential present and wrong (B-162).
+    const parsed = parseEnv("export A=1\r\nB='two'\r\nC=\"three\"\r\nD=four\r\n")
+    expect(parsed).toEqual({ A: '1', B: 'two', C: 'three', D: 'four' })
   })
 })
 
@@ -122,5 +134,39 @@ describe('the list of accesses', () => {
         false,
       )
     }
+  })
+})
+
+describe('the mode of a secrets file', () => {
+  /** A secrets file anyone may read. */
+  const loose = () => {
+    const file = path.join(mkdtempSync(path.join(os.tmpdir(), 'okolos-access-')), 'cloudflare.env')
+    writeFileSync(file, 'X=1\n', { mode: 0o644 })
+    return file
+  }
+
+  // Windows has no POSIX mode bits, so a 0644 file cannot be made there to be found;
+  // this is the macOS and Linux promise, and it is skipped on win32 (B-163).
+  it.skipIf(process.platform === 'win32')('is BAD when others can read it, on macOS and Linux', () => {
+    expect(permissionProblem(loose(), 'darwin')).toMatch(/readable by others/)
+  })
+
+  it('is not checked on Windows, rather than reported BAD for a mode that does not exist there', () => {
+    expect(modesApply('win32')).toBe(false)
+    expect(modesApply('linux')).toBe(true)
+    expect(permissionProblem(loose(), 'win32')).toBeNull()
+  })
+})
+
+describe('running it as a command', () => {
+  it('answers on its command line, so the run guard matches however the path is spelled', () => {
+    // The guard compared import.meta.url with `file://` + argv[1], which never holds on
+    // Windows (`C:\…`), so the tool ran nothing there. An unknown command is answered
+    // offline, which is all this needs.
+    const run = spawnSync(process.execPath, [path.join(import.meta.dirname, 'access.mjs'), 'no-such-command'], {
+      encoding: 'utf8',
+    })
+    expect(run.status).toBe(1)
+    expect(run.stderr).toContain('unknown command')
   })
 })

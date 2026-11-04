@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-import { filesIn } from './tree.mjs'
+import { filesIn, toPosix } from './tree.mjs'
 
 // @ts-expect-error — a plain .mjs tool, imported for the parsing it does.
 import { NEVER_BLOCK, RULE_LIMIT, SHORT_HOST_CHARS, SOURCES, buildSnapshot, defaultOut, guard, hostFrom, hostsFrom, ingest, shrankTooFar } from './ingest.mjs'
@@ -60,6 +60,13 @@ describe('the sweep keeps order and drops repeats', () => {
   it('keeps the source order — the cap depends on it', () => {
     const hosts = hostsFrom('https://a.test/1\nhttps://b.test/2\nhttps://c.test/3')
     expect(hosts).toEqual(['a.test', 'b.test', 'c.test'])
+  })
+
+  it('reads a source served with CRLF line endings as it reads LF', () => {
+    expect(hostsFrom('https://a.test/1\r\nb.test\r\nhttps://c.test/3\r\n')).toEqual(
+      hostsFrom('https://a.test/1\nb.test\nhttps://c.test/3\n'),
+    )
+    expect(hostsFrom('https://a.test/1\r\nb.test\r\n')).toEqual(['a.test', 'b.test'])
   })
 
   it('keeps the first sighting of a host that appears twice', () => {
@@ -411,12 +418,20 @@ describe('the version comes from what is served, not from the worktree (F1)', ()
     expect(existsSync(out)).toBe(false)
   })
 
-  it('writes the file whole and owner-only, leaving no temporary beside it', async () => {
+  it('writes the file whole, leaving no temporary beside it', async () => {
+    const out = planted(0, 0)
+    await ingest({ out, seed: null, fetchImpl: world({ served: { status: 404 } }), log: quiet })
+    expect(filesIn(path.dirname(out), '.json')).toEqual(['phishing.json'])
+    expect(filesIn(path.dirname(out), '.tmp')).toEqual([])
+  })
+
+  // Windows has no POSIX mode bits (`stat().mode & 0o777` reads 0o666 there whatever
+  // was asked), so this runs on macOS and Linux, where the feed agent runs, and is
+  // skipped on win32 rather than loosened everywhere (B-162).
+  it.skipIf(process.platform === 'win32')('writes the file owner-only', async () => {
     const out = planted(0, 0)
     await ingest({ out, seed: null, fetchImpl: world({ served: { status: 404 } }), log: quiet })
     expect(statSync(out).mode & 0o777).toBe(0o600)
-    expect(filesIn(path.dirname(out), '.json')).toEqual(['phishing.json'])
-    expect(filesIn(path.dirname(out), '.tmp')).toEqual([])
   })
 
   it('writes nothing on a dry run', async () => {
@@ -428,6 +443,6 @@ describe('the version comes from what is served, not from the worktree (F1)', ()
 
   it('writes outside the git working tree by default', () => {
     expect(defaultOut().startsWith(root), defaultOut()).toBe(false)
-    expect(defaultOut()).toMatch(/\.okolos\/state\/feeds\/phishing\.json$/)
+    expect(toPosix(defaultOut())).toMatch(/\.okolos\/state\/feeds\/phishing\.json$/)
   })
 })
