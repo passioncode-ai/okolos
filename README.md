@@ -60,8 +60,8 @@ Full vector coverage: [docs/coverage-matrix.md](docs/coverage-matrix.md).
 
 ## Quick start for a new teammate
 
-**Install.** Nothing is published yet: no Chrome Web Store or Firefox Add-ons listing, no
-GitHub release. Build it and load the unpacked extension:
+**Install.** Nothing is published yet: no Chrome Web Store, Firefox Add-ons or Edge Add-ons
+listing, no GitHub release. Build it and load the unpacked extension:
 
 ```bash
 corepack enable && pnpm install     # Node 22.18+ or 23.6 to 24; also installs the pre-push hook
@@ -73,12 +73,35 @@ Corepack ships with Node 22 to 24 only, on every OS, Windows included (where `co
 needs an administrator shell when Node is under Program Files). On Node 25 and later,
 install pnpm as the [development runbook](docs/runbooks/development.md#windows) says (`npm i -g
 pnpm` or the pnpm.io installer; `packageManager` still pins the version). On Windows,
-`pnpm package` writes the zips with `tar.exe` from System32; no store has yet been sent a zip
-built on Windows, so build release archives on macOS or Linux.
+`pnpm package` writes the zips with `tar.exe` from System32. No run of `pnpm package` that writes
+the archives has a recorded commit on any OS yet (B-172).
 
 Chrome: `chrome://extensions` → Developer mode → **Load unpacked** →
-`apps/extension/dist/chrome`. Firefox: `about:debugging` → This Firefox → **Load Temporary
-Add-on** → `apps/extension/dist/firefox/manifest.json`.
+`apps/extension/dist/chrome`. Edge takes the same Chrome build: `edge://extensions` →
+Developer mode → **Load unpacked** → `apps/extension/dist/chrome`. Firefox: `about:debugging` →
+This Firefox → **Load Temporary Add-on** → `apps/extension/dist/firefox/manifest.json`.
+
+**Where it runs.** The extension supports Chrome 137+, Edge 137+ and Firefox 129+ on Windows,
+macOS and Linux. The floor is the manifests' (`minimum_chrome_version` in
+`apps/extension/manifest.chrome.json`, `strict_min_version` in
+`apps/extension/manifest.firefox.json`), and
+[ADR-0011](docs/adr/0011-the-signature-primitive-decides-the-supported-range.md) says why. The
+built extension asks no OS anything (`tools/docs.test.ts` reads the bundles), and the one path it
+sees, a download's file name, is split on both `/` and `\` (`downloads.onCreated` in
+`packages/platform/src/adapter.ts`). That is read from the code, not run: browser tests run in CI on
+Linux only, in Playwright's Chromium and Firefox, and no run in Edge, on Windows or on macOS has a
+recorded commit yet.
+`okolos-mail scan` targets Windows, macOS and Linux with Node 22.18 or later in the 22 line or 23.6 or later, and reads `.eml` and `.emlx`; its start fixes are in the tree and its test
+passes on Linux and Windows CI (run 40625746452 on `46a5752`); B-161 is closed. Mail watching is Apple
+Mail on macOS only, and not built. Contributor tooling (`pnpm gates`, the pre-push hook,
+`pnpm package`, e2e) is written to run on macOS, Linux and Windows (B-162, B-163 and B-164 are closed):
+CI runs the gates on Linux and on `windows-latest`, and on macOS the gates run locally only: there is no macOS job in CI, and no stored record of a
+local run. No archive-writing `pnpm package`
+run with a recorded commit exists on any OS. On Windows
+the full pre-push hook, an archive-writing `pnpm package` and e2e have not been run; e2e runs on
+Linux only. Each row with its proof: the
+[development runbook](docs/runbooks/development.md#на-каких-ос); what may be promised to a
+user: [docs/brand/facts.md](docs/brand/facts.md#где-работает).
 
 **Configure.** The extension needs no account and no key. The email leak check asks Have I
 Been Pwned only with your own HIBP API key (from haveibeenpwned.com, paid): paste it into the

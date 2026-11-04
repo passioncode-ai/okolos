@@ -28,3 +28,4 @@
 | [0017](0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md) | The feed agent publishes from a pinned checkout and counts from what is served (lifecycle LC-02/03/12/14) | `tools/feed-job.test.ts`, `tools/publish-feed.test.ts`, `tools/ingest.test.ts` |
 | [0018](0018-agents-get-their-own-extension.md) | У агентов — своё расширение, Okolos Bridge, в этом же репозитории | `tools/manifest.test.ts` |
 | [0019](0019-page-content-never-reaches-our-infrastructure.md) | Содержимое страниц не попадает на нашу инфраструктуру; агенту — только разрешённое задачей | `packages/net/src/destinations.test.ts` |
+| [0020](0020-okolos-agent-b1-runs-on-macos-only.md) | Okolos Agent фазы Б1 только на macOS; Windows отдельной фазой | `docs/brand/facts.md`, строка B-171 в `docs/backlog.md` |

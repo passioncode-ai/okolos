@@ -9,6 +9,27 @@
 `package.json` не остался здесь неназванным. Возможность, о которой никто не
 знает, отличается от отсутствующей только тем, что за неё уже заплатили.
 
+## На каких ОС
+
+Решение прогона стабильности и Windows от 2026-10-27, принятое по умолчанию (B-166): на вопрос
+1 «Поддержка Windows» канва прогона записала сразу с пометкой «принято по умолчанию» (коммит `4c22375`), ответа оператора нет, и действует её рекомендация. Что из
+этого можно обещать пользователю и откуда решение, записано в
+[facts.md](../brand/facts.md#где-работает); здесь то же для того, кто собирает и проверяет.
+Столбец «Обещано» и есть решение, столбец справа говорит, что его доказывает, и где
+доказательства пока нет. Что делается на Windows иначе и что там проверено, записано один раз,
+в разделе [«Windows»](#windows) ниже; таблица на него ссылается.
+
+| Что | Обещано | Чем подтверждено |
+|---|---|---|
+| Расширение | Chrome 137+, Edge 137+ и Firefox 129+ на Windows, macOS и Linux | пороги версий из манифестов и [ADR-0011](../adr/0011-the-signature-primitive-decides-the-supported-range.md); кода, зависящего от ОС, в сборке нет (`tools/docs.test.ts`); Edge получает сборку Chrome; браузерный прогон есть в CI только на Linux, в Chromium и Firefox из Playwright; прогона в Edge, на Windows или на macOS с записанным коммитом нет; такие прогоны: строка B-172 |
+| `okolos-mail scan` | Windows, macOS и Linux (B-161 закрыт) | исправления запуска в этом дереве; тест, который запускает саму команду, проходит в CI на Linux и Windows (прогон 40572549603 на `3276f2c`); B-161 закрыт, последний прогон 40625746452 на `46a5752` ([facts.md](../brand/facts.md#где-работает)) |
+| Наблюдение за почтой (SCN-042) | только Apple Mail на macOS | не построено, `docs/ux/scenarios.md` |
+| `pnpm gates` и хук pre-push | macOS, Linux и Windows | Linux и Windows: задачи `gates` и `gates (windows)` в `.github/workflows/ci.yml`, прогон 40572549603 на `3276f2c` зелёный; что гоняет задача Windows и чего она не проверяет (полный прогон хука в том числе), в разделе [«Windows»](#windows). macOS: задачи в CI нет; гейты на macOS гоняет хук pre-push при каждой отправке, но сохранённой записи такого прогона нет |
+| `pnpm package` | macOS, Linux и Windows | прогона с записью архива и с записанным коммитом нет ни на одной ОС; на Windows архив пишет `tar.exe` (раздел [«Windows»](#windows), `tools/archive.test.ts`). CI гоняет `pnpm package:check`, те же проверки без записи архива; сам `pnpm package` в CI не идёт ни на одной ОС |
+| `pnpm test:e2e`, `pnpm test:e2e:firefox` | macOS, Linux и Windows | задачи `e2e (chromium)` и `e2e (firefox)` только на `ubuntu-latest`; на macOS и Windows e2e в CI нет (раздел [«Windows»](#windows)) |
+| Агент фида (`pnpm feed:agent`) | только macOS | launchd, [ADR-0017](../adr/0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md) |
+| Okolos Agent (мост, фаза Б1) | только macOS; Windows отдельной фазой | [ADR-0020](../adr/0020-okolos-agent-b1-runs-on-macos-only.md); Windows: B-171 |
+
 ## Что нужно на машине
 
 | Что | Версия | Зачем |
@@ -102,7 +123,9 @@ Firefox для e2e на Windows лежит в `%LOCALAPPDATA%\ms-playwright`; п
 [40517607494](https://github.com/passioncode-ai/okolos/actions/runs/40517607494) на
 `714e336`; дерево с исправлениями B-162 и B-163 проверил прогон
 [40572549603](https://github.com/passioncode-ai/okolos/actions/runs/40572549603) на `3276f2c`,
-зелёный во всех четырёх задачах). Её шаги: `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`,
+зелёный во всех четырёх задачах; дерево с последними документами по Windows проверил
+[40625746452](https://github.com/passioncode-ai/okolos/actions/runs/40625746452) на `46a5752`,
+тоже зелёный). Её шаги: `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`,
 `pnpm build`, `pnpm test` (в нём архив через `tar.exe` из System32 и решение хука под `sh`
 из Git for Windows), `pnpm ux:lint`, `pnpm brand:lint`, `pnpm i18n:sweep` и
 `pnpm package:check` (проверки архива без записи). На Windows не проверены: e2e в Chromium и
