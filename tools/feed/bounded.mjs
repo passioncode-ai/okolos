@@ -11,7 +11,31 @@ import { spawn } from 'node:child_process'
  *
  * The result is returned, never thrown: the caller decides what a failure means,
  * and a stage that needs its exit code should not have to parse an exception.
+ *
+ * Windows has no process groups to signal: `process.kill(-pid)` throws there, and
+ * `detached` opens a console of its own instead. So on win32 the child is not
+ * detached, and the tree under it is ended with `taskkill /PID <pid> /T` (SIGTERM)
+ * then `/T /F` (SIGKILL), spawned without a shell (B-162). What Windows cannot do is
+ * find the children of a parent that has already exited, so the sweep after a
+ * normal exit is POSIX-only; a PID is reused there quickly, and `taskkill` on a
+ * reused one would end an unrelated process.
  */
+
+/**
+ * Variables that carry the Cloudflare credential. Only the publish step, behind
+ * the secret runner, may see one; every other child (git, pnpm install, the
+ * ingest) gets `withoutSecrets(env)`. One list for the job, the bootstrap and the
+ * installer (every installer child goes through its `installerEnv`). The bootstrap
+ * hands the job itself the whole environment: publish inherits it through the job.
+ */
+export const SECRET_VARIABLES = ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY']
+
+/** A copy of `env` without SECRET_VARIABLES. */
+export function withoutSecrets(env) {
+  const copy = { ...env }
+  for (const name of SECRET_VARIABLES) delete copy[name]
+  return copy
+}
 
 /** Groups started here and not yet ended — what a shutdown must kill. */
 const live = new Set()
@@ -21,9 +45,49 @@ export function liveGroups() {
   return live.size
 }
 
+/**
+ * How `signal` reaches the tree under `pid` on `platform`: a signal to the process
+ * group, or the `taskkill` command line that stands in for one on win32.
+ *
+ * @param {number} pid
+ * @param {'SIGTERM' | 'SIGKILL'} signal
+ * @param {string} [platform]
+ * @returns {{ kind: 'group', pid: number, signal: string } | { kind: 'taskkill', command: string, args: string[] }}
+ */
+export function killPlan(pid, signal, platform = process.platform) {
+  if (platform === 'win32') {
+    const args = ['/PID', String(pid), '/T']
+    if (signal === 'SIGKILL') args.push('/F')
+    return { kind: 'taskkill', command: 'taskkill', args }
+  }
+  return { kind: 'group', pid: -pid, signal }
+}
+
+/**
+ * The spawn options that give a child its own group where groups exist.
+ *
+ * @param {string} [platform]
+ */
+export function groupSpawnOptions(platform = process.platform) {
+  return { detached: platform !== 'win32', windowsHide: true }
+}
+
+/** Whether a child that exited on its own still has its group swept (POSIX only). */
+export function sweepsAfterExit(platform = process.platform) {
+  return platform !== 'win32'
+}
+
 function signalGroup(pid, signal) {
+  const plan = killPlan(pid, signal)
+  if (plan.kind === 'taskkill') {
+    // No shell: taskkill.exe is an executable and the pid is a number.
+    const killer = spawn(plan.command, plan.args, { stdio: 'ignore', windowsHide: true })
+    // "not found": the tree has already ended, which is the outcome asked for.
+    killer.on('error', () => {})
+    return
+  }
   try {
-    process.kill(-pid, signal)
+    process.kill(plan.pid, signal)
   } catch {
     // ESRCH: the group is already empty, which is the outcome asked for.
   }
@@ -62,7 +126,7 @@ export function runBounded(
       child = spawn(command, args, {
         cwd,
         env,
-        detached: true,
+        ...groupSpawnOptions(),
         stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
       })
     } catch (cause) {
@@ -102,7 +166,7 @@ export function runBounded(
 
     // The direct child is done; whatever it left in its group is not ours to keep.
     child.on('exit', () => {
-      if (child.pid !== undefined) signalGroup(child.pid, 'SIGKILL')
+      if (child.pid !== undefined && sweepsAfterExit()) signalGroup(child.pid, 'SIGKILL')
     })
 
     let settled = false

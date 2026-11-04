@@ -29,8 +29,8 @@ fails the build.
 |---|---|
 | **AI Shield** | Detects text present in the DOM but invisible to a human and phrased as an instruction — the "XSS of the agent era". Three local stages: DOM-vs-render diff → rules and signatures → a compact ONNX classifier that never blocks on its own |
 | **Sanitizer & agent gate** | Removes hidden instructions before an assistant reads the page (reversibly), and requires a human decision before an agent acts on a page where an injection was found |
-| **Link & page guard** | Known-phishing blocking, punycode/homoglyph/typosquat lookalikes, open-redirect unwrapping, ClickFix "paste-and-run" fake CAPTCHAs, tech-support lock traps, credential-entry warnings |
-| **Download guard** | Reputation of the final URL, type/MIME mismatch, known-bad hashes — and an honest statement of which checks did *not* run |
+| **Link & page guard** | Known-phishing blocking, punycode/homoglyph/typosquat lookalikes, open-redirect unwrapping, ClickFix "paste-and-run" fake CAPTCHAs, tech-support lock traps, credential-entry warnings, a stopped click on a link that may open a program on the computer (`ms-msdt:`, `search-ms:`, Office links to a document not over https) |
+| **Download guard** | Reputation of the final URL, type/MIME mismatch, the Windows types attacks start with read as programs (`.dll`, `.one`, `.rdp`, `.search-ms`), and an honest statement of which checks did *not* run (there is no hash check: the file is not written yet when the check runs, `docs/coverage-matrix.md` row 2.2); a doubted file can be deleted from its warning |
 | **Credentials** | Password leak checks against a local corpus (zero network requests on a hit), k-anonymity with padding otherwise, reuse detection, breach and infostealer monitoring |
 | **Extension guard** | Continuous watch: permission deltas between versions, publisher changes, silent updates, static package analysis. One-time vetting is not enough — 34% of extensions gained permissions in a year |
 | **Assistant** | Every verdict explained in plain language with at most three next steps, at least one executable in place. Never more than three items in the queue |
@@ -60,18 +60,48 @@ Full vector coverage: [docs/coverage-matrix.md](docs/coverage-matrix.md).
 
 ## Quick start for a new teammate
 
-**Install.** Nothing is published yet: no Chrome Web Store or Firefox Add-ons listing, no
-GitHub release. Build it and load the unpacked extension:
+**Install.** Nothing is published yet: no Chrome Web Store, Firefox Add-ons or Edge Add-ons
+listing, no GitHub release. Build it and load the unpacked extension:
 
 ```bash
-corepack enable && pnpm install     # Node and pnpm; also installs the pre-push hook
+corepack enable && pnpm install     # Node 22.18+ or 23.6 to 24; also installs the pre-push hook
 pnpm build                          # apps/extension/dist/chrome and apps/extension/dist/firefox
 pnpm package                        # the store zips, checked, in apps/extension/dist/release/
 ```
 
+Corepack ships with Node 22 to 24 only, on every OS, Windows included (where `corepack enable` usually
+needs an administrator shell when Node is under Program Files). On Node 25 and later,
+install pnpm as the [development runbook](docs/runbooks/development.md#windows) says (`npm i -g
+pnpm` or the pnpm.io installer; `packageManager` still pins the version). On Windows,
+`pnpm package` writes the zips with `tar.exe` from System32. No run of `pnpm package` that writes
+the archives has a recorded commit on any OS yet (B-172).
+
 Chrome: `chrome://extensions` → Developer mode → **Load unpacked** →
-`apps/extension/dist/chrome`. Firefox: `about:debugging` → This Firefox → **Load Temporary
-Add-on** → `apps/extension/dist/firefox/manifest.json`.
+`apps/extension/dist/chrome`. Edge takes the same Chrome build: `edge://extensions` →
+Developer mode → **Load unpacked** → `apps/extension/dist/chrome`. Firefox: `about:debugging` →
+This Firefox → **Load Temporary Add-on** → `apps/extension/dist/firefox/manifest.json`.
+
+**Where it runs.** The extension supports Chrome 137+, Edge 137+ and Firefox 129+ on Windows,
+macOS and Linux. The floor is the manifests' (`minimum_chrome_version` in
+`apps/extension/manifest.chrome.json`, `strict_min_version` in
+`apps/extension/manifest.firefox.json`), and
+[ADR-0011](docs/adr/0011-the-signature-primitive-decides-the-supported-range.md) says why. The
+built extension asks no OS anything (`tools/docs.test.ts` reads the bundles), and the one path it
+sees, a download's file name, is split on both `/` and `\` (`downloads.onCreated` in
+`packages/platform/src/adapter.ts`). That is read from the code, not run: browser tests run in CI on
+Linux only, in Playwright's Chromium and Firefox, and no run in Edge, on Windows or on macOS has a
+recorded commit yet.
+`okolos-mail scan` targets Windows, macOS and Linux with Node 22.18 or later in the 22 line or 23.6 or later, and reads `.eml` and `.emlx`; its start fixes are in the tree and its test
+passes on Linux and Windows CI (run 40625746452 on `46a5752`); B-161 is closed. Mail watching is Apple
+Mail on macOS only, and not built. Contributor tooling (`pnpm gates`, the pre-push hook,
+`pnpm package`, e2e) is written to run on macOS, Linux and Windows (B-162, B-163 and B-164 are closed):
+CI runs the gates on Linux and on `windows-latest`, and on macOS the gates run locally only: there is no macOS job in CI, and no stored record of a
+local run. No archive-writing `pnpm package`
+run with a recorded commit exists on any OS. On Windows
+the full pre-push hook, an archive-writing `pnpm package` and e2e have not been run; e2e runs on
+Linux only. Each row with its proof: the
+[development runbook](docs/runbooks/development.md#на-каких-ос); what may be promised to a
+user: [docs/brand/facts.md](docs/brand/facts.md#где-работает).
 
 **Configure.** The extension needs no account and no key. The email leak check asks Have I
 Been Pwned only with your own HIBP API key (from haveibeenpwned.com, paid): paste it into the

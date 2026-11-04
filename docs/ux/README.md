@@ -18,7 +18,10 @@ Product context lives one level up: [../product-vision.md](../product-vision.md)
 **Before calling any UX work done:**
 
 ```bash
-python3 docs/ux/lint.py
+pnpm ux:lint
 ```
+
+It runs `docs/ux/lint.py` through `tools/python.mjs`, which finds Python 3 under
+`python3`, `python` or `py -3`, so the same command works on Windows.
 
 Entry point for all UX work: `/ux`.

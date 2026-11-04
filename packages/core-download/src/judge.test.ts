@@ -145,6 +145,89 @@ describe('the shapes this list is a claim about', () => {
     }
   })
 
+  it('recognises the Windows types used for initial access in 2026 (B-165)', () => {
+    // Libraries, OneNote and Excel add-ins, the App Installer and ClickOnce
+    // manifests, the shell's saved searches and settings shortcuts, and Java Web
+    // Start: each of these runs something when opened, and none was on the list
+    // the audit of 2026-10-27 read.
+    for (const ext of [
+      'dll',
+      'one',
+      'xll',
+      'xlam',
+      'appinstaller',
+      'msixbundle',
+      'appxbundle',
+      'library-ms',
+      'search-ms',
+      'searchConnector-ms',
+      'settingcontent-ms',
+      'application',
+      'jnlp',
+    ]) {
+      const verdict = named(`invoice.${ext}`)
+      expect(verdict.shape.map((entry) => entry.code), ext).toContain('is-a-program')
+    }
+  })
+
+  it('sees a new type behind a decoy extension, and in either case', () => {
+    expect(judgeDownload(evidence({ filename: 'счёт.pdf.one', mimeType: null })).shape.map((e) => e.code)).toContain(
+      'double-extension',
+    )
+    expect(named('Report.SEARCH-MS').shape.map((entry) => entry.code)).toContain('is-a-program')
+  })
+
+  it('keeps every type listed before 2026-10-27 in the class it had', () => {
+    // The list grew; nothing on it moved. A type changing class changes the
+    // sentence a person reads, so the old membership is pinned here.
+    const program = [
+      'exe', 'msi', 'msp', 'com', 'scr', 'pif', 'apk', 'dmg', 'pkg', 'deb', 'rpm', 'appx', 'msix', 'gadget',
+      'bat', 'cmd', 'ps1', 'ps2', 'psc1', 'vbs', 'vbe', 'js', 'jse', 'wsf', 'wsh', 'sh', 'jar', 'hta', 'mshxml',
+      'lnk', 'scf', 'url', 'reg', 'msc', 'cpl', 'chm', 'inf', 'ade', 'adp',
+      'docm', 'dotm', 'xlsm', 'xltm', 'xlsb', 'pptm', 'potm', 'ppam',
+    ]
+    const archive = [
+      'zip', 'rar', '7z', 'iso', 'img', 'cab', 'arj', 'lzh', 'ace', 'tar', 'gz', 'tgz', 'bz2', 'xz', 'zst',
+      'vhd', 'vhdx', 'wim',
+    ]
+    for (const ext of program) {
+      expect(named(`file.${ext}`).shape.map((entry) => entry.code), ext).toEqual(['is-a-program'])
+    }
+    for (const ext of archive) {
+      expect(named(`file.${ext}`).shape.map((entry) => entry.code), ext).toEqual(['is-an-archive'])
+    }
+  })
+
+  it('recognises the remaining initial-access types (B-165, round 1)', () => {
+    // A rogue Remote Desktop file, a ClickOnce shortcut, a troubleshooter package
+    // (the ms-msdt payload as a file), a OneNote package, Excel's web query and
+    // SYLK formats, a Visual Studio Tools for Office add-in, and the two script
+    // component formats `regsvr32` loads. Each runs or connects something on open.
+    for (const ext of ['rdp', 'appref-ms', 'diagcab', 'onepkg', 'iqy', 'slk', 'vsto', 'wsc', 'sct']) {
+      expect(named(`invoice.${ext}`).shape.map((entry) => entry.code), ext).toContain('is-a-program')
+    }
+  })
+
+  it('reads the type past a trailing dot or space, which Windows drops', () => {
+    // Windows strips trailing dots and spaces from a name and runs the file by the
+    // extension that is left; a list anchored at the very end missed all three.
+    for (const name of ['a.one.', 'a.one ', 'report.dll. . ']) {
+      expect(named(name).shape.map((entry) => entry.code), JSON.stringify(name)).toContain('is-a-program')
+    }
+    expect(named('invoice.pdf.dll.').shape.map((entry) => entry.code)).toContain('double-extension')
+  })
+
+  it('sees a decoy extension with a space before the real one', () => {
+    expect(named('invoice.pdf .dll').shape.map((entry) => entry.code)).toContain('double-extension')
+  })
+
+  it('does not read a longer name as one of the new types', () => {
+    // `.one` and `.application` are short words; only the last extension counts.
+    for (const name of ['phone.txt', 'application.pdf', 'one.docx', 'notes.onetoc2.txt']) {
+      expect(named(name).shape, name).toEqual([])
+    }
+  })
+
   it('recognises macro-enabled Office documents, which look like documents', () => {
     for (const ext of ['docm', 'xlsm', 'pptm', 'xlsb', 'dotm']) {
       expect(named(`отчёт.${ext}`).shape.map((entry) => entry.code), ext).toContain('is-a-program')

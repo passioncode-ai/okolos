@@ -1,7 +1,10 @@
 /** @vitest-environment happy-dom */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { BannerHandlers } from '@okolos/ui'
+
 import { showDownloadVerdict, type DownloadVerdictMessage } from './download.js'
+import { createSurfaceSlot } from './surface-slot.js'
 
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -47,7 +50,7 @@ describe('a download that was stopped', () => {
   it('says the file never reached the disk, rather than offering to stop it', () => {
     const handle = showDownloadVerdict(message(), deps())
     const detail = handle?.root.querySelector('[data-role=detail]')?.textContent ?? ''
-    expect(detail).toContain('на диск ничего не попало')
+    expect(detail).toContain('на диске ничего не осталось')
   })
 
   it('names what matched', () => {
@@ -74,9 +77,10 @@ describe('a download that was only doubted', () => {
 
   it('does not claim the file was cancelled, because it was not', () => {
     const handle = showDownloadVerdict(message({ action: 'warn' }), deps())
-    expect(handle?.root.querySelector('[data-role=detail]')?.textContent).not.toContain(
-      'nothing reached your disk',
-    )
+    // Against the catalogue the panel renders, not a literal in another language, which
+    // passed in every state of the code (round 11 seam).
+    const cancelled = (CATALOGUE as Record<string, { message: string }>)['warnDownloadCancelled']?.message ?? '(missing key)'
+    expect(handle?.root.querySelector('[data-role=detail]')?.textContent).not.toContain(cancelled)
   })
 })
 
@@ -147,5 +151,90 @@ describe('the words for a code', () => {
       const missing = values.filter((value) => !detail.includes(value))
       expect(missing, `${shape.code} dropped its values from the sentence`).toEqual([])
     }
+  })
+})
+
+describe('a download panel closed by the person, through the real slot (B-165, round 2)', () => {
+  /**
+   * The download module closes its panel with the handle the slot gave it. Before the slot
+   * released on a handle's close, the slot's watch read the closed panel as the page
+   * removing a warning and drew it again a quarter-second later.
+   */
+  it('stays closed after Dismiss, and the slot is free again', async () => {
+    const slot = createSurfaceSlot({
+      doc: document,
+      noteRefused: () => undefined,
+      escalate: async () => undefined,
+      alsoLine: (kinds) => `also here: ${kinds.join(', ')}`,
+      wait: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+    })
+    let handlers: BannerHandlers | null = null
+    showDownloadVerdict(message(), {
+      ...deps(),
+      mountWarning: (props, given) => {
+        handlers = given
+        return slot.claim({ kind: 'download', severity: props.severity, props, handlers: given })
+      },
+    })
+    expect(banner()).not.toBeNull()
+
+    ;(handlers as BannerHandlers | null)?.onDismiss()
+    await new Promise<void>((resolve) => setTimeout(resolve, 1000))
+
+    expect(banner()).toBeNull()
+    expect(slot.current()).toBeNull()
+    slot.release()
+  })
+})
+
+describe('a doubted download, discarded from its panel (B-165, round 4)', () => {
+  it('asks the browser to delete the file, and closes once it did', async () => {
+    const discard = vi.fn(async () => true)
+    const handle = showDownloadVerdict(message({ action: 'warn', headline: 'doubted', downloadId: 42 } as never), { ...deps(), discard })
+    handle?.root.querySelector<HTMLElement>('[data-role=primary]')?.click()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(discard).toHaveBeenCalledWith(42)
+    expect(banner()).toBeNull()
+  })
+
+  it('stays up and says so when the file could not be deleted', async () => {
+    const discard = vi.fn(async () => false)
+    const handle = showDownloadVerdict(message({ action: 'warn', headline: 'doubted', downloadId: 42 } as never), { ...deps(), discard })
+    handle?.root.querySelector<HTMLElement>('[data-role=primary]')?.click()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(banner()).not.toBeNull()
+  })
+})
+
+describe('a blocked download the browser finished before it could be stopped (B-180, round 9)', () => {
+  it('does not say nothing reached the disk, and says the file may be there', () => {
+    const handle = showDownloadVerdict(message({ stopped: false, downloadId: 7 }), deps())
+    const detail = handle?.root.querySelector('[data-role=detail]')?.textContent ?? ''
+    expect(detail).not.toContain('на диске ничего не осталось')
+    expect(detail).toContain('файл мог успеть записаться на диск')
+  })
+
+  it('does not claim a stop in the headline either (round 10 seam)', () => {
+    const handle = showDownloadVerdict(message({ stopped: false, downloadId: 7 }), deps())
+    const headline = handle?.root.querySelector('[data-role=headline]')?.textContent ?? ''
+    expect(headline).not.toContain('остановлена до сохранения')
+    expect(headline).toBe('Загрузку из списка не удалось остановить вовремя')
+  })
+
+  it('offers to delete the file, and deleting asks the worker', async () => {
+    const discard = vi.fn(async () => true)
+    const handle = showDownloadVerdict(message({ stopped: false, downloadId: 7 }), { ...deps(), discard })
+    const primary = handle?.root.querySelector<HTMLElement>('[data-role=primary]')
+    expect(primary?.textContent).toBe('Удалить файл')
+    primary?.click()
+    await Promise.resolve()
+    expect(discard).toHaveBeenCalledWith(7)
+  })
+
+  it('keeps the old sentence when the worker confirmed the stop', () => {
+    const handle = showDownloadVerdict(message({ stopped: true }), deps())
+    expect(handle?.root.querySelector('[data-role=detail]')?.textContent).toContain('на диске ничего не осталось')
   })
 })

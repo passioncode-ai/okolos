@@ -160,8 +160,8 @@ flowchart TD
 ### FLW-06: ClickFix — page copies a command
 - **Traces:** ST-007 (JTBD-02, JRN-03/#3)
 - **Goal:** interrupt between the clipboard write and the user pasting into a system dialog — the last moment we can reach
-- **Entry points:** script-initiated clipboard write containing a shell-like payload, with no genuine user copy action
-- **Success exit:** user does not run the command; clipboard content is flagged
+- **Entry points:** script-initiated clipboard write containing a shell-like payload, with no genuine user copy action; a click on a link whose address may open a program on the computer (SCN-049, added 2026-10-27)
+- **Success exit:** user does not run the command; clipboard content is flagged; a link that would start a program is stopped before the browser passes it on. When both happen in one click (the FileFix page) on a page that reads as a ClickFix page (the verification pretext and a run box), the ClickFix warning takes the panel from the link warning and keeps what the link warning listed behind it; a page worded otherwise, or one whose ClickFix warning was disputed, keeps the link warning and the click stays stopped
 - **Task analysis:**
   1. Stop before switching windows
   2. Understand in one sentence why this is fake
@@ -173,9 +173,12 @@ flowchart TD
   A[Screen: Page - fake CAPTCHA] -->|script writes command to clipboard| B[Screen: In-page banner - clickfix variant, blocking]
   B -->|what is this| C[State: plain-language explanation + the copied text shown verbatim]
   C -->|leave page| D[Back to previous page]
-  C -->|I already ran it| E[Screen: Recovery checklist]
-  B -->|dismiss - deliberate action required| F[Warning collapses to a persistent marker]
+  B -->|This is wrong| F[Warning closes for this page]
   F --> A
+  P[Screen: Popup - recovery entry] -->|I already ran it| E[Screen: Recovery checklist]
+  G[Screen: Page with a link to a program] -->|click, the click is stopped| H[Screen: In-page banner, clickfix variant, blocking: what would open and where]
+  H -->|leave page| D
+  H -->|this is wrong| I[Warning closes; that link goes through on the next click]
 ```
 
 - **Screens traversed:**
@@ -200,8 +203,8 @@ flowchart TD
   A[Screen: Page - fake lock] -->|forced fullscreen or dialog loop| B[Trap broken: fullscreen exited, dialogs suppressed]
   B --> C[Screen: In-page banner - techsupport variant]
   C -->|close this page| D[Tab closed or previous page]
-  C -->|I already called them| E[Screen: Recovery checklist]
-  C -->|dismiss| A2[Page remains, suppression stays active]
+  C -->|This is wrong| A2[Warning closes for this page, suppression stays active]
+  P[Screen: Popup - recovery entry] -->|I already called them| E[Screen: Recovery checklist]
   B -->|suppression not possible in this context| B_err[Inline: cannot fully block dialogs here - close the tab]
   B_err --> D
 ```
@@ -216,7 +219,7 @@ flowchart TD
 - **Traces:** ST-009 (JTBD-02)
 - **Goal:** a dangerous file is stopped before it is saved, and the user is told exactly which checks applied
 - **Entry points:** download started
-- **Success exit:** file kept after a clean check, or discarded after a warning
+- **Success exit:** a file whose address is in a feed is cancelled before it lands; a doubted file is kept or deleted at the person's word
 - **Task analysis:**
   1. See the verdict before the file lands
   2. Keep or discard
@@ -224,20 +227,19 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  A[Download started] --> B{Source in feeds?}
-  B -->|yes| W[Screen: In-page banner - download variant, blocking]
-  B -->|no| C{Hash obtainable?}
-  C -->|yes| D{Known-bad hash?}
-  C -->|no| E[Verdict: partial - URL checks only, stated in UI]
-  D -->|yes| W
-  D -->|no| F[Verdict: clean by the checks that ran]
-  E --> G[Screen: In-page banner - download variant, informational]
-  F --> G
-  W -->|discard file| H[Download cancelled, journalled]
-  W -->|keep anyway| I[Download kept; exception journalled]
-  G -->|keep| I
-  B -->|feeds unavailable| B_err[Inline: feeds stale - checks limited]
-  B_err --> C
+  A[Download started] --> B{Address or redirect in feeds?}
+  B -->|yes| X[Download cancelled at once, before it lands, journalled]
+  X --> W[Screen: In-page banner - download variant, critical]
+  B -->|no| N[Name reported, or 5 s waited for it]
+  N --> T{Program, hidden type or check not run?}
+  T -->|yes| D[Screen: In-page banner - download variant, major]
+  T -->|no| G[No banner: clean by the checks that ran, no hash check; journalled]
+  W -->|show the record| J[Journal]
+  D -->|discard the file| H[Cancelled if running, file deleted, dropped from the list]
+  D -->|delete failed| E[Inline: delete it from the browser's downloads]
+  D -->|this is wrong or dismiss| I[File stays where the browser put it]
+  B -->|feeds unavailable| B_err[Feed check not run, stated in the verdict]
+  B_err --> N
 ```
 
 - **Screens traversed:**
@@ -487,7 +489,7 @@ flowchart TD
 ### FLW-16: Recovery — "I already fell for it"
 - **Traces:** ST-015 (JTBD-06, JRN-03/#5)
 - **Goal:** turn panic into an ordered checklist matched to what actually happened
-- **Entry points:** "I already ran it / already entered it" from any banner; SCR-02 popup; SCR-07 queue
+- **Entry points:** the recovery entry in the SCR-02 popup; SCR-07 queue (the banners have no "I already ran it" button)
 - **Success exit:** the checklist for that incident type is completed or explicitly deferred
 - **Task analysis:**
   1. Say what happened

@@ -54,19 +54,44 @@ export interface Extensions {
   selfId(): string
 }
 
+/** A download as `onCreated` reports it. */
+export interface CreatedDownload {
+  id: number
+  url: string
+  finalUrl?: string
+  filename: string
+  mime: string | null
+}
+
 /** Downloads, where the only moment to intervene is before the bytes land. */
 export interface Downloads {
-  /** Fires as an item is created, before it is written. */
-  onCreated(
-    handler: (item: {
-      id: number
-      url: string
-      finalUrl?: string
-      filename: string
-      mime: string | null
-    }) => void,
-  ): void
+  /**
+   * Fires as an item is created, before it is written. `named` resolves to the same item with
+   * the file name the browser decides later (Chrome reports a new download with an empty name
+   * and fills it in through `downloads.onChanged`), or to the item as it is after five seconds
+   * without one; for an item that already has its name it resolves to that item at once. The
+   * item comes first so that a check that needs no name (the feed, by address) can cancel the
+   * download before the bytes land (round 8 of the B-165 certification: waiting for the name
+   * first let a listed file finish before its cancel).
+   */
+  onCreated(handler: (item: CreatedDownload, named: Promise<CreatedDownload>) => void): void
   cancel(id: number): Promise<void>
+  /**
+   * Discards a download by the state the browser reports: a running one is cancelled (the
+   * browser drops the partial file), a finished one has its file deleted, an interrupted one
+   * has nothing on disk; each is then dropped from the browser's list. True when no file of it
+   * is left; false when the file could not be deleted or the download is unknown.
+   */
+  discard(id: number): Promise<boolean>
+  /** One download by id, as `onCreated` reports it plus its state, or null when unknown. */
+  find(id: number): Promise<{
+    id: number
+    url: string
+    finalUrl?: string
+    filename: string
+    mime: string | null
+    state: 'in_progress' | 'interrupted' | 'complete'
+  } | null>
   /** True when this browser exposes the API at all. */
   available(): boolean
 }
@@ -283,7 +308,16 @@ export interface WebExtensionApi {
         }) => void,
       ): void
     }
+    /** Where Chrome reports the file name it decided after `onCreated`, which carries none. */
+    onChanged?: {
+      addListener(cb: (delta: { id: number; filename?: { current?: string } }) => void): void
+    }
     cancel(id: number): Promise<void>
+    removeFile?(id: number): Promise<void>
+    erase?(query: { id: number }): Promise<number[]>
+    search?(query: { id: number }): Promise<
+      Array<{ id: number; url: string; finalUrl?: string; filename?: string; mime?: string; state?: string; exists?: boolean }>
+    >
   }
   management?: {
     getAll(): Promise<

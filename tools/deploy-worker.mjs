@@ -20,6 +20,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 
+import { binInvocation } from './bin.mjs'
 import { renderConfig } from './deploy-config.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -41,15 +42,18 @@ function step(label) {
 function loadEnv() {
   const file = path.join(homedir(), '.okolos/cloudflare.env')
   if (!existsSync(file)) return
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
+  for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
     const m = /^\s*(?:export\s+)?([A-Z0-9_]+)=(?:'([^']*)'|"([^"]*)"|(.*))\s*$/.exec(line)
     if (m) process.env[m[1]] ??= m[2] ?? m[3] ?? m[4]
   }
 }
 
 function wrangler(args, { capture = false } = {}) {
-  const out = execFileSync('npx', ['wrangler', ...args], {
+  // npx is npx.cmd on Windows, which Node will not spawn without a shell (B-163).
+  const npx = binInvocation('npx', ['wrangler', ...args])
+  const out = execFileSync(npx.command, npx.args, {
     cwd: proxy,
+    shell: npx.shell,
     encoding: 'utf8',
     stdio: capture ? ['inherit', 'pipe', 'inherit'] : 'inherit',
     env: process.env,

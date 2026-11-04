@@ -49,6 +49,15 @@ describe('the failure code', () => {
   })
 })
 
+describe('the floors and the root engines', () => {
+  it('say the same versions, so a node engines allows can run the command', () => {
+    const engines = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')).engines.node
+    expect(engines).toBe('^22.18.0 || >=23.6.0')
+    for (const node of ['22.18.0', '23.6.0', '24.0.0']) expect(runsFromSources(node, 'strip'), node).toBe(true)
+    for (const node of ['22.17.9', '23.5.0']) expect(runsFromSources(node, 'strip'), node).toBe(false)
+  })
+})
+
 describe('the launcher, with the node it runs on injected', () => {
   const quiet = () => {
     const lines: string[] = []
@@ -83,6 +92,20 @@ describe('the launcher, with the node it runs on injected', () => {
     expect(loaded).toBe(false)
     expect(out.lines.join('')).toContain(`okolos-mail: Node.js ${NODE_RANGE} is needed`)
     expect(out.lines.join('')).toContain('this is Node.js 22.17.0')
+  })
+
+  it('names both floors to a node of the 23 line below 23.6, which it also refuses', async () => {
+    const out = quiet()
+    const code = await launch({
+      argv: ['scan', 'x'],
+      env: {},
+      node: '23.3.0',
+      typescript: undefined,
+      load: async () => ({ run: () => undefined }),
+      write: out.write,
+    })
+    expect(code).toBe(EXIT.unreadable)
+    expect(out.lines.join('')).toMatch(/22\.18.*23\.6.*23\.3\.0/)
   })
 
   it('ends with 2 and a line on stderr when loading the command fails', async () => {

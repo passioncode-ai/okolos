@@ -36,7 +36,7 @@ describe('the browser’s own dialogs', () => {
     const offenders: string[] = []
     for (const source of sources()) {
       const text = readFileSync(path.join(root, source), 'utf8')
-      for (const [index, line] of text.split('\n').entries()) {
+      for (const [index, line] of text.split(/\r?\n/).entries()) {
         const call = banned.some((name) => new RegExp(`(?:window\\.)?\\b${name}\\s*\\(`).test(line))
         // A line that only mentions the word — a comment, a message key — is not a call.
         const commented = /^\s*(?:\/\/|\*|\/\*)/.test(line)

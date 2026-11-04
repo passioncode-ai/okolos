@@ -3,6 +3,8 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { toPosix } from './tree.mjs'
+
 /**
  * One implementation of "reject if this never settles".
  *
@@ -23,10 +25,11 @@ const root = path.resolve(import.meta.dirname, '..')
 const HOME = 'packages/platform/src/adapter.ts'
 
 function sources(): string[] {
+  // fs.globSync answers in the platform's spelling; HOME is the repository's (B-164).
   return globSync(['apps/*/src/**/*.ts', 'packages/*/src/**/*.ts'], {
     cwd: root,
-    exclude: (p) => p.includes('.test.') || p.includes('/dist/'),
-  })
+    exclude: (p) => p.includes('.test.') || toPosix(p).includes('/dist/'),
+  }).map((p) => toPosix(p))
 }
 
 describe('the deadline wrapper', () => {

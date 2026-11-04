@@ -8,13 +8,16 @@ import path from 'node:path'
  * routine `git checkout -- .`, `stash` or `reset` took it backwards and the next run
  * published a version every extension refuses as a replay (F1). State now lives
  * under `~/.okolos/state`, logs under `~/Library/Logs/Okolos` (LC-12), and the agent
- * runs from its own pinned checkout rather than a developer's clone (F2). Each root
+ * runs from its own pinned checkout rather than a developer's clone (F2). What launchd
+ * starts lives beside that checkout, never in it (`agentBin`, B-159): a missing
+ * checkout must be something the agent records and repairs. Each root
  * can be moved by an environment variable, which is how tests stay out of the real
  * home directory.
  */
 export function feedPaths(env = process.env, home = os.homedir()) {
   const state = env.OKOLOS_STATE_DIR || path.join(home, '.okolos', 'state')
   const logs = env.OKOLOS_LOG_DIR || path.join(home, 'Library', 'Logs', 'Okolos')
+  const agentBin = env.OKOLOS_AGENT_BIN || path.join(home, '.okolos', 'bin', 'feed-agent')
   return {
     state,
     feed: path.join(state, 'feeds', 'phishing.json'),
@@ -24,5 +27,7 @@ export function feedPaths(env = process.env, home = os.homedir()) {
     log: path.join(logs, 'feed.log'),
     launchdLog: path.join(logs, 'feed.launchd.log'),
     agentCheckout: env.OKOLOS_AGENT_CHECKOUT || path.join(home, '.okolos', 'agent-checkout'),
+    agentBin,
+    bootstrap: path.join(agentBin, 'bootstrap.mjs'),
   }
 }

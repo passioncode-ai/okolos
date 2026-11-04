@@ -9,16 +9,38 @@
 `package.json` не остался здесь неназванным. Возможность, о которой никто не
 знает, отличается от отсутствующей только тем, что за неё уже заплатили.
 
+## На каких ОС
+
+Решение прогона стабильности и Windows от 2026-10-27, принятое по умолчанию (B-166): на вопрос
+1 «Поддержка Windows» канва прогона записала сразу с пометкой «принято по умолчанию» (коммит `4c22375`), ответа оператора нет, и действует её рекомендация. Что из
+этого можно обещать пользователю и откуда решение, записано в
+[facts.md](../brand/facts.md#где-работает); здесь то же для того, кто собирает и проверяет.
+Столбец «Обещано» и есть решение, столбец справа говорит, что его доказывает, и где
+доказательства пока нет. Что делается на Windows иначе и что там проверено, записано один раз,
+в разделе [«Windows»](#windows) ниже; таблица на него ссылается.
+
+| Что | Обещано | Чем подтверждено |
+|---|---|---|
+| Расширение | Chrome 137+, Edge 137+ и Firefox 129+ на Windows, macOS и Linux | пороги версий из манифестов и [ADR-0011](../adr/0011-the-signature-primitive-decides-the-supported-range.md); кода, зависящего от ОС, в сборке нет (`tools/docs.test.ts`); Edge получает сборку Chrome; браузерный прогон есть в CI только на Linux, в Chromium и Firefox из Playwright; прогона в Edge, на Windows или на macOS с записанным коммитом нет; такие прогоны: строка B-172 |
+| `okolos-mail scan` | Windows, macOS и Linux (B-161 закрыт) | исправления запуска в этом дереве; тест, который запускает саму команду, проходит в CI на Linux и Windows (прогон 40572549603 на `3276f2c`); B-161 закрыт, последний прогон 40625746452 на `46a5752` ([facts.md](../brand/facts.md#где-работает)) |
+| Наблюдение за почтой (SCN-042) | только Apple Mail на macOS | не построено, `docs/ux/scenarios.md` |
+| `pnpm gates` и хук pre-push | macOS, Linux и Windows | Linux и Windows: задачи `gates` и `gates (windows)` в `.github/workflows/ci.yml`, прогон 40572549603 на `3276f2c` зелёный; что гоняет задача Windows и чего она не проверяет (полный прогон хука в том числе), в разделе [«Windows»](#windows). macOS: задачи в CI нет; гейты на macOS гоняет хук pre-push при каждой отправке, но сохранённой записи такого прогона нет |
+| `pnpm package` | macOS, Linux и Windows | прогона с записью архива и с записанным коммитом нет ни на одной ОС; на Windows архив пишет `tar.exe` (раздел [«Windows»](#windows), `tools/archive.test.ts`). CI гоняет `pnpm package:check`, те же проверки без записи архива; сам `pnpm package` в CI не идёт ни на одной ОС |
+| `pnpm test:e2e`, `pnpm test:e2e:firefox` | macOS, Linux и Windows | задачи `e2e (chromium)` и `e2e (firefox)` только на `ubuntu-latest`; на macOS и Windows e2e в CI нет (раздел [«Windows»](#windows)) |
+| Агент фида (`pnpm feed:agent`) | только macOS | launchd, [ADR-0017](../adr/0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md) |
+| Okolos Agent (мост, фаза Б1) | только macOS; Windows отдельной фазой | [ADR-0020](../adr/0020-okolos-agent-b1-runs-on-macos-only.md); Windows: B-171 |
+
 ## Что нужно на машине
 
 | Что | Версия | Зачем |
 |---|---|---|
-| Node | `^22.18.0 \|\| >=23.6.0` (проверено на 26.10.0) | всё остальное; с этих версий node снимает типы с TypeScript без флага, а `okolos-mail` запускается из исходников (B-161) |
-| pnpm | `11.10.0` — задан в `packageManager` | воркспейс из 21 пакета |
-| Python 3 | любой 3.x (проверено на 3.14.6) | `docs/ux/lint.py`, `tools/model/evaluate.py` |
+| Node | `^22.18.0 \|\| >=23.6.0` (`engines` в `package.json`; проверено на 26.4.0 и 26.10.0): ниже `okolos-mail` не запускается, и его тест в `pnpm test` краснеет | всё остальное; с этих версий node снимает типы с TypeScript без флага, а `okolos-mail` запускается из исходников (B-161) |
+| pnpm | `11.10.0`, задан в `packageManager` | воркспейс из 23 пакетов (`apps/*` и `packages/*`) |
+| Python 3 | 3.7 и новее для линтеров (`tools/python.mjs` берёт первый такой), 3.9 и новее для `tools/model/evaluate.py` (проверено на 3.14.6), под именем `python3`, `python` или `py -3` | `docs/ux/lint.py`, `docs/brand/lint.py`, `tools/model/evaluate.py` |
 | Браузеры Playwright | ставятся командой ниже | e2e в Chromium и Firefox |
 
-Corepack включит нужный pnpm сам:
+Corepack включит нужный pnpm сам (Node 22–24; с Node 25 corepack в поставку Node не
+входит, и pnpm ставится сам, см. «Windows» ниже, на macOS и Linux так же):
 
 ```bash
 corepack enable
@@ -30,6 +52,89 @@ pnpm exec playwright install chromium firefox
 `.githooks`, и с этого момента `git push` не уходит без гейтов. Это не
 формальность — 2026-08-07 красный коммит ушёл именно потому, что правило жило в
 документе, а push в шелле.
+
+### Windows
+
+`pnpm gates` и хук pre-push рассчитаны и на Windows-чекаут (B-162, B-163). Сверх
+таблицы выше нужны:
+
+- **Git for Windows.** Хук запускает его `sh`; `tools/ci.test.ts` находит этот `sh`
+  рядом с `git` (`git --exec-path`), даже когда в PATH его нет, как в PowerShell и cmd.
+- **Оболочка: Git Bash или PowerShell 7** (`pwsh`). Команды этого раннбука идут в обеих,
+  кроме трёх, которым нужен Git Bash (или macOS и Linux), замера окна агента, который работает только на macOS, и инструментов фида, которые на Windows не работают вовсе (таблица ниже): запись доступа
+  `printf %s "$VALUE" | node tools/access.mjs set …` в разделе «Доступы» (в PowerShell нет
+  `printf`); проверка `git ls-files --eol | grep w/crlf` в рецепте для старого клона (в
+  PowerShell нет `grep`; там `git ls-files --eol | Select-String w/crlf`); обход хука
+  `OKOLOS_SKIP_GATES=1 git push` (в PowerShell: `$env:OKOLOS_SKIP_GATES=1; git push`, затем
+  `Remove-Item Env:OKOLOS_SKIP_GATES`). Только на macOS: замер окна агента `node tools/agent-window-spike.mjs`
+  в разделе «Прочее» (Chrome из `/Applications`, сравнение с Chrome for Testing из его места на
+  Mac и чтение переднего приложения через `osascript`: на Linux фокус не читается). В `cmd.exe` и Windows PowerShell 5.1 часть команд читается иначе.
+- **Node и pnpm.** На Node 22–24 corepack включает pnpm, как выше; на Windows, где Node стоит в
+  Program Files, `corepack enable` обычно требует оболочку администратора, иначе ставьте pnpm
+  как для Node 25 ниже (CI на Windows ставит его `pnpm/action-setup`). С Node 25 corepack
+  в Node не входит: pnpm ставится `npm i -g pnpm` или автономным установщиком с
+  pnpm.io (`iwr https://get.pnpm.io/install.ps1 -useb | iex` в PowerShell); версию
+  всё равно задаёт `packageManager`.
+- **Python 3 под одним из имён `py -3`, `python`, `python3`.** Гейты зовут Python через
+  `tools/python.mjs`: он берёт первое имя, которое докажет, что это Python 3, поэтому
+  заглушка из Microsoft Store не проходит. На Windows линтеры получают `PYTHONUTF8=1`,
+  иначе русский вывод через трубу хука падает в cp1252.
+
+Что на Windows делается иначе, и где это проверено:
+
+| Что | macOS, Linux | Windows | Проверка |
+|---|---|---|---|
+| Python | `python3`, затем `python` | `py -3`, `python`, `python3` | `tools/python.test.ts` |
+| `pnpm`, `npx` из инструментов разработки (гейты, `pnpm package`, e2e, `deploy-worker`) | без оболочки | через cmd.exe одной строкой команды; аргумент со спецсимволом cmd отклоняется. Инструменты фида на Windows не работают: `feed:refresh` и публикация для машины с ключом подписи на macOS или Linux (ADR-0002), агент фида `feed:agent` только для macOS (launchd, ADR-0017) | `tools/bin.test.ts` |
+| архив `pnpm package` | `zip -q -r -X` | `%SystemRoot%\System32\tar.exe -a` | `tools/archive.test.ts` |
+| дерево процессов фида | сигнал группе | `taskkill /T`, через паузу `/T /F` | `tools/feed/bounded.test.ts` |
+| geckodriver в e2e Firefox, сборка в `pnpm package` по сроку | `child.kill()` | `taskkill /PID <pid> /T /F`: иначе кончается только cmd.exe | `tools/bin.test.ts` |
+| права 0600 на файлы с секретами | проверяются | тесты пропущены с причиной, `access.mjs` пишет `n/a` | `tools/feed/log.test.ts`, `tools/access.test.ts` |
+| Firefox для e2e | кэш Playwright в домашней папке | `%LOCALAPPDATA%\ms-playwright\firefox-*\firefox\firefox.exe` | `tools/find-firefox.test.ts` |
+
+Клон, сделанный до появления `.gitattributes`, держит в рабочем дереве CRLF: Git не
+переписывает файл, который не менялся, а `git add --renormalize .` трогает только индекс
+(индекс этого репозитория и так в LF, это держит `tools/ci.test.ts`, «holds no CRLF in the
+index»). Рабочее дерево переводят один раз, на чистом дереве: сначала закоммитьте или
+спрячьте (`git stash`) свою работу, потому что `reset --hard` выбрасывает незакоммиченное.
+
+```bash
+git status --porcelain                          # пусто: работа закоммичена или спрятана
+git rm -r --cached -q . && git reset -q --hard  # индекс заново из HEAD, файлы заново по .gitattributes
+git ls-files --eol | grep w/crlf                # ничего не печатает: на диске нет CRLF
+```
+
+Эти три строки исполняет `tools/ci.test.ts` («a clone made before .gitattributes is
+converted by the runbook's own commands»): берёт их из этого блока и гоняет во временном
+репозитории с `core.autocrlf=true`, где хук до перевода лежит с CRLF.
+
+Firefox для e2e на Windows лежит в `%LOCALAPPDATA%\ms-playwright`; порядок поиска один на
+все платформы и записан ниже, в разделе «Тесты, которые не входят в `gates`».
+
+`pnpm package` сверяет архив со сборкой по списку файлов из центрального каталога zip,
+а не по байтам: `zip` и `tar` пишут разные байты. Концы строк держит `.gitattributes`
+(`* text=auto eol=lf`): чекаут получает LF при любом `core.autocrlf`. `tools/ci.test.ts`
+проверяет это дважды: «line endings are LF on every checkout» читает `.gitattributes` и
+индекс, а тест рецепта для старого клона прогоняет его во временном репозитории с
+`core.autocrlf=true` и смотрит файлы на диске.
+
+На Windows гейты гоняет задача CI `gates (windows)` на `windows-latest`
+(`.github/workflows/ci.yml`, B-164; первый зелёный прогон
+[40517607494](https://github.com/passioncode-ai/okolos/actions/runs/40517607494) на
+`714e336`; дерево с исправлениями B-162 и B-163 проверил прогон
+[40572549603](https://github.com/passioncode-ai/okolos/actions/runs/40572549603) на `3276f2c`,
+зелёный во всех четырёх задачах; дерево с последними документами по Windows проверил
+[40625746452](https://github.com/passioncode-ai/okolos/actions/runs/40625746452) на `46a5752`,
+тоже зелёный). Её шаги: `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`,
+`pnpm build`, `pnpm test` (в нём архив через `tar.exe` из System32 и решение хука под `sh`
+из Git for Windows), `pnpm ux:lint`, `pnpm brand:lint`, `pnpm i18n:sweep` и
+`pnpm package:check` (проверки архива без записи). На Windows не проверены: e2e в Chromium и
+Firefox (обе задачи e2e идут только на Linux, решение записано в `ci.yml`), полный прогон
+хука pre-push со всеми гейтами, `pnpm package` с записью архива и загрузка в магазины архива,
+собранного на Windows, поиск Firefox в настоящем кэше Windows. Строки таблицы выше про e2e
+(geckodriver, Firefox в `%LOCALAPPDATA%`) доказаны только тестами, которым платформа
+передаётся параметром. Агент фида работает только под launchd на macOS (ADR-0017), на
+Windows его нет.
 
 ## Цикл разработки
 
@@ -193,9 +298,17 @@ elements» и больше ничего, а между навигацией и �
 это проверка, а не соглашение — закрытый корень и есть граница доверия
 ([ADR-0001](../adr/0001-closed-shadow-root.md)).
 
-Firefox-прогон ищет бинарник в кэше Playwright, иначе — `FIREFOX_BINARY`. Он
-поднимает geckodriver на порту 4444; занятый порт — самая частая причина
-непонятного падения.
+Firefox-прогон берёт бинарник так (`tools/find-firefox.mjs`, тест
+`tools/find-firefox.test.ts`, «lets FIREFOX_BINARY win»): `FIREFOX_BINARY`, когда переменная
+задана, на любой платформе; иначе самый новый Firefox из всех кэшей Playwright
+(`PLAYWRIGHT_BROWSERS_PATH`, на macOS и Linux `~/Library/Caches/ms-playwright`,
+`~/.cache/ms-playwright` и `/root/.cache/ms-playwright`, на Windows
+`%LOCALAPPDATA%\ms-playwright`). Нет ни одного: прогон отказывает с командой
+`pnpm exec playwright install firefox`. Это касается только первого шага
+`pnpm test:e2e:firefox`; второй шаг, `gecko-layout`, берёт Firefox и Chromium Playwright сам, и
+`FIREFOX_BINARY` его не меняет: нужен `pnpm exec playwright install firefox chromium`. Первый шаг
+(`tools/firefox-e2e.mjs`) поднимает geckodriver на порту 4444; занятый порт бывает самой частой
+причиной непонятного падения.
 
 ## Генерируемое — руками не править
 
@@ -221,7 +334,7 @@ pnpm i18n:sweep              # входит в gates: отказывает, ес
 pnpm feed:ingest             # собрать блок-лист из OpenPhish в ~/.okolos/state/feeds/phishing.json
 pnpm feed:refresh            # собрать и опубликовать одной командой (ключ подписи, чекаут на origin/main)
 pnpm feed:agent              # поставить launchd-агента: обновляет фид каждые 12 часов
-pnpm feed:snapshot           # скопировать опубликованный фид в feeds/phishing.json — для коммита
+pnpm feed:snapshot           # скопировать опубликованный фид в feeds/phishing.json для коммита; агент сам открывает PR со снимком через 7 дней (B-158)
 node tools/i18n-sweep.mjs --list   # каждая, с файлом и строкой
 ```
 
@@ -331,6 +444,7 @@ pnpm suffix:gap      # таблица суффиксов против насто
 каждый процесс перед выходом. Окно может на секунду появиться на экране:
 
 ```bash
+# только на macOS: Chrome из /Applications, фокус читается через osascript
 node tools/agent-window-spike.mjs --out /tmp/b0.json   # инфобар, CDP, размер снимка, фокус
 ```
 

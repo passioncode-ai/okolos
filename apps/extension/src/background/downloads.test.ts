@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { FeedSnapshot } from '@okolos/core-feeds'
 
-import { handleDownload, type DownloadDeps, type DownloadItem } from './downloads.js'
+import { discardDownload, handleDownload, type DownloadDeps, type DownloadItem } from './downloads.js'
 
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -33,16 +33,16 @@ function item(overrides: Partial<DownloadItem> = {}): DownloadItem {
 }
 
 function deps(overrides: Partial<DownloadDeps> = {}): DownloadDeps & {
-  cancel: ReturnType<typeof vi.fn>
+  stop: ReturnType<typeof vi.fn>
   journal: ReturnType<typeof vi.fn>
 } {
   return {
     feed: async () => FEED,
-    cancel: vi.fn(async () => undefined),
+    stop: vi.fn(async () => true),
     journal: vi.fn(async () => undefined),
     announce: vi.fn(async () => undefined),
     ...overrides,
-  } as DownloadDeps & { cancel: ReturnType<typeof vi.fn>; journal: ReturnType<typeof vi.fn> }
+  } as DownloadDeps & { stop: ReturnType<typeof vi.fn>; journal: ReturnType<typeof vi.fn> }
 }
 
 describe('a file from a listed address', () => {
@@ -51,7 +51,7 @@ describe('a file from a listed address', () => {
     const verdict = await handleDownload(item({ url: 'https://malware.test/x.exe' }), d)
 
     expect(verdict.action).toBe('block')
-    expect(d.cancel).toHaveBeenCalledWith(1)
+    expect(d.stop).toHaveBeenCalledWith(1)
   })
 
   it('names the list and the date of its entry', async () => {
@@ -94,7 +94,7 @@ describe('when the lists are unavailable', () => {
     const d = deps({ feed: async () => null })
     const verdict = await handleDownload(item(), d)
     expect(verdict.action).not.toBe('block')
-    expect(d.cancel).not.toHaveBeenCalled()
+    expect(d.stop).not.toHaveBeenCalled()
   })
 
   it('survives a storage failure without stopping the download', async () => {
@@ -104,7 +104,7 @@ describe('when the lists are unavailable', () => {
       },
     })
     await expect(handleDownload(item(), d)).resolves.toBeTruthy()
-    expect(d.cancel).not.toHaveBeenCalled()
+    expect(d.stop).not.toHaveBeenCalled()
   })
 })
 
@@ -117,7 +117,7 @@ describe('what the file name gives away', () => {
   it('does not cancel on a warning — that is the user’s call', async () => {
     const d = deps()
     await handleDownload(item({ filename: 'invoice.pdf.exe' }), d)
-    expect(d.cancel).not.toHaveBeenCalled()
+    expect(d.stop).not.toHaveBeenCalled()
   })
 })
 
@@ -135,7 +135,7 @@ describe('a redirect, which is how a malicious file is usually served', () => {
       d,
     )
     expect(verdict.action).toBe('block')
-    expect(d.cancel).toHaveBeenCalledWith(1)
+    expect(d.stop).toHaveBeenCalledWith(1)
   })
 
   it('cancels when the link is listed and the landing address is not', async () => {
@@ -160,7 +160,7 @@ describe('a redirect, which is how a malicious file is usually served', () => {
       d,
     )
     expect(verdict.action).not.toBe('block')
-    expect(d.cancel).not.toHaveBeenCalled()
+    expect(d.stop).not.toHaveBeenCalled()
   })
 
   it('still checks the one address when there is no second one', async () => {
@@ -171,3 +171,104 @@ describe('a redirect, which is how a malicious file is usually served', () => {
   })
 })
 
+
+describe('discardDownload (B-165, round 7)', () => {
+  it('deletes the download the top frame names, without judging it again', async () => {
+    const asked: number[] = []
+    const result = await discardDownload({ downloadId: 7 }, { frameId: 0 }, async (id) => {
+      asked.push(id)
+      return true
+    })
+    expect(result).toEqual({ ok: true })
+    expect(asked).toEqual([7])
+  })
+
+  it('refuses a frame inside the page and a malformed id, touching nothing', async () => {
+    const asked: number[] = []
+    const discard = async (id: number) => {
+      asked.push(id)
+      return true
+    }
+    expect(await discardDownload({ downloadId: 7 }, { frameId: 3 }, discard)).toEqual({ ok: false })
+    expect(await discardDownload({ downloadId: 7 }, {}, discard)).toEqual({ ok: false })
+    expect(await discardDownload({ downloadId: '7' }, { frameId: 0 }, discard)).toEqual({ ok: false })
+    expect(await discardDownload({ downloadId: 1.5 }, { frameId: 0 }, discard)).toEqual({ ok: false })
+    expect(await discardDownload(null, { frameId: 0 }, discard)).toEqual({ ok: false })
+    expect(asked).toEqual([])
+  })
+
+  it('reports a failed deletion as not done', async () => {
+    expect(await discardDownload({ downloadId: 7 }, { frameId: 0 }, async () => false)).toEqual({ ok: false })
+    expect(
+      await discardDownload({ downloadId: 7 }, { frameId: 0 }, async () => {
+        throw new Error('gone')
+      }),
+    ).toEqual({ ok: false })
+  })
+})
+
+describe('a download Chrome names after creating it (B-165, round 8)', () => {
+  it('cancels a listed download at once, before the name arrives', async () => {
+    const d = deps()
+    let name: (named: DownloadItem) => void = () => undefined
+    const named = new Promise<DownloadItem>((done) => {
+      name = done
+    })
+    const verdict = await handleDownload(item({ url: 'https://malware.test/x', filename: '' }), d, named)
+    expect(verdict.action).toBe('block')
+    expect(d.stop).toHaveBeenCalledWith(1)
+    // The name never came, and nothing waited for it.
+    name(item({ url: 'https://malware.test/x', filename: 'x.exe' }))
+  })
+
+  it('judges an unlisted download by the name, once the browser gives it', async () => {
+    const d = deps()
+    const announce = vi.fn(async () => undefined)
+    const verdict = await handleDownload(
+      item({ url: 'https://files.test/get', filename: '', mime: null }),
+      { ...d, announce },
+      Promise.resolve(item({ url: 'https://files.test/get', filename: 'invoice.pdf.exe', mime: null })),
+    )
+    expect(verdict.action).toBe('warn')
+    expect(verdict.shape.map((s) => s.code)).toContain('double-extension')
+    expect(d.stop).not.toHaveBeenCalled()
+    expect(d.journal).toHaveBeenCalledWith(expect.objectContaining({ explain: expect.stringContaining('invoice.pdf.exe') }))
+    expect(announce).toHaveBeenCalledWith(verdict, expect.objectContaining({ filename: 'invoice.pdf.exe' }))
+  })
+
+  it('judges by what it has when the name never resolves', async () => {
+    const d = deps()
+    const verdict = await handleDownload(
+      item({ url: 'https://files.test/get', filename: '', mime: null }),
+      d,
+      Promise.reject(new Error('gone')),
+    )
+    expect(verdict.action).not.toBe('block')
+    expect(d.stop).not.toHaveBeenCalled()
+  })
+})
+
+describe('a listed file the browser finished before it could be stopped (B-180, round 9)', () => {
+  it('is announced as not stopped, so the panel does not say nothing reached the disk', async () => {
+    const announce = vi.fn(async () => undefined)
+    const d = deps({ stop: vi.fn(async () => false), announce })
+    const verdict = await handleDownload(item({ url: 'https://malware.test/x.lnk', filename: 'x.lnk' }), d)
+
+    expect(verdict.action).toBe('block')
+    expect(d.stop).toHaveBeenCalledWith(1)
+    expect(announce).toHaveBeenCalledWith(verdict, expect.anything(), { stopped: false })
+  })
+
+  it('is announced as stopped when the browser confirms nothing is left', async () => {
+    const announce = vi.fn(async () => undefined)
+    const verdict = await handleDownload(item({ url: 'https://malware.test/x.exe' }), deps({ announce }))
+    expect(announce).toHaveBeenCalledWith(verdict, expect.anything(), { stopped: true })
+  })
+
+  it('counts a stop that throws as not stopped', async () => {
+    const announce = vi.fn(async () => undefined)
+    const d = deps({ stop: vi.fn(async () => { throw new Error('gone') }), announce })
+    const verdict = await handleDownload(item({ url: 'https://malware.test/x.exe' }), d)
+    expect(announce).toHaveBeenCalledWith(verdict, expect.anything(), { stopped: false })
+  })
+})
