@@ -116,3 +116,12 @@ instead), so the texts say what is sent and what is not, and never call it anony
 
 `docs/privacy.md` (the «Чего нет» bullet and a new section) is written with the code, against the final event
 catalogue, and checked then. Next: stage 4 plan.
+- 2026-11-04 17:30 UTC, sshlg-growth answered (thread `881757d0`): `platform` is `browser_extension` (not `web`:
+  `web` means a site's page), browser and OS through `systemProps`; growth adds the value in manifest revision 34
+  (RB-111); until then `POST /v1/config` refuses it, which Okolos does not call. And the server: PassionCode
+  products send to `analytics.passioncode.ai` (passioncode-platform `infra/analytics`), not `analytics.sshlg.me`;
+  growth reads both. The operator's decision names no server, `analytics.sshlg.me` was this run's choice from the
+  usage-events skill, so the design changes: D1 host `analytics.passioncode.ai`; D5 `platform: browser_extension`;
+  D8 App-Key slot `passioncode-platform/prod/APTABASE_APP_KEY_OKOLOS`, made by growth with
+  passioncode-platform `scripts/app.sh create` (asked, answer pending). `docs/brand/facts.md` and
+  `packages/net/src/destinations.ts` will name `analytics.passioncode.ai`.
