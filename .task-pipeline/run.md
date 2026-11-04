@@ -133,3 +133,20 @@ catalogue, and checked then. Next: stage 4 plan.
 - 2026-11-04 18:15 UTC, sshlg-growth: `browser_extension` is live in growth 0.37.0 (manifest revision 34, `279aeaa`):
   config request and its targeting, `segment.platform` in stats, funnel and series, `platforms` on an experiment
   card. The usage-events and remote-config skills name it in growth's repository until the sshlg-skills release.
+
+## Stage 4: plan (2026-11-04)
+
+The queue is written here as prose rather than as a validated work graph (`graph.py`): the run is one branch and
+seven nodes in a line with two parallel steps; said out loud as the weaker form.
+
+| Node | Risk | What | Depends on | Done when |
+|---|---|---|---|---|
+| A1 | R2 | purpose `usage-data` in `@okolos/contracts` `Purpose`, `packages/net` `PURPOSES` and `DESTINATIONS` (`analytics.passioncode.ai` only), the redactor's rules for it, and its three wordings in `packages/ui/src/self-audit/panel.ts` (ru, en) | - | unit tests red then green: a `usage-data` request to any other host is refused, one to the host is audited before it leaves |
+| A2 | R3 | the sink (`packages/usage`): consent state and `iid` in `storage.local`, a queue capped at 25 a batch that drops events older than 24 h, the closed event catalogue with enumerated props, `iid`/`environment`/`platform: browser_extension` and `systemProps` attached in one place, `isDebug` from the build, sending through `request` | A1 | tests: off sends nothing and drops the queue; on again makes a new `iid`; a planted URL, page text, file name, email or password in any prop is refused; the sink stops attaching `iid` → a test fails |
+| A3 | R2 | consent per browser: Chrome and Edge on from the first run; Firefox `data_collection_permissions.optional: [technicalAndInteraction]` in `manifest.firefox.json`, sending only while `permissions.getAll()` lists it, the switch calls `permissions.request`/`remove`; no `data_collection` key (Firefox 129..139) → nothing sent | A2 | unit tests for each branch; manifest test |
+| A4 | R2 | UI: the notice on SCR-01 and the block on SCR-12, strings from the Copylot-checked set in `packages/i18n` (ru, en) | A3 | e2e Chromium: notice shown once, switch off then on; a11y spec green |
+| A5 | R2 | events wired: `extension_installed`, `first_run_completed`, `warning_shown`, `check_done`, `error_occurred` (area and kind enumerated); `docs/analytics.md` the catalogue with file:line | A2 | catalogue test: every name sent appears in the catalogue and back |
+| A6 | R2 | build: `pnpm package` injects the App-Key from `passioncode-platform/prod/APTABASE_APP_KEY_OKOLOS` through `use_secret.py run`; dev, e2e and CI builds carry no key and send nothing; a gate that no `A-` key shape is in the tree or in a non-store bundle | A2 | gate seen red with a planted key |
+| A7 | R1 | docs in the same change: `docs/privacy.md` (the «Чего нет» list, a new section), `docs/store/listing.md` ru and en, `docs/brand/facts.md` destinations, ADR-0021, scenario statuses SCN-049..052, CHANGELOG | A1..A6 | `tools/docs.test.ts`, `python3 docs/ux/lint.py`, Copylot reports for the privacy text |
+
+Next: A1, test first.
