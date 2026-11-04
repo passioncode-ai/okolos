@@ -2025,6 +2025,9 @@
   "warnDownloadCancelled": {
     "message": "The file was cancelled, so nothing reached your disk."
   },
+  "warnDownloadNotStopped": {
+    "message": "The download could not be stopped in time, so the file may be on your disk. Delete it."
+  },
   "warnDownloadDiscardFailed": {
     "message": "The file could not be deleted. Delete it from the browser's downloads."
   },

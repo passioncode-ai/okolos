@@ -1122,7 +1122,7 @@ platform.runtime.onBrowserStart(() => {
 platform.downloads.onCreated((item, named) => {
   void handleDownload(item, {
     feed: currentFeed,
-    cancel: (id) => platform.downloads.cancel(id),
+    stop: (id) => platform.downloads.discard(id),
     journal: async (entry) => {
       const db = await openDb()
       const now = new Date().toISOString()
@@ -1133,7 +1133,7 @@ platform.downloads.onCreated((item, named) => {
         detail: { explain: entry.explain, outcome: entry.outcome },
       })
     },
-    announce: async (verdict) => {
+    announce: async (verdict, _item, outcome) => {
       /**
        * `tabs.sendToActive`, not `runtime.send`, and the difference is the whole
        * defect this replaces.
@@ -1161,6 +1161,7 @@ platform.downloads.onCreated((item, named) => {
           reasons: verdict.reasons.join(' '),
           skipped: verdict.skipped.map((entry) => `${entry.check}: ${entry.why}`).join('; '),
           downloadId: item.id,
+          ...(outcome ? { stopped: outcome.stopped } : {}),
         })
         .catch(() => false)
 

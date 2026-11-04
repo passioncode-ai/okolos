@@ -206,3 +206,27 @@ describe('a doubted download, discarded from its panel (B-165, round 4)', () => 
     expect(banner()).not.toBeNull()
   })
 })
+
+describe('a blocked download the browser finished before it could be stopped (B-180, round 9)', () => {
+  it('does not say nothing reached the disk, and says the file may be there', () => {
+    const handle = showDownloadVerdict(message({ stopped: false, downloadId: 7 }), deps())
+    const detail = handle?.root.querySelector('[data-role=detail]')?.textContent ?? ''
+    expect(detail).not.toContain('на диск ничего не попало')
+    expect(detail).toContain('файл мог успеть записаться на диск')
+  })
+
+  it('offers to delete the file, and deleting asks the worker', async () => {
+    const discard = vi.fn(async () => true)
+    const handle = showDownloadVerdict(message({ stopped: false, downloadId: 7 }), { ...deps(), discard })
+    const primary = handle?.root.querySelector<HTMLElement>('[data-role=primary]')
+    expect(primary?.textContent).toBe(CATALOGUE.bannerActionDownload.message)
+    primary?.click()
+    await Promise.resolve()
+    expect(discard).toHaveBeenCalledWith(7)
+  })
+
+  it('keeps the old sentence when the worker confirmed the stop', () => {
+    const handle = showDownloadVerdict(message({ stopped: true }), deps())
+    expect(handle?.root.querySelector('[data-role=detail]')?.textContent).toContain('на диск ничего не попало')
+  })
+})

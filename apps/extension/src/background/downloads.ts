@@ -31,9 +31,14 @@ export interface DownloadItem {
 
 export interface DownloadDeps {
   feed(): Promise<FeedSnapshot | null>
-  cancel(id: number): Promise<void>
+  /**
+   * Stops a download and removes its file if the browser already wrote it, by the state the
+   * browser reports (the adapter's `discard`). `true` only when nothing of it is left on disk.
+   */
+  stop(id: number): Promise<boolean>
   journal(entry: { explain: string; outcome: string }): Promise<void>
-  announce(verdict: DownloadVerdict, item: DownloadItem): Promise<void>
+  /** `stopped` is present on a block only: whether the stop is confirmed (B-180, round 9). */
+  announce(verdict: DownloadVerdict, item: DownloadItem, outcome?: { stopped: boolean }): Promise<void>
 }
 
 /**
@@ -102,10 +107,15 @@ export async function handleDownload(
 
   let item = created
   let verdict = byAddress
+  let outcome: { stopped: boolean } | undefined
   if (byAddress.action === 'block') {
-    // Cancelled first, explained second. The order matters: the file must not
-    // reach the disk while a banner is being drawn.
-    await deps.cancel(created.id).catch(() => undefined)
+    // Stopped first, explained second. The order matters: the file must not
+    // reach the disk while a banner is being drawn. A bare cancel was not enough
+    // (round 9 of the B-180 certification): Chrome's cancel resolves for a download
+    // that already finished and leaves the file, and a file of a few hundred bytes
+    // finishes inside the feed read. So the stop looks again and removes what was
+    // written, and the panel says "nothing reached the disk" only when it is confirmed.
+    outcome = { stopped: await deps.stop(created.id).catch(() => false) }
   } else {
     item = await named.catch(() => created)
     verdict = item === created ? byAddress : judgeItem(item, feed)
@@ -118,7 +128,7 @@ export async function handleDownload(
     })
     .catch(() => undefined)
 
-  await deps.announce(verdict, item).catch(() => undefined)
+  await (outcome ? deps.announce(verdict, item, outcome) : deps.announce(verdict, item)).catch(() => undefined)
   return verdict
 }
 

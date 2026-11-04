@@ -911,17 +911,27 @@ describe('a download whose name Chrome reports later (B-165, rounds 7 and 8)', (
   })
 
   it('resolves `named` at once for a download that already has its name (Firefox)', async () => {
+    // With onChanged present, as in real Firefox: without it the adapter takes the other exit
+    // and this test would pass even if the `item.filename` branch were gone (round 9 seam).
+    vi.useFakeTimers()
     const held: { created?: (item: { id: number; url: string; filename?: string }) => void } = {}
     const platform = createPlatform('firefox', fakeApi({
       downloads: {
         onCreated: { addListener: (cb) => { held.created = cb } },
+        onChanged: { addListener: () => undefined },
         cancel: async () => undefined,
       },
     }))
     const later: Array<Promise<{ filename: string }>> = []
     platform.downloads.onCreated((_item, named) => later.push(named))
     held.created?.({ id: 6, url: 'https://x.test/c', filename: '/home/a/c.msi' })
+    let settled = false
+    void later[0]?.then(() => { settled = true })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(settled).toBe(true)
     expect((await later[0])?.filename).toBe('c.msi')
+    vi.useRealTimers()
   })
 })
 

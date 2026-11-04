@@ -33,6 +33,12 @@ export interface DownloadVerdictMessage {
   readonly skipped: string
   /** The browser's id of the download; absent from an older background. */
   readonly downloadId?: number
+  /**
+   * On a block: whether the worker confirmed nothing of the file is left on disk. `false` when
+   * the browser finished it before it could be stopped (B-180, round 9); absent from an older
+   * background, which is read as stopped.
+   */
+  readonly stopped?: boolean
 }
 
 /**
@@ -116,6 +122,8 @@ export function showDownloadVerdict(
   if (message.action === 'inform') return null
 
   const blocked = message.action === 'block'
+  // A block whose stop was not confirmed must not say the disk is clean, and has a real action.
+  const leftOnDisk = blocked && message.stopped === false
   let banner: BannerHandle | null = null
   const dismiss = () => {
     banner?.destroy()
@@ -140,7 +148,7 @@ export function showDownloadVerdict(
       detail: [
         message.reasons,
         message.shape.map(shapeSentence).join(' '),
-        blocked ? t('warnDownloadCancelled') : '',
+        leftOnDisk ? t('warnDownloadNotStopped') : blocked ? t('warnDownloadCancelled') : '',
         message.skipped ? t('warnDownloadSkipped', message.skipped) : '',
       ]
         .filter(Boolean)
@@ -148,11 +156,11 @@ export function showDownloadVerdict(
       sourceLine: t('warnFoundBy', t('warnDownloadSource')),
       // Not "Discard the file": the browser already did, and offering an action
       // nobody can take is worse than offering none.
-      primaryLabel: blocked ? t('warnDownloadShowRecord') : t('bannerActionDownload'),
+      primaryLabel: blocked && !leftOnDisk ? t('warnDownloadShowRecord') : t('bannerActionDownload'),
     },
     {
-      onPrimary: blocked ? deps.openJournal : discard,
-      onRetry: blocked ? deps.openJournal : discard,
+      onPrimary: blocked && !leftOnDisk ? deps.openJournal : discard,
+      onRetry: blocked && !leftOnDisk ? deps.openJournal : discard,
       onDispute: dismiss,
       onDismiss: dismiss,
     },
