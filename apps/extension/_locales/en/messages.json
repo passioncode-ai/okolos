@@ -2106,7 +2106,10 @@
     "message": "A download was stopped before it was saved"
   },
   "warnDownloadCancelled": {
-    "message": "The file was cancelled, so nothing reached your disk."
+    "message": "The download was cancelled, and nothing of it is left on your disk."
+  },
+  "warnDownloadNotStoppedHeadline": {
+    "message": "A listed download was not stopped in time"
   },
   "warnDownloadNotStopped": {
     "message": "The download could not be stopped in time, so the file may be on your disk. Delete it."

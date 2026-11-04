@@ -142,7 +142,9 @@ export function showDownloadVerdict(
     {
       variant: 'download',
       severity: blocked ? 'critical' : 'major',
-      headline: blocked
+      headline: leftOnDisk
+        ? t('warnDownloadNotStoppedHeadline')
+        : blocked
         ? t('warnDownloadBlockedHeadline')
         : t(HEADLINE_KEY[message.headline] ?? 'warnDownloadBlockedHeadline'),
       detail: [

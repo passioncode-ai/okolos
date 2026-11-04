@@ -181,6 +181,12 @@ export interface RpcMap {
       skipped: string
       /** The browser's id of the download, so the panel's "Discard the file" can act on it. */
       downloadId: number
+      /**
+       * On a block only: whether the stop is confirmed, nothing of the file left on disk.
+       * `false` makes the panel say the file may be on disk and offer to delete it
+       * (B-180, rounds 9 and 10 of the seam).
+       */
+      stopped?: boolean
     }
     res: { ok: true }
   }

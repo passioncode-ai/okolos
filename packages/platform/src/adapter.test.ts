@@ -769,13 +769,19 @@ describe('the navigation listener wakes the worker for web pages only', () => {
 })
 
 describe('discarding a download, by the state the browser reports (B-165, round 6)', () => {
-  function api(state: string | null, calls: string[], removeFails = false) {
+  // A real cancel turns a running download into 'interrupted' (USER_CANCELED); `cancelIgnored`
+  // is a download already finishing, which the browser lets complete (round 10 seam).
+  function api(state: string | null, calls: string[], removeFails = false, cancelIgnored = false) {
+    let current = state
     return fakeApi({
       downloads: {
         onCreated: { addListener: () => undefined },
         search: async (query: { id: number }) =>
-          state === null ? [] : [{ id: query.id, url: 'https://x.test/a.exe', filename: '/d/a.exe', mime: 'application/x-msdownload', state, exists: true }],
-        cancel: async (id: number) => { calls.push(`cancel ${id}`) },
+          current === null ? [] : [{ id: query.id, url: 'https://x.test/a.exe', filename: '/d/a.exe', mime: 'application/x-msdownload', state: current, exists: true }],
+        cancel: async (id: number) => {
+          calls.push(`cancel ${id}`)
+          if (!cancelIgnored && current === 'in_progress') current = 'interrupted'
+        },
         removeFile: async (id: number) => {
           if (removeFails) throw new Error('file not found')
           calls.push(`remove ${id}`)
@@ -789,6 +795,14 @@ describe('discarding a download, by the state the browser reports (B-165, round 
     const calls: string[] = []
     expect(await createPlatform('chrome', api('in_progress', calls)).downloads.discard(7)).toBe(true)
     expect(calls).toEqual(['cancel 7', 'erase 7'])
+  })
+
+  it('does not call a download stopped while the browser still reports it running after the cancel (round 10 seam)', async () => {
+    // A download already finishing may ignore the cancel and complete. Counting that as
+    // stopped put "nothing is left on your disk" over a file that was.
+    const calls: string[] = []
+    expect(await createPlatform('chrome', api('in_progress', calls, false, true)).downloads.discard(7)).toBe(false)
+    expect(calls).toEqual(['cancel 7'])
   })
 
   it('deletes the file of a finished one, which cancel would leave on disk in Chrome', async () => {

@@ -50,7 +50,7 @@ describe('a download that was stopped', () => {
   it('says the file never reached the disk, rather than offering to stop it', () => {
     const handle = showDownloadVerdict(message(), deps())
     const detail = handle?.root.querySelector('[data-role=detail]')?.textContent ?? ''
-    expect(detail).toContain('на диск ничего не попало')
+    expect(detail).toContain('на диске ничего не осталось')
   })
 
   it('names what matched', () => {
@@ -211,8 +211,15 @@ describe('a blocked download the browser finished before it could be stopped (B-
   it('does not say nothing reached the disk, and says the file may be there', () => {
     const handle = showDownloadVerdict(message({ stopped: false, downloadId: 7 }), deps())
     const detail = handle?.root.querySelector('[data-role=detail]')?.textContent ?? ''
-    expect(detail).not.toContain('на диск ничего не попало')
+    expect(detail).not.toContain('на диске ничего не осталось')
     expect(detail).toContain('файл мог успеть записаться на диск')
+  })
+
+  it('does not claim a stop in the headline either (round 10 seam)', () => {
+    const handle = showDownloadVerdict(message({ stopped: false, downloadId: 7 }), deps())
+    const headline = handle?.root.querySelector('[data-role=headline]')?.textContent ?? ''
+    expect(headline).not.toContain('остановлена до сохранения')
+    expect(headline).toBe('Загрузку из списка не удалось остановить вовремя')
   })
 
   it('offers to delete the file, and deleting asks the worker', async () => {
@@ -227,6 +234,6 @@ describe('a blocked download the browser finished before it could be stopped (B-
 
   it('keeps the old sentence when the worker confirmed the stop', () => {
     const handle = showDownloadVerdict(message({ stopped: true }), deps())
-    expect(handle?.root.querySelector('[data-role=detail]')?.textContent).toContain('на диск ничего не попало')
+    expect(handle?.root.querySelector('[data-role=detail]')?.textContent).toContain('на диске ничего не осталось')
   })
 })

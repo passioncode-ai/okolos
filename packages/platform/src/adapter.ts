@@ -357,6 +357,10 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
           }
           // It may have finished between the look and the cancel (round 7): look again.
           item = (await look()) ?? item
+          // Still running after the cancel: a download already finishing may ignore it and
+          // complete. That is not a stop, and the entry stays so the file can still be
+          // removed from the warning (round 10 seam).
+          if (item.state === 'in_progress') return false
         }
         // A finished file already moved or deleted is gone; nothing is left to remove.
         if (item.state === 'complete' && item.exists !== false) {
