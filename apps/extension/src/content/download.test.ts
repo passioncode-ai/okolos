@@ -219,7 +219,7 @@ describe('a blocked download the browser finished before it could be stopped (B-
     const discard = vi.fn(async () => true)
     const handle = showDownloadVerdict(message({ stopped: false, downloadId: 7 }), { ...deps(), discard })
     const primary = handle?.root.querySelector<HTMLElement>('[data-role=primary]')
-    expect(primary?.textContent).toBe(CATALOGUE.bannerActionDownload.message)
+    expect(primary?.textContent).toBe('Удалить файл')
     primary?.click()
     await Promise.resolve()
     expect(discard).toHaveBeenCalledWith(7)
