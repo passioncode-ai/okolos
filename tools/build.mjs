@@ -36,7 +36,18 @@ const shared = {
   configFile: false,
   logLevel: 'warn',
   resolve: { conditions: ['import', 'module', 'browser', 'default'] },
-  define: { __OKOLOS_TEST_HOOKS__: JSON.stringify(withTestHooks) },
+  define: {
+    __OKOLOS_TEST_HOOKS__: JSON.stringify(withTestHooks),
+    /**
+     * Usage and error data (B-198, B-199). Only the store build made by `pnpm package` sets
+     * these, through the secret runner; every other build carries no App-Key and `sandbox`, and
+     * a build with no key sends nothing. A test-hook build never carries a key.
+     */
+    __OKOLOS_USAGE__: JSON.stringify({
+      appKey: withTestHooks ? null : (process.env.OKOLOS_USAGE_APP_KEY || null),
+      environment: !withTestHooks && process.env.OKOLOS_USAGE_ENV === 'production' ? 'production' : 'sandbox',
+    }),
+  },
 }
 
 for (const target of targets) {

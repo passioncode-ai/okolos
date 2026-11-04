@@ -943,3 +943,21 @@ describe('discard edge cases (B-165, round 7)', () => {
     expect(calls).toEqual(['erase 3'])
   })
 })
+
+describe('the version and the data consent (B-198, B-199)', () => {
+  it('reads the version from the manifest, and says 0.0.0 when the browser gives none', () => {
+    expect(createPlatform('chrome', fakeApi({ runtime: { getManifest: () => ({ version: '0.1.0' }) } } as never)).runtime.version()).toBe('0.1.0')
+    expect(createPlatform('chrome', fakeApi({})).runtime.version()).toBe('0.0.0')
+  })
+
+  it('offers Firefox its data consent and Chrome none', async () => {
+    const permissions = {
+      getAll: async () => ({ data_collection: ['technicalAndInteraction'] }),
+      request: async () => true,
+      remove: async () => true,
+    }
+    const firefox = createPlatform('firefox', fakeApi({ permissions } as never)).dataConsent
+    expect(await firefox.getAll?.()).toEqual({ data_collection: ['technicalAndInteraction'] })
+    expect(createPlatform('chrome', fakeApi({ permissions } as never)).dataConsent).toEqual({})
+  })
+})

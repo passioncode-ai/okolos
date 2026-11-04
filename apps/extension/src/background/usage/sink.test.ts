@@ -25,8 +25,8 @@ function harness(overrides: Partial<UsageDeps> = {}, start?: UsageState) {
     appKey: 'A-SH-0000000000',
     environment: 'production',
     initialConsent: 'on',
-    appVersion: '0.1.0',
-    system: { osName: 'macOS', osVersion: '26.6', engineName: 'Chrome', engineVersion: '142', locale: 'ru-RU' },
+    extensionVersion: '0.1.0',
+    locale: 'ru-RU',
     ...overrides,
   }
   return {
@@ -37,7 +37,7 @@ function harness(overrides: Partial<UsageDeps> = {}, start?: UsageState) {
     advance: (ms: number) => {
       clock += ms
     },
-    events: () => sent.flatMap((s) => JSON.parse(s.body) as Array<Record<string, unknown>>),
+    events: () => sent.map((s) => JSON.parse(s.body) as Record<string, unknown>),
   }
 }
 
@@ -56,17 +56,18 @@ describe('an event that leaves', () => {
     expect(event?.eventName).toBe('first_run_completed')
   })
 
-  it('goes to the batch route with the App-Key, and says it is not a debug event in a store build', async () => {
+  it('goes to the single-event route with the App-Key, and says it is not a debug event in a store build', async () => {
     const h = harness()
     await h.sink.track('extension_installed', { reason: 'install' })
     await h.sink.flush()
 
-    expect(h.sent[0]?.url).toBe('https://analytics.passioncode.ai/api/v0/events')
+    expect(h.sent[0]?.url).toBe('https://analytics.passioncode.ai/api/v0/event')
     expect(h.sent[0]?.headers['App-Key']).toBe('A-SH-0000000000')
     const system = h.events()[0]?.systemProps as Record<string, unknown>
     expect(system.isDebug).toBe(false)
     expect(system.sdkVersion).toMatch(/^okolos-usage@/)
-    expect(system.osName).toBe('macOS')
+    // Empty: the server reads the OS from the User-Agent, so the extension never asks for it.
+    expect(system.osName).toBe('')
   })
 
   it('is a debug event in any other build, and its environment says sandbox', async () => {
@@ -151,12 +152,14 @@ describe('nothing from the page or the person', () => {
 })
 
 describe('the queue', () => {
-  it('sends at most 25 events a request', async () => {
+  it('sends one event a request and at most 25 a flush; the rest waits for the next', async () => {
     const h = harness()
     for (let i = 0; i < 30; i += 1) await h.sink.track('warning_shown', { kind: 'lookalike' })
     await h.sink.flush()
 
-    expect(h.sent.map((s) => (JSON.parse(s.body) as unknown[]).length)).toEqual([25, 5])
+    expect(h.sent).toHaveLength(25)
+    expect(h.sent.every((s) => !Array.isArray(JSON.parse(s.body)))).toBe(true)
+    expect(h.state()?.queue).toHaveLength(5)
   })
 
   it('drops events older than 24 hours rather than sending them late', async () => {

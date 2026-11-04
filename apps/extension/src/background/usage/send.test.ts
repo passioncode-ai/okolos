@@ -5,7 +5,7 @@ import { createUsageSink } from './sink.js'
 import { usageSender } from './send.js'
 
 describe('a batch through the network module', () => {
-  it('is audited as usage-data with the count of events, and the redactor lets an ordinary batch through', async () => {
+  it('is audited as usage-data naming the event, and the redactor lets an ordinary event through', async () => {
     const audit: AuditEntry[] = []
     const seen: Array<{ url: string; headers?: Readonly<Record<string, string>> }> = []
     let state: Parameters<Parameters<typeof createUsageSink>[0]['save']>[0] | undefined
@@ -31,22 +31,23 @@ describe('a batch through the network module', () => {
       appKey: 'A-SH-0000000000',
       environment: 'production',
       initialConsent: 'on',
-      appVersion: '0.1.0',
-      system: { osName: 'Windows', engineName: 'Edge', engineVersion: '142', locale: 'en-US' },
+      extensionVersion: '0.1.0',
+      locale: 'en-US',
     })
 
     await sink.track('extension_installed', { reason: 'install' })
     await sink.track('error_occurred', { area: 'feed', kind: 'network' })
     await sink.flush()
 
-    expect(audit).toHaveLength(1)
+    expect(audit).toHaveLength(2)
     expect(audit[0]).toMatchObject({
       purpose: 'usage-data',
       destination: 'analytics.passioncode.ai',
-      payloadShape: 'usage-events:2',
+      payloadShape: 'usage-event:extension_installed',
       outcome: 'sent',
     })
-    expect(seen[0]?.url).toBe('https://analytics.passioncode.ai/api/v0/events')
+    expect(audit[1]?.payloadShape).toBe('usage-event:error_occurred')
+    expect(seen[0]?.url).toBe('https://analytics.passioncode.ai/api/v0/event')
     expect(state?.queue).toHaveLength(0)
   })
 })

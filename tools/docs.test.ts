@@ -619,7 +619,19 @@ describe('the brand pack states facts, and a fact is checkable', () => {
       const bundles = filesUnder(dist, '.js', { skip: [] })
       expect(bundles.length, `${path.relative(root, dist)} holds no script: ${rebuild}`).toBeGreaterThan(0)
       for (const file of bundles) {
-        const hit = probe.exec(readFileSync(file, 'utf8'))
+        /**
+         * One hit is not a probe and is narrowed out with its reason: the growth platform's
+         * `platform` prop, a constant naming the kind of product (`browser_extension`) on every
+         * usage event (B-198, B-199). It reads nothing about the system; the OS of an event is
+         * filled by the analytics server from the request's own User-Agent. Only the exact
+         * key-value pair is removed, so a read of `navigator.platform` beside it still hits.
+         * The same for `systemProps.appVersion`, which the Aptabase contract names and which
+         * carries the extension's own version (`deps.extensionVersion`), not the browser's.
+         */
+        const shipped = readFileSync(file, 'utf8')
+          .replaceAll('platform:"browser_extension"', '')
+          .replace(/appVersion:[A-Za-z_$][\w$]*\.extensionVersion/g, '')
+        const hit = probe.exec(shipped)
         expect(
           hit?.[0],
           `${path.relative(root, file)} asks which OS it runs on (${rebuild})`,

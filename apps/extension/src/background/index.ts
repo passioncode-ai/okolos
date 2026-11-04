@@ -45,6 +45,11 @@ import { ensureRules, runIfDue, WAKE_ALARMS, type DueStore } from './wake.js'
  */
 
 const platform = detectPlatform()
+/**
+ * Usage and error events (B-198, B-199): on by default by the browser's rules, off in
+ * settings, sent through the audited network path. Read lazily, so a plain wake costs nothing.
+ */
+const usage = startUsage(platform, auditDeps)
 
 /**
  * The worker shows copy too — a download verdict reaches a banner within the
@@ -64,6 +69,7 @@ import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 
 import { recordPageRequest } from './page-requests.js'
 import { recordTrap } from './trap-journal.js'
+import { startUsage } from './usage/start.js'
 import { optionsPageFor } from '../options/views.js'
 
 /**
@@ -306,6 +312,7 @@ async function handleGateDecision(decision: GateDecision): Promise<{ ok: true }>
 // and it is easiest to make in exactly this kind of one-line wiring.
 platform.runtime.onInstalled(() => {
   void platform.tabs.create(platform.runtime.getUrl('first-run.html'))
+  void usage.track('extension_installed', { reason: 'install' })
 })
 
 /**
@@ -1360,6 +1367,9 @@ void platform.alarms.create(RETENTION_ALARM, RETENTION.periodInMinutes)
 platform.alarms.onFired((name) => {
   if (name === FEED_ALARM) {
     void pullFeed()
+    // Usage events ride the feed's alarm rather than a fourth one: at most four sends a day,
+    // and the wake budget in wake.ts stays as it is. Events live 24 hours in the queue.
+    void usage.flush()
     return
   }
   if (name === INVENTORY_ALARM) {

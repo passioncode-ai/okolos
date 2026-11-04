@@ -11,16 +11,20 @@ import { admissible, type EventName, type EventProps } from './catalogue.js'
  * only and writes the audit entry first (ADR-0003).
  */
 
-export const ENDPOINT = 'https://analytics.passioncode.ai/api/v0/events'
+/**
+ * The single-event route, one event a request: with `osName` empty the server reads the OS and
+ * the browser from the request's own User-Agent header, so the extension never asks which
+ * system it runs on (B-166's promise, `tools/docs.test.ts` «asks no OS»). The batch route
+ * stores `systemProps` as sent and would need the extension to read the OS itself.
+ */
+export const ENDPOINT = 'https://analytics.passioncode.ai/api/v0/event'
 const SDK_VERSION = 'okolos-usage@1'
-/** Aptabase refuses more in one request. */
-const BATCH = 25
+/** At most this many events a flush, each its own request; the rest waits for the next. */
+const PER_FLUSH = 25
 /** Aptabase refuses an event older than a day; a late one is dropped, never sent. */
 const MAX_AGE_MS = 24 * 60 * 60 * 1000
 /** A device that never reaches the network must not grow this without end. */
 const QUEUE_MAX = 500
-/** One flush sends at most this many batches; the rest waits for the next. */
-const BATCHES_PER_FLUSH = 4
 
 export interface QueuedEvent {
   readonly eventName: EventName
@@ -50,14 +54,10 @@ export interface UsageDeps {
   readonly environment: 'production' | 'sandbox'
   /** Where collection starts before anybody touched the switch: the browser's answer in Firefox. */
   readonly initialConsent: 'on' | 'off'
-  readonly appVersion: string
-  readonly system: {
-    readonly osName: string
-    readonly osVersion?: string
-    readonly engineName: string
-    readonly engineVersion: string
-    readonly locale: string
-  }
+  /** The extension's version, sent as `systemProps.appVersion`. */
+  readonly extensionVersion: string
+  /** The browser's language, for `systemProps.locale`. Nothing about the device. */
+  readonly locale: string
 }
 
 export interface UsageSink {
@@ -101,14 +101,13 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
         state = { ...state, queue: fresh }
         await deps.save(state)
       }
-      for (let round = 0; round < BATCHES_PER_FLUSH && state.queue.length > 0; round += 1) {
-        const batch = state.queue.slice(0, BATCH)
-        const body = JSON.stringify(batch.map((event) => wire(event, deps)))
+      for (let sent = 0; sent < PER_FLUSH && state.queue.length > 0; sent += 1) {
+        const event = state.queue[0] as QueuedEvent
         let drop: boolean
         try {
           const response = await deps.send({
             url: ENDPOINT,
-            body,
+            body: JSON.stringify(wire(event, deps)),
             headers: { 'App-Key': deps.appKey, 'Content-Type': 'application/json' },
           })
           // Retried only on 429 and 5xx; a 400 or 404 would fail the same way every time.
@@ -117,11 +116,10 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
           drop = false
         }
         if (!drop) return
-        // Re-read: an event tracked while the request was in flight was appended at the end and
-        // must not be lost. Only a flush takes from the head, so the batch is the first
-        // `batch.length` events of what is stored now.
+        // Re-read: an event tracked while the request was in flight was appended at the end.
+        // Only a flush takes from the head, so the one just sent is the first stored now.
         const latest = await read()
-        state = { ...latest, queue: latest.queue.slice(batch.length) }
+        state = { ...latest, queue: latest.queue.slice(1) }
         await deps.save(state)
       }
     },
@@ -143,14 +141,11 @@ function wire(event: QueuedEvent, deps: UsageDeps) {
     eventName: event.eventName,
     systemProps: {
       isDebug: deps.environment !== 'production',
-      locale: deps.system.locale,
-      osName: deps.system.osName,
-      osVersion: deps.system.osVersion ?? '',
-      appVersion: deps.appVersion,
-      appBuildNumber: '',
+      locale: deps.locale.slice(0, 10),
+      // Empty, so the single-event route fills the OS and the browser from the User-Agent.
+      osName: '',
+      appVersion: deps.extensionVersion,
       sdkVersion: SDK_VERSION,
-      engineName: deps.system.engineName,
-      engineVersion: deps.system.engineVersion,
     },
     props: event.props,
   }

@@ -6,6 +6,7 @@ export type {
   Alarms,
   Blocking,
   CreatedDownload,
+  DataConsent,
   Downloads,
   Extensions,
   KeyValueStore,

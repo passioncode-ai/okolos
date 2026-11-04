@@ -1,6 +1,7 @@
 import { isEnvelope, type Envelope, type RpcMap, type RpcType } from '@okolos/contracts'
 
 import type {
+  DataConsent,
   CreatedDownload,
   Platform,
   RpcHandler,
@@ -85,7 +86,19 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
     selfExtensionId = self.id
   })
 
+  /**
+   * Firefox only: Chrome has no built-in data consent, and its `permissions` object has no
+   * `data_collection` half, so the consent module reads Chrome by its own rule.
+   */
+  const perms = kind === 'firefox' ? api.permissions : undefined
+  const dataConsent: DataConsent = {
+    ...(perms?.getAll ? { getAll: perms.getAll.bind(perms) } : {}),
+    ...(perms?.request ? { request: perms.request.bind(perms) } : {}),
+    ...(perms?.remove ? { remove: perms.remove.bind(perms) } : {}),
+  }
+
   return {
+    dataConsent,
     kind,
 
     storage: {
@@ -187,6 +200,10 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
 
       getUrl(path: string): string {
         return api.runtime.getURL(path)
+      },
+
+      version(): string {
+        return api.runtime.getManifest?.().version ?? '0.0.0'
       },
 
       async openOptionsPage(): Promise<void> {
