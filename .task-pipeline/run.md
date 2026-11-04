@@ -76,3 +76,24 @@ Retro floor: no `docs/evidence/retro.md` in this repository, 0 bytes read.
   Allowed meanwhile: stage 1 reading and stage 2 design notes in this ledger, nothing user-facing, nothing that
   sends. Rows B-197..B-199 are in fabric-workspace `knowledge/plans.md` (PR #620). Resume trigger: the operator's
   answer relayed with his words.
+- 2026-11-04 ~17:25 UTC: the operator answered both points (relayed verbatim by fabric-workspace-f1 from session
+  74a9440a): «На все остальное там апрув, типа давай делать, и все, что там не закончили, давай дорабатывать.»
+  No exception for Okolos: point D applies. Rewrite `docs/privacy.md:162` and the store card in the same change as
+  the collection, texts through Copylot. Firefox: as the platform allows, `technicalAndInteraction` optional in the
+  install flow. Chrome: on from the first run, with the notice. Pause lifted; open question 1 closed.
+
+## Stage 2: design (draft, 2026-11-04)
+
+| # | Decision | Why |
+|---|---|---|
+| D1 | Transport: our own small client over `packages/net` with a new purpose `usage-data` whose only host is `analytics.sshlg.me`; batch route `/api/v0/events`, at most 25 a request; retry only transport errors, 429 and 5xx with backoff | ADR-0003 (one choke point, closed purposes, audit entry before the request); client contract |
+| D2 | Consent state in `storage.local`: `on` or `off`, the random `iid` while on. Chrome and Edge: on from the first run, the notice is on the first-run screen (SCR-01). Firefox 140+: on only while `browser.permissions.getAll()` lists `technicalAndInteraction` under `data_collection`; the manifest declares it under `browser_specific_settings.gecko.data_collection_permissions.optional`; the options switch calls `permissions.request` / `permissions.remove`. Firefox 129..139 (no `data_collection` key): nothing is sent, the switch says why | operator 2026-11-04; Firefox platform rule; keeps the 129 floor |
+| D3 | Off: delete `iid`, drop the queue, send nothing; on again: a new `iid`. No erasure promise (Okolos is not on growth's C4 path) | consent.md |
+| D4 | `environment`/`isDebug` from the build: the store build made by `pnpm package` is `production`/`false`; dev, e2e and CI builds are `sandbox`/`true`; a build with no App-Key sends nothing | client contract «Build modes» |
+| D5 | `platform`: asked of sshlg-growth (thread `881757d0`), proposal `browser_extension`; `osName`, `engineName`, `engineVersion` filled from `navigator.userAgent` by the server's map | usage-events; client contract «Web sinks» |
+| D6 | Events: a closed catalogue in `docs/analytics.md`; each event's props an enumerated schema checked at the sink; errors as `error_occurred` {`area`, `kind`} events, not the unused `/api/v0/error` route | usage-events; client contract «Error reporting (exists, not yet used)» |
+| D7 | Nothing from the page or the person: no URL, host, page text, file name, hash, password, address, typed text, stack text; a unit test runs every catalogue event through the sink with planted page data and fails if any leaves | ADR-0019; consent.md «Never send» |
+| D8 | App-Key `sshlg-analytics/prod/APTABASE_APP_KEY_OKOLOS` injected by `pnpm package` through `use_secret.py run`; never in a tracked file | usage-events «The transport» |
+| D9 | Same change: `docs/privacy.md` (the «Чего нет» list and a new section), `docs/store/listing.md` ru and en, `docs/brand/facts.md` destinations, ADR-0021, `docs/ux/scenarios.md` (first-run notice, the switch, Firefox both ways), `flows.md`, `screens.md` SCR-01 and the options screen; texts through Copylot | operator 2026-11-04 ~17:25; CLAUDE.md routes |
+
+Next: stage 3, scenarios through super-ux, then the plan and TDD build.
