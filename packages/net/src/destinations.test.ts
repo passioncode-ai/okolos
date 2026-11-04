@@ -247,6 +247,7 @@ describe('every purpose has a producer, or a recorded reason it has none', () =>
       'apps/extension/src/background/leaks.ts',
       'apps/extension/src/background/password.ts',
       'apps/extension/src/background/feed-sync.ts',
+      'apps/extension/src/background/usage/send.ts',
       'packages/model/src/manager.ts',
     ]
       .map((file) => readFileSync(path.join(root, file), 'utf8'))
