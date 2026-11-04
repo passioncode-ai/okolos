@@ -102,3 +102,17 @@ Next: stage 3, scenarios through super-ux, then the plan and TDD build.
   (`docs/ux/scenarios.md`, status draft), SCR-01 and SCR-12 planned notes (`docs/ux/screens.md`);
   `python3 docs/ux/lint.py` OK. Next: product texts through Copylot (notice, switch block, privacy text, store card),
   then the plan.
+
+## Stage 3: product texts (Copylot, voice Okolos 266030ff v1)
+
+The brand pack forbids «анонимно» as a promise in the interface (`docs/brand/terminology.md:121`: name what leaves
+instead), so the texts say what is sent and what is not, and never call it anonymous.
+
+| Where | ru-RU | en-US | Copylot report |
+|---|---|---|---|
+| SCR-01 notice | «Okolos отправляет нам данные о том, как работает продукт и где он ломается, чтобы его исправлять. В них нет адресов страниц, их текста, имён файлов, почты и паролей.» Link «Выключить в настройках» | «Okolos sends us data on how the product runs and where it breaks, so we can fix it. It contains no page addresses, page text, file names, email or passwords.» Link «Turn off in settings» | ru `63697267`, en `f0382019` (ui, score 100 each, no blocking) |
+| SCR-12 block | heading «Данные об использовании и ошибках»; switch «Отправлять данные об использовании и ошибках»; what is sent: «Отправляются названия действий и ошибок из закрытого списка, версия расширения, браузер и система. Адреса страниц, их текст, имена файлов, почта и пароли не отправляются.»; off: «Выключено: ничего не отправляется, номер установки удалён.»; save failed: «Изменение не сохранилось. Сейчас сохранено: {state}.»; Firefox 129..139: «В этой версии Firefox нет встроенного согласия на сбор данных, поэтому Okolos ничего не отправляет. Обновите Firefox до версии 140, чтобы выбрать.»; Firefox 140+: «В Firefox выбор хранит браузер. Переключатель просит Firefox разрешить или запретить отправку.» | the same set in English, as checked | same reports |
+| store card, replaces «Не собирает аналитику» | «• Отправляет данные об использовании и ошибках, чтобы мы исправляли продукт. Адреса страниц, их текст, почта и пароли туда не попадают. Выключается в настройках.» and «• Не просит аккаунт, не показывает рекламу.» | «• Sends usage and error data so we can fix what breaks for you, and none of it is a page address, page text, an email or a password. Settings turn it off.» and «• Asks for no account, shows no advertising.» | ru `b184e587` (store, 87), en `8887fb7b` (store, 100; the first draft `c55852db` scored 71.3 on rhythm and was rewritten) |
+
+`docs/privacy.md` (the «Чего нет» bullet and a new section) is written with the code, against the final event
+catalogue, and checked then. Next: stage 4 plan.
