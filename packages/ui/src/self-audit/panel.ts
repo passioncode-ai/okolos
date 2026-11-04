@@ -314,6 +314,7 @@ const KEPT_KEY: Record<string, string> = {
   'leak-lookup': 'auditKeptLeakLookup',
   'file-hash': 'auditKeptFileHash',
   'domain-status': 'auditKeptDomainStatus',
+  'usage-data': 'auditKeptUsageData',
 }
 
 /** The three outcomes the contract has, in words. A row with none says so instead. */
@@ -332,6 +333,7 @@ const PURPOSE_KEY: Record<string, string> = {
   'leak-lookup': 'auditPurposeLeakLookup',
   'file-hash': 'auditPurposeFileHash',
   'domain-status': 'auditPurposeDomainStatus',
+  'usage-data': 'auditPurposeUsageData',
 }
 
 /**

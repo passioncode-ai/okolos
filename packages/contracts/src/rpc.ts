@@ -103,6 +103,8 @@ export type Purpose =
   | 'leak-lookup'
   | 'file-hash'
   | 'domain-status'
+  /** Usage and error events, on by default and switched off in settings (B-198, B-199). */
+  | 'usage-data'
 
 export interface AuditEntry {
   readonly id: string

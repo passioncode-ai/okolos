@@ -123,6 +123,9 @@
   "auditPayloadNone": {
     "message": "none"
   },
+  "auditPurposeUsageData": {
+    "message": "sending usage and error data"
+  },
   "auditPurposeDomainStatus": {
     "message": "checking a domain status"
   },
@@ -2401,6 +2404,9 @@
   },
   "auditKeptFileHash": {
     "message": "The file’s hash. Not its name, not its contents."
+  },
+  "auditKeptUsageData": {
+    "message": "Names of actions and errors from a fixed list, a random install number, the extension version, the browser and the system. No page addresses, no page text, no file names, no email and no passwords."
   },
   "auditKeptDomainStatus": {
     "message": "The domain you checked. No page address, no page content."
