@@ -74,6 +74,15 @@ export interface TrapDeps {
    * when it fails, the site counts as not trusted.
    */
   trusted?: () => Promise<boolean>
+  /**
+   * Told when the page has been looked at: after every check, once the warning (if any)
+   * is drawn, and for a copy the user made themselves, which is judged by being ignored.
+   *
+   * It exists for the end-to-end tests, which used to assert "no warning" after a fixed
+   * wait and passed under load on a check that had not run yet (B-169). The entry point
+   * wires it to a mark only in the build with test hooks.
+   */
+  judged?: () => void
 }
 
 export interface TrapWatcher {
@@ -161,7 +170,10 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
   let insideHeldClick = false
 
   const onCopy = (event: Event) => {
-    if (event.isTrusted && !insideHeldClick) return
+    if (event.isTrusted && !insideHeldClick) {
+      deps.judged?.()
+      return
+    }
     scriptedCopy = true
     try {
       // An execCommand copy carries no data of its own yet: empty is unreadable, and
@@ -254,6 +266,11 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
   }
 
   function check(): void {
+    look()
+    deps.judged?.()
+  }
+
+  function look(): void {
     // A link warning gives way: ClickFix and tech-support are the more urgent sentence
     // (the FileFix page opens search-ms: and copies the command with one click), so the
     // check runs under it and its verdict takes the panel.

@@ -8,8 +8,6 @@ export type {
   CreatedDownload,
   Downloads,
   Extensions,
-  Inference,
-  InferenceHostKind,
   KeyValueStore,
   Platform,
   RpcHandler,

@@ -83,7 +83,18 @@ export async function compareInventory(deps: InventoryDeps): Promise<InventoryCh
 
   if (rows.length === 0) {
     const at = deps.now()
-    for (const entry of current) await deps.db.put('snapshots', stored(entry, at))
+    /**
+     * One transaction for the whole baseline, so nobody reads half of it.
+     *
+     * On a fresh profile the worker's start-up review and the extensions screen can both
+     * arrive here. Written one row at a time, the baseline was visible half done, and a
+     * reader in between diffed the full list against it and reported every extension not
+     * yet stored as installed: a change on a profile nothing had changed (B-168). A
+     * transaction is all or nothing to every other reader, and two first comparisons that
+     * both found the store empty write the same rows.
+     */
+    const tx = deps.db.transaction('snapshots', 'readwrite')
+    await Promise.all([...current.map((entry) => tx.store.put(stored(entry, at))), tx.done])
     // Reporting every installed extension as "newly installed" would bury the
     // one that matters under the twenty that do not.
     return []
