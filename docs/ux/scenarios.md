@@ -58,10 +58,10 @@ are specified once in [screens.md](screens.md).
 | SCN-046 | An action that spends, sends, deletes or signs in waits for the person | agent-bridge | P-01 | ST-029, FLW-22 | draft | — |
 | SCN-047 | The person takes over a step, hands back, or stops every agent | agent-bridge | P-01 | ST-030, FLW-22 | draft | — |
 | SCN-048 | What agents left behind is cleaned, and nothing in use is touched | agent-bridge | P-01 | ST-031, FLW-23 | draft | — |
-| SCN-049 | The first run says what anonymous data is sent, and it is on | privacy | P-01 | ST-032, FLW-24 | draft | not yet |
-| SCN-050 | The person switches anonymous data off, and on again | privacy | P-01 | ST-032, FLW-24 | draft | not yet |
-| SCN-051 | In Firefox the browser asks, and the product obeys | privacy | P-01 | ST-032, FLW-24 | draft | not yet |
-| SCN-052 | An error the person hit reaches us without their data | privacy | P-01 | ST-032, FLW-24 | draft | not yet |
+| SCN-050 | The first run says what anonymous data is sent, and it is on | privacy | P-01 | ST-032, FLW-24 | draft | not yet |
+| SCN-051 | The person switches anonymous data off, and on again | privacy | P-01 | ST-032, FLW-24 | draft | not yet |
+| SCN-052 | In Firefox the browser asks, and the product obeys | privacy | P-01 | ST-032, FLW-24 | draft | not yet |
+| SCN-053 | An error the person hit reaches us without their data | privacy | P-01 | ST-032, FLW-24 | draft | not yet |
 
 ## Personas
 
@@ -595,7 +595,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Status:** implemented
 - **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, apps/extension/src/options/index.ts — PARTIAL: unit-tested including the rejected-export path; the download itself is not yet asserted end-to-end, because a Chromium download in a persistent-context extension test writes to a real path and the assertion would be about Playwright's plumbing rather than the product
 
-### SCN-049: The first run says what anonymous data is sent, and it is on
+### SCN-050: The first run says what anonymous data is sent, and it is on
 - **Persona:** P-01
 - **Feature:** privacy
 - **Traces:** ST-032, FLW-24 (JTBD-05, JRN-01/#4)
@@ -603,7 +603,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Preconditions:** no prior local data
 - **Steps:**
   1. User reads the first-run screen -> system shows one sentence: anonymous data about use and errors is sent, only to improve the product, and it can be switched off in settings
-  2. User follows "switch off in settings" -> system opens settings at the switch (SCN-050)
+  2. User follows "switch off in settings" -> system opens settings at the switch (SCN-051)
   3. User closes the first-run screen without acting -> collection stays on; the notice is not shown again
 - **Expected result:** the person learns on the first run what is sent and how to stop it, and nothing they did on a page is part of it
 - **Alt paths:** an install that existed before this release opens the browser -> the same notice is shown once, on the next first-run screen or as a one-time line in the popup, and collection is on unless the person had already switched it off
@@ -613,7 +613,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Status:** draft
 - **Coverage:** none yet, planned in run `feat/usage-analytics` (B-199)
 
-### SCN-050: The person switches anonymous data off, and on again
+### SCN-051: The person switches anonymous data off, and on again
 - **Persona:** P-01
 - **Feature:** privacy
 - **Traces:** ST-032, FLW-24 (JTBD-05, JRN-01/#4)
@@ -630,7 +630,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Status:** draft
 - **Coverage:** none yet, planned in run `feat/usage-analytics` (B-199)
 
-### SCN-051: In Firefox the browser asks, and the product obeys
+### SCN-052: In Firefox the browser asks, and the product obeys
 - **Persona:** P-01
 - **Feature:** privacy
 - **Traces:** ST-032, FLW-24 (JTBD-05, JRN-01/#4)
@@ -648,7 +648,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Status:** draft
 - **Coverage:** none yet, planned in run `feat/usage-analytics` (B-199)
 
-### SCN-052: An error the person hit reaches us without their data
+### SCN-053: An error the person hit reaches us without their data
 - **Persona:** P-01
 - **Feature:** privacy
 - **Traces:** ST-032, FLW-24 (JTBD-05, JRN-01/#4)

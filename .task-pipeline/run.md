@@ -98,7 +98,7 @@ Retro floor: no `docs/evidence/retro.md` in this repository, 0 bytes read.
 
 Next: stage 3, scenarios through super-ux, then the plan and TDD build.
 - 2026-11-04: stage 3, UX chain written (inline fallback in the super-ux format; Figma is off by the 2026-08-04
-  decision): ST-032 (`docs/ux/foundation.md`), FLW-24 (`docs/ux/flows.md`), SCN-049..SCN-052 under privacy
+  decision): ST-032 (`docs/ux/foundation.md`), FLW-24 (`docs/ux/flows.md`), SCN-050..SCN-053 under privacy
   (`docs/ux/scenarios.md`, status draft), SCR-01 and SCR-12 planned notes (`docs/ux/screens.md`);
   `python3 docs/ux/lint.py` OK. Next: product texts through Copylot (notice, switch block, privacy text, store card),
   then the plan.
@@ -147,6 +147,9 @@ seven nodes in a line with two parallel steps; said out loud as the weaker form.
 | A4 | R2 | UI: the notice on SCR-01 and the block on SCR-12, strings from the Copylot-checked set in `packages/i18n` (ru, en) | A3 | e2e Chromium: notice shown once, switch off then on; a11y spec green |
 | A5 | R2 | events wired: `extension_installed`, `first_run_completed`, `warning_shown`, `check_done`, `error_occurred` (area and kind enumerated); `docs/analytics.md` the catalogue with file:line | A2 | catalogue test: every name sent appears in the catalogue and back |
 | A6 | R2 | build: `pnpm package` injects the App-Key from `passioncode-platform/prod/APTABASE_APP_KEY_OKOLOS` through `use_secret.py run`; dev, e2e and CI builds carry no key and send nothing; a gate that no `A-` key shape is in the tree or in a non-store bundle | A2 | gate seen red with a planted key |
-| A7 | R1 | docs in the same change: `docs/privacy.md` (the «Чего нет» list, a new section), `docs/store/listing.md` ru and en, `docs/brand/facts.md` destinations, ADR-0021, scenario statuses SCN-049..052, CHANGELOG | A1..A6 | `tools/docs.test.ts`, `python3 docs/ux/lint.py`, Copylot reports for the privacy text |
+| A7 | R1 | docs in the same change: `docs/privacy.md` (the «Чего нет» list, a new section), `docs/store/listing.md` ru and en, `docs/brand/facts.md` destinations, ADR-0021, scenario statuses SCN-050..052, CHANGELOG | A1..A6 | `tools/docs.test.ts`, `python3 docs/ux/lint.py`, Copylot reports for the privacy text |
 
 Next: A1, test first.
+- 2026-11-04: scenarios renumbered SCN-050..SCN-053: SCN-049 is taken on `sw/sw-07` («A link would open a program
+  outside the browser», N-107), found when its spec met main's fixed-waits gate. The draft range SCN-049..SCN-052
+  in this ledger above now reads SCN-050..SCN-053.

@@ -173,7 +173,7 @@ generator, and the sheet declares no colour of its own.
   | success | findings exist | - | count by category, primary action into SCR-07 |
 - **Wireframe:** wireframes/SCR-01.md
 - **Coverage:** packages/ui/src/first-run/screen.ts:renderFirstRun, apps/extension/src/first-run/index.ts
-- **Scenarios:** SCN-001, SCN-002, SCN-049
+- **Scenarios:** SCN-001, SCN-002, SCN-050
 - **Planned (B-199, run `feat/usage-analytics`):** one notice sentence that anonymous data about use and errors is sent, only to improve the product, with the link "Выключить в настройках" to SCR-12
 - **Resources:** local corpus loader, extension inventory adapter, tab scanner
 - **Status:** built
@@ -417,7 +417,7 @@ generator, and the sheet declares no colour of its own.
 - **Behavior notes (the key field):** the key is never put back on screen. The field is `type=password`, is emptied the moment a key is accepted, and is never filled from storage: the renderer is told only whether a key exists. Showing even its last characters would put part of a paid credential into every screenshot of this page, and nothing a person does here needs it: replacing pastes a new key over the old, removing needs none
 - **Wireframe:** wireframes/SCR-12.md
 - **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, apps/extension/src/options/leak-key.ts, e2e/scn-024.spec.ts (data controls built; watchlist, quiet mode and the proxy toggle land with their modules), e2e/scn-015.spec.ts (the key block: saved, never shown back, removed)
-- **Scenarios:** SCN-015, SCN-023, SCN-024, SCN-050, SCN-051
+- **Scenarios:** SCN-015, SCN-023, SCN-024, SCN-051, SCN-052
 - **Planned (B-199, run `feat/usage-analytics`):** block "Анонимные данные": a switch, one sentence on what is sent, a link to the privacy text; in Firefox the switch asks the browser, and on Firefox 129 to 139 it says nothing is sent because the browser has no consent
 - **Resources:** settings store, exporter, wipe routine
 - **Status:** built
