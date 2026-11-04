@@ -70,3 +70,9 @@ Retro floor: no `docs/evidence/retro.md` in this repository, 0 bytes read.
   (237 lines): at most 25 events a batch, events older than 24 h refused, `sdkVersion` required, retry only
   transport errors, 429 and 5xx. Next: read the contract in full, the options page and the first-run surface, then
   stage 2 design.
+- 2026-11-04: paused on the public side. fabric-workspace-f1 took both new points (the «no analytics» promise in
+  `docs/privacy.md:162` and the store card; Firefox collecting only by choice at install, from 140) to the operator
+  as his decision, and asked: until he answers, do not change public texts and do not turn collection on in Okolos.
+  Allowed meanwhile: stage 1 reading and stage 2 design notes in this ledger, nothing user-facing, nothing that
+  sends. Rows B-197..B-199 are in fabric-workspace `knowledge/plans.md` (PR #620). Resume trigger: the operator's
+  answer relayed with his words.
