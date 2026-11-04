@@ -1,5 +1,13 @@
 import { t } from '@okolos/i18n'
-import { mergeLeaks, type Leak, type LeakInventory, type SourceStatus } from '@okolos/core-leaks'
+import {
+  HIBP_KEY_HEADER_SHAPE,
+  HIBP_SOURCE,
+  mergeLeaks,
+  type KeyRemedy,
+  type Leak,
+  type LeakInventory,
+  type SourceStatus,
+} from '@okolos/core-leaks'
 import { request, type RequestDeps } from '@okolos/net'
 import { withDeadline } from '@okolos/platform'
 
@@ -31,8 +39,21 @@ export interface LeakSource {
   readonly name: string
   /** Null when the source cannot run — the reason is shown to the user. */
   readonly unavailable: string | null
+  /** Set when `unavailable` is for want of the person's key, so the screen can point at the field. */
+  readonly needsKey?: KeyRemedy
   lookup(address: string, deps: RequestDeps): Promise<readonly Leak[]>
 }
+
+/**
+ * The source answered that the key is not good. Its own type so the merge can tell "fix
+ * the key" from "wait and try again", which a message string cannot carry.
+ */
+class KeyRefused extends Error {}
+
+/** The key remedies, named once. */
+const KEY_MISSING: KeyRemedy = 'missing'
+const KEY_REFUSED: KeyRemedy = 'refused'
+const KEY_UNREADABLE: KeyRemedy = 'unreadable'
 
 export const CAVALIER: LeakSource = {
   name: 'Hudson Rock Cavalier',
@@ -67,21 +88,29 @@ export const CAVALIER: LeakSource = {
  * The breached-account API needs a paid key. Without one the source is not
  * silently dropped: it reports why it could not run, and the coverage line says
  * the list may be incomplete because of it.
+ *
+ * The key is the person's own, saved on the settings screen (B-125). It travels in
+ * exactly one place, the `hibp-api-key` header the API requires; the audit entry the
+ * choke point writes carries no headers, and nothing here logs it.
  */
 export function hibp(apiKey: string | null): LeakSource {
+  const name = HIBP_SOURCE
   return {
-    name: 'Have I Been Pwned',
+    name,
     // Not caught by the sweep — a capital letter inside the run defeats its anchor, the
     // same family of blind spot as B-76 — and it travels in the same field as the
     // timeout above, which a person can be shown.
-    unavailable: apiKey ? null : t('leakSourceNoKey'),
+    unavailable: apiKey ? null : t('leakSourceNoKey', name),
+    ...(apiKey ? {} : { needsKey: KEY_MISSING }),
     async lookup(address, deps) {
       const response = await request(
         {
           url: `https://haveibeenpwned.com/api/v3/breachedaccount/${encodeURIComponent(address)}?truncateResponse=false`,
           method: 'GET',
           purpose: 'leak-lookup',
-          payloadShape: `email:${redact(address)}`,
+          // The header is named, never its value: the self-audit's "what left" line has to say a
+          // key left, and this log is exportable (B-125 round 2).
+          payloadShape: `email:${redact(address)}, ${HIBP_KEY_HEADER_SHAPE}`,
           triggeredBy: 'user:leak-check',
           headers: { 'hibp-api-key': apiKey ?? '' },
           // The address is a path segment here, which the guard did not
@@ -91,6 +120,10 @@ export function hibp(apiKey: string | null): LeakSource {
         deps,
       )
       if (response.status === 404) return []
+      // 401 is this API's word for a key it does not accept. Any other failure used to be
+      // read as a list of breaches and surfaced as "body.map is not a function".
+      if (response.status === 401) throw new KeyRefused(t('leakSourceKeyRefused', name))
+      if (!response.ok) throw new Error(t('leakSourceStatus', name, String(response.status)))
       const body = (await response.json()) as Array<{
         Name?: string
         Domain?: string
@@ -110,6 +143,28 @@ export function hibp(apiKey: string | null): LeakSource {
   }
 }
 
+/**
+ * The breached-account source, built from whatever the store says about the saved key.
+ *
+ * Three answers, and the third is why this exists: a key, no key, or a store that could not
+ * be read. The last used to read as "no key saved", so a storage failure told the person to
+ * add a key they may already have, and linked to a field that is not drawn when storage
+ * fails. It is still not asked, and the reason says what actually happened.
+ */
+export async function hibpFromStore(read: () => Promise<unknown>): Promise<LeakSource> {
+  let stored: unknown
+  try {
+    stored = await read()
+  } catch {
+    return {
+      ...hibp(null),
+      unavailable: t('leakSourceKeyUnreadable', HIBP_SOURCE),
+      needsKey: KEY_UNREADABLE,
+    }
+  }
+  return hibp(typeof stored === 'string' && stored !== '' ? stored : null)
+}
+
 export async function lookupLeaks(
   address: string,
   sources: readonly LeakSource[],
@@ -120,7 +175,12 @@ export async function lookupLeaks(
 
   for (const source of sources) {
     if (source.unavailable) {
-      statuses.push({ name: source.name, answered: false, why: source.unavailable })
+      statuses.push({
+        name: source.name,
+        answered: false,
+        why: source.unavailable,
+        ...(source.needsKey === undefined ? {} : { needsKey: source.needsKey }),
+      })
       continue
     }
     try {
@@ -137,6 +197,7 @@ export async function lookupLeaks(
         name: source.name,
         answered: false,
         why: cause instanceof Error ? cause.message : String(cause),
+        ...(cause instanceof KeyRefused ? { needsKey: KEY_REFUSED } : {}),
       })
     }
   }

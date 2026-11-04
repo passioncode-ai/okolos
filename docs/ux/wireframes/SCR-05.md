@@ -22,6 +22,7 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 
 - **success** — feed match
 - **error** — feed metadata unavailable
+- **embedded by another page** — any site puts `interstitial.html` in an iframe — it is the one web-accessible file the extension has, because the blocker redirects a tab to it
 
 **Source of truth:** `packages/ui/src/interstitial/interstitial.ts`. This file is derived from it; if the two
 disagree, the renderer is right and this file is stale.

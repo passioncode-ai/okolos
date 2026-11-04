@@ -167,6 +167,80 @@ describe('the workflow runs what the project has', () => {
   })
 })
 
+/**
+ * The jobs of the workflow, each by its key, with its own lines only.
+ *
+ * Reading the workflow as one text let the Linux job answer for the Windows one: the
+ * Windows job could be deleted, moved to ubuntu, or cut to `echo skipped` and every
+ * check above stayed green (round 1 of the N-105 certification, four plants).
+ */
+function jobs(yaml: string): Map<string, string> {
+  const body = yaml.slice(yaml.indexOf('\njobs:\n') + '\njobs:\n'.length)
+  const found = new Map<string, string>()
+  const starts = [...body.matchAll(/^ {2}([\w-]+):\s*$/gm)]
+  starts.forEach((start, i) => {
+    const from = start.index ?? 0
+    const to = starts[i + 1]?.index ?? body.length
+    found.set(start[1] as string, body.slice(from, to))
+  })
+  return found
+}
+
+/**
+ * Lines that let a gates job pass while a gate fails or never runs: a condition, a
+ * `continue-on-error`, or a command whose failure is swallowed (round 2 of the N-105
+ * certification: each of these left the per-job check green).
+ */
+function softenersIn(job: string): string[] {
+  return job
+    .split('\n')
+    .filter((line) => /^\s+(?:- )?(?:if|continue-on-error):/.test(line) || /^\s+(?:- )?run: .*(?:\|\||;\s*exit|^\s*echo)/.test(line) || /^\s+(?:- )?run: echo\b/.test(line))
+    .map((line) => line.trim())
+}
+
+/** Which gate steps a job body does not run. */
+function gatesMissingFrom(job: string): string[] {
+  const runs = commandsIn(job)
+  return gateSteps().filter((step) => {
+    const resolved = scripts[step] ?? ''
+    return !(runs.includes(`pnpm ${step}`) || (resolved !== '' && shares(runs, resolved)))
+  })
+}
+
+describe('each gates job runs the whole chain on its own system', () => {
+  const GATE_JOBS: Readonly<Record<string, string>> = { gates: 'ubuntu-latest', windows: 'windows-latest' }
+
+  for (const [key, system] of Object.entries(GATE_JOBS)) {
+    it(`the "${key}" job runs on ${system} and runs every step of \`pnpm gates\``, () => {
+      const job = jobs(workflow).get(key)
+      expect(job, `the workflow has no "${key}" job`).toBeDefined()
+      expect(job).toMatch(new RegExp(`^\\s+runs-on: ${system}\\s*$`, 'm'))
+      expect(gatesMissingFrom(job ?? ''), `the "${key}" job skips these gates`).toEqual([])
+      expect(softenersIn(job ?? ''), `the "${key}" job can pass with a gate failing`).toEqual([])
+    })
+  }
+
+  it('would notice a Windows job cut down, moved, softened or removed', () => {
+    const windows = jobs(workflow).get('windows') ?? ''
+    /** A plant that no longer finds its anchor proves nothing: refuse it instead of passing. */
+    const plant = (from: string, to: string): string => {
+      expect(windows, `the plant's anchor "${from}" is gone from the Windows job`).toContain(from)
+      return windows.replace(from, to)
+    }
+    expect(gatesMissingFrom(plant('run: pnpm test\n', 'run: echo skipped\n'))).toEqual(['test'])
+    expect(plant('runs-on: windows-latest', 'runs-on: ubuntu-latest')).not.toMatch(/^\s+runs-on: windows-latest\s*$/m)
+    expect(jobs(workflow.replace(windows, '')).get('windows')).toBeUndefined()
+    // A gate dropped from the Windows job and kept in the Linux one.
+    expect(gatesMissingFrom(plant('run: pnpm i18n:sweep\n', ''))).toEqual(['i18n:sweep'])
+    // A gate that still runs but can no longer fail the job.
+    expect(softenersIn(plant('runs-on: windows-latest', 'runs-on: windows-latest\n    continue-on-error: true'))).not.toEqual([])
+    expect(softenersIn(plant('      - name: lint\n', '      - name: lint\n        if: false\n'))).not.toEqual([])
+    expect(softenersIn(plant('run: pnpm lint\n', 'run: pnpm lint || exit 0\n'))).not.toEqual([])
+    expect(softenersIn(plant('run: pnpm typecheck\n', 'run: pnpm typecheck; exit 0\n'))).not.toEqual([])
+    expect(softenersIn(plant('run: pnpm brand:lint\n', 'run: echo pnpm brand:lint\n'))).not.toEqual([])
+  })
+})
+
 describe('the local shortcut matches CI', () => {
   it('builds before running the gates that read the build', () => {
     // Without this `pnpm gates` runs the bundle scanners over whatever dist
@@ -281,6 +355,7 @@ describe('a clone made before .gitattributes is converted by the runbook\'s own 
 
   it('leaves no CRLF on disk, and every line it prints is empty, as the runbook says', () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-crlf-'))
+    try {
     const git = (...args: string[]) =>
       execFileSync('git', ['-c', 'user.email=t@example.test', '-c', 'user.name=t', ...args], { cwd: dir, encoding: 'utf8' })
     const hook = path.join(dir, '.githooks', 'pre-push')
@@ -307,6 +382,10 @@ describe('a clone made before .gitattributes is converted by the runbook\'s own 
     expect(readFileSync(hook, 'utf8').includes('\r'), 'the hook still has CR on disk').toBe(false)
     expect(readFileSync(path.join(dir, 'README.md'), 'utf8')).toBe('a\nb\n')
     expect(git('ls-files', '--eol')).not.toMatch(/w\/crlf/)
+    } finally {
+      // Every pre-push runs this; a repository left per run piles up in TMPDIR (N-105, round 1).
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

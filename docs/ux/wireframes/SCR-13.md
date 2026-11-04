@@ -27,6 +27,7 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 - **loading** — building the checklist
 - **empty** — no incident selected
 - **success** — checklist active
+- **success (broad)** — the incident name is not one we have a playbook for — including an address this product never produces
 
 **Source of truth:** `packages/ui/src/recovery/recovery.ts`. This file is derived from it; if the two
 disagree, the renderer is right and this file is stale.
