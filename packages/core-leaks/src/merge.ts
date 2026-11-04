@@ -28,14 +28,42 @@ export interface Leak {
   readonly domain?: string
 }
 
+/**
+ * Why a source was not checked, when the reason is the person's own key: none is saved,
+ * the source refused the one that is, or the one that is could not be read from the
+ * device. Absent for every other reason, whose remedy is waiting rather than the key
+ * (B-125). Only `missing` and `refused` have the key field as their remedy.
+ */
+export type KeyRemedy = 'missing' | 'refused' | 'unreadable'
+
+/**
+ * The breached-account source's name, as it calls itself. One constant because the screen
+ * credits this source's data only when this source answered, and a second spelling would
+ * make the credit vanish without a test noticing.
+ */
+export const HIBP_SOURCE = 'Have I Been Pwned'
+
+/**
+ * How a breach lookup records, in the outbound log's payload shape, that the person's key
+ * went in its header: the header's name, never its value. The background writes it and the
+ * self-audit summary counts it; one constant so the count cannot silently stop matching.
+ */
+export const HIBP_KEY_HEADER_SHAPE = 'header:hibp-api-key'
+
 export type SourceStatus =
   | { readonly name: string; readonly answered: true; readonly leaks: readonly Leak[] }
-  | { readonly name: string; readonly answered: false; readonly why: string }
+  | {
+      readonly name: string
+      readonly answered: false
+      readonly why: string
+      readonly needsKey?: KeyRemedy
+    }
 
 export interface SourceReport {
   readonly name: string
   readonly answered: boolean
   readonly why?: string
+  readonly needsKey?: KeyRemedy
 }
 
 export interface LeakInventory {
@@ -69,7 +97,12 @@ export function mergeLeaks(statuses: readonly SourceStatus[]): LeakInventory {
   const sources: SourceReport[] = statuses.map((status) =>
     status.answered
       ? { name: status.name, answered: true }
-      : { name: status.name, answered: false, why: status.why },
+      : {
+          name: status.name,
+          answered: false,
+          why: status.why,
+          ...(status.needsKey === undefined ? {} : { needsKey: status.needsKey }),
+        },
   )
   const silent = sources.filter((source) => !source.answered)
   const leaks = [...seen.values()].sort(byDateDescending)

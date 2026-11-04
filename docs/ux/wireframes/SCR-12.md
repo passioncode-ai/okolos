@@ -21,11 +21,24 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 - `export-failed`
 - `wipe-retry`
 - `wipe-failed`
+- `leak-key`
+- `leak-key-title`
+- `leak-key-field`
+- `leak-key-actions`
+- `leak-key-needs`
+- `leak-key-save`
+- `leak-key-remove`
+- `leak-key-blurb`
+- `leak-key-state`
 
 **States**
 
 - **success** — default
 - **error** — export or wipe failed
+- **no key** — no Have I Been Pwned key saved, the state every install starts in
+- **key saved** — a key is stored
+- **refused** — "Сохранить ключ" pressed after trimming (spaces around a key are dropped silently) with an empty field (only spaces counts), a space or a non-printing character inside the key, a character outside the Latin layout, or more than 256 characters
+- **key write failed** — saving or removing the key failed
 
 **Source of truth:** `packages/ui/src/settings/data-controls.ts`. This file is derived from it; if the two
 disagree, the renderer is right and this file is stale.

@@ -5,12 +5,11 @@ import { createPlatform, RPC_TIMEOUT_MS, toSafeUrl, withDeadline } from './adapt
 import type { WebExtensionApi } from './types.js'
 
 /**
- * Each section may be stubbed on its own; the rest keeps working. `offscreen`
- * is the exception: it has no base to merge into, so a test that wants one
- * supplies the whole thing.
+ * Each section may be stubbed on its own; the rest keeps working. The optional
+ * sections are the exception: they have no base to merge into, so a test that
+ * wants one supplies the whole thing.
  */
 type OptionalSection =
-  | 'offscreen'
   | 'declarativeNetRequest'
   | 'webNavigation'
   | 'downloads'
@@ -58,7 +57,6 @@ function fakeApi(overrides: ApiOverrides = {}): WebExtensionApi {
   // to Platform forced every test that stubs one runtime method to restate all
   // of them — churn that hides what each test actually cares about.
   const {
-    offscreen,
     declarativeNetRequest,
     webNavigation,
     downloads,
@@ -69,7 +67,6 @@ function fakeApi(overrides: ApiOverrides = {}): WebExtensionApi {
   return {
     ...base,
     ...sections,
-    ...(offscreen ? { offscreen } : {}),
     ...(declarativeNetRequest ? { declarativeNetRequest } : {}),
     ...(webNavigation ? { webNavigation } : {}),
     ...(downloads ? { downloads } : {}),
@@ -183,45 +180,6 @@ describe('install-time wiring goes through the adapter too', () => {
   it('resolves a packaged file to an extension url', () => {
     const platform = createPlatform('chrome', fakeApi())
     expect(platform.runtime.getUrl('first-run.html')).toBe('chrome-extension://test/first-run.html')
-  })
-})
-
-describe('where a model may run', () => {
-  it('reports no host on Chrome, and creates nothing to find that out', async () => {
-    /**
-     * This used to create an offscreen document and answer `'offscreen'`, which made
-     * `prepare()` report `ready`, which opened the third stage's gate, which sent every
-     * unresolved candidate on a round trip that came back `null` (B-50).
-     *
-     * The third stage is not shipped — measured 2026-08-08, REQ-37: nine false positives
-     * of thirty-four at 0.97–1.00 confidence, while the first stage's rules give 100%
-     * recall with none. So there is nowhere to run one on Chrome, and saying so costs a
-     * document per wake-up and a permission in the store listing less than pretending.
-     */
-    const created: unknown[] = []
-    const platform = createPlatform('chrome', fakeApi({
-      offscreen: {
-        hasDocument: async () => false,
-        createDocument: async (info) => {
-          created.push(info)
-        },
-      },
-    }))
-
-    await expect(platform.inference.ensureHost()).resolves.toBe('none')
-    expect(created, 'a document was created for a classifier that is not shipped').toEqual([])
-  })
-
-  it('runs on the background page in Firefox, which has one', async () => {
-    const platform = createPlatform('firefox', fakeApi())
-    await expect(platform.inference.ensureHost()).resolves.toBe('background')
-  })
-
-  it('says plainly when there is nowhere to run a model at all', async () => {
-    // Distinct from "the model has not been fetched": one is a device fact, the
-    // other is a state the user can change.
-    const platform = createPlatform('chrome', fakeApi())
-    await expect(platform.inference.ensureHost()).resolves.toBe('none')
   })
 })
 

@@ -73,6 +73,7 @@ export {
 export {
   renderDataControls,
   type DataControlsHandlers,
+  type LeakKeyPanel,
   type WipeOutcome,
 } from './settings/data-controls.js'
 export { shadowMode } from './shadow.js'

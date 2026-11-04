@@ -27,7 +27,7 @@ export function toSafeUrl(raw: string | undefined): string | null {
 
 /**
  * Both browsers are built from the same adapter: the differences that matter
- * to this product (worker vs page, offscreen vs direct inference) live in the
+ * to this product (a worker or a background page) live in the
  * extension composition, not in these calls.
  */
 /**
@@ -338,32 +338,6 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
           },
           { url: [{ schemes: ['http', 'https'] }] },
         )
-      },
-    },
-
-    inference: {
-      /**
-       * Where a classifier could run — and on Chrome the answer is nowhere, by decision.
-       *
-       * This used to create an offscreen document and return `'offscreen'`, which made
-       * `prepare()` report `ready`, which opened the third stage's gate, which sent every
-       * unresolved candidate on a round trip that came back `null` because there are no
-       * weights and there will not be. A document per worker wake-up, a permission in the
-       * store listing, and a status claiming a classifier that cannot answer (B-50).
-       *
-       * The third stage is **not shipped** — measured 2026-08-08 and recorded in REQ-37:
-       * nine false positives out of thirty-four at 0.97–1.00 confidence, on screen-reader
-       * labels in both languages, while the first stage's rules give 100% recall with none
-       * on the same corpus. So the offscreen document, the `offscreen` permission and the
-       * page that hosted it are gone with it, and this says `none` rather than building
-       * scaffolding for something that will not run.
-       *
-       * Firefox keeps `'background'`: its background context is a page with a DOM, so
-       * there is nothing to create and nothing to ask for. If the model ever ships, this
-       * is the one function that changes.
-       */
-      async ensureHost(): Promise<'offscreen' | 'background' | 'none'> {
-        return kind === 'firefox' ? 'background' : 'none'
       },
     },
 

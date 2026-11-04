@@ -104,9 +104,6 @@ importers:
       '@okolos/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
-      '@okolos/model':
-        specifier: workspace:*
-        version: link:../../packages/model
       '@okolos/net':
         specifier: workspace:*
         version: link:../../packages/net

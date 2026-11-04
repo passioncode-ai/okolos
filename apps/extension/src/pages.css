@@ -227,6 +227,22 @@ textarea {
   margin-block: var(--ok-space-3);
 }
 
+/*
+ * The Have I Been Pwned key on the settings screen (B-125): a block of its own under the
+ * export and wipe actions, set apart by a rule so its buttons do not read as a third and
+ * fourth way to handle "all data". The field is as wide as the address field, for the
+ * same reason: a key is one line and a full-width box reads as a text area.
+ */
+[data-role='leak-key'] {
+  margin-block-start: var(--ok-space-4);
+  padding-block-start: var(--ok-space-3);
+  border-block-start: var(--ok-shape-hairline) solid var(--ok-colour-border);
+}
+
+[data-role='leak-key-field'] {
+  inline-size: min(100%, 320px);
+}
+
 /* ------------------------------------------------------------- the overview */
 
 /*
@@ -346,6 +362,7 @@ textarea {
 [data-role='note'],
 [data-role='continue-note'],
 [data-role='coverage'],
+[data-role='source-key'],
 [data-role='sources'] {
   color: var(--ok-colour-text-muted);
   font-size: var(--ok-type-size-sm);
