@@ -58,6 +58,10 @@ are specified once in [screens.md](screens.md).
 | SCN-046 | An action that spends, sends, deletes or signs in waits for the person | agent-bridge | P-01 | ST-029, FLW-22 | draft | — |
 | SCN-047 | The person takes over a step, hands back, or stops every agent | agent-bridge | P-01 | ST-030, FLW-22 | draft | — |
 | SCN-048 | What agents left behind is cleaned, and nothing in use is touched | agent-bridge | P-01 | ST-031, FLW-23 | draft | — |
+| SCN-049 | The first run says what anonymous data is sent, and it is on | privacy | P-01 | ST-032, FLW-24 | draft | not yet |
+| SCN-050 | The person switches anonymous data off, and on again | privacy | P-01 | ST-032, FLW-24 | draft | not yet |
+| SCN-051 | In Firefox the browser asks, and the product obeys | privacy | P-01 | ST-032, FLW-24 | draft | not yet |
+| SCN-052 | An error the person hit reaches us without their data | privacy | P-01 | ST-032, FLW-24 | draft | not yet |
 
 ## Personas
 
@@ -590,6 +594,76 @@ See [foundation.md](foundation.md) → Personas.
 - **Known limit — the retry is the button itself.** There is no separate "try again" for export, unlike the wipe: pressing "Export all data" again *is* the retry, and the stale failure clears when it succeeds. Recorded so the absence is a decision
 - **Status:** implemented
 - **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, apps/extension/src/options/index.ts — PARTIAL: unit-tested including the rejected-export path; the download itself is not yet asserted end-to-end, because a Chromium download in a persistent-context extension test writes to a real path and the assertion would be about Playwright's plumbing rather than the product
+
+### SCN-049: The first run says what anonymous data is sent, and it is on
+- **Persona:** P-01
+- **Feature:** privacy
+- **Traces:** ST-032, FLW-24 (JTBD-05, JRN-01/#4)
+- **Entry point:** extension just installed in Chrome or Edge, the first-run screen opens
+- **Preconditions:** no prior local data
+- **Steps:**
+  1. User reads the first-run screen -> system shows one sentence: anonymous data about use and errors is sent, only to improve the product, and it can be switched off in settings
+  2. User follows "switch off in settings" -> system opens settings at the switch (SCN-050)
+  3. User closes the first-run screen without acting -> collection stays on; the notice is not shown again
+- **Expected result:** the person learns on the first run what is sent and how to stop it, and nothing they did on a page is part of it
+- **Alt paths:** an install that existed before this release opens the browser -> the same notice is shown once, on the next first-run screen or as a one-time line in the popup, and collection is on unless the person had already switched it off
+- **UI elements:** notice sentence, link "Выключить в настройках", the existing "Что отправляется" link
+- **States covered:** success
+- **Errors & recovery:** the consent state cannot be written -> nothing is sent until it can, and the notice is shown again next time
+- **Status:** draft
+- **Coverage:** none yet, planned in run `feat/usage-analytics` (B-199)
+
+### SCN-050: The person switches anonymous data off, and on again
+- **Persona:** P-01
+- **Feature:** privacy
+- **Traces:** ST-032, FLW-24 (JTBD-05, JRN-01/#4)
+- **Entry point:** settings (SCR-12), block "Анонимные данные"
+- **Preconditions:** collection is on
+- **Steps:**
+  1. User turns the switch off -> system deletes the install's random id, drops the unsent events and stops sending; the block says so
+  2. User turns the switch on again -> system makes a new random id and sends from then on
+- **Expected result:** off means nothing leaves for this purpose; on again cannot be joined to the earlier id
+- **Alt paths:** the self-audit log (SCN-019) shows the sent batches under their purpose while on, and none after off
+- **UI elements:** switch, one sentence on what is sent, link to the privacy text
+- **States covered:** success, error
+- **Errors & recovery:** the switch cannot be saved -> the block says the change did not go through and shows the state actually stored
+- **Status:** draft
+- **Coverage:** none yet, planned in run `feat/usage-analytics` (B-199)
+
+### SCN-051: In Firefox the browser asks, and the product obeys
+- **Persona:** P-01
+- **Feature:** privacy
+- **Traces:** ST-032, FLW-24 (JTBD-05, JRN-01/#4)
+- **Entry point:** Firefox install prompt; settings (SCR-12)
+- **Preconditions:** Firefox 140 or later
+- **Steps:**
+  1. User installs -> Firefox's own prompt offers technical and interaction data as an optional choice
+  2. User leaves it on or turns it off -> the product sends only while Firefox grants it
+  3. User changes the switch in settings -> the product asks Firefox to grant or drop the permission, and follows Firefox's answer
+- **Expected result:** in Firefox the browser's choice is the product's choice, both ways
+- **Alt paths:** Firefox 129 to 139, which has no built-in consent -> nothing is sent, and the settings block says why
+- **UI elements:** the browser's install prompt; the settings switch
+- **States covered:** success, empty
+- **Errors & recovery:** Firefox refuses the request (no user gesture, or declined) -> the switch shows off
+- **Status:** draft
+- **Coverage:** none yet, planned in run `feat/usage-analytics` (B-199)
+
+### SCN-052: An error the person hit reaches us without their data
+- **Persona:** P-01
+- **Feature:** privacy
+- **Traces:** ST-032, FLW-24 (JTBD-05, JRN-01/#4)
+- **Entry point:** any feature fails (a scan, a feed update, a check)
+- **Preconditions:** collection is on
+- **Steps:**
+  1. A check fails on the person's device -> system records one event naming the area and the kind of failure from a closed list
+  2. The next batch is sent -> the event leaves through the one network module and is listed in the self-audit log
+- **Expected result:** the team can see that, where and how often the product fails for people, and the event carries no page address, text, file name, email or password
+- **Alt paths:** collection is off -> nothing is recorded or sent
+- **UI elements:** none beyond SCN-019's log
+- **States covered:** error
+- **Errors & recovery:** sending fails -> the batch is retried with backoff; events older than 24 hours are dropped, never sent late
+- **Status:** draft
+- **Coverage:** none yet, planned in run `feat/usage-analytics` (B-198)
 
 ## daily-use
 

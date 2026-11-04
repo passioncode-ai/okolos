@@ -786,3 +786,30 @@ flowchart TD
 
 - **Screens traversed:** none designed yet — the census and deep-scan views are designed in Б3.
 - **`ppid = 1` is not an orphan on macOS.** Every service-manager job looks like that, including a browser the machine keeps on purpose with no client between sessions. The rule is a conjunction of facts, never one of them.
+
+### FLW-24: Anonymous usage and error data
+- **Traces:** ST-032 (JTBD-05, JRN-01/#4)
+- **Goal:** the person knows what is sent and why, and can switch it off; the product learns where it fails without learning anything about the person's pages
+- **Entry points:** the first-run screen (SCR-01); settings (SCR-12); Firefox's own install prompt
+- **Success exit:** the person's choice holds: on sends anonymous events through the one network module, off sends nothing
+- **Task analysis:**
+  1. Read the notice on the first run
+  2. Keep it on, or open settings and switch it off
+  3. Later, switch it on or off again
+- **Flow:**
+
+```mermaid
+flowchart TD
+  I[Install] --> B{Browser}
+  B -->|Chrome or Edge| N[First run: notice, collection on] --> S{Settings switch}
+  B -->|Firefox 140+| P[Install prompt: optional technical and interaction data] --> G{Granted?}
+  G -->|yes| ON[On: events sent]
+  G -->|no| OFF[Off: nothing sent]
+  B -->|Firefox 129..139| OLD[Off: the browser has no consent, nothing sent; settings say why]
+  S -->|off| OFF2[Off: id deleted, queue dropped]
+  S -->|on| ON
+  OFF2 -->|switched on again| NEW[On with a new id]
+```
+
+- **Screens traversed:** SCR-01, SCR-12, SCR-10 (the requests show in the self-audit log)
+

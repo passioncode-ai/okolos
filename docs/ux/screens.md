@@ -21,7 +21,7 @@ never updated, which is the same drift this file exists to catch.)
 
 | ID | Screen | Used by | Figma | Status | Coverage |
 |----|--------|---------|-------|--------|----------|
-| SCR-01 | First-run check | FLW-01, FLW-14 | - | built | packages/ui/src/first-run/screen.ts:renderFirstRun |
+| SCR-01 | First-run check | FLW-01, FLW-14, FLW-24 | - | built | packages/ui/src/first-run/screen.ts:renderFirstRun |
 | SCR-02 | Popup | FLW-17, FLW-11, FLW-13 | - | built | e2e/scn-020.spec.ts |
 | SCR-03 | In-page warning banner | FLW-02, FLW-05, FLW-06, FLW-07, FLW-08, FLW-09, FLW-10 | - | built | packages/ui/src/banner/banner.ts:mountBanner |
 | SCR-04 | Finding inspector | FLW-02, FLW-03 | - | built | packages/ui/src/inspector/inspector.ts:mountInspector |
@@ -32,7 +32,7 @@ never updated, which is the same drift this file exists to catch.)
 | SCR-09 | Extensions watch | FLW-12 | - | built | e2e/scn-017.spec.ts |
 | SCR-10 | Self-audit | FLW-13, FLW-17 | - | built | packages/ui/src/self-audit/panel.ts:renderSelfAudit |
 | SCR-11 | Journal and weekly diff | FLW-17 | - | built | e2e/scn-020.spec.ts |
-| SCR-12 | Settings | FLW-05, FLW-14 | - | built | packages/ui/src/settings/data-controls.ts:renderDataControls |
+| SCR-12 | Settings | FLW-05, FLW-14, FLW-24 | - | built | packages/ui/src/settings/data-controls.ts:renderDataControls |
 | SCR-13 | Recovery checklist | FLW-06, FLW-07, FLW-16 | - | built | e2e/scn-025.spec.ts |
 | SCR-14 | Public domain status | FLW-04, FLW-15 | - | built | apps/proxy/src/router.test.ts |
 | SCR-15 | Dashboard overview | FLW-17 | - | built | packages/ui/src/dashboard/overview.ts:renderOverview, e2e/scn-027.spec.ts |
@@ -161,7 +161,7 @@ generator, and the sheet declares no colour of its own.
 ## Screens
 
 ### SCR-01: First-run check
-- **Used by:** FLW-01 (all steps), FLW-14 (post-wipe return)
+- **Used by:** FLW-01 (all steps), FLW-14 (post-wipe return), FLW-24 (the anonymous-data notice, planned)
 - **Purpose:** deliver a real, local result within 30 seconds of install — the product's proof of value before any configuration
 - **Elements:** one-line statement of what runs locally; per-check progress list (open tabs / installed extensions / password corpus readiness); findings summary; **primary action: "Показать, с чего начать"**; secondary "Пока пропустить"; link "Что отправляется" → SCR-10
 - **States:**
@@ -173,7 +173,8 @@ generator, and the sheet declares no colour of its own.
   | success | findings exist | - | count by category, primary action into SCR-07 |
 - **Wireframe:** wireframes/SCR-01.md
 - **Coverage:** packages/ui/src/first-run/screen.ts:renderFirstRun, apps/extension/src/first-run/index.ts
-- **Scenarios:** SCN-001, SCN-002
+- **Scenarios:** SCN-001, SCN-002, SCN-049
+- **Planned (B-199, run `feat/usage-analytics`):** one notice sentence that anonymous data about use and errors is sent, only to improve the product, with the link "Выключить в настройках" to SCR-12
 - **Resources:** local corpus loader, extension inventory adapter, tab scanner
 - **Status:** built
 
@@ -401,7 +402,7 @@ generator, and the sheet declares no colour of its own.
 - **Status:** built
 
 ### SCR-12: Settings
-- **Used by:** FLW-05 (watchlist edit), FLW-11 (the HIBP key), FLW-14
+- **Used by:** FLW-05 (watchlist edit), FLW-11 (the HIBP key), FLW-14, FLW-24 (the anonymous-data switch, planned)
 - **Purpose:** the few switches that change behaviour, plus data ownership
 - **Elements:** brand watchlist (add/edit/remove); quiet mode toggle; proxy on/off with a plain explanation of what each option reveals and to whom; retention period; **primary action: "Выгрузить все данные"**; "Удалить все данные" (разрушительное, подтверждается списком того, что удаляется — **по одному виду на каждое хранилище, девять**; список приходит из схемы, а не пишется рядом с ней, и рендерер отказывается рисовать подтверждение, которое не называет ничего). **The trusted domains list moved to SCR-16** on 2026-08-12: the dashboard lists one area per view, the overview names "Доверенные домены" and "Ваши данные" separately, and reviewing what you trusted is a different job from exporting and wiping. **The Have I Been Pwned key block** (`leak-key`), under the export and wipe actions: a heading, a sentence naming where the key goes (only haveibeenpwned.com, in the request header, when a check is pressed) and where it does not (the export, the log), a status line, a masked field (`leak-key-field`), "Сохранить ключ" or, once one is saved, "Заменить ключ" (`leak-key-save`), and "Удалить ключ" (`leak-key-remove`) only when there is something to remove
 - **States:**
@@ -416,7 +417,8 @@ generator, and the sheet declares no colour of its own.
 - **Behavior notes (the key field):** the key is never put back on screen. The field is `type=password`, is emptied the moment a key is accepted, and is never filled from storage: the renderer is told only whether a key exists. Showing even its last characters would put part of a paid credential into every screenshot of this page, and nothing a person does here needs it: replacing pastes a new key over the old, removing needs none
 - **Wireframe:** wireframes/SCR-12.md
 - **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, apps/extension/src/options/leak-key.ts, e2e/scn-024.spec.ts (data controls built; watchlist, quiet mode and the proxy toggle land with their modules), e2e/scn-015.spec.ts (the key block: saved, never shown back, removed)
-- **Scenarios:** SCN-015, SCN-023, SCN-024
+- **Scenarios:** SCN-015, SCN-023, SCN-024, SCN-050, SCN-051
+- **Planned (B-199, run `feat/usage-analytics`):** block "Анонимные данные": a switch, one sentence on what is sent, a link to the privacy text; in Firefox the switch asks the browser, and on Firefox 129 to 139 it says nothing is sent because the browser has no consent
 - **Resources:** settings store, exporter, wipe routine
 - **Status:** built
 

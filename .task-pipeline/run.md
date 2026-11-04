@@ -97,3 +97,8 @@ Retro floor: no `docs/evidence/retro.md` in this repository, 0 bytes read.
 | D9 | Same change: `docs/privacy.md` (the «Чего нет» list and a new section), `docs/store/listing.md` ru and en, `docs/brand/facts.md` destinations, ADR-0021, `docs/ux/scenarios.md` (first-run notice, the switch, Firefox both ways), `flows.md`, `screens.md` SCR-01 and the options screen; texts through Copylot | operator 2026-11-04 ~17:25; CLAUDE.md routes |
 
 Next: stage 3, scenarios through super-ux, then the plan and TDD build.
+- 2026-11-04: stage 3, UX chain written (inline fallback in the super-ux format; Figma is off by the 2026-08-04
+  decision): ST-032 (`docs/ux/foundation.md`), FLW-24 (`docs/ux/flows.md`), SCN-049..SCN-052 under privacy
+  (`docs/ux/scenarios.md`, status draft), SCR-01 and SCR-12 planned notes (`docs/ux/screens.md`);
+  `python3 docs/ux/lint.py` OK. Next: product texts through Copylot (notice, switch block, privacy text, store card),
+  then the plan.
