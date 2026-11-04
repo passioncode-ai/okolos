@@ -55,4 +55,14 @@ describe('the worker wiring', () => {
     expect(await usage.set(false)).toBe('off')
     expect(await usage.state()).toBe('off')
   })
+
+  it('in Firefox reads the answer the page got from the browser, and an on Firefox refused stays off', async () => {
+    const p = platform('firefox')
+    let granted = false
+    const usage = startUsage(p.platform, audit, { getAll: async () => ({ data_collection: granted ? ['technicalAndInteraction'] : [] }) })
+    expect(await usage.set(true)).toBe('off')
+    granted = true
+    expect(await usage.set(true)).toBe('on')
+    expect(await usage.set(false)).toBe('off')
+  })
 })

@@ -147,6 +147,12 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
       return discardDownload(message.payload, from, (id) => platform.downloads.discard(id)) as Promise<
         RpcMap[T]['res']
       >
+    case 'usage/state':
+      return usage.state().then((state) => ({ state })) as Promise<RpcMap[T]['res']>
+    case 'usage/set':
+      return usage
+        .set(Boolean((message.payload as { on?: unknown }).on))
+        .then((state) => ({ state })) as Promise<RpcMap[T]['res']>
     case 'password/pending':
       return answerPendingVerdict(from) as Promise<RpcMap[T]['res']>
     case 'leaks/check':

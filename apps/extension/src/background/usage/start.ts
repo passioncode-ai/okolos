@@ -74,11 +74,15 @@ export function startUsage(platform: Platform, audit: () => Promise<RequestDeps>
       return allowed === 'unsupported' ? 'unsupported' : await s.consent()
     },
     async set(on) {
-      const answer = await switchConsent(platform.kind, permissions, on)
-      const { s } = await current()
+      // Chrome: the switch is the consent. Firefox: the page already asked the browser inside
+      // the click (a worker has no user gesture), so the worker only reads its answer, and an
+      // "on" Firefox did not grant stays off.
+      const answer = platform.kind === 'chrome' ? await switchConsent('chrome', permissions, on) : await browserConsent('firefox', permissions)
       if (answer === 'unsupported') return 'unsupported'
-      await s.setConsent(answer === 'on')
-      return answer
+      const { s } = await current()
+      const next = on && answer === 'on'
+      await s.setConsent(next)
+      return next ? 'on' : 'off'
     },
   }
 }
