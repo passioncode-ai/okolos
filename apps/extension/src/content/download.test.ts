@@ -77,9 +77,10 @@ describe('a download that was only doubted', () => {
 
   it('does not claim the file was cancelled, because it was not', () => {
     const handle = showDownloadVerdict(message({ action: 'warn' }), deps())
-    expect(handle?.root.querySelector('[data-role=detail]')?.textContent).not.toContain(
-      'nothing reached your disk',
-    )
+    // Against the catalogue the panel renders, not a literal in another language, which
+    // passed in every state of the code (round 11 seam).
+    const cancelled = (CATALOGUE as Record<string, { message: string }>)['warnDownloadCancelled']?.message ?? '(missing key)'
+    expect(handle?.root.querySelector('[data-role=detail]')?.textContent).not.toContain(cancelled)
   })
 })
 
