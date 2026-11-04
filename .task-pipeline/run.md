@@ -61,3 +61,12 @@ Retro floor: no `docs/evidence/retro.md` in this repository, 0 bytes read.
 - 2026-11-04: stage 0 started; brief and REQ spine written; stage 1 next: Aptabase client contract
   (`~/DATA/sshlg-analytics/docs/client-contract.md`), Firefox `permissions` API for data collection, the
   extension's network module and options page.
+- 2026-11-04: stage 1, first findings. (1) `packages/net/src/destinations.ts` is a closed map purpose → hosts,
+  checked at run time (ADR-0003); analytics needs a new purpose (working name `usage-data`) with exactly
+  `analytics.sshlg.me`, plus its wording in the audit panel, in `@okolos/contracts` `Purpose` and in
+  `docs/brand/facts.md`. (2) `apps/extension/manifest.firefox.json` has `strict_min_version` 129, while Firefox's
+  built-in data consent exists from 140 (extensionworkshop.com): stage 2 decides between raising the floor to 140
+  and not sending on 129..139. (3) The Aptabase client contract is `~/DATA/sshlg-analytics/docs/client-contract.md`
+  (237 lines): at most 25 events a batch, events older than 24 h refused, `sdkVersion` required, retry only
+  transport errors, 429 and 5xx. Next: read the contract in full, the options page and the first-run surface, then
+  stage 2 design.
