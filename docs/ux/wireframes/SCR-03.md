@@ -24,6 +24,7 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 **States**
 
 - **success** — a finding is raised
+- **closed by the person** — "This is wrong" or dismiss
 - **error** — detail view or action failed
 - **removed by the page** — the page deletes the host from the document
 - **more than one kind of finding** — a second detector finds something on the same page

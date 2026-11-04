@@ -141,8 +141,20 @@ includes a redirect from `*.workers.dev`, not just a CNAME.
   2.2 AA, foundation → Product mechanics).
 - Every verdict shows its source: which check fired, which feed or stage, and
   when the data was last updated.
-- Every verdict is disputable in one click ("this is wrong"), and the
-  disagreement is remembered.
+- Every verdict is disputable in one click ("this is wrong"). How long the
+  disagreement is remembered depends on the surface: on a lookalike or a
+  login form on a new domain (in the page or in a frame) it adds the site to
+  trusted domains and outlives the page; the in-page trap panels (ClickFix
+  SCN-008, tech-support SCN-009, a link that may open a program SCN-049)
+  remember it for the life of the page only and journal nothing: after it
+  the same ClickFix or tech-support warning does not come back on that page
+  and writes no second journal line, and that one link goes through. The
+  link warning also obeys Trusted sites: on a trusted site it is not raised.
+  On the download panel "This is wrong" closes that panel and remembers
+  nothing. On the injection and leaked-password panels it clears the page's
+  findings and takes every panel down (`resolveEverything` in
+  `apps/extension/src/content/index.ts`); nothing outlives the page, and a
+  new finding later on the same page raises a new panel.
 - No counters of "threats blocked", no protection score, no streaks.
 - In-page surfaces render inside a closed Shadow DOM so page CSS cannot
   restyle or hide them.
@@ -202,11 +214,12 @@ generator, and the sheet declares no colour of its own.
 - **Status note:** built for the injection variant only
 - **Used by:** FLW-02, FLW-05, FLW-06, FLW-07, FLW-08, FLW-09, FLW-10
 - **Purpose:** speak at the moment of the decision, inside the page, without stealing the page
-- **Elements:** severity icon + label; one-sentence plain-language reason; **one primary action per variant**; secondary "Показать" → SCR-04 where applicable; "Это неверно"; dismiss. Variants: `injection`, `lookalike`, `clickfix` (blocking), `techsupport`, `download`, `credential`, `password`
+- **Elements:** severity icon + label; one-sentence plain-language reason; **one primary action per variant**; secondary "Показать" → SCR-04 where applicable; "Это неверно"; dismiss. Variants: `injection`, `lookalike`, `clickfix` (blocking), `techsupport`, `download`, `credential`, `password`. The `clickfix` variant also carries the link that may open a program outside the browser (SCN-049, 2026-10-27): the same trap by another road, with its own headline and sentence and no new element
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
-  | success | a finding is raised | - | banner appears in the corner; blocking variants (clickfix) overlay and require a deliberate dismiss |
+  | success | a finding is raised | - | banner appears in the corner; blocking variants (clickfix) overlay and require a deliberate dismiss. The link warning (SCN-049) moves focus to its first action, "Leave this page", when it opens, and back to the link when "This is wrong" closes it |
+  | closed by the person | "This is wrong" or dismiss | - | the panel goes and stays gone: the slot is released with it. Until 2026-10-27 the slot's watch read this close as the page deleting the warning and drew it again (B-165 round 1) |
   | error | detail view or action failed | - | inline failure text with retry; the warning itself never disappears on error |
   | removed by the page | the page deletes the host from the document | - | put back up to three times, a quarter-second apart; after that the extension's **icon** carries a badge and the journal records the count. The banner is not on the page any more, and the product says so rather than going quiet |
   | more than one kind of finding | a second detector finds something on the same page | - | **one panel, never two.** The worst finding holds it, a tie leaves it where it is, and the rest become a single line naming how many other kinds are here. Two panels at the same `inset` drew one warning on top of another until 2026-08-20 (B-69) |
@@ -216,7 +229,7 @@ generator, and the sheet declares no colour of its own.
 - **Behavior notes — severity in a word and a colour, in that order.** The word is the message; the strip on the panel's leading edge is the third signal, from the same three token levels the extension's own screens use. Until 2026-08-21 there was no strip and no colour at all here, so `Критично` and `Незначительно` were indistinguishable at a glance (B-116)
 - **Wireframe:** wireframes/SCR-03.md
 - **Coverage:** packages/ui/src/banner/banner.ts:mountBanner, e2e/scn-003.spec.ts, e2e/a11y-overlays.spec.ts, e2e/scn-034.spec.ts (the credential variant drawn from a frame's report, asserted through the open shadow root of the hooked build)
-- **Scenarios:** SCN-003, SCN-006, SCN-008, SCN-009, SCN-011, SCN-012, SCN-013, SCN-031, SCN-034, SCN-035, SCN-036
+- **Scenarios:** SCN-003, SCN-006, SCN-008, SCN-009, SCN-011, SCN-012, SCN-013, SCN-031, SCN-034, SCN-035, SCN-036, SCN-049
 - **Resources:** shared banner component, variant copy table, i18n strings
 - **Status:** built
 

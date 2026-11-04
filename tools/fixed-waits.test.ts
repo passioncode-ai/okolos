@@ -35,6 +35,10 @@ const KNOWN: Record<string, { sites: number; why: string }> = {
     sites: 2,
     why: 'a wipe that must not happen has no completion signal to wait for; same class as B-169, left open under it',
   },
+  'e2e/scn-049.spec.ts': {
+    sites: 6,
+    why: 'a link warning that must not come back after a dispute, a right click that must not be stopped and a page that must not raise anything before the click have no completion signal to wait for; same class as B-169, left open under B-189',
+  },
   'e2e/scn-037.spec.ts': {
     sites: 1,
     why: 'a blocked frame whose document never loads has no signal of its own; same class as B-169, left open under it',

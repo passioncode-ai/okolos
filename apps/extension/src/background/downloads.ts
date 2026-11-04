@@ -31,13 +31,21 @@ export interface DownloadItem {
 
 export interface DownloadDeps {
   feed(): Promise<FeedSnapshot | null>
-  cancel(id: number): Promise<void>
+  /**
+   * Stops a download and removes its file if the browser already wrote it, by the state the
+   * browser reports (the adapter's `discard`). `true` only when nothing of it is left on disk.
+   */
+  stop(id: number): Promise<boolean>
   journal(entry: { explain: string; outcome: string }): Promise<void>
-  announce(verdict: DownloadVerdict, item: DownloadItem): Promise<void>
+  /** `stopped` is present on a block only: whether the stop is confirmed (B-180, round 9). */
+  announce(verdict: DownloadVerdict, item: DownloadItem, outcome?: { stopped: boolean }): Promise<void>
 }
 
-export async function handleDownload(item: DownloadItem, deps: DownloadDeps): Promise<DownloadVerdict> {
-  const feed = await deps.feed().catch(() => null)
+/**
+ * The verdict on one download, from its addresses, name, type and the feed. Pure: the same
+ * item and feed give the same verdict.
+ */
+export function judgeItem(item: DownloadItem, feed: FeedSnapshot | null): DownloadVerdict {
 
   /**
    * Both addresses are checked, and either one listed is enough.
@@ -79,11 +87,38 @@ export async function handleDownload(item: DownloadItem, deps: DownloadDeps): Pr
       },
     },
   })
+  return verdict
+}
 
-  if (verdict.action === 'block') {
-    // Cancelled first, explained second. The order matters: the file must not
-    // reach the disk while a banner is being drawn.
-    await deps.cancel(item.id).catch(() => undefined)
+/**
+ * `named` is the same download once the browser has named the file (Chrome names it after
+ * creating it). The feed check needs only the addresses, so it runs on the item as created and
+ * a listed download is cancelled at once; only the checks that read the name wait for it
+ * (round 8 of the B-165 certification: waiting for the name first let a listed file finish
+ * before its cancel, under a panel saying nothing reached the disk).
+ */
+export async function handleDownload(
+  created: DownloadItem,
+  deps: DownloadDeps,
+  named: Promise<DownloadItem> = Promise.resolve(created),
+): Promise<DownloadVerdict> {
+  const feed = await deps.feed().catch(() => null)
+  const byAddress = judgeItem(created, feed)
+
+  let item = created
+  let verdict = byAddress
+  let outcome: { stopped: boolean } | undefined
+  if (byAddress.action === 'block') {
+    // Stopped first, explained second. The order matters: the file must not
+    // reach the disk while a banner is being drawn. A bare cancel was not enough
+    // (round 9 of the B-180 certification): Chrome's cancel resolves for a download
+    // that already finished and leaves the file, and a file of a few hundred bytes
+    // finishes inside the feed read. So the stop looks again and removes what was
+    // written, and the panel says "nothing reached the disk" only when it is confirmed.
+    outcome = { stopped: await deps.stop(created.id).catch(() => false) }
+  } else {
+    item = await named.catch(() => created)
+    verdict = item === created ? byAddress : judgeItem(item, feed)
   }
 
   await deps
@@ -93,6 +128,26 @@ export async function handleDownload(item: DownloadItem, deps: DownloadDeps): Pr
     })
     .catch(() => undefined)
 
-  await deps.announce(verdict, item).catch(() => undefined)
+  await (outcome ? deps.announce(verdict, item, outcome) : deps.announce(verdict, item)).catch(() => undefined)
   return verdict
+}
+
+/**
+ * The person asked to delete a doubted download from its warning ("Delete file").
+ *
+ * Only the top frame's content script may ask: a frame inside the page is not where the warning
+ * stands, and a page cannot message the extension at all. The download is not judged again here
+ * (round 7): the warning the person answered is the judgement, and a second one could disagree
+ * with it (a feed refreshed since, a name the browser reported late) and leave the button dead.
+ */
+export async function discardDownload(
+  payload: unknown,
+  from: { frameId?: number },
+  discard: (id: number) => Promise<boolean>,
+): Promise<{ ok: boolean }> {
+  const downloadId = (payload as { downloadId?: unknown } | null)?.downloadId
+  if (from.frameId !== 0 || typeof downloadId !== 'number' || !Number.isInteger(downloadId)) {
+    return { ok: false }
+  }
+  return { ok: await discard(downloadId).catch(() => false) }
 }

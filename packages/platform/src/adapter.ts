@@ -1,6 +1,7 @@
 import { isEnvelope, type Envelope, type RpcMap, type RpcType } from '@okolos/contracts'
 
 import type {
+  CreatedDownload,
   Platform,
   RpcHandler,
   RpcSender,
@@ -276,24 +277,103 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
       available: () => Boolean(api.downloads),
 
       onCreated(handler): void {
-        api.downloads?.onCreated.addListener((item) => {
-          handler({
-            id: item.id,
-            url: item.url,
-            // Both addresses travel: the link the page carried and where it landed.
-            // A short link to a malicious host is innocent at the first and not at
-            // the second, and the check used to see only the first (B-57).
-            ...(item.finalUrl !== undefined && item.finalUrl !== item.url
-              ? { finalUrl: item.finalUrl }
-              : {}),
-            filename: (item.filename ?? '').split(/[\\/]/).pop() ?? '',
-            mime: item.mime ?? null,
+        /**
+         * Chrome reports a download before it has decided the file name, so `onCreated` carries
+         * an empty one and the type checks judged every download as nameless (measured in
+         * Chromium 151, round 7 of the B-165 certification). A nameless download waits for the
+         * name `onChanged` brings, up to five seconds, and is reported once, with it or without.
+         */
+        const NAME_WAIT_MS = 5_000
+        const waiting = new Map<number, { item: CreatedDownload; done: (item: CreatedDownload) => void; timer: ReturnType<typeof setTimeout> }>()
+        const shape = (item: { id: number; url: string; finalUrl?: string; filename?: string; mime?: string }): CreatedDownload => ({
+          id: item.id,
+          url: item.url,
+          // Both addresses travel: the link the page carried and where it landed.
+          // A short link to a malicious host is innocent at the first and not at
+          // the second, and the check used to see only the first (B-57).
+          ...(item.finalUrl !== undefined && item.finalUrl !== item.url
+            ? { finalUrl: item.finalUrl }
+            : {}),
+          filename: (item.filename ?? '').split(/[\\/]/).pop() ?? '',
+          mime: item.mime ?? null,
+        })
+        api.downloads?.onChanged?.addListener((delta) => {
+          const pending = waiting.get(delta.id)
+          const name = delta.filename?.current
+          if (pending === undefined || !name) return
+          clearTimeout(pending.timer)
+          waiting.delete(delta.id)
+          pending.done({ ...pending.item, filename: name.split(/[\\/]/).pop() ?? '' })
+        })
+        api.downloads?.onCreated.addListener((raw) => {
+          const item = shape(raw)
+          if (item.filename || !api.downloads?.onChanged) {
+            handler(item, Promise.resolve(item))
+            return
+          }
+          // The item goes to the handler now, before Chrome names it, so a check by address
+          // runs while the download can still be stopped; the name follows (round 8).
+          const named = new Promise<CreatedDownload>((done) => {
+            const timer = setTimeout(() => {
+              waiting.delete(item.id)
+              done(item)
+            }, NAME_WAIT_MS)
+            waiting.set(item.id, { item, done, timer })
           })
+          handler(item, named)
         })
       },
 
       async cancel(id: number): Promise<void> {
         await api.downloads?.cancel(id)
+      },
+
+      async find(id: number) {
+        const [item] = (await api.downloads?.search?.({ id }).catch(() => [])) ?? []
+        if (item === undefined) return null
+        const state = item.state === 'complete' || item.state === 'interrupted' ? item.state : 'in_progress'
+        return {
+          id: item.id,
+          url: item.url,
+          ...(item.finalUrl !== undefined && item.finalUrl !== item.url ? { finalUrl: item.finalUrl } : {}),
+          filename: (item.filename ?? '').split(/[\\/]/).pop() ?? '',
+          mime: item.mime ?? null,
+          state,
+        } as const
+      },
+
+      async discard(id: number): Promise<boolean> {
+        const downloads = api.downloads
+        const look = async () => (await downloads?.search?.({ id }).catch(() => []))?.[0]
+        let item = await look()
+        if (!downloads || item === undefined) return false
+        // By the state the browser reports (round 6): Chrome's cancel resolves for a finished
+        // download too and leaves its file on disk, and removeFile refuses one still running.
+        if (item.state !== 'complete' && item.state !== 'interrupted') {
+          try {
+            await downloads.cancel(id)
+          } catch {
+            return false
+          }
+          // It may have finished between the look and the cancel (round 7): look again.
+          item = (await look()) ?? item
+          // Still running after the cancel: a download already finishing may ignore it and
+          // complete. That is not a stop, and the entry stays so the file can still be
+          // removed from the warning (round 10 seam).
+          if (item.state === 'in_progress') return false
+        }
+        // A finished file already moved or deleted is gone; nothing is left to remove.
+        if (item.state === 'complete' && item.exists !== false) {
+          if (!downloads.removeFile) return false
+          try {
+            await downloads.removeFile(id)
+          } catch {
+            const after = await look()
+            if (after?.exists !== false) return false
+          }
+        }
+        await downloads.erase?.({ id }).catch(() => undefined)
+        return true
       },
     },
 

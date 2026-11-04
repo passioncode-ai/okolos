@@ -1,6 +1,7 @@
 import { standingFindings } from '@okolos/core-extensions'
 import { detectHidden } from '@okolos/core-injection'
 import { detectPlatform, type RpcSender } from '@okolos/platform'
+
 import { buildRules, matchUrl, type FeedSnapshot,
 } from '@okolos/core-feeds'
 import {
@@ -24,7 +25,7 @@ import type {
   Verdict,
 } from '@okolos/contracts'
 
-import { handleDownload } from './downloads.js'
+import { discardDownload, handleDownload } from './downloads.js'
 import {
   acceptInventoryChange,
   compareInventory,
@@ -62,6 +63,7 @@ import { explained, t, useResolver } from '@okolos/i18n'
 import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 
 import { recordPageRequest } from './page-requests.js'
+import { recordTrap } from './trap-journal.js'
 import { optionsPageFor } from '../options/views.js'
 
 /**
@@ -105,6 +107,11 @@ const FEED_ALARM = FEED.name
 const RETENTION_ALARM = RETENTION.name
 const INVENTORY_ALARM = INVENTORY.name
 
+/**
+ * A discard is taken only from a top frame's content script, by the download's id, and the
+ * download is not judged again (`discardDownload`, round 7 of the B-165 certification): the
+ * warning the person answered is the judgement. A page cannot message the extension at all.
+ */
 platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSender) => {
   switch (message.type) {
     case 'page/candidates':
@@ -130,6 +137,10 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
       ) as Promise<RpcMap[T]['res']>
     case 'password/shown':
       return forgetHeldVerdict(from) as Promise<RpcMap[T]['res']>
+    case 'download/discard':
+      return discardDownload(message.payload, from, (id) => platform.downloads.discard(id)) as Promise<
+        RpcMap[T]['res']
+      >
     case 'password/pending':
       return answerPendingVerdict(from) as Promise<RpcMap[T]['res']>
     case 'leaks/check':
@@ -938,13 +949,6 @@ const STORAGE_KEY: Record<string, string> = {
   full: 'logStorageFull',
 }
 
-/** What each page trap is recorded as. `generic` covers one we cannot name. */
-const TRAP_KEY: Record<string, string> = {
-  clickfix: 'logTrapClickfix',
-  techsupport: 'logTrapTechsupport',
-  generic: 'logTrapGeneric',
-}
-
 /**
  * A state-changing request the page made while a finding was unresolved.
  *
@@ -969,19 +973,8 @@ async function journalPageRequest(
 }
 
 async function journalTrap(payload: { kind: string; signals: string }): Promise<{ ok: true }> {
-  // Table, not a ternary, because `tools/locales.test.ts` finds the keys a
-  // build asks for by reading `t('…')`, `*_KEY` tables and `…Key:` fields — and
-  // deliberately nothing looser, since a looser reader keeps dead messages
-  // alive. Written any other way these five keys read as translated-and-unused.
   try {
-    const db = await openDb()
-    const now = new Date().toISOString()
-    await db.put('journal', {
-      id: `trap:${payload.kind}:${now}`,
-      createdAt: now,
-      kind: 'verdict',
-      detail: { explainKey: TRAP_KEY[payload.kind] ?? 'logTrapGeneric', signals: payload.signals },
-    })
+    await recordTrap({ db: await openDb(), now: () => new Date().toISOString() }, payload)
   } catch (cause) {
     console.warn('okolos: could not journal a page trap', cause)
   }
@@ -1112,10 +1105,10 @@ platform.runtime.onBrowserStart(() => {
  * Downloads are judged as they are created — the only moment the bytes have not
  * landed yet. Nothing here waits on the page: a direct link has no page.
  */
-platform.downloads.onCreated((item) => {
+platform.downloads.onCreated((item, named) => {
   void handleDownload(item, {
     feed: currentFeed,
-    cancel: (id) => platform.downloads.cancel(id),
+    stop: (id) => platform.downloads.discard(id),
     journal: async (entry) => {
       const db = await openDb()
       const now = new Date().toISOString()
@@ -1126,7 +1119,7 @@ platform.downloads.onCreated((item) => {
         detail: { explain: entry.explain, outcome: entry.outcome },
       })
     },
-    announce: async (verdict) => {
+    announce: async (verdict, _item, outcome) => {
       /**
        * `tabs.sendToActive`, not `runtime.send`, and the difference is the whole
        * defect this replaces.
@@ -1153,6 +1146,8 @@ platform.downloads.onCreated((item) => {
           shape: verdict.shape,
           reasons: verdict.reasons.join(' '),
           skipped: verdict.skipped.map((entry) => `${entry.check}: ${entry.why}`).join('; '),
+          downloadId: item.id,
+          ...(outcome ? { stopped: outcome.stopped } : {}),
         })
         .catch(() => false)
 
@@ -1174,7 +1169,7 @@ platform.downloads.onCreated((item) => {
         }
       }
     },
-  })
+  }, named)
 })
 
 /**
