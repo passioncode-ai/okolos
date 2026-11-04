@@ -59,6 +59,49 @@ describe('the first run', () => {
     expect(await (await openDb()).getAll('snapshots')).toHaveLength(2)
   })
 
+  /**
+   * Two first comparisons at once, which is what a fresh profile does.
+   *
+   * The worker's start-up review and the extensions screen both reach this function, and
+   * on a fresh profile both may find the store empty. The baseline used to be written one
+   * extension at a time, so a reader arriving while it was half written diffed the full
+   * list against a partial baseline and reported every extension not yet stored. CI saw a
+   * fresh profile with a change on it once (B-168, run 36563089100).
+   */
+  it('reports nothing to a second first comparison that reads while the first writes', async () => {
+    const list = [ext(), ext({ id: 'def', name: 'Tab Saver' }), ext({ id: 'ghi', name: 'Reader' })]
+    const db = await openDb()
+    const reader: InventoryDeps = { db, list: async () => list, now: () => NOW, selfId: 'self' }
+    let second: Promise<unknown> | null = null
+    // The second reader starts the moment the first one begins to write, whichever way it
+    // writes: one row at a time, or one transaction for the lot.
+    const startSecond = () => {
+      second ??= compareInventory(reader)
+    }
+    const writer: InventoryDeps = {
+      ...reader,
+      db: new Proxy(db, {
+        get(target, key) {
+          const value = Reflect.get(target, key) as unknown
+          if (typeof value !== 'function') return value
+          if (key === 'put' || key === 'transaction') {
+            return (...args: unknown[]) => {
+              const result = (value as (...a: unknown[]) => unknown).apply(target, args)
+              startSecond()
+              return result
+            }
+          }
+          return (value as (...a: unknown[]) => unknown).bind(target)
+        },
+      }),
+    }
+
+    expect(await compareInventory(writer)).toEqual([])
+    expect(second, 'the race was never provoked: the first comparison wrote nothing').not.toBeNull()
+    expect(await second).toEqual([])
+    expect(await db.getAll('snapshots')).toHaveLength(3)
+  })
+
   it('records everything the comparison will need, not a subset of it', async () => {
     // Host permissions and the name were not stored at all. The first absence
     // produced a false `critical` on every run; the second made a removal read

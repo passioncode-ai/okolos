@@ -28,6 +28,7 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 
 - **success** — evidence available
 - **error** — evidence lost (page mutated)
+- **refused** — restore pressed on a node the page has taken over
 
 **Source of truth:** `packages/ui/src/inspector/inspector.ts`. This file is derived from it; if the two
 disagree, the renderer is right and this file is stale.

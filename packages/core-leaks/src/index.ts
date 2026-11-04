@@ -1,5 +1,8 @@
 export {
+  HIBP_KEY_HEADER_SHAPE,
+  HIBP_SOURCE,
   mergeLeaks,
+  type KeyRemedy,
   type Leak,
   type LeakInventory,
   type SourceReport,

@@ -252,6 +252,82 @@ export const MARK_PARTIAL = 'okolos:scan-partial'
 export const MEASURE_TO_BANNER = 'okolos:banner'
 
 /**
+ * A scan, and everything it set in motion, has settled, measured from the scan's start.
+ *
+ * "Settled" is the point of the name: the verdict came back and the warning is drawn, or
+ * the frame's report reached the embedding page (or was given up), or there was nothing
+ * to ask about. Not written when the scan threw: that is `okolos:scan-failed`, and a
+ * check that did not finish must never read as one that found nothing.
+ *
+ * Two readers. The e2e report tells "the answer came back and the mount is what is
+ * missing" from "the answer never came" (B-78). And a test that asserts a page stays
+ * silent waits for this instead of a fixed time: under load the wait ran out before the
+ * scan did, and the assertion passed on a check that had not run (B-169).
+ */
+export const MEASURE_SCAN = 'okolos:scan'
+
+/**
+ * The address check has settled, from the navigation: the lookalike warning is drawn or
+ * was decided against. Not written when the check could not run (B-169).
+ */
+export const MEASURE_LOOKALIKE = 'okolos:lookalike'
+
+/**
+ * This document's question "does the tab hold a leak verdict nobody was shown?" has been
+ * answered, and a held verdict, if there was one, is drawn. Not written when the question
+ * failed (B-169).
+ */
+export const MEASURE_PENDING = 'okolos:pending'
+
+/**
+ * Test-hook marks: a focus judged by the password pause, and a look at the page by the
+ * trap watcher. Per event, so they would pile up in the timeline of a page a person
+ * works in for hours; written only in the build with test hooks, and
+ * `tools/gates/bundle-scan.test.ts` asserts the shipped bundle does not carry them.
+ */
+const MARK_FOCUS_JUDGED = 'okolos:focus-judged'
+const MARK_TRAP_JUDGED = 'okolos:trap-judged'
+
+/**
+ * Test-hook mark: this document has handled the answer to its own password check, the
+ * warning drawn, the leak relayed to the embedding page (or given up), or nothing to say.
+ * The worker's `okolos:password` cannot say this: the asking document handles the answer
+ * after the worker has returned it. Per submission, so test build only, like the two above.
+ */
+function passwordHandled(): void {
+  // The name is written inside the guard, not as a module constant: the bundler kept an
+  // unused constant in the shipped build, and the bundle gate refuses the name there.
+  if (__OKOLOS_TEST_HOOKS__) performance.mark('okolos:password-handled')
+}
+
+declare const __OKOLOS_TEST_HOOKS__: boolean | undefined
+
+/**
+ * The scan has settled, and whether it asked the worker anything.
+ *
+ * **One entry per document, the latest.** A page that keeps changing is rescanned up to
+ * twice a second, and user-timing entries are never evicted, so a measure per scan would
+ * pile up in the timeline of a page someone keeps open all day: up to 7 200 an hour. The
+ * previous entry is cleared before the next is written; a reader waiting for "settled at
+ * least once" sees one entry either way.
+ *
+ * `asked` travels in the entry's `detail`, so the e2e report can tell "the answer came
+ * back" from "there was no question" (a blinded walk, or nothing to ask about).
+ *
+ * Wrapped like its siblings: a page can have replaced the API, and a measurement that
+ * throws must not turn a scan that did its work into a scan journalled as failed.
+ */
+function scanSettled(started: number, asked: boolean): void {
+  try {
+    const end = performance.now()
+    performance.clearMeasures(MEASURE_SCAN)
+    performance.measure(MEASURE_SCAN, { start: started, end, detail: { asked } })
+  } catch {
+    // Nothing to report is better than a scan reported as failed.
+  }
+}
+
+/**
  * The bridge to the MAIN-world watcher.
  *
  * It is armed only while this page carries a finding nobody has dealt with, so
@@ -335,6 +411,7 @@ async function scan(): Promise<void> {
         })
       })
     }
+    scanSettled(started, false)
     return
   }
 
@@ -345,7 +422,10 @@ async function scan(): Promise<void> {
   const response = await platform.runtime.send('page/candidates', page)
 
   const verdicts: Verdict[] = response?.verdicts ?? []
-  if (verdicts.length === 0) return
+  if (verdicts.length === 0) {
+    scanSettled(started, true)
+    return
+  }
 
   // Neutralise in every frame, including the ones that never show a banner: an
   // injection inside an iframe is read by an assistant just as readily as one
@@ -361,10 +441,19 @@ async function scan(): Promise<void> {
   armPageWatch(unresolved.length > 0)
 
   if (!isTopFrame) {
+    // Settled once the embedding page has it, or the report was given up: a frame's
+    // finding is not on screen until then.
     void tellEmbeddingPage(verdicts)
+      .then(() => scanSettled(started, true))
+      .catch((cause: unknown) => {
+        // Visible, as it was when this rejection went unhandled: a report that failed
+        // outright, rather than being given up, is a defect worth a console line.
+        console.warn('okolos: a frame report failed', cause)
+      })
     return
   }
   show(worst(verdicts), verdicts.length, page.truncated, neutralised)
+  scanSettled(started, true)
 }
 
 /**
@@ -988,10 +1077,20 @@ if (isTopFrame) {
       await platform.runtime.send('trust/add', { domain: host })
     },
     leave: () => history.back(),
-  }).catch(() => {
-    // An address that could not be checked is not an address declared safe;
-    // nothing is shown either way, and the page is left alone.
   })
+    .then(() => {
+      // From the navigation, which is what a person waited from. A page can have taken the
+      // API away; the measure is a fact for observers, never a reason to throw.
+      try {
+        performance.measure(MEASURE_LOOKALIKE)
+      } catch {
+        // Nothing to report.
+      }
+    })
+    .catch(() => {
+      // An address that could not be checked is not an address declared safe;
+      // nothing is shown either way, and the page is left alone.
+    })
 }
 
 /**
@@ -1012,6 +1111,9 @@ if (isTopFrame) {
       void platform.runtime
         .send('trap/warned', { kind, signals: signals.join(',') })
         .catch(() => undefined)
+    },
+    judged: () => {
+      if (__OKOLOS_TEST_HOOKS__) performance.mark(MARK_TRAP_JUDGED)
     },
     exitFullscreen: () => {
       void document.exitFullscreen?.().catch(() => {
@@ -1066,6 +1168,9 @@ watchCredentialFields({
     await platform.runtime.send('trust/add', { domain: host })
   },
   leave: () => history.back(),
+  judged: () => {
+    if (__OKOLOS_TEST_HOOKS__) performance.mark(MARK_FOCUS_JUDGED)
+  },
 })
 
 /**
@@ -1081,8 +1186,9 @@ watchCredentialFields({
 function tellEmbeddingPageOfPassword(finding: {
   severity: 'critical' | 'major' | 'minor'
   lines: FrameLine[]
-}): void {
-  void reportToEmbeddingPage(
+}): Promise<unknown> {
+  // Returned so the pause can say it judged the focus only once the report has arrived.
+  return reportToEmbeddingPage(
     { kind: 'credential', origin: '', severity: finding.severity, lines: finding.lines },
     {
       relay: (report) => platform.runtime.send('frame/report', report),
@@ -1105,8 +1211,9 @@ function tellEmbeddingPageOfPassword(finding: {
  * password and a verdict on a password already sent are different events with different
  * remedies, and the journal is queried by kind.
  */
-function tellEmbeddingPageOfLeak(lines: FrameLine[], offline: boolean): void {
-  void reportToEmbeddingPage(
+function tellEmbeddingPageOfLeak(lines: FrameLine[], offline: boolean): Promise<unknown> {
+  // Returned so the submit handler can say it handled the answer once the report arrived.
+  return reportToEmbeddingPage(
     { kind: 'password', origin: '', lines, offline },
     {
       relay: (report) => platform.runtime.send('frame/report', report),
@@ -1177,14 +1284,18 @@ document.addEventListener(
           sha1,
           host: location.host,
         })
-        if (!verdict?.compromised) return
+        if (!verdict?.compromised) {
+          passwordHandled()
+          return
+        }
 
         const lines = passwordLines(verdict)
 
         // A frame reports rather than draws, and the words are not decided here: keys
         // travel and the surface that draws them resolves them.
         if (!isTopFrame) {
-          tellEmbeddingPageOfLeak(lines, verdict.offline)
+          await tellEmbeddingPageOfLeak(lines, verdict.offline)
+          passwordHandled()
           return
         }
 
@@ -1196,6 +1307,7 @@ document.addEventListener(
           host: location.host === '' ? null : location.host,
           headline: t('warnPasswordHeadline'),
         })
+        passwordHandled()
       } catch (cause) {
         /**
          * A failed check is not a clean password, and it is not a broken login
@@ -1291,6 +1403,11 @@ if (isTopFrame) {
     .send('password/pending', {})
     .then((held) => {
       if (held) showPasswordVerdict(held.host, held.verdict, held.verdict.offline)
+      try {
+        performance.measure(MEASURE_PENDING)
+      } catch {
+        // Nothing to report: the verdict, if any, is drawn either way.
+      }
     })
     .catch(() => {
       // Nothing to show and nothing to say: the verdict, if there is one, is in the

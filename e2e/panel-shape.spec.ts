@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures.js'
+import { expectJournalRows } from './surfaces.js'
 
 /**
  * Every screen of this extension is one panel, shaped the same way.
@@ -134,7 +135,11 @@ test('a clickable row is drawn as a row, not as a chip', async ({ context, exten
    */
   const page = await context.newPage()
   await page.goto(`chrome-extension://${extensionId}/options.html#journal`)
-  await expect(page.locator('[data-role=journal]')).toHaveCount(1)
+  // The row, not only its container: the screen is a snapshot taken as it opens, and on a
+  // fresh profile the first row (the feed download) can land a moment after that. Waiting
+  // for the container and reading the row at once failed on CI with "no journal row to
+  // measure" (run 40868937905).
+  await expectJournalRows(page, 'button[data-role=entry]')
 
   const shape = await page.evaluate(() => {
     const row = document.querySelector('button[data-role=entry]')

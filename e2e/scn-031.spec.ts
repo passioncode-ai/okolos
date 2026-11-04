@@ -1,5 +1,5 @@
 import { expect, serveHosts, test } from './fixtures.js'
-import { expectBanner } from './surfaces.js'
+import { expectBanner, expectPageSettled } from './surfaces.js'
 
 /**
  * A finding inside an embedded frame is told to the page that embeds it.
@@ -75,6 +75,8 @@ test('stays silent when the embedded frame is ordinary', async ({ context }) => 
   const page = await context.newPage()
   await page.goto('https://parent.test/')
 
-  await page.waitForTimeout(2_000)
+  // Until both documents have scanned and anything the frame reported has reached the top,
+  // not for a time: a fixed wait ran out first under load (B-169).
+  await expectPageSettled(page)
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 })

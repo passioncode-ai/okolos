@@ -1,6 +1,6 @@
 import { expect, test } from './hooks.js'
 import { serveHosts } from './serve.js'
-import { expectSurface } from './surfaces.js'
+import { expectPageSettled, expectScriptReady, expectSurface, frameAt } from './surfaces.js'
 
 /**
  * A login form inside an embedded frame is checked, and its finding reaches the page a
@@ -50,6 +50,8 @@ test('warns about a login form inside a frame, on the page that embeds it', asyn
   await serveHosts(context, { 'parent.test': PARENT, 'g00gle.com': LOGIN_FRAME })
   const page = await context.newPage()
   await page.goto('https://parent.test/')
+  // The frame's script listens before the click, or the click reaches nobody (B-78).
+  await expectScriptReady(await frameAt(page, 'https://g00gle.com'))
 
   /**
    * A click rather than `.focus()`, and the difference is not style. The pause is bound
@@ -99,6 +101,7 @@ test('does not mount a banner inside the frame with the form', async ({ context 
   await serveHosts(context, { 'parent.test': PARENT, 'g00gle.com': LOGIN_FRAME })
   const page = await context.newPage()
   await page.goto('https://parent.test/')
+  await expectScriptReady(await frameAt(page, 'https://g00gle.com'))
   await page.frameLocator('iframe').locator('input[type=password]').click()
   await expectSurface(page, 'okolos-banner', context)
 
@@ -114,6 +117,7 @@ test('stays silent when the embedded frame asks for no password', async ({ conte
   const page = await context.newPage()
   await page.goto('https://parent.test/')
 
-  await page.waitForTimeout(2_000)
+  // Until both documents have scanned and the address is checked, not for a time (B-169).
+  await expectPageSettled(page)
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 })

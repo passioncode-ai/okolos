@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -113,7 +113,8 @@ describe('okolos-mail, started the way a person starts it', () => {
    * `argv[1]` names neither the file nor its extension. The command must not
    * care: the old check would have run nothing here too. Windows gets a `.cmd`
    * shim instead of a link and creating one needs privileges, so this case is
-   * POSIX; the Windows argv shape is `entry.test.ts`.
+   * POSIX. Windows spellings of the path cannot matter: nothing reads `argv[1]`,
+   * which `index.test.ts` holds.
    */
   it.skipIf(process.platform === 'win32')('runs when started through a link with another name', () => {
     const link = path.join(dir, 'okolos-mail')
@@ -125,20 +126,21 @@ describe('okolos-mail, started the way a person starts it', () => {
 
   /**
    * The guarantee B-161 lacked: whatever goes wrong before a verdict, the
-   * process does not end with the 0 that means "nothing found". The plant
-   * replaces `index.ts` with a module that throws as it loads, which is the
-   * earliest point the command's own code can fail.
+   * process does not end with the 0 that means "nothing found", nor node's 1,
+   * which means "signals found" here. Each plant replaces one module with one
+   * that throws: `index.ts` as it loads, the earliest point the command's own
+   * code can fail, and `scan.ts` inside `main`, the latest.
    */
-  it('exits 2, not 0, when the command fails before it can scan', () => {
-    const plant = path.join(dir, 'plant.mjs')
+  function plant(module: string, source: string): string[] {
+    const file = path.join(dir, `plant-${module.replace(/\W/g, '-')}.mjs`)
     writeFileSync(
-      plant,
+      file,
       [
         "import { registerHooks } from 'node:module'",
         'registerHooks({',
         '  load(url, context, next) {',
-        "    if (url.endsWith('/apps/mail-cli/src/index.ts')) {",
-        "      return { format: 'module', source: 'throw new Error(\"planted\")', shortCircuit: true }",
+        `    if (url.endsWith(${JSON.stringify(`/apps/mail-cli/src/${module}`)})) {`,
+        `      return { format: 'module', source: ${JSON.stringify(source)}, shortCircuit: true }`,
         '    }',
         '    return next(url, context)',
         '  },',
@@ -146,44 +148,67 @@ describe('okolos-mail, started the way a person starts it', () => {
         '',
       ].join('\n'),
     )
-    const out = okolosMail(['scan', clean], { before: ['--import', pathToFileURL(plant).href] })
-    expect(out.stderr).toContain('planted')
+    return ['--import', pathToFileURL(file).href]
+  }
+
+  it('exits 2 with an okolos-mail: line when the command fails before it can scan', () => {
+    const out = okolosMail(['scan', clean], { before: plant('index.ts', 'throw new Error("planted in load")') })
+    expect(out.stderr).toMatch(/^okolos-mail: .*planted in load/)
+    expect(out.stdout).not.toContain(word('mailVerdictNone'))
+    expect(out.code).toBe(EXIT.unreadable)
+  })
+
+  it('exits 2 with an okolos-mail: line when main itself throws', () => {
+    const out = okolosMail(['scan', clean], {
+      before: plant(
+        'scan.ts',
+        'export const EXIT = { nothingFound: 0, signalsFound: 1, unreadable: 2 }\n' +
+          'export function scan() { throw new Error("planted in main") }\n',
+      ),
+    })
+    expect(out.stderr).toMatch(/^okolos-mail: .*planted in main/)
     expect(out.stdout).not.toContain(word('mailVerdictNone'))
     expect(out.code).toBe(EXIT.unreadable)
   })
 
   /**
-   * `index.ts` still runs when it is itself the file node was started with, as
-   * a built or bundled copy would be. The resolve hook is the one
-   * `src/launch.mjs` installs, written out here so the run goes through no
-   * launcher at all.
+   * B-161 round 2: a reader that goes away (`| head -1`, `| grep -q`) closes
+   * the pipe, the write fails with EPIPE, and node with no listener for that
+   * error exits 1, which here means "signals found", for a message in which
+   * nothing was found. The reader leaving does not change the verdict, so the
+   * code is the verdict's. A closed stderr must not turn a 2 into a 1 either.
    */
-  it('runs main exactly once when index.ts is started directly', () => {
-    const hook = path.join(dir, 'resolve-ts.mjs')
-    writeFileSync(
-      hook,
-      [
-        "import { registerHooks } from 'node:module'",
-        'registerHooks({',
-        '  resolve(specifier, context, next) {',
-        '    try {',
-        '      return next(specifier, context)',
-        '    } catch (error) {',
-        "      if (specifier.startsWith('.') && specifier.endsWith('.js') && context.parentURL?.endsWith('.ts')) {",
-        "        return next(`${specifier.slice(0, -3)}.ts`, context)",
-        '      }',
-        '      throw error',
-        '    }',
-        '  },',
-        '})',
-        '',
-      ].join('\n'),
-    )
-    const out = okolosMail(['scan', clean], {
-      entry: path.join(app, 'src/index.ts'),
-      before: ['--import', pathToFileURL(hook).href],
+  async function withClosed(
+    streams: readonly ('stdout' | 'stderr')[],
+    args: readonly string[],
+    before: readonly string[] = [],
+  ): Promise<{ code: number | null; stderr: string }> {
+    const child = spawn(process.execPath, [...before, bin, ...args], {
+      cwd: root,
+      env: { ...process.env, OKOLOS_LOCALE: 'ru' },
+      stdio: ['ignore', 'pipe', 'pipe'],
     })
-    expect(count(out.stdout, word('mailVerdictNone'))).toBe(1)
+    let stderr = ''
+    for (const name of streams) child[name].destroy()
+    if (!streams.includes('stderr')) child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString()))
+    const code = await new Promise<number | null>((resolve) => child.on('close', (status) => resolve(status)))
+    return { code, stderr }
+  }
+
+  it('ends with the verdict, not 1, when the reader has closed stdout', async () => {
+    const out = await withClosed(['stdout'], ['scan', clean])
+    expect(out.stderr).toBe('')
     expect(out.code).toBe(EXIT.nothingFound)
+  })
+
+  it('ends an unread message with 2 when the reader has closed stdout', async () => {
+    const out = await withClosed(['stdout'], ['scan', empty])
+    expect(out.stderr).toBe('')
+    expect(out.code).toBe(EXIT.unreadable)
+  })
+
+  it('ends a failure with 2, not 1, when stderr is closed too', async () => {
+    const out = await withClosed(['stdout', 'stderr'], ['scan', clean], plant('scan.ts', 'export const EXIT = {}\nexport function scan() { throw new Error("planted") }\n'))
+    expect(out.code).toBe(EXIT.unreadable)
   })
 })

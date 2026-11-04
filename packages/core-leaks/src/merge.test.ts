@@ -42,6 +42,26 @@ describe('what the number counts', () => {
     expect(inventory.sources[0]).toMatchObject({ answered: false, why: 'no API key configured' })
   })
 
+  it('keeps whether the remedy is a key, so the screen can point at the field', () => {
+    // A timeout's remedy is waiting; a missing or refused key's remedy is a setting.
+    // The screen offers the link only for the second, and it can only tell them apart
+    // if the fact survives the merge.
+    const inventory = mergeLeaks([
+      { name: 'Have I Been Pwned', answered: false, why: 'no key', needsKey: 'missing' },
+      { name: 'Other', answered: false, why: 'refused', needsKey: 'refused' },
+      silent('Cavalier', 'timed out'),
+    ])
+    expect(inventory.sources.map((source) => source.needsKey)).toEqual(['missing', 'refused', undefined])
+    expect(inventory.sources[2]).not.toHaveProperty('needsKey')
+  })
+
+  it('keeps an unreadable key apart from a missing one', () => {
+    const inventory = mergeLeaks([
+      { name: 'Have I Been Pwned', answered: false, why: 'unreadable', needsKey: 'unreadable' },
+    ])
+    expect(inventory.sources[0]?.needsKey).toBe('unreadable')
+  })
+
   it('does not pretend an empty result is a complete one when nothing answered', () => {
     const inventory = mergeLeaks([silent('HIBP', 'offline'), silent('Cavalier', 'offline')])
     expect(inventory.leaks).toEqual([])
