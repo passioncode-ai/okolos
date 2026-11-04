@@ -130,3 +130,6 @@ catalogue, and checked then. Next: stage 4 plan.
   printed), a Debug test event accepted (200). growth-onboarding steps 1..3 hold; growth registration and reading this
   server wait for RB-108 on growth's side (a reader password from the operator). Resource proposed to Observatory as
   `prop:6aa77ea2725844ea`. Revision 34 with `browser_extension` rolls out today.
+- 2026-11-04 18:15 UTC, sshlg-growth: `browser_extension` is live in growth 0.37.0 (manifest revision 34, `279aeaa`):
+  config request and its targeting, `segment.platform` in stats, funnel and series, `platforms` on an experiment
+  card. The usage-events and remote-config skills name it in growth's repository until the sshlg-skills release.
