@@ -179,9 +179,19 @@ export interface RpcMap {
       shape: ReadonlyArray<{ code: string; filename?: string; mimeType?: string }>
       reasons: string
       skipped: string
+      /** The browser's id of the download, so the panel's "Discard the file" can act on it. */
+      downloadId: number
+      /**
+       * On a block only: whether the stop is confirmed, nothing of the file left on disk.
+       * `false` makes the panel say the file may be on disk and offer to delete it
+       * (B-180, rounds 9 and 10 of the seam).
+       */
+      stopped?: boolean
     }
     res: { ok: true }
   }
+  /** Cancel a doubted download, delete its file and drop it from the list (B-165). */
+  'download/discard': { req: { downloadId: number }; res: { ok: boolean } }
   /** SHA-1 of a submitted password. The password itself never crosses this line. */
   'password/check': {
     /**

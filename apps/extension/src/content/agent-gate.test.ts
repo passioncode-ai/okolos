@@ -332,6 +332,32 @@ describe('actions nobody can name', () => {
     expect(journal[0]).toMatchObject({ outcome: 'blocked', reason: 'unidentified' })
   })
 
+  it('blocks a link that hands its address to a Windows program, and journals no address', async () => {
+    // B-165 read `safeUrl` dropping every scheme but http(s) as a silent drop. On a
+    // page with a finding it is not silent: the click is blocked outright, because
+    // nothing honest can be asked about an address the gate will not print. On a
+    // page without one the trap watcher holds the same click (`traps.ts`), so both
+    // roads are covered, and the address never reaches the journal from here.
+    for (const href of [
+      'search-ms:query=x&crumb=location:%5C%5Cfiles.attacker.test%5Cs',
+      'ms-msdt:/id PCWDiagnostic',
+      'file://fileserver.attacker.test/share/a.lnk',
+    ]) {
+      const { ask, journal } = install()
+      document.body.innerHTML = '<a>Open</a>'
+      ;(document.querySelector('a') as HTMLAnchorElement).setAttribute('href', href)
+      const event = scripted('click')
+      ;(document.querySelector('a') as HTMLAnchorElement).dispatchEvent(event)
+      await settle()
+
+      expect(event.defaultPrevented, href).toBe(true)
+      expect(ask, href).not.toHaveBeenCalled()
+      expect(journal[0], href).toMatchObject({ outcome: 'blocked', reason: 'unidentified' })
+      expect(JSON.stringify(journal[0]), href).not.toContain('attacker')
+      installed.pop()?.uninstall()
+    }
+  })
+
   it('blocks a submit event fired at something that is not a form', async () => {
     const { journal } = install()
     document.body.innerHTML = '<div id="fake"></div>'

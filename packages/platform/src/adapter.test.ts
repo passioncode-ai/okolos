@@ -348,6 +348,7 @@ const DOWNLOAD_VERDICT = {
   shape: [{ code: 'double-extension', filename: 'invoice.pdf.exe' }],
   reasons: 'listed by URLhaus on 2026-08-04',
   skipped: 'hash: the file has not been written yet',
+  downloadId: 7,
 }
 
 describe('reaching the content script', () => {
@@ -764,5 +765,177 @@ describe('the navigation listener wakes the worker for web pages only', () => {
     }))
     platform.blocking.onBlocked(() => undefined)
     expect(filter).toEqual({ url: [{ schemes: ['http', 'https'] }] })
+  })
+})
+
+describe('discarding a download, by the state the browser reports (B-165, round 6)', () => {
+  // A real cancel turns a running download into 'interrupted' (USER_CANCELED); `cancelIgnored`
+  // is a download already finishing, which the browser lets complete (round 10 seam).
+  function api(state: string | null, calls: string[], removeFails = false, cancelIgnored = false) {
+    let current = state
+    return fakeApi({
+      downloads: {
+        onCreated: { addListener: () => undefined },
+        search: async (query: { id: number }) =>
+          current === null ? [] : [{ id: query.id, url: 'https://x.test/a.exe', filename: '/d/a.exe', mime: 'application/x-msdownload', state: current, exists: true }],
+        cancel: async (id: number) => {
+          calls.push(`cancel ${id}`)
+          if (!cancelIgnored && current === 'in_progress') current = 'interrupted'
+        },
+        removeFile: async (id: number) => {
+          if (removeFails) throw new Error('file not found')
+          calls.push(`remove ${id}`)
+        },
+        erase: async (query: { id: number }) => { calls.push(`erase ${query.id}`); return [query.id] },
+      },
+    })
+  }
+
+  it('cancels one still running: the browser drops the partial file', async () => {
+    const calls: string[] = []
+    expect(await createPlatform('chrome', api('in_progress', calls)).downloads.discard(7)).toBe(true)
+    expect(calls).toEqual(['cancel 7', 'erase 7'])
+  })
+
+  it('does not call a download stopped while the browser still reports it running after the cancel (round 10 seam)', async () => {
+    // A download already finishing may ignore the cancel and complete. Counting that as
+    // stopped put "nothing is left on your disk" over a file that was.
+    const calls: string[] = []
+    expect(await createPlatform('chrome', api('in_progress', calls, false, true)).downloads.discard(7)).toBe(false)
+    expect(calls).toEqual(['cancel 7'])
+  })
+
+  it('deletes the file of a finished one, which cancel would leave on disk in Chrome', async () => {
+    const calls: string[] = []
+    expect(await createPlatform('chrome', api('complete', calls)).downloads.discard(7)).toBe(true)
+    expect(calls).toEqual(['remove 7', 'erase 7'])
+  })
+
+  it('only drops an interrupted one from the list: nothing of it is on disk', async () => {
+    const calls: string[] = []
+    expect(await createPlatform('chrome', api('interrupted', calls)).downloads.discard(7)).toBe(true)
+    expect(calls).toEqual(['erase 7'])
+  })
+
+  it('says it did not when the file could not be deleted, or the download is unknown', async () => {
+    expect(await createPlatform('chrome', api('complete', [], true)).downloads.discard(7)).toBe(false)
+    expect(await createPlatform('chrome', api(null, [])).downloads.discard(7)).toBe(false)
+  })
+
+  it('finds a download by id with its addresses, bare name, type and state', async () => {
+    const found = await createPlatform('chrome', api('complete', [])).downloads.find(7)
+    expect(found).toMatchObject({ id: 7, url: 'https://x.test/a.exe', filename: 'a.exe', mime: 'application/x-msdownload', state: 'complete' })
+  })
+})
+
+describe('a download whose name Chrome reports later (B-165, rounds 7 and 8)', () => {
+  it('hands the download over at once, and the name onChanged brings through `named`', async () => {
+    vi.useFakeTimers()
+    const held: {
+      created?: (item: { id: number; url: string; filename?: string }) => void
+      changed?: (delta: { id: number; filename?: { current?: string } }) => void
+    } = {}
+    const platform = createPlatform('chrome', fakeApi({
+      downloads: {
+        onCreated: { addListener: (cb) => { held.created = cb } },
+        onChanged: { addListener: (cb) => { held.changed = cb } },
+        cancel: async () => undefined,
+      },
+    }))
+    const seen: string[] = []
+    const later: Array<Promise<{ filename: string }>> = []
+    platform.downloads.onCreated((item, named) => {
+      seen.push(item.filename)
+      later.push(named)
+    })
+    held.created?.({ id: 4, url: 'https://x.test/a', filename: '' })
+    // At once, nameless: a check by address can still stop it (round 8).
+    expect(seen).toEqual([''])
+    held.changed?.({ id: 4, filename: { current: 'C:\\Users\\a\\Downloads\\setup.exe' } })
+    expect((await later[0])?.filename).toBe('setup.exe')
+    held.changed?.({ id: 4, filename: { current: 'C:\\Users\\a\\Downloads\\other.exe' } })
+    vi.advanceTimersByTime(10_000)
+    expect(seen).toEqual([''])
+    expect((await later[0])?.filename).toBe('setup.exe')
+    vi.useRealTimers()
+  })
+
+  it('resolves `named` with no name when none comes within five seconds', async () => {
+    vi.useFakeTimers()
+    const held: { created?: (item: { id: number; url: string; filename?: string }) => void } = {}
+    const platform = createPlatform('chrome', fakeApi({
+      downloads: {
+        onCreated: { addListener: (cb) => { held.created = cb } },
+        onChanged: { addListener: () => undefined },
+        cancel: async () => undefined,
+      },
+    }))
+    const later: Array<Promise<{ filename: string }>> = []
+    platform.downloads.onCreated((_item, named) => later.push(named))
+    held.created?.({ id: 5, url: 'https://x.test/b', filename: '' })
+    let settled = false
+    void later[0]?.then(() => { settled = true })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+    vi.advanceTimersByTime(5_000)
+    expect((await later[0])?.filename).toBe('')
+    vi.useRealTimers()
+  })
+
+  it('resolves `named` at once for a download that already has its name (Firefox)', async () => {
+    // With onChanged present, as in real Firefox: without it the adapter takes the other exit
+    // and this test would pass even if the `item.filename` branch were gone (round 9 seam).
+    vi.useFakeTimers()
+    const held: { created?: (item: { id: number; url: string; filename?: string }) => void } = {}
+    const platform = createPlatform('firefox', fakeApi({
+      downloads: {
+        onCreated: { addListener: (cb) => { held.created = cb } },
+        onChanged: { addListener: () => undefined },
+        cancel: async () => undefined,
+      },
+    }))
+    const later: Array<Promise<{ filename: string }>> = []
+    platform.downloads.onCreated((_item, named) => later.push(named))
+    held.created?.({ id: 6, url: 'https://x.test/c', filename: '/home/a/c.msi' })
+    let settled = false
+    void later[0]?.then(() => { settled = true })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(settled).toBe(true)
+    expect((await later[0])?.filename).toBe('c.msi')
+    vi.useRealTimers()
+  })
+})
+
+describe('discard edge cases (B-165, round 7)', () => {
+  it('deletes the file when the download finished between the state check and the cancel', async () => {
+    const calls: string[] = []
+    let state = 'in_progress'
+    const platform = createPlatform('chrome', fakeApi({
+      downloads: {
+        onCreated: { addListener: () => undefined },
+        search: async (query: { id: number }) => [{ id: query.id, url: 'https://x.test/a', filename: '/d/a.exe', state, exists: true }],
+        cancel: async (id: number) => { calls.push(`cancel ${id}`); state = 'complete' },
+        removeFile: async (id: number) => { calls.push(`remove ${id}`) },
+        erase: async (query: { id: number }) => { calls.push(`erase ${query.id}`); return [query.id] },
+      },
+    }))
+    expect(await platform.downloads.discard(3)).toBe(true)
+    expect(calls).toEqual(['cancel 3', 'remove 3', 'erase 3'])
+  })
+
+  it('counts a finished download whose file is already gone as discarded', async () => {
+    const calls: string[] = []
+    const platform = createPlatform('chrome', fakeApi({
+      downloads: {
+        onCreated: { addListener: () => undefined },
+        search: async (query: { id: number }) => [{ id: query.id, url: 'https://x.test/a', filename: '/d/a.exe', state: 'complete', exists: false }],
+        cancel: async () => undefined,
+        removeFile: async () => { throw new Error('file not found') },
+        erase: async (query: { id: number }) => { calls.push(`erase ${query.id}`); return [query.id] },
+      },
+    }))
+    expect(await platform.downloads.discard(3)).toBe(true)
+    expect(calls).toEqual(['erase 3'])
   })
 })
