@@ -172,3 +172,9 @@ Next: A1, test first.
   Firefox `permissions.request` works only inside a user gesture, so the settings page asks Firefox itself and
   then tells the worker. Remaining red on `pnpm gates`: four `tools/docs.test.ts` rows (facts.md and privacy.md
   must name `usage-data` and its host: A7) and `tools/listing.test.ts` (store screenshots: retake).
+- 2026-11-05: node A4 done (`570ab74`): first-run notice (SCR-01), settings block (SCR-12), RPC `usage/state` and
+  `usage/set`, e2e `e2e/scn-050.spec.ts` green in Chromium. Found on the way: `detectPlatform` told Firefox by
+  the presence of `browser`, which recent Chromium offers too, so Chrome read as Firefox; fixed by
+  `runtime.getBrowserInfo` with tests seen red first. Nothing in the product depended on the kind before this run,
+  which is why it never showed. Next: A5 (events wired at their sites and `docs/analytics.md`), A6 (the store build
+  injects the App-Key), A7 (privacy text, store card, facts, ADR, scenario statuses), the store screenshot retake.
