@@ -1,0 +1,138 @@
+{
+ "capabilities": [
+  "cargo",
+  "docker",
+  "gh",
+  "git",
+  "network",
+  "node",
+  "npm",
+  "python3"
+ ],
+ "counts": {
+  "findings": 0,
+  "probes_blind": 2,
+  "probes_run": 7
+ },
+ "findings": [],
+ "generated_at": "2026-10-27T12:44:55Z",
+ "probes": [
+  {
+   "id": "secrets-tree",
+   "needs": [
+    "git"
+   ],
+   "phase": "probe",
+   "reason": "no credential pattern in the tracked tree",
+   "verdict": "clean"
+  },
+  {
+   "id": "secrets-history",
+   "needs": [
+    "git"
+   ],
+   "phase": "probe",
+   "reason": "no credential pattern in the last 400 commits",
+   "verdict": "clean"
+  },
+  {
+   "id": "worktree",
+   "needs": [
+    "git"
+   ],
+   "phase": "probe",
+   "reason": "working tree clean",
+   "verdict": "clean"
+  },
+  {
+   "id": "telemetry",
+   "needs": [],
+   "phase": "prod",
+   "reason": "no deploy target declared — a library or tool, for which absent telemetry is a design, not a gap",
+   "verdict": "clean"
+  },
+  {
+   "id": "ci-present",
+   "needs": [],
+   "phase": "prod",
+   "reason": "CI configured: github-actions",
+   "verdict": "clean"
+  },
+  {
+   "id": "docs-present",
+   "needs": [],
+   "phase": "seams",
+   "reason": "7 documentation marker(s): README.md, docs, CLAUDE.md, AGENTS.md, CHANGELOG.md, docs/adr, docs/evidence",
+   "verdict": "clean"
+  },
+  {
+   "id": "gitignore-secrets",
+   "needs": [
+    "git"
+   ],
+   "phase": "probe",
+   "reason": "no credential-shaped file is tracked",
+   "verdict": "clean"
+  },
+  {
+   "id": "channel-divergence",
+   "needs": [
+    "git"
+   ],
+   "phase": "prod",
+   "reason": "HEAD says 0.0.0 and no tag v0.0.0 exists — the channels make no common claim yet",
+   "verdict": "blind"
+  },
+  {
+   "id": "published-version",
+   "needs": [
+    "npm",
+    "network"
+   ],
+   "phase": "prod",
+   "reason": "npm view said nothing about okolos — unpublished, private, or the registry is unreachable",
+   "verdict": "blind"
+  }
+ ],
+ "profile": {
+  "ci": [
+   "github-actions"
+  ],
+  "deploy": [],
+  "docs": [
+   "README.md",
+   "docs",
+   "CLAUDE.md",
+   "AGENTS.md",
+   "CHANGELOG.md",
+   "docs/adr",
+   "docs/evidence"
+  ],
+  "languages": [
+   "javascript"
+  ],
+  "managers": [
+   "npm",
+   "pnpm"
+  ],
+  "monorepo": true,
+  "name": "okolos",
+  "root": "/Users/sshlg/DATA/_worktrees/okolos-stability",
+  "submodules": [],
+  "telemetry": [],
+  "tracked_files": 668,
+  "vcs": "git",
+  "version": "0.0.0",
+  "workspaces": false
+ },
+ "ratchet": {
+  "carried": [],
+  "closed": [],
+  "first_run": true,
+  "new": [],
+  "unranked": []
+ },
+ "root": "/Users/sshlg/DATA/_worktrees/okolos-stability",
+ "schema": "project-audit/1",
+ "sidecar": "/Users/sshlg/DATA/_worktrees/okolos-stability/docs/audit/2026-10-27-audit.json"
+}
