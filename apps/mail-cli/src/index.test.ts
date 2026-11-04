@@ -1,66 +1,122 @@
-import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 
-import { describe, expect, it } from 'vitest'
+import ts from 'typescript'
+import { afterAll, describe, expect, it } from 'vitest'
 
-import { DEFAULT_LOCALE, localeFromEnv, run, type RunIo } from './index.js'
 import { EXIT } from './scan.js'
+import { filesUnder } from '../../../tools/tree.mjs'
 
-describe('the language the command speaks', () => {
-  /**
-   * Two surfaces of one product must not disagree about its language. The
-   * manifest is the one that ships; this holds the command to it.
-   */
-  it('defaults to the same locale the extension manifest declares', () => {
-    const manifest = JSON.parse(
-      readFileSync(path.join(process.cwd(), 'apps/extension/manifest.chrome.json'), 'utf8'),
-    ) as { default_locale: string }
-    expect(DEFAULT_LOCALE).toBe(manifest.default_locale)
-  })
+/**
+ * `index.ts` started directly, the way a person tries a package before reading
+ * its `bin`: `node src/index.ts`, or `node dist/index.js` after `tsc -b`.
+ *
+ * Spawned, never imported: importing this module from a test would start the
+ * command inside the test runner, which is the point of the module.
+ *
+ * B-161 round 2: the built `index.js` exited 1 without scanning, because its
+ * static imports reach the TypeScript sources of the workspace packages and
+ * plain node cannot link them. A direct start now goes through the same
+ * launcher as `okolos-mail`: the node check, the resolve hook, exit 2 with an
+ * `okolos-mail:` line on any failure.
+ */
+const root = process.cwd()
+const app = path.join(root, 'apps/mail-cli')
+const src = path.join(app, 'src')
 
-  it('ignores the shell, because the shell says what the terminal is, not what this speaks', () => {
-    expect(localeFromEnv({ LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' })).toBe('ru')
-  })
+const messages = JSON.parse(
+  readFileSync(path.join(root, 'apps/extension/_locales/ru/messages.json'), 'utf8'),
+) as Record<string, { message: string }>
+const word = (key: string): string => messages[key]?.message ?? `[${key}]`
 
-  it('honours a deliberate override', () => {
-    expect(localeFromEnv({ OKOLOS_LOCALE: 'en' })).toBe('en')
-    expect(localeFromEnv({ OKOLOS_LOCALE: 'ru' })).toBe('ru')
-  })
-})
+const scratch = mkdtempSync(path.join(os.tmpdir(), 'okolos-mail-index-'))
+const clean = path.join(scratch, 'clean.eml')
+writeFileSync(clean, ['From: a@b.test', 'Subject: s', '', 'body', ''].join('\r\n'))
+const empty = path.join(scratch, 'empty.eml')
+writeFileSync(empty, '')
 
-/** A `RunIo` that records instead of touching the process. */
-function recorder() {
-  const seen = { written: [] as string[], failed: [] as unknown[], codes: [] as number[] }
-  const io: RunIo = {
-    write: (text) => seen.written.push(text),
-    fail: (error) => seen.failed.push(error),
-    exit: (code) => seen.codes.push(code),
-  }
-  return { io, seen }
+/**
+ * What `tsc -b` puts in `dist/`, made here without touching the tree: every
+ * source module transpiled into `<tmp>/apps/mail-cli/dist`, beside links to
+ * the real `src/`, `node_modules/` and `apps/extension/`, so relative imports,
+ * package resolution and the catalogue URL resolve exactly as they do from the
+ * real `dist/`. Outside the tree because other gates walk it while this runs
+ * (`tools/graph-check.test.ts` counted a temporary directory here as a source).
+ * Directory links are junctions on Windows, which need no privilege.
+ */
+const mirror = mkdtempSync(path.join(os.tmpdir(), 'okolos-mail-built-'))
+const link = (target: string, at: string): void => {
+  mkdirSync(path.dirname(at), { recursive: true })
+  symlinkSync(target, at, process.platform === 'win32' ? 'junction' : 'dir')
+}
+link(src, path.join(mirror, 'apps/mail-cli/src'))
+link(path.join(app, 'node_modules'), path.join(mirror, 'apps/mail-cli/node_modules'))
+link(path.join(root, 'apps/extension'), path.join(mirror, 'apps/extension'))
+const built = path.join(mirror, 'apps/mail-cli/dist')
+mkdirSync(built)
+for (const file of filesUnder(src, '.ts')) {
+  if (file.endsWith('.test.ts')) continue
+  const output = ts.transpileModule(readFileSync(file, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, verbatimModuleSyntax: true },
+  }).outputText
+  writeFileSync(path.join(built, path.basename(file).replace(/\.ts$/, '.js')), output)
 }
 
-describe('how the command ends', () => {
-  it('writes the verdict and ends with its code', () => {
-    const { io, seen } = recorder()
-    run(['scan', 'x'], {}, io, () => ({ text: 'verdict', code: EXIT.signalsFound }))
-    expect(seen.written).toEqual(['verdict\n'])
-    expect(seen.failed).toEqual([])
-    expect(seen.codes).toEqual([EXIT.signalsFound])
+afterAll(() => {
+  rmSync(scratch, { recursive: true, force: true })
+  // Removes the links, never what they point at.
+  rmSync(mirror, { recursive: true, force: true })
+})
+
+function start(entry: string, args: readonly string[]) {
+  const out = spawnSync(process.execPath, [entry, ...args], {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...process.env, OKOLOS_LOCALE: 'ru' },
+  })
+  return { code: out.status, stdout: out.stdout, stderr: out.stderr }
+}
+
+const count = (text: string, needle: string): number => text.split(needle).length - 1
+
+describe('index started directly', () => {
+  it('from the sources, scans once and exits with the verdict', () => {
+    const out = start(path.join(src, 'index.ts'), ['scan', clean])
+    expect(out.stderr).toBe('')
+    expect(count(out.stdout, word('mailVerdictNone'))).toBe(1)
+    expect(out.code).toBe(EXIT.nothingFound)
+  })
+
+  it('from a build, scans once and exits with the verdict', () => {
+    const out = start(path.join(built, 'index.js'), ['scan', clean])
+    expect(out.stderr).toBe('')
+    expect(count(out.stdout, word('mailVerdictNone'))).toBe(1)
+    expect(out.code).toBe(EXIT.nothingFound)
+  })
+
+  it('from a build, refuses an empty message with 2', () => {
+    const out = start(path.join(built, 'index.js'), ['scan', empty])
+    expect(out.stdout).toContain(word('mailParseEmpty'))
+    expect(out.code).toBe(EXIT.unreadable)
   })
 
   /**
-   * Left to node, a throw exits 1, and 1 is `EXIT.signalsFound`: a crash would
-   * read as a finding. It is neither a finding nor a clean message, so it ends
-   * the way an unread message does.
+   * The old failure, held shut by construction: B-161 compared `argv[1]` with
+   * the module's own path, and every spelling that comparison missed (Windows
+   * separators, `\\?\` long paths, 8.3 short names, a link) ran nothing and
+   * exited 0. Nothing in the command decides by `argv[1]` any more; the
+   * launcher always runs it, and a direct start always does too.
    */
-  it('ends a crash with the unread code, never 0 and never 1', () => {
-    const { io, seen } = recorder()
-    const planted = new Error('planted')
-    run(['scan', 'x'], {}, io, () => {
-      throw planted
-    })
-    expect(seen.written).toEqual([])
-    expect(seen.failed).toEqual([planted])
-    expect(seen.codes).toEqual([EXIT.unreadable])
+  it('decides nothing by argv[1]', () => {
+    const files = [...filesUnder(src, '.ts'), ...filesUnder(src, '.mjs'), ...filesUnder(path.join(app, 'bin'), '.mjs')]
+      .filter((file) => !file.endsWith('.test.ts'))
+    expect(files.length).toBeGreaterThanOrEqual(5)
+    // Code, not prose: the comments that tell this story name argv[1] too.
+    const code = (file: string): string =>
+      readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const readers = files.filter((file) => /argv\s*\[\s*1\s*\]/.test(code(file)))
+    expect(readers.map((file) => path.relative(root, file))).toEqual([])
   })
 })

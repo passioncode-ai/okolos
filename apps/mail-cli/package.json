@@ -9,7 +9,7 @@
     "okolos-mail": "./bin/okolos-mail.mjs"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/command.ts"
   },
   "scripts": {
     "build": "tsc -b"
