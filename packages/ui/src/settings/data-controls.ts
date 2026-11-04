@@ -53,6 +53,20 @@ export function leakKeyProblem(key: string): 'empty' | 'long' | 'shape' | 'latin
 /** The longest key the block accepts; `leakKeyLong` names the same number. */
 export const LEAK_KEY_MAX = 256
 
+/**
+ * The usage and error data switch (B-199). `state` is what is in force, by the browser's rules
+ * and the person's choice; `unsupported` is a Firefox with no built-in data consent, where
+ * nothing is sent and the switch cannot turn it on. In Firefox the browser keeps the choice and
+ * the page asks it from the click (`onSwitch` runs inside the change event).
+ */
+export interface UsagePanel {
+  readonly state: 'on' | 'off' | 'unsupported'
+  readonly firefox: boolean
+  /** The last change did not save; the switch shows what is stored. */
+  readonly failed?: boolean
+  readonly onSwitch: (on: boolean) => void
+}
+
 export interface DataControlsHandlers {
   readonly onExport: () => Promise<void>
   readonly onWipe: () => Promise<WipeOutcome>
@@ -78,6 +92,8 @@ export function renderDataControls(
   dataKinds: readonly string[],
   /** The key block, drawn under the data actions. Absent, the screen has no key block. */
   leakKey?: LeakKeyPanel,
+  /** The usage and error data block, last. Absent, the screen has none. */
+  usage?: UsagePanel,
 ): HTMLElement {
   // An empty list would render a confirmation that names nothing, which reads as
   // "nothing will be deleted" over a button that deletes everything. Refused
@@ -122,8 +138,11 @@ export function renderDataControls(
    */
   const keyBlock = leakKey === undefined ? null : renderLeakKey(doc, leakKey)
   if (keyBlock !== null) section.append(keyBlock)
+  const usageBlock = usage === undefined ? null : renderUsage(doc, usage)
+  if (usageBlock !== null) section.append(usageBlock)
+  const after = keyBlock ?? usageBlock
   const place = (el: HTMLElement): void => {
-    if (keyBlock !== null) section.insertBefore(el, keyBlock)
+    if (after !== null) section.insertBefore(el, after)
     else section.append(el)
   }
 
@@ -315,6 +334,37 @@ function renderLeakKey(doc: Document, panel: LeakKeyPanel): HTMLElement {
     field,
     actions,
   )
+  return block
+}
+
+/**
+ * The usage and error data block: what is sent and what is not, the switch, and what is in
+ * force. Says nothing is sent wherever nothing is, and why.
+ */
+function renderUsage(doc: Document, panel: UsagePanel): HTMLElement {
+  const block = doc.createElement('section')
+  block.setAttribute('data-role', 'usage')
+
+  const heading = doc.createElement('h2')
+  heading.setAttribute('data-role', 'usage-title')
+  heading.textContent = t('usageTitle')
+
+  const label = doc.createElement('label')
+  const box = doc.createElement('input')
+  box.type = 'checkbox'
+  box.setAttribute('data-role', 'usage-switch')
+  box.checked = panel.state === 'on'
+  box.disabled = panel.state === 'unsupported'
+  box.addEventListener('change', () => panel.onSwitch(box.checked))
+  const caption = doc.createElement('span')
+  caption.textContent = t('usageSwitch')
+  label.append(box, caption)
+
+  block.append(heading, text(doc, 'usage-what', t('usageWhat')), label)
+  if (panel.state === 'off') block.append(text(doc, 'usage-state', t('usageOff')))
+  if (panel.state === 'unsupported') block.append(text(doc, 'usage-state', t('usageFirefoxOld')))
+  else if (panel.firefox) block.append(text(doc, 'usage-firefox', t('usageFirefox')))
+  if (panel.failed) block.append(text(doc, 'usage-failed', t('usageSaveFailed')))
   return block
 }
 

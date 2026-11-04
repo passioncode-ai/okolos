@@ -991,6 +991,12 @@
   "firstRunStateUnavailable": {
     "message": "not available yet"
   },
+  "firstRunUsageNotice": {
+    "message": "Okolos sends us data on how the product runs and where it breaks, so we can fix it. It contains no page addresses, page text, file names, email or passwords."
+  },
+  "firstRunUsageOff": {
+    "message": "Turn off in settings"
+  },
   "firstRunWhatSends": {
     "message": "What this sends"
   },
@@ -2645,5 +2651,26 @@
   },
   "mailSkipNoSender": {
     "message": "the message carries no parsable sender address"
+  },
+  "usageTitle": {
+    "message": "Usage and error data"
+  },
+  "usageWhat": {
+    "message": "What is sent: names of actions and errors from a fixed list, the extension version, the browser and the system. Page addresses, page text, file names, email and passwords are not sent."
+  },
+  "usageSwitch": {
+    "message": "Send usage and error data"
+  },
+  "usageOff": {
+    "message": "Off: nothing is sent, and the install number is deleted."
+  },
+  "usageSaveFailed": {
+    "message": "The change was not saved."
+  },
+  "usageFirefoxOld": {
+    "message": "This version of Firefox has no built-in consent for data collection, so Okolos sends nothing. Update Firefox to version 140 to choose."
+  },
+  "usageFirefox": {
+    "message": "In Firefox the browser keeps the choice. The switch asks Firefox to allow or stop sending."
   }
 }

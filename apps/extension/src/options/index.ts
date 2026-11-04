@@ -32,6 +32,7 @@ import {
   type AttentionItem,
   type ExtensionsState,
   type LeakKeyPanel,
+  type UsagePanel,
   type LeaksState,
   type OverviewHandlers,
   type PanelState,
@@ -53,6 +54,7 @@ import { mapJournal } from '../popup/state.js'
 import { answered } from './answered.js'
 import { keepingFocus, markFocus } from './keep-focus.js'
 import { hasLeakKey, removeLeakKey, saveLeakKey } from './leak-key.js'
+import { switchConsent } from '../background/usage/consent.js'
 import { showFailure } from './failure.js'
 import { whilePending } from './pending.js'
 import {
@@ -1084,7 +1086,45 @@ async function dataSection(): Promise<HTMLElement> {
     // the build until the confirmation has words for it.
     Object.values(DATA_KIND_KEY),
     await leakKeyPanel(),
+    await usagePanel(),
   )
+}
+
+/** Whether the last switch did not save, shown once on the repaint that follows it. */
+let usageFailed = false
+
+/**
+ * The usage and error data switch (B-199). In Firefox the browser keeps the choice and
+ * `permissions.request` works only inside a user gesture, so this page asks Firefox from the
+ * change event and the worker then reads what Firefox granted.
+ */
+async function usagePanel(): Promise<UsagePanel | undefined> {
+  let state: UsagePanel['state']
+  try {
+    state = (await platform.runtime.send('usage/state', {})).state
+  } catch {
+    return undefined
+  }
+  const failed = usageFailed
+  usageFailed = false
+  return {
+    state,
+    firefox: platform.kind === 'firefox',
+    failed,
+    onSwitch: (on: boolean) => {
+      const asked = platform.kind === 'firefox' ? switchConsent('firefox', platform.dataConsent, on) : Promise.resolve(null)
+      void asked
+        .then(() => platform.runtime.send('usage/set', { on }))
+        // A Firefox that declined is an answer, not a failure: the repaint shows the switch off.
+        .then(() => {
+          usageFailed = false
+        })
+        .catch(() => {
+          usageFailed = true
+        })
+        .finally(() => void reload())
+    },
+  }
 }
 
 /**

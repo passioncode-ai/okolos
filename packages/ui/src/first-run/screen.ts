@@ -24,12 +24,20 @@ export interface CheckRow {
 export interface FirstRunProps {
   readonly checks: readonly CheckRow[]
   readonly findings: number
+  /**
+   * Whether usage and error data is being sent (B-199, SCN-050). The notice is shown only for
+   * `on`: off, a Firefox that did not grant it and a Firefox with no built-in consent send
+   * nothing, and a sentence saying something is sent would be untrue there.
+   */
+  readonly usage?: 'on' | 'off' | 'unsupported'
 }
 
 export interface FirstRunHandlers {
   readonly onContinue: () => void
   readonly onSkip: () => void
   readonly onOpenAudit: () => void
+  /** Opens settings at the usage and error data switch. */
+  readonly onUsageSettings?: () => void
 }
 
 /**
@@ -75,8 +83,19 @@ export function renderFirstRun(
     actions.append(button(doc, 'retry', t('firstRunRetry'), handlers.onContinue))
   }
   section.append(actions)
+  if (props.usage === 'on') section.append(usageNotice(doc, handlers.onUsageSettings))
 
   return section
+}
+
+function usageNotice(doc: Document, onSettings: (() => void) | undefined): HTMLElement {
+  const block = doc.createElement('div')
+  block.setAttribute('data-role', 'usage')
+  const notice = doc.createElement('p')
+  notice.setAttribute('data-role', 'usage-notice')
+  notice.textContent = t('firstRunUsageNotice')
+  block.append(notice, button(doc, 'usage-off', t('firstRunUsageOff'), () => onSettings?.()))
+  return block
 }
 
 function intro(doc: Document): HTMLParagraphElement {

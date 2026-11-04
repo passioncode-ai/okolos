@@ -82,11 +82,21 @@ async function checks(): Promise<{ rows: CheckRow[]; findings: number }> {
   return { rows, findings }
 }
 
+/** What the worker says about usage and error data; anything else reads as off (no notice). */
+async function usageState(): Promise<'on' | 'off' | 'unsupported'> {
+  try {
+    return (await platform.runtime.send('usage/state', {})).state
+  } catch {
+    return 'off'
+  }
+}
+
 async function paint(): Promise<void> {
   if (!root) return
-  const { rows, findings } = await checks()
+  const [{ rows, findings }, usage] = await Promise.all([checks(), usageState()])
   root.replaceChildren(
-    renderFirstRun(document, { checks: rows, findings }, {
+    renderFirstRun(document, { checks: rows, findings, usage }, {
+      onUsageSettings: () => void platform.tabs.create(platform.runtime.getUrl(optionsPageFor('data'))),
       // Straight to the queue: the first interaction should end with something
       // to do, not a page to read.
       onContinue: () => void platform.tabs.create(platform.runtime.getUrl(optionsPageFor('queue'))),
