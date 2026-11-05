@@ -99,6 +99,28 @@ console.log('\n── the blocklist, which is the thing this product blocks with
   ok(`${shipped} is ${feedAgeDays(Date.now(), shipped).toFixed(1)} days old, within ${FEED_MAX_AGE_DAYS}`)
 }
 
+console.log('\n── usage and error data: the App-Key is the store archive\'s, and only its')
+/**
+ * B-198, B-199. The store archive sends usage and error events as `production`, with the App-Key
+ * the secret runner puts in the environment for this command only; nothing else ever carries the
+ * key, and a build without it sends nothing. `--check` (CI) builds no store archive, so it
+ * needs no key.
+ */
+const usageKey = process.env.APTABASE_APP_KEY_OKOLOS ?? ''
+if (!checkOnly) {
+  if (!/^A-SH-\d{10}$/i.test(usageKey)) {
+    die(
+      'the store archive needs its App-Key, from the vault and for this command only:\n' +
+        '     python3 "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod ' +
+        'passioncode-platform APTABASE_APP_KEY_OKOLOS -- pnpm package',
+    )
+  }
+  process.env.OKOLOS_USAGE_ENV = 'production'
+  ok('the App-Key is in the environment of this command, and the build will be production')
+} else {
+  ok('--check builds no store archive, so it carries no App-Key')
+}
+
 console.log('\n── build, so the archive is of something this command made')
 // Per target, not per `dist`. `dist` also holds `release/` and the two e2e
 // builds, so it exists long after a target directory has been deleted — and then
@@ -130,6 +152,11 @@ for (const target of TARGETS) {
     )
   }
   ok('shadow roots are closed — no test hooks in this build')
+
+  if (usageKey !== '' && content.includes(usageKey)) die(`${target}'s content script carries the App-Key`)
+  if (!checkOnly && !readFileSync(path.join(dir, 'background.js'), 'utf8').includes(usageKey)) {
+    die(`${target}'s background was built without the App-Key, so it would send nothing`)
+  }
 
   const contents = filesIn(dir)
   const present = new Set(contents)

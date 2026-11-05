@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -44,5 +45,39 @@ describe('the event catalogue, for people and for the code', () => {
         expect(around, `${file}:${line} does not send ${name}`).toMatch(new RegExp(`'${name}'|check: '`))
       }
     }
+  })
+})
+
+/**
+ * The App-Key lives in the vault (`passioncode-platform/prod/APTABASE_APP_KEY_OKOLOS`) and in the
+ * store archive `pnpm package` makes with it, nowhere else. A key of the Aptabase shape is
+ * `A-SH-` and ten digits; the tests' all-zero one is the only kind allowed in the tree.
+ */
+describe('the App-Key', () => {
+  const real = /A-SH-(?!0{10})\d{10}/i
+
+  it('is in no tracked file', () => {
+    const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean)
+    const hits = tracked.filter((file) => {
+      try {
+        return real.test(readFileSync(path.join(root, file), 'utf8'))
+      } catch {
+        return false
+      }
+    })
+    expect(hits).toEqual([])
+  })
+
+  it('is in no build but the store archive: dist/<target> and the e2e builds carry none', () => {
+    const dist = path.join(root, 'apps/extension/dist')
+    const builds = existsSync(dist) ? readdirSync(dist).filter((name) => name !== 'release') : []
+    const hits: string[] = []
+    for (const build of builds) {
+      const dir = path.join(dist, build)
+      for (const file of readdirSync(dir).filter((name) => name.endsWith('.js'))) {
+        if (/A-SH-\d{10}/i.test(readFileSync(path.join(dir, file), 'utf8'))) hits.push(`${build}/${file}`)
+      }
+    }
+    expect(hits).toEqual([])
   })
 })

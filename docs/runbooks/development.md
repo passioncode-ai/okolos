@@ -346,9 +346,22 @@ node tools/i18n-sweep.mjs --list   # каждая, с файлом и строк
 ## Выпуск
 
 ```bash
-pnpm package         # собирает, проверяет, кладёт zip и печатает размер и sha256
-pnpm package:check   # те же проверки, без записи архива
+pnpm package         # собирает, проверяет, кладёт zip и печатает размер и sha256 (нужен ключ, ниже)
+pnpm package:check   # те же проверки, без записи архива; ключ не нужен, так идёт CI
 ```
+
+Архив для магазина собирается с ключом приложения Aptabase из хранилища, только для этой
+команды (B-198, B-199). Без ключа `pnpm package` останавливается и печатает эту же команду:
+
+```bash
+python3 "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod \
+  passioncode-platform APTABASE_APP_KEY_OKOLOS -- pnpm package
+```
+
+Ключ попадает только в `background.js` архива; сборка с `production` отправляет события об
+использовании и ошибках на `analytics.passioncode.ai`. Любая другая сборка (`pnpm build`, e2e, CI)
+идёт без ключа и ничего не отправляет, а `tools/analytics.test.ts` («the App-Key») не пускает
+ключ ни в отслеживаемые файлы, ни в `dist/` вне архива.
 
 Архивы уходят в `apps/extension/dist/release/okolos-<target>-<version>.zip`.
 Упаковка отказывается от сборки с тестовыми хуками, от манифеста, называющего

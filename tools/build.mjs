@@ -44,7 +44,9 @@ const shared = {
      * a build with no key sends nothing. A test-hook build never carries a key.
      */
     __OKOLOS_USAGE__: JSON.stringify({
-      appKey: withTestHooks ? null : (process.env.OKOLOS_USAGE_APP_KEY || null),
+      // The vault slot passioncode-platform/prod/APTABASE_APP_KEY_OKOLOS, set only by the secret
+      // runner around `pnpm package` (docs/runbooks/development.md, «Сборка для магазина»).
+      appKey: withTestHooks ? null : (process.env.APTABASE_APP_KEY_OKOLOS || null),
       environment: !withTestHooks && process.env.OKOLOS_USAGE_ENV === 'production' ? 'production' : 'sandbox',
     }),
   },
