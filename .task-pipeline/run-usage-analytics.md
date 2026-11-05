@@ -502,3 +502,17 @@ Seam tier, round 16: **fail** on one `breaks`: B-207 pinned its policy pointer a
 the squash decision keeps off main (now anchored by section and quote, not by commit). Risk taken in: the commits this
 ledger cites as evidence live, after the squash, only in `refs/pull/29/head` on GitHub (also in B-213); pins in tracked
 files go only to commits already on origin/main.
+
+## Stage 6: certification, round 17 (2026-11-05, on 2d073ff)
+
+CI on 2d073ff green on all four jobs. Unit tier: **pass** (tenth clean unit round; two risks into B-215: the policy
+gate ignores the HTTP status; the release key scan covers two files of the archive). Product tier: **fail** on one
+`breaks`: the «Удалить все данные» confirmation and the storage-reset note named the install number but not the unsent
+events the click deletes (both notes, ru and en, now name them, Copylot ru `b86e6890`, en `a259c8a3`; SCN-023 step 1
+says so). Risks taken in: README's list of what leaves names the person's Have I Been Pwned key; ADR-0003's «а их
+шесть» dated as past. Into the backlog: Firefox's `Origin` header as a possible per-install identifier (B-203, not
+measured); the partial wipe with a failed renewal (B-215). Seam tier: **fail** on one `breaks`: the first-run note
+«частые пароли проверяются без запроса» kept ST-011's old promise on the shipped screen (now «без запроса о пароле» /
+«with no request about the password», Copylot ru `c0cc32b7`, en `ccc6d5b6`; the store screenshots retaken, since
+`02-first-run.png` shows the note and the surface digest does not cover `_locales`). Slip: ADR-0003 was edited before
+its lease was taken (third time in this run); the lease was taken at once and released after the edit.

@@ -16,7 +16,7 @@ Every consumer security extension that protects your browsing also *watches*
 your browsing — the incumbents render a server-side history of the pages you
 visited into a web dashboard. Okolos is built the other way round: verdicts
 are computed locally; what leaves the device is hash prefixes, the address you
-ask it to check, and, while it is on, usage and error data from a closed list
+ask it to check (with your Have I Been Pwned key, if you saved one), and, while it is on, usage and error data from a closed list
 ([docs/privacy.md](docs/privacy.md)); and the extension keeps a log of every
 outbound request it made, which you can read and export.
 

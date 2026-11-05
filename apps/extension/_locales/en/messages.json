@@ -436,7 +436,7 @@
     "message": "Keep my data"
   },
   "dataConfirmNote": {
-    "message": "It cannot be undone. If usage and error data is on, the install number is replaced with a new one too. Export first if you want a copy."
+    "message": "It cannot be undone. If usage and error data is on, the install number is replaced with a new one too, and unsent events are deleted. Export first if you want a copy."
   },
   "dataConfirmTitle": {
     "message": "This deletes, from this device:"
@@ -937,7 +937,7 @@
     "message": "Leaked-password check"
   },
   "firstRunCheckPasswordNote": {
-    "message": "runs on submit; the most common ones are answered without any request"
+    "message": "runs on submit; the most common ones are answered with no request about the password"
   },
   "firstRunCheckStorage": {
     "message": "Local storage"
@@ -1980,7 +1980,7 @@
     "message": "Clear the local data"
   },
   "storageResetNote": {
-    "message": "Clearing removes everything Okolos kept on this device: findings, the journal, the network audit, exceptions, settings with a saved Have I Been Pwned key, extension snapshots, the model, the feeds and the password-reuse index. If usage and error data is on, the install number is replaced with a new one. It cannot be undone."
+    "message": "Clearing removes everything Okolos kept on this device: findings, the journal, the network audit, exceptions, settings with a saved Have I Been Pwned key, extension snapshots, the model, the feeds and the password-reuse index. If usage and error data is on, the install number is replaced with a new one and unsent events are deleted. It cannot be undone."
   },
   "storageRetry": {
     "message": "Try again"
