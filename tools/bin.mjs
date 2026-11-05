@@ -59,6 +59,9 @@ export function shCandidates(platform = process.platform, gitExecPath = '') {
   return candidates
 }
 
+/** Children runToCompletion started as process-group leaders (POSIX). */
+const GROUP_LEADERS = new WeakSet()
+
 /**
  * Ends `child` and everything it started.
  *
@@ -75,6 +78,16 @@ export function shCandidates(platform = process.platform, gitExecPath = '') {
  */
 export function endTree(child, { platform = process.platform, signal = 'SIGTERM', run = runTaskkill } = {}) {
   if (platform !== 'win32' || child.pid === undefined) {
+    // A child runToCompletion started leads its own process group: the whole group is ended, so
+    // the build under pnpm goes with it (B-215). Anything else is ended alone, as before.
+    if (GROUP_LEADERS.has(child) && child.pid !== undefined) {
+      try {
+        process.kill(-child.pid, signal)
+        return
+      } catch {
+        // The group is already gone; the child itself may still be there.
+      }
+    }
     child.kill(signal)
     return
   }
@@ -103,7 +116,10 @@ function runTaskkill(command, args) {
 export function runToCompletion(name, args, { cwd, timeoutMs, platform = process.platform, onSpawn }) {
   const invocation = binInvocation(name, args, platform)
   return new Promise((resolve, reject) => {
-    const child = spawn(invocation.command, invocation.args, { cwd, stdio: 'inherit', shell: invocation.shell })
+    // Its own process group on macOS and Linux, so endTree can end what it started too (B-215).
+    const group = platform !== 'win32'
+    const child = spawn(invocation.command, invocation.args, { cwd, stdio: 'inherit', shell: invocation.shell, detached: group })
+    if (group) GROUP_LEADERS.add(child)
     onSpawn?.(child)
     let timedOut = false
     const timer = setTimeout(() => {
