@@ -1,5 +1,5 @@
 import { AuditWriteError, type RequestDeps } from '@okolos/net'
-import type { Platform } from '@okolos/platform'
+import { withDeadline, type Platform } from '@okolos/platform'
 
 import type { EventName, EventProps } from './catalogue.js'
 import { browserConsent, ConsentUnreadable, type ConsentApi, type ConsentState } from './consent.js'
@@ -40,6 +40,9 @@ export interface Usage {
  * audited network path. A Firefox that took the grant back makes the stored switch off at once,
  * so its install id and queue go with it.
  */
+
+/** The outbound log is opened per send within this, or the send counts as a failed audit write. */
+const AUDIT_OPEN_MS = 5_000
 export function startUsage(
   platform: Platform,
   audit: () => Promise<RequestDeps>,
@@ -55,9 +58,12 @@ export function startUsage(
         // The audit is opened per send, as every other caller does: a handle kept for the
         // worker's life would write to a connection a reset or the browser closed. One that
         // cannot be opened is an audit write that failed: nothing left, so the event is kept.
+        // Opened within 5 s too: an open with no deadline of its own would hold the flush, and the
+        // switch behind it, past the page's RPC deadline (B-214).
         let deps: RequestDeps
         try {
-          deps = await audit()
+          // i18n-exempt: a failure the sink reads to keep the event; never shown to anyone
+          deps = await withDeadline(audit(), AUDIT_OPEN_MS, 'the outbound log did not open in time')
         } catch (cause) {
           throw new AuditWriteError(cause)
         }

@@ -203,7 +203,8 @@ describe('the queue', () => {
     })
     for (let i = 0; i < 25; i += 1) await h.sink.track('warning_shown', { kind: 'lookalike' })
     clock += 24 * 60 * 60 * 1000 - 60_000
-    await h.sink.flush()
+    // A flush stops starting requests after 8 s (B-214), so the queue drains over several.
+    for (let i = 0; i < 30 && (h.state()?.queue.length ?? 0) > 0; i += 1) await h.sink.flush()
     expect(sentAt.length).toBeGreaterThan(0)
     expect(Math.max(...sentAt)).toBeLessThanOrEqual(24 * 60 * 60 * 1000)
     expect(h.state()?.queue).toHaveLength(0)
@@ -343,5 +344,23 @@ describe('a flush whose queue head moved during the send (B-215, round 13)', () 
 
     // The second event was never accepted and is still queued, ahead of the one appended later.
     expect(h.state()?.queue.map((event) => event.eventName)).toEqual(['first_run_completed', 'extension_installed'])
+  })
+})
+
+describe('one flush stays inside the RPC deadline (B-214)', () => {
+  it('starts no request after 8 seconds: the rest waits for the next flush, so a switch behind it is not held past 30 s', async () => {
+    const h = harness()
+    await h.sink.track('warning_shown', { kind: 'lookalike' })
+    await h.sink.track('warning_shown', { kind: 'download' })
+    await h.sink.track('warning_shown', { kind: 'clickfix' })
+    // Each send takes 5 s of the clock: after two, the third would start at 10 s.
+    h.deps.send = vi.fn(async (spec) => {
+      h.sent.push(spec)
+      h.advance(5_000)
+      return new Response('{}', { status: 200 })
+    })
+    await h.sink.flush()
+    expect(h.sent).toHaveLength(2)
+    expect(h.state()?.queue).toHaveLength(1)
   })
 })
