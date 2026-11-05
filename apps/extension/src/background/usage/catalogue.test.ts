@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { TrapKind } from '../../content/traps.js'
 
-import { admissible, CATALOGUE, downloadWarningShown, passwordCheckResult, trapWarning } from './catalogue.js'
+import { admissible, CATALOGUE, downloadWarningShown, leakCheckResult, passwordCheckResult, trapWarning } from './catalogue.js'
 
 describe('the catalogue', () => {
   it('admits an event with every declared prop at one of its values', () => {
@@ -68,5 +68,20 @@ describe('a download warning', () => {
     expect(downloadWarningShown('block', false)).toBe(false)
     expect(downloadWarningShown('warn', false)).toBe(false)
     expect(downloadWarningShown('inform', true)).toBe(false)
+  })
+})
+
+describe('the leak check, by what it found out (B-215)', () => {
+  it('is found when any source found a leak, even if another stayed silent', () => {
+    expect(leakCheckResult(2, false)).toBe('found')
+    expect(leakCheckResult(1, true)).toBe('found')
+  })
+
+  it('is ok only when every source answered and none found anything', () => {
+    expect(leakCheckResult(0, true)).toBe('ok')
+  })
+
+  it('is unavailable when a source stayed silent and nothing was found: a question not answered', () => {
+    expect(leakCheckResult(0, false)).toBe('unavailable')
   })
 })

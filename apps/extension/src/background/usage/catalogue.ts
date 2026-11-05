@@ -96,6 +96,17 @@ export function passwordCheckResult(code: PasswordVerdict['explain']['code']): E
 }
 
 /**
+ * A leak check, by what it found out, the same rule as the password check: a leak any source
+ * found is found, even when another source stayed silent; nothing found is ok only when every
+ * source answered, and a silent source with nothing found is a question not answered. Fixed
+ * before the first production send (the event-history rule; B-215, round 7).
+ */
+export function leakCheckResult(leaks: number, complete: boolean): EventProps<'check_done'>['result'] {
+  if (leaks > 0) return 'found'
+  return complete ? 'ok' : 'unavailable'
+}
+
+/**
  * A download verdict counts as `warning_shown{download}` only when it warned and a page took it:
  * from a bookmark or a background tab no content script answers (`tabs.sendToActive` is false),
  * the journal records it as unseen, and nobody was warned. The event's meaning is fixed at its
