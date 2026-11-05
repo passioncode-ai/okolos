@@ -580,4 +580,9 @@ a person and recorded in B-213.
 - **Human steps:** delete the remote branch `feat/usage-analytics`; the decisions in B-203, B-216, B-137 and B-186;
   whether to ask GitHub support to drop private names from `refs/pull/29/head` and B-198's older history.
 - **Checks run:** `pnpm gates` green on every pushed commit (last: 3530 passed on 62a3d48); CI green on 62a3d48.
-- **Exact next task:** B-213, starting with fabric-workspace `knowledge/products.md:49` and `plans.md:127`.
+- **B-213 done (2026-11-05):** fabric-workspace PR #663 (`3a17eaa`, `npm test` 172 passed) and org-index PR #89
+  (`78bce88`, unittest 302 OK, `check_index.py`'s one finding is the same on main); the wiki publishes at the scheduled
+  sync. The closeout of this run is okolos PR #30 (`7087e84`).
+- **Exact next task:** B-215's text items in one Copylot pass: `usageWhat`, `auditKeptUsageData` and CHANGELOG name the
+  build kind, the constant labels and the event values; «хэш» becomes «хеш» in privacy.md and facts.md; the day-old
+  event wording in analytics.md and `sink.ts:94`.
