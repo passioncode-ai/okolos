@@ -29,7 +29,7 @@ import path from 'node:path'
 
 import { archivePlan, compareEntries, zipEntries } from './archive.mjs'
 import { runToCompletion } from './bin.mjs'
-import { guardKeyedBuilds } from './keyed-builds.mjs'
+import { carriesKey, guardKeyedBuilds, keyedTargets } from './keyed-builds.mjs'
 import { toHtml } from './privacy-page.mjs'
 import { PRIVACY_URL, servedPolicyBehind } from './privacy-served.mjs'
 import { filesUnder } from './tree.mjs'
@@ -112,6 +112,12 @@ console.log('\n── the blocklist, which is the thing this product blocks with
 }
 
 console.log('\n── usage and error data: the App-Key is the store archive\'s, and only its')
+// Both modes, before anything is built: a run killed before its keyless rebuild leaves a keyed
+// dist/<target> behind, which an unpacked load would carry; it is removed, not trusted (B-215).
+for (const target of keyedTargets(dist, TARGETS)) {
+  rmSync(path.join(dist, target), { recursive: true, force: true })
+  console.log(`   removed dist/${target}: a run that was stopped left it carrying an App-Key`)
+}
 /**
  * B-198, B-199. The store archive sends usage and error events as `production`, with the App-Key
  * the secret runner puts in the environment for this command only; nothing else ever carries the
@@ -194,7 +200,8 @@ for (const target of TARGETS) {
   }
   ok('shadow roots are closed — no test hooks in this build')
 
-  if (usageKey !== '' && content.includes(usageKey)) die(`${target}'s content script carries the App-Key`)
+  const leaked = carriesKey(dir, usageKey)
+  if (leaked.length > 0) die(`${target} carries the App-Key outside its background: ${leaked.join(', ')}`)
   if (!checkOnly && !readFileSync(path.join(dir, 'background.js'), 'utf8').includes(usageKey)) {
     die(`${target}'s background was built without the App-Key, so it would send nothing`)
   }

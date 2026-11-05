@@ -7,3 +7,5 @@ export declare function guardKeyedBuilds(
   watch(child: import('node:child_process').ChildProcess): void
   drop(): void
 }
+export declare function carriesKey(dir: string, key: string): string[]
+export declare function keyedTargets(dist: string, targets: readonly string[]): string[]
