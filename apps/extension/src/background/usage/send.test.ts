@@ -43,12 +43,15 @@ describe('a batch through the network module', () => {
     expect(audit[0]).toMatchObject({
       purpose: 'usage-data',
       destination: 'analytics.passioncode.ai',
-      payloadShape: 'usage-event:extension_installed',
+      payloadShape: 'usage-event:extension_installed reason=install',
       // The alarm that really sends it, so the row can be lined up with the network panel.
       triggeredBy: 'alarm:feeds',
       outcome: 'sent',
     })
-    expect(audit[1]?.payloadShape).toBe('usage-event:error_occurred')
+    // The row names the event's values from the closed catalogue, so what left is checkable in
+    // the log; never the install number or the constant labels (B-215, round 21).
+    expect(audit[1]?.payloadShape).toBe('usage-event:error_occurred area=feed kind=network')
+    expect(audit.map((row) => row.payloadShape).join(' ')).not.toMatch(/iid|environment|platform|browser_extension/)
     expect(seen[0]?.url).toBe('https://analytics.passioncode.ai/api/v0/event')
     expect(state?.queue).toHaveLength(0)
   })
