@@ -69,7 +69,7 @@ import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 
 import { recordPageRequest } from './page-requests.js'
 import { recordTrap } from './trap-journal.js'
-import { downloadWarningShown, passwordCheckResult, trapWarning } from './usage/catalogue.js'
+import { downloadWarningShown, leakCheckResult, passwordCheckResult, trapWarning } from './usage/catalogue.js'
 import { startUsage } from './usage/start.js'
 import { optionsPageFor } from '../options/views.js'
 
@@ -772,7 +772,7 @@ async function handleLeakCheck(payload: { address: string }): Promise<RpcMap['le
   // Found or not, never what: no address, no breach name, no count.
   void usage.track('check_done', {
     check: 'leak-inventory',
-    result: !inventory.complete ? 'unavailable' : inventory.leaks.length > 0 ? 'found' : 'ok',
+    result: leakCheckResult(inventory.leaks.length, inventory.complete),
   })
   return {
     leaks: inventory.leaks.map((leak) => ({ ...leak, classes: [...leak.classes] })),
