@@ -2676,7 +2676,7 @@
     "message": "The change was not saved. Try again."
   },
   "usageRenewFailed": {
-    "message": "The install number was not replaced. Turn \"$SWITCH$\" off and on again to get a new one.",
+    "message": "The install number was not replaced, and the unsent events are still there. Turn \"$SWITCH$\" off and on again: that deletes them and gives a new number.",
     "placeholders": {
       "switch": {
         "content": "$1"

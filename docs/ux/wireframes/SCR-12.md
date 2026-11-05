@@ -46,7 +46,7 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 - **usage on** — usage and error data is on (Chrome and Edge from the first run; Firefox while it grants it)
 - **usage off** — the switch was turned off
 - **usage unsupported** — Firefox 129 to 139, with no built-in data consent
-- **usage not renewed** — «Удалить все данные» or «Очистить локальные данные» could not replace the install number (SCN-023, SCN-032)
+- **usage not renewed** — «Удалить все данные» or «Очистить локальные данные» could not replace the install number, and the unsent events stay (SCN-023, SCN-032)
 - **usage not saved** — the switch did not go through (the worker did not answer, or Firefox kept the permission after off)
 - **no key** — no Have I Been Pwned key saved, the state every install starts in
 - **key saved** — a key is stored
