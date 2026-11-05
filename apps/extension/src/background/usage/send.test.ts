@@ -44,6 +44,8 @@ describe('a batch through the network module', () => {
       purpose: 'usage-data',
       destination: 'analytics.passioncode.ai',
       payloadShape: 'usage-event:extension_installed',
+      // The alarm that really sends it, so the row can be lined up with the network panel.
+      triggeredBy: 'alarm:feeds',
       outcome: 'sent',
     })
     expect(audit[1]?.payloadShape).toBe('usage-event:error_occurred')

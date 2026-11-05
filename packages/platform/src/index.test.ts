@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { detectPlatform } from './index.js'
 
 const runtime = () => ({
-  getURL: (p: string) => p,
+  getURL: (p: string) => `chrome-extension://okolos/${p}`,
   onInstalled: { addListener: () => undefined },
   sendMessage: async () => undefined,
   onMessage: { addListener: () => undefined },
@@ -37,5 +37,15 @@ describe('which browser this is', () => {
     vi.stubGlobal('chrome', api())
     vi.stubGlobal('browser', undefined)
     expect(detectPlatform().kind).toBe('chrome')
+  })
+
+  it('is Firefox in a content script too, where there is no getBrowserInfo: the extension URL says so', () => {
+    const firefox = api({ getURL: (p: string) => `moz-extension://okolos/${p}` })
+    vi.stubGlobal('chrome', api())
+    vi.stubGlobal('browser', firefox)
+    const platform = detectPlatform()
+    expect(platform.kind).toBe('firefox')
+    // And on Firefox's own promise-based `browser` object, as before B-199.
+    expect(platform.runtime.getUrl('x')).toBe('moz-extension://okolos/x')
   })
 })

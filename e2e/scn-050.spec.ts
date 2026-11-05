@@ -43,3 +43,28 @@ test('the switch turns it off, and on again', async ({ context, extensionId }) =
   await expect(first.locator('[data-role=checks]')).toBeVisible()
   await expect(first.locator('[data-role=usage-notice]')).toHaveCount(0)
 })
+
+test('"Delete all data" takes the install number too: collection stays on, under a new one', async ({ context, extensionId }) => {
+  const page = await context.newPage()
+  await page.goto(`chrome-extension://${extensionId}/options.html#data`)
+  // Off and on again gives this profile an install number to delete.
+  await page.locator('[data-role=usage-switch]').uncheck()
+  await expect(page.locator('[data-role=usage-state]')).toHaveCount(1)
+  await page.locator('[data-role=usage-switch]').check()
+  await expect(page.locator('[data-role=usage-state]')).toHaveCount(0)
+  const stored = () =>
+    page.evaluate(async () => {
+      const got = await chrome.storage.local.get('usage:state')
+      return got['usage:state'] as { consent: string; iid: string | null; queue: unknown[] }
+    })
+  const before = await stored()
+  expect(before.iid).toBeTruthy()
+
+  await page.locator('[data-role=wipe]').click()
+  await page.locator('[data-role=confirm-yes]').click()
+  await expect.poll(async () => (await stored()).iid).not.toBe(before.iid)
+  const after = await stored()
+  expect(after).toMatchObject({ consent: 'on', queue: [] })
+  expect(after.iid).toBeTruthy()
+  await expect(page.locator('[data-role=usage-switch]')).toBeChecked()
+})

@@ -31,6 +31,14 @@ describe('Firefox 140 and later, where the browser asks at install', () => {
     expect(remove).toHaveBeenCalledWith(DATA)
   })
 
+  it('asks Firefox inside the click: the request goes before anything is awaited', () => {
+    // Firefox honours permissions.request only while the click is being handled; an await
+    // before it (here a getAll that never answers) would give that moment away.
+    const request = vi.fn(async () => true)
+    void switchConsent('firefox', { getAll: () => new Promise(() => {}), request }, true)
+    expect(request).toHaveBeenCalledWith(DATA)
+  })
+
   it('counts a refused or failed request as off', async () => {
     const request = vi.fn(async () => {
       throw new Error('permissions.request may only be called from a user input handler')

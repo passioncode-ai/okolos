@@ -41,7 +41,21 @@ const checkOnly = process.argv.includes('--check')
 
 function die(message) {
   console.error(`\npackage: ${message}`)
+  dropKeyedBuilds()
   process.exit(1)
+}
+
+/** Set once the store build is in dist/<target>, which then carries the App-Key. */
+let keyed = false
+
+/**
+ * A run that stops after the store build removes it: dist/<target> is what an unpacked load
+ * and every test read, and it never carries the key (B-199). `pnpm build` puts it back.
+ */
+function dropKeyedBuilds() {
+  if (!keyed) return
+  for (const target of TARGETS) rmSync(path.join(dist, target), { recursive: true, force: true })
+  console.error('package: removed the store builds in dist/, which carried the App-Key; `pnpm build` restores them')
 }
 
 const ok = (message) => console.log(`   ok    ${message}`)
@@ -132,6 +146,7 @@ if (!checkOnly || !built) {
   // pnpm is pnpm.cmd on Windows, which Node will not spawn without a shell (B-163).
   // At the deadline the whole tree ends, not only that cmd.exe (B-164).
   await runToCompletion('pnpm', ['build'], { cwd: root, timeoutMs: 10 * 60_000 })
+  keyed = !checkOnly
 }
 
 for (const target of TARGETS) {
@@ -243,6 +258,24 @@ for (const target of TARGETS) {
   for (const name of pruneReleases(out)) {
     console.log(`   pruned ${name} (keeping the newest ${RELEASES_KEPT} per browser)`)
   }
+}
+
+if (keyed) {
+  console.log('\n── dist/<target> again, without the App-Key: only the archive carries it')
+  delete process.env.APTABASE_APP_KEY_OKOLOS
+  delete process.env.OKOLOS_USAGE_ENV
+  try {
+    await runToCompletion('pnpm', ['build'], { cwd: root, timeoutMs: 10 * 60_000 })
+  } catch (cause) {
+    die(`the keyless rebuild failed (${cause instanceof Error ? cause.message : String(cause)})`)
+  }
+  for (const target of TARGETS) {
+    if (readFileSync(path.join(dist, target, 'background.js'), 'utf8').includes(usageKey)) {
+      die(`${target} still carries the App-Key after the keyless rebuild`)
+    }
+  }
+  keyed = false
+  ok('dist/chrome and dist/firefox carry no App-Key')
 }
 
 console.log(

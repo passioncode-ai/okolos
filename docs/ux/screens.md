@@ -186,7 +186,7 @@ generator, and the sheet declares no colour of its own.
 - **Wireframe:** wireframes/SCR-01.md
 - **Coverage:** packages/ui/src/first-run/screen.ts:renderFirstRun, apps/extension/src/first-run/index.ts
 - **Scenarios:** SCN-001, SCN-002, SCN-050
-- **Usage notice (B-199):** one notice sentence that anonymous data about use and errors is sent, only to improve the product, with the link "Отключить в настройках" to SCR-12
+- **Usage notice (B-199):** one notice sentence that data about use and errors is sent, only to fix the product, and what is not in it, with the link "Изменить в настройках" to SCR-12; shown only while collection is on. The intro above it says that the addresses and text of pages are not sent
 - **Resources:** local corpus loader, extension inventory adapter, tab scanner
 - **Status:** built
 
@@ -431,7 +431,7 @@ generator, and the sheet declares no colour of its own.
 - **Wireframe:** wireframes/SCR-12.md
 - **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, apps/extension/src/options/leak-key.ts, e2e/scn-024.spec.ts (data controls built; watchlist, quiet mode and the proxy toggle land with their modules), e2e/scn-015.spec.ts (the key block: saved, never shown back, removed)
 - **Scenarios:** SCN-015, SCN-023, SCN-024, SCN-051, SCN-052
-- **Usage block (B-199):** block "Данные об использовании и ошибках": a switch, one sentence on what is sent, a link to the privacy text; in Firefox the switch asks the browser, and on Firefox 129 to 139 it says nothing is sent because the browser has no consent
+- **Usage block (B-199):** block "Данные об использовании и ошибках": a switch, one sentence on what is sent; in Firefox the switch asks the browser, and on Firefox 129 to 139 it says nothing is sent because the browser has no consent
 - **Resources:** settings store, exporter, wipe routine
 - **Status:** built
 
@@ -536,7 +536,7 @@ generator, and the sheet declares no colour of its own.
 ### SCR-18: Privacy page
 - **Used by:** FLW-18 (deciding whether to install), as the second step. It is also linked from the store listing and from the extension, and it is the document SCR-10 (self-audit) must agree with. **The gap recorded here on 2026-08-12 closed 2026-08-20 (B-22):** the pre-install journey is in the chain now — JRN-01 stages 2 and 3 always carried it, and what was missing was ST-021 between the journey and these pages
 - **Purpose:** state what leaves the device, where to, why, and what is never stored — the document the store requires and the one the self-audit screen must agree with
-- **Elements:** the five outbound destinations with what each carries; what is stored on the device and for how long; the reuse-index paragraph; what does not exist (no analytics, no account, no ads); why the extension asks for every site
+- **Elements:** the six kinds of outbound request with what each carries, usage and error data among them; what is stored on the device and for how long; the reuse-index paragraph; what does not exist (no account, no ads, no browsing tracking); why the extension asks for every site
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|

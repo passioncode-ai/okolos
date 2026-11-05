@@ -12,7 +12,12 @@ import { sessionIdAt } from './system.js'
  * `production`; every other build carries no key and `sandbox`, and a build with no key sends
  * nothing (client contract «Build modes»).
  */
-declare const __OKOLOS_USAGE__: { appKey: string | null; environment: 'production' | 'sandbox' } | undefined
+interface Build {
+  readonly appKey: string | null
+  readonly environment: 'production' | 'sandbox'
+}
+
+declare const __OKOLOS_USAGE__: Build | undefined
 
 const STATE_KEY = 'usage:state'
 
@@ -30,8 +35,12 @@ export interface Usage {
  * audited network path. A Firefox that took the grant back makes the stored switch off at once,
  * so its install id and queue go with it.
  */
-export function startUsage(platform: Platform, audit: () => Promise<RequestDeps>, permissions: ConsentApi = platform.dataConsent): Usage {
-  const build = typeof __OKOLOS_USAGE__ === 'undefined' ? { appKey: null, environment: 'sandbox' as const } : __OKOLOS_USAGE__
+export function startUsage(
+  platform: Platform,
+  audit: () => Promise<RequestDeps>,
+  permissions: ConsentApi = platform.dataConsent,
+  build: Build = typeof __OKOLOS_USAGE__ === 'undefined' ? { appKey: null, environment: 'sandbox' } : __OKOLOS_USAGE__,
+): Usage {
   const suffix = Math.floor(Math.random() * 100_000_000)
   let send: ((spec: { url: string; body: string; headers: Record<string, string> }) => Promise<Response>) | null = null
 
@@ -53,36 +62,63 @@ export function startUsage(platform: Platform, audit: () => Promise<RequestDeps>
       locale: globalThis.navigator?.language ?? '',
     })
 
+  // Firefox: the browser keeps the choice. A grant taken back drops the stored "on" with its
+  // install id; a grant given again (in about:addons) turns it back on with a new one.
   const current = async () => {
     const allowed = await browserConsent(platform.kind, permissions)
     const s = sink(allowed)
-    if (allowed !== 'on' && (await s.consent()) === 'on') await s.setConsent(false)
+    const stored = await s.consent()
+    if (allowed !== 'on' && stored === 'on') await s.setConsent(false)
+    if (allowed === 'on' && stored === 'off' && platform.kind === 'firefox') await s.setConsent(true)
     return { allowed, s }
   }
 
+  // Every change to the stored state, one at a time. Each step reads, awaits and writes the
+  // whole state, and the worker can run several at once (a message, the alarm, the switch): two
+  // events at once kept one, and a switch-off between an event's read and its write brought the
+  // old install id back.
+  let chain: Promise<unknown> = Promise.resolve()
+  const serial = <T>(step: () => Promise<T>): Promise<T> => {
+    const run = chain.then(step, step)
+    chain = run.catch(() => undefined)
+    return run
+  }
+
   return {
-    async track(name, props) {
-      const { s } = await current()
-      await s.track(name, props).catch(() => false)
-    },
-    async flush() {
-      const { s } = await current()
-      await s.flush().catch(() => undefined)
-    },
-    async state() {
-      const { allowed, s } = await current()
-      return allowed === 'unsupported' ? 'unsupported' : await s.consent()
-    },
+    // An event that cannot be recorded goes missing; it never becomes a rejection in the worker.
+    track: (name, props) =>
+      serial(async () => {
+        const { s } = await current()
+        await s.track(name, props)
+      }).then(
+        () => undefined,
+        () => undefined,
+      ),
+    flush: () =>
+      serial(async () => {
+        const { s } = await current()
+        await s.flush()
+      }).then(
+        () => undefined,
+        () => undefined,
+      ),
+    state: () =>
+      serial(async () => {
+        const { allowed, s } = await current()
+        return allowed === 'unsupported' ? 'unsupported' : await s.consent()
+      }),
     async set(on) {
       // Chrome: the switch is the consent. Firefox: the page already asked the browser inside
       // the click (a worker has no user gesture), so the worker only reads its answer, and an
       // "on" Firefox did not grant stays off.
       const answer = platform.kind === 'chrome' ? await switchConsent('chrome', permissions, on) : await browserConsent('firefox', permissions)
       if (answer === 'unsupported') return 'unsupported'
-      const { s } = await current()
-      const next = on && answer === 'on'
-      await s.setConsent(next)
-      return next ? 'on' : 'off'
+      return serial(async () => {
+        const { s } = await current()
+        const next = on && answer === 'on'
+        await s.setConsent(next)
+        return next ? 'on' : 'off'
+      })
     },
   }
 }

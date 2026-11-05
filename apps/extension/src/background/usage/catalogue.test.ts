@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { admissible, CATALOGUE } from './catalogue.js'
+import type { TrapKind } from '../../content/traps.js'
+
+import { admissible, CATALOGUE, trapWarning } from './catalogue.js'
 
 describe('the catalogue', () => {
   it('admits an event with every declared prop at one of its values', () => {
@@ -28,5 +30,22 @@ describe('the catalogue', () => {
     for (const props of Object.values(CATALOGUE)) {
       for (const reserved of ['iid', 'environment', 'platform']) expect(Object.keys(props)).not.toContain(reserved)
     }
+  })
+})
+
+describe('a page trap', () => {
+  it('is counted under the catalogue value of its own kind, for every kind the content script sends', () => {
+    const kinds: readonly TrapKind[] = ['clickfix', 'techsupport', 'outside-link']
+    for (const kind of kinds) {
+      const value = trapWarning(kind)
+      expect(value, kind).not.toBeNull()
+      expect(admissible('warning_shown', { kind: value })).toBe(true)
+    }
+    expect(trapWarning('techsupport')).toBe('tech-support')
+  })
+
+  it('is not counted when its kind is one nobody mapped', () => {
+    expect(trapWarning('browser-lock')).toBeNull()
+    expect(trapWarning('https://x.test')).toBeNull()
   })
 })

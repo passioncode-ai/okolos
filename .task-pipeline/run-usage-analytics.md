@@ -178,3 +178,29 @@ Next: A1, test first.
   `runtime.getBrowserInfo` with tests seen red first. Nothing in the product depended on the kind before this run,
   which is why it never showed. Next: A5 (events wired at their sites and `docs/analytics.md`), A6 (the store build
   injects the App-Key), A7 (privacy text, store card, facts, ADR, scenario statuses), the store screenshot retake.
+
+## Stage 6: certification, round 1 (2026-11-05, on 07a8237)
+
+Three blind tiers, read-only, targeted tests only (the coordinator's one-heavy-run rule; free disk 2.7 to 6.5 GB,
+under the 8 GB stop, so no build, gates or e2e on this machine). All three: **fail**.
+
+| Finding | Tiers | Fix, and the test seen red first |
+|---|---|---|
+| Firefox switch cannot turn data on: `permissions.request` after an awaited `getAll` | unit, seam, product | request first in `switchConsent`; `consent.test.ts` «asks Firefox inside the click» |
+| Tech-support trap warnings never counted (`techsupport` vs `tech-support`), `browser-lock` claimed | unit, seam, product | `trapWarning` typed by `TrapKind`; `catalogue.test.ts` «a page trap»; `docs/analytics.md` row |
+| `pnpm package` leaves the keyed store build in `dist/<target>` | unit, seam | keyless rebuild after the archives, keyed builds removed on `die`; `tools/analytics.test.ts` «leaves no keyed build» |
+| Storage race: a switch-off mid-record brought the old install id back; two events at once kept one | unit, seam | one promise chain in `start.ts`; `start.test.ts` «one change at a time» |
+| Retry rule wider than its comment | unit | retry only 408, 429, 5xx, transport; drop on other 4xx and net refusals; `sink.test.ts` |
+| Rejections behind `void usage.track` | unit | `track`/`flush` swallow; `start.test.ts` |
+| A Firefox re-grant left the stored state off | unit | re-grant turns it on with a new id; `start.test.ts` |
+| Firefox content scripts read as `chrome` | unit, seam | `moz-extension:` URL also tells Firefox; `packages/platform/src/index.test.ts` |
+| «Удалить все данные» kept the install id and queue | seam, product | `renewUsage` after `wipeAll`; `e2e/scn-050.spec.ts` third test (CI) |
+| Audit rows named `alarm:usage`, an alarm that does not exist | product | `alarm:feeds`; `send.test.ts` (plant `alarm:usage` fails it) |
+| Five surfaces said «no analytics»; first-run intro contradicted the notice; lists of what is sent disagreed; «при установке»; SCN-050 alt path, SCN-051 link, SCN-053 entry/recovery; «anonymous» in UX records; «Отключить» taken by another action; listing bullet under «Чего он не делает»; ADR app id; AGENTS.md lifecycle | product | README, scenarios (SCN-053 now partial, facts 53/42), flows, foundation, screens, privacy, facts, listing, ADR-0021, AGENTS.md, CHANGELOG; strings Copylot ru `15625dea` + `1e6a07bf`, en `83bee74b` + `f7d3d0fc` (100, no blocking) |
+
+Risks kept out of this unit as backlog rows: B-203 (server retention and IP), B-204 (CWS form, addons-linter),
+B-205 (audit volume, carried clause), B-206 (events not wired yet), B-207 (positioning docs), B-208 (feed-job flake).
+
+Not done here: store screenshots (`pnpm screenshots` needs a build, held by the disk stop); `tools/listing.test.ts`
+«the screenshots are of this product» stays red until they are retaken. Next: round 2 (adversarial) on the pushed head,
+screenshots when free disk is 8 GB or more, then CI green on all four jobs and merge.

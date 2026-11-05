@@ -1071,7 +1071,9 @@ async function dataSection(): Promise<HTMLElement> {
       onExport: download,
       onWipe: async () => {
         const db = await openDb()
-        return wipeAll(db)
+        const wiped = await wipeAll(db)
+        await renewUsage()
+        return wiped
       },
       // The erase took the key, so the leaks screen goes back to its start here and in every
       // other tab: its last result spoke about a key that no longer exists (N-110 round 3).
@@ -1088,6 +1090,21 @@ async function dataSection(): Promise<HTMLElement> {
     await leakKeyPanel(),
     await usagePanel(),
   )
+}
+
+/**
+ * "Delete all data" takes the install number and the unsent events as well (docs/privacy.md):
+ * collection that was on stays on, under a new number, so nothing sent later links to what was
+ * sent before. Off has no number to take. A renewal that fails is logged, and the wipe it
+ * follows still stands.
+ */
+async function renewUsage(): Promise<void> {
+  try {
+    const { state } = await platform.runtime.send('usage/state', {})
+    if (state === 'on') await platform.runtime.send('usage/set', { on: true })
+  } catch (cause) {
+    console.warn('okolos: the wipe could not renew the usage install number', cause)
+  }
 }
 
 /** Whether the last switch did not save, shown once on the repaint that follows it. */

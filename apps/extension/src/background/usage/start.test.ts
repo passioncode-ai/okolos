@@ -66,3 +66,60 @@ describe('the worker wiring', () => {
     expect(await usage.set(false)).toBe('off')
   })
 })
+
+describe('one change at a time', () => {
+  const keyed = { appKey: 'A-SH-0000000000', environment: 'sandbox' as const }
+
+  it('a switch-off that lands while an event is being recorded stays off, with no install id', async () => {
+    const p = platform('chrome', { consent: 'on', iid: '6f0c2b0e-8b5e-4d8c-9a51-2f0f5c3d9e11', queue: [] })
+    // Every read answers a turn late with what was there when it was asked, so an event's read and
+    // its write have a gap another call can use.
+    const get = p.platform.storage.get.bind(p.platform.storage)
+    p.platform.storage.get = (async (key: string) => {
+      const value = structuredClone(await get(key))
+      await new Promise((resolve) => setTimeout(resolve, 1))
+      return value
+    }) as typeof p.platform.storage.get
+    const usage = startUsage(p.platform, audit, {}, keyed)
+
+    const tracked = usage.track('warning_shown', { kind: 'lookalike' })
+    const off = usage.set(false)
+    await Promise.all([tracked, off])
+
+    expect(p.values.get('usage:state')).toEqual({ consent: 'off', iid: null, queue: [] })
+  })
+
+  it('two events recorded at once are both kept', async () => {
+    const p = platform('chrome')
+    const get = p.platform.storage.get.bind(p.platform.storage)
+    p.platform.storage.get = (async (key: string) => {
+      const value = structuredClone(await get(key))
+      await new Promise((resolve) => setTimeout(resolve, 1))
+      return value
+    }) as typeof p.platform.storage.get
+    const usage = startUsage(p.platform, audit, {}, keyed)
+
+    await Promise.all([usage.track('warning_shown', { kind: 'lookalike' }), usage.track('warning_shown', { kind: 'clickfix' })])
+
+    expect((p.values.get('usage:state') as UsageState).queue).toHaveLength(2)
+  })
+
+  it('a storage that fails makes an event go missing, never a rejection in the worker', async () => {
+    const p = platform('chrome')
+    p.platform.storage.get = (async () => {
+      throw new Error('storage gone')
+    }) as typeof p.platform.storage.get
+    const usage = startUsage(p.platform, audit, {}, keyed)
+    await expect(usage.track('warning_shown', { kind: 'lookalike' })).resolves.toBeUndefined()
+    await expect(usage.flush()).resolves.toBeUndefined()
+  })
+})
+
+describe('Firefox, where the browser keeps the choice', () => {
+  it('a grant given again in Firefox turns collection back on, with a new install id', async () => {
+    const p = platform('firefox', { consent: 'off', iid: null, queue: [] })
+    const usage = startUsage(p.platform, audit, { getAll: async () => ({ data_collection: ['technicalAndInteraction'] }) })
+    expect(await usage.state()).toBe('on')
+    expect((p.values.get('usage:state') as UsageState).iid).toMatch(/^[0-9a-f-]{36}$/)
+  })
+})

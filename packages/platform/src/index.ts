@@ -29,10 +29,11 @@ declare const browser: WebExtensionApi | undefined
  * Firefox is told by `runtime.getBrowserInfo`, which only Firefox has, and not by `browser`
  * being there: recent Chromium offers a `browser` object too, and Chrome read as Firefox
  * (found 2026-11-04 in e2e, when the usage consent became the first thing to depend on the
- * kind: Chrome was then read as a Firefox with no built-in data consent).
+ * kind: Chrome was then read as a Firefox with no built-in data consent). A Firefox content
+ * script has no `getBrowserInfo`, so there its own extension URL says so: `moz-extension:`.
  */
 export function detectPlatform(): Platform {
-  if (typeof browser !== 'undefined' && browser?.runtime && typeof (browser.runtime as { getBrowserInfo?: unknown }).getBrowserInfo === 'function') {
+  if (typeof browser !== 'undefined' && browser?.runtime && isFirefox(browser)) {
     return createPlatform('firefox', browser)
   }
   if (typeof chrome !== 'undefined' && chrome?.runtime) {
@@ -42,4 +43,13 @@ export function detectPlatform(): Platform {
     return createPlatform('chrome', browser)
   }
   throw new Error('No WebExtension API found: this build must run inside an extension context')
+}
+
+function isFirefox(api: WebExtensionApi): boolean {
+  if (typeof (api.runtime as { getBrowserInfo?: unknown }).getBrowserInfo === 'function') return true
+  try {
+    return api.runtime.getURL('').startsWith('moz-extension:')
+  } catch {
+    return false
+  }
 }

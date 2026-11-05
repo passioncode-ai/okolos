@@ -458,8 +458,8 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 - **Priority:** should
 - **Status:** proposed
 
-### ST-032: Help improve the product with anonymous data, and switch it off
-- **Story:** As P-01, I want to be told on the first run that the product sends anonymous data about its use and its errors, only to improve it, and to switch that off in settings, so that the product can be fixed when it fails for me without my pages, addresses or passwords ever leaving the device.
+### ST-032: Help improve the product with usage and error data, and switch it off
+- **Story:** As P-01, I want to be told on the first run that the product sends data about its use and its errors, from a closed list, only to improve it, and to switch that off in settings, so that the product can be fixed when it fails for me without my pages, addresses or passwords ever leaving the device.
 - **Traces:** JTBD-05, JRN-01/#4
 - **Acceptance criteria:**
   - Given a fresh install in Chrome or Edge, when the first-run screen opens, then it says in one sentence what is sent and why, collection is on, and the screen links to the switch.

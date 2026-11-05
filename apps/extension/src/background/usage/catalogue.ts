@@ -1,3 +1,5 @@
+import type { TrapKind } from '../../content/traps.js'
+
 /**
  * Every usage and error event Okolos may send, and every value each of its props may take.
  *
@@ -54,4 +56,19 @@ export function admissible(name: string, props: Readonly<Record<string, unknown>
   const keys = Object.keys(props)
   if (keys.length !== Object.keys(allowed).length) return false
   return keys.every((key) => Object.hasOwn(allowed, key) && (allowed[key] as readonly unknown[]).includes(props[key]))
+}
+
+/**
+ * A page trap's kind, as the content script names it, to the value `warning_shown` counts it
+ * under. Typed by `TrapKind`, so a kind added there fails the build until it is mapped here.
+ * A kind nobody mapped is not counted (`null`), never sent as it came.
+ */
+const TRAP_WARNING: Readonly<Record<TrapKind, EventProps<'warning_shown'>['kind']>> = {
+  clickfix: 'clickfix',
+  techsupport: 'tech-support',
+  'outside-link': 'outside-link',
+}
+
+export function trapWarning(kind: string): EventProps<'warning_shown'>['kind'] | null {
+  return Object.hasOwn(TRAP_WARNING, kind) ? TRAP_WARNING[kind as TrapKind] : null
 }

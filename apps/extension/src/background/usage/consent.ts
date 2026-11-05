@@ -36,11 +36,16 @@ export async function browserConsent(browser: Browser, api: ConsentApi): Promise
  */
 export async function switchConsent(browser: Browser, api: ConsentApi, on: boolean): Promise<ConsentState> {
   if (browser === 'chrome') return on ? 'on' : 'off'
-  if ((await firefoxGranted(api)) === null) return 'unsupported'
   if (on) {
-    const granted = await (api.request?.(DATA) ?? Promise.resolve(false)).catch(() => false)
+    // First, before any await: the click's moment ends at the first one, and Firefox refuses a
+    // request made after it. A Firefox with no built-in consent refuses it too, and getAll then
+    // says which of the two it was.
+    const asked = (api.request?.(DATA) ?? Promise.resolve(false)).catch(() => false)
+    const granted = await asked
+    if ((await firefoxGranted(api)) === null) return 'unsupported'
     return granted ? 'on' : 'off'
   }
+  if ((await firefoxGranted(api)) === null) return 'unsupported'
   await (api.remove?.(DATA) ?? Promise.resolve(false)).catch(() => false)
   return 'off'
 }

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { DestinationError } from '@okolos/net'
+
 import { CATALOGUE } from './catalogue.js'
 import { createUsageSink, type UsageDeps, type UsageState } from './sink.js'
 
@@ -187,8 +189,30 @@ describe('the queue', () => {
     }
   })
 
-  it('never retries a 400 or a 404: the batch is dropped', async () => {
-    for (const status of [400, 404]) {
+  it('keeps an event for later on 408 too: the server timed out, the event was fine', async () => {
+    const h = harness({ send: vi.fn(async () => new Response('', { status: 408 })) })
+    await h.sink.track('warning_shown', { kind: 'lookalike' })
+    await h.sink.flush()
+    expect(h.state()?.queue).toHaveLength(1)
+  })
+
+  it('drops an event the network module refused, so it does not hold the queue behind it', async () => {
+    let calls = 0
+    const send = vi.fn(async () => {
+      calls += 1
+      if (calls === 1) throw new DestinationError('usage-data', 'elsewhere.example')
+      return new Response('{}', { status: 200 })
+    })
+    const h = harness({ send })
+    await h.sink.track('warning_shown', { kind: 'lookalike' })
+    await h.sink.track('warning_shown', { kind: 'clickfix' })
+    await h.sink.flush()
+    expect(send).toHaveBeenCalledTimes(2)
+    expect(h.state()?.queue).toHaveLength(0)
+  })
+
+  it('never retries a 4xx other than 408 and 429: the event is dropped', async () => {
+    for (const status of [400, 401, 403, 404, 413, 422]) {
       const h = harness({ send: vi.fn(async () => new Response('', { status })) })
       await h.sink.track('warning_shown', { kind: 'lookalike' })
       await h.sink.flush()

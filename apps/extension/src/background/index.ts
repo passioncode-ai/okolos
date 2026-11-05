@@ -69,7 +69,7 @@ import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 
 import { recordPageRequest } from './page-requests.js'
 import { recordTrap } from './trap-journal.js'
-import type { EventProps } from './usage/catalogue.js'
+import { trapWarning } from './usage/catalogue.js'
 import { startUsage } from './usage/start.js'
 import { optionsPageFor } from '../options/views.js'
 
@@ -1002,8 +1002,10 @@ async function journalTrap(payload: { kind: string; signals: string }): Promise<
   } catch (cause) {
     console.warn('okolos: could not journal a page trap', cause)
   }
-  // The kind only, from the catalogue's list; the sink refuses anything else. No signal, no page.
-  void usage.track('warning_shown', { kind: payload.kind } as EventProps<'warning_shown'>)
+  // The kind only, mapped to the catalogue's value; an unmapped kind is not counted. No signal,
+  // no page.
+  const kind = trapWarning(payload.kind)
+  if (kind !== null) void usage.track('warning_shown', { kind })
   return { ok: true }
 }
 

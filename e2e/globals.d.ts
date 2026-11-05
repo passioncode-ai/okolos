@@ -49,4 +49,6 @@ declare const chrome: {
   management: {
     getAll(): Promise<Array<{ id: string; name: string; version: string; installType?: string }>>
   }
+  /** Read only, to see that "Delete all data" renewed the usage install number (SCN-051). */
+  storage: { local: { get(key: string): Promise<Record<string, unknown>> } }
 }

@@ -45,7 +45,7 @@ Full vector coverage: [docs/coverage-matrix.md](docs/coverage-matrix.md).
 4. Self-audit — the product shows you what it sent.
 5. Action over alarm — a queue you can finish, not a counter that grows.
 6. Explainable and disputable verdicts — one click to overrule, and it is remembered.
-7. No telemetry, no analytics, no gamification, no paywall.
+7. No gamification, no paywall. Usage and error data from a closed catalogue is on by default and off in settings, and carries no page address, page text or password ([docs/privacy.md](docs/privacy.md)).
 
 ## Documentation
 

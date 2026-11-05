@@ -1,3 +1,5 @@
+import { DestinationError, RedactionError } from '@okolos/net'
+
 import { admissible, type EventName, type EventProps } from './catalogue.js'
 
 /**
@@ -110,10 +112,12 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
             body: JSON.stringify(wire(event, deps)),
             headers: { 'App-Key': deps.appKey, 'Content-Type': 'application/json' },
           })
-          // Retried only on 429 and 5xx; a 400 or 404 would fail the same way every time.
-          drop = response.ok || response.status === 400 || response.status === 404
-        } catch {
-          drop = false
+          drop = response.ok || !retried(response.status)
+        } catch (cause) {
+          // The network module's own refusal (a host off the list, a body the redactor stopped)
+          // would come back the same way every time; a transport error or a failed audit write
+          // may not.
+          drop = cause instanceof DestinationError || cause instanceof RedactionError
         }
         if (!drop) return
         // Re-read: an event tracked while the request was in flight was appended at the end.
@@ -132,6 +136,11 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
       return (await read()).consent
     },
   }
+}
+
+/** Kept for the next flush only on 408, 429 and 5xx; any other 4xx would fail the same way again. */
+function retried(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500
 }
 
 function wire(event: QueuedEvent, deps: UsageDeps) {

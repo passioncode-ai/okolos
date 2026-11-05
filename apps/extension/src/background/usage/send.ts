@@ -16,7 +16,8 @@ export function usageSender(deps: RequestDeps): UsageDeps['send'] {
         method: 'POST',
         purpose: 'usage-data',
         payloadShape: `usage-event:${eventName(spec.body)}`,
-        triggeredBy: 'alarm:usage',
+        // Sent with the feed alarm, the only one that flushes: the row names it as it is.
+        triggeredBy: 'alarm:feeds',
         body: spec.body,
         headers: spec.headers,
       },
