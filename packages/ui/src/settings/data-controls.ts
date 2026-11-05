@@ -367,7 +367,8 @@ function renderUsage(doc: Document, panel: UsagePanel): HTMLElement {
   if (panel.state === 'unsupported') block.append(text(doc, 'usage-state', t('usageFirefoxOld')))
   else if (panel.firefox) block.append(text(doc, 'usage-firefox', t('usageFirefox')))
   if (panel.failed) block.append(text(doc, 'usage-failed', t('usageSaveFailed')))
-  if (panel.renewFailed) block.append(text(doc, 'usage-renew-failed', t('usageRenewFailed', t('usageSwitch'))))
+  // Only while collection is on: off and unsupported keep no install number to replace (B-215).
+  if (panel.renewFailed && panel.state === 'on') block.append(text(doc, 'usage-renew-failed', t('usageRenewFailed', t('usageSwitch'))))
   return block
 }
 
