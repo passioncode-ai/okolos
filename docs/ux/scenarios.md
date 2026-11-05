@@ -635,7 +635,7 @@ See [foundation.md](foundation.md) → Personas.
   1. User reads the first-run screen -> system shows the notice "Okolos отправляет нам данные об использовании и ошибках, чтобы исправлять продукт там, где он ломается. В них нет адресов страниц, их текста, имён файлов, почты и паролей." at the end of the screen, after its actions; the intro above says that the addresses and text of pages are not sent
   2. User follows «Открыть «Ваши данные»» -> system opens «Ваши данные», where the switch is the last block (SCN-051)
   3. User closes the first-run screen without acting -> collection stays on; the notice is not shown again
-- **Expected result:** the person learns on the first run what is sent and how to stop it; no page address, page text, file name, email or password is part of it, and an event names only which warning was shown or how a check ended (docs/analytics.md)
+- **Expected result:** the person learns on the first run what is sent and how to stop it; no page address, page text, file name, email or password is part of it, and an event names only an action or an error from the closed list in docs/analytics.md (an install, which warning was shown, how a check ended, which area failed and how), never a page
 - **Alt paths:** collection is off (the person switched it off, or Firefox did not grant it) -> the first-run screen shows no notice; there is no install older than the notice: no store build shipped before this change (CHANGELOG), so the first store release is the first build that sends
 - **UI elements:** notice sentence, link «Открыть «Ваши данные»», the existing "Что отправляется" link
 - **States covered:** success

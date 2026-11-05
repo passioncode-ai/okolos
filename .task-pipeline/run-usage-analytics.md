@@ -381,3 +381,17 @@ takes the switch label as a substitution (`data-controls.test.ts`). B-203 asks t
 and the GeoIP question; B-214 names the data screen waiting on `usage/state`. The backlog was edited before its lease
 was taken (taken before the commit): a slip, said here.
 Gates on this tree: 3523 passed, 1 red (SCR-14 wireframe, the landing's new sends block; regenerated, SCR-17 record names it); wireframes and listing 38/38; ux:lint, brand:lint, i18n:sweep, package:check exit 0; screenshots retaken (13 GB free). Next: round 9.
+
+## Stage 6: certification, round 9 (2026-11-05, on 3f24292)
+
+CI on 3f24292 green on all four jobs. Unit tier: **pass** (two risks, into B-214 and B-215). Seam tier: **fail** on one
+`breaks`: three backlog rows pointed at lines this branch moved (B-215 `sink.ts:120` → `:134`, B-202 `index.ts:1126` →
+`:1171`, B-212 `router.ts:305` → `:318`, `:328`); fixed under the lease. Risk taken in: the facts.md `usage-data` row
+carries the privacy.md caveat on the country and daily count from the IP. The substituted `usageRenewFailed` renders
+to the text Copylot checked in round 7 (ru `faf3cefa`, en `0edf2e7c`).
+Product tier, round 9: **fail** on one `breaks`: SCN-050's expected result said an event names only a warning or a
+check result, while install and error events also leave; reworded to the catalogue. Risks taken in: facts.md names
+Firefox's optional `technicalAndInteraction`; ST-011 points to `check_done` in docs/analytics.md; B-200 records what
+ADR-0021 delivered; B-204 names the AMO source-build difference (the App-Key). Not taken: Aptabase's own container
+logs and the IP (platform owner, beside B-203); the live worker is behind main (deploy is the first release step).
+pnpm gates green in full on this tree: 216 files, 3524 tests. Next: round 10.
