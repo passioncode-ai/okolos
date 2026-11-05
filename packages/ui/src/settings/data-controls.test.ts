@@ -572,6 +572,13 @@ describe('usage and error data (B-199, SCN-051, SCN-052)', () => {
     expect(role(el, 'usage-renew-failed')?.textContent).toBe(message('usageRenewFailed').replace('$SWITCH$', message('usageSwitch')))
   })
 
+  it('says the install number was not replaced only while collection is on: off and unsupported have none to replace (B-215)', () => {
+    for (const state of ['off', 'unsupported'] as const) {
+      const el = renderDataControls(document, handlers(), kinds, undefined, panel({ renewFailed: true, state }))
+      expect(role(el, 'usage-renew-failed'), state).toBeNull()
+    }
+  })
+
   it('says a change that did not save did not save', () => {
     const el = renderDataControls(document, handlers(), kinds, undefined, panel({ failed: true }))
     expect(role(el, 'usage-failed')?.textContent).toBe(message('usageSaveFailed'))
