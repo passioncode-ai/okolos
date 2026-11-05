@@ -12,6 +12,19 @@
  */
 
 export type Browser = 'chrome' | 'firefox'
+
+/**
+ * Firefox's answer could not be read this time (`permissions.getAll` failed). Not the same as
+ * no built-in consent: a read that failed for a moment must not drop the install id and the
+ * queue as a grant taken back would (B-215).
+ */
+export class ConsentUnreadable extends Error {
+  constructor(cause: unknown) {
+    // i18n-exempt: an error the worker catches to keep the stored state; never shown to anyone
+    super('the browser data consent could not be read', { cause })
+    this.name = 'ConsentUnreadable'
+  }
+}
 export type ConsentState = 'on' | 'off' | 'unsupported'
 
 const DATA = { data_collection: ['technicalAndInteraction'] }
@@ -50,21 +63,40 @@ export async function switchConsent(browser: Browser, api: ConsentApi, on: boole
     }
     const asked = request.catch(() => false)
     const granted = await asked
-    if ((await firefoxGranted(api)) === null) return 'unsupported'
+    if ((await readBack(api)) === null) return 'unsupported'
     return granted ? 'on' : 'off'
   }
-  if ((await firefoxGranted(api)) === null) return 'unsupported'
+  if ((await readBack(api)) === null) return 'unsupported'
   await (api.remove?.(DATA) ?? Promise.resolve(false)).catch(() => false)
   // Read back, never assumed: a removal that did not take leaves the grant on, and the worker
   // follows the grant, so "off" here would be undone at the next event with a new install id.
   // An answer that cannot be read is not a confirmed off either: the page then says not saved.
-  return (await firefoxGranted(api)) === false ? 'off' : 'on'
+  return (await readBack(api)) === false ? 'off' : 'on'
 }
 
-/** `null` when this Firefox has no built-in data consent. */
+/**
+ * The switch's read-back keeps its old reading of a failed read: `null` (unsupported) after a
+ * request, not a confirmed off after a removal. Only the worker's step tells a failed read from
+ * no consent, because only it would otherwise drop what is stored.
+ */
+async function readBack(api: ConsentApi): Promise<boolean | null> {
+  try {
+    return await firefoxGranted(api)
+  } catch (cause) {
+    if (cause instanceof ConsentUnreadable) return null
+    throw cause
+  }
+}
+
+/** `null` when this Firefox has no built-in data consent; throws `ConsentUnreadable` when it cannot be read. */
 async function firefoxGranted(api: ConsentApi): Promise<boolean | null> {
   if (!api.getAll) return null
-  const all = await api.getAll().catch(() => null)
-  if (all === null || !Array.isArray(all.data_collection)) return null
+  let all: Awaited<ReturnType<NonNullable<ConsentApi['getAll']>>>
+  try {
+    all = await api.getAll()
+  } catch (cause) {
+    throw new ConsentUnreadable(cause)
+  }
+  if (!Array.isArray(all?.data_collection)) return null
   return all.data_collection.includes('technicalAndInteraction')
 }
