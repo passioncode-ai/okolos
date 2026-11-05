@@ -522,7 +522,7 @@ generator, and the sheet declares no colour of its own.
 ### SCR-17: Product landing page
 - **Used by:** FLW-18 (deciding whether to install). **The gap recorded here on 2026-08-12 is closed 2026-08-20 (B-22)** — and the way it was recorded is why closing it was easy: the entry said a flow traced to no story would be a diagram rather than a design, and named the missing piece instead of inventing one. ST-021 is that story, FLW-18 the flow, SCN-033 the scenario
 - **Purpose:** let someone who has never heard of this decide whether to install it — including by reading what it refuses to do
-- **Elements:** what the product is in one sentence; what it does; **what it does not do** (half the page); how to install; links to `/privacy` and `/status`. **Primary action: install**
+- **Elements:** what the product is in one sentence; what it does; what it sends (`[data-role=sends]`: usage and error data, the listing's own line, B-199); **what it does not do** (half the page); how to install; links to `/privacy` and `/status`. **Primary action: install**
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|

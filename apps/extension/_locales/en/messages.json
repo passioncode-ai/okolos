@@ -2676,7 +2676,12 @@
     "message": "The change was not saved. Try again."
   },
   "usageRenewFailed": {
-    "message": "The install number was not replaced. Turn \"Send usage and error data\" off and on again to get a new one."
+    "message": "The install number was not replaced. Turn \"$SWITCH$\" off and on again to get a new one.",
+    "placeholders": {
+      "switch": {
+        "content": "$1"
+      }
+    }
   },
   "usageFirefoxOld": {
     "message": "This version of Firefox has no built-in consent for data collection, so Okolos sends nothing. Update Firefox to version 140 to choose."

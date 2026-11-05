@@ -366,3 +366,18 @@ flush, before the loop, so on a slow network an event that turned a day old duri
 still went (the tier's probe: 4.6 minutes past a day). Fixed: `sendable(at, now)` before each request; an event
 stamped more than 5 minutes in the future (a corrected clock) is dropped too (the tier's risk). `sink.test.ts`, two
 cases seen red. analytics.md says it.
+
+Seam tier, round 8 (on e686e8f): one `breaks`, the policy's «резервные копии 14 дней» while the platform README also
+names a weekly off-host droplet backup with no stated period. Product tier, round 8: four `breaks`, the same backup
+claim; SCN-050's «nothing they did on a page is part of it»; SCN-033's /privacy-agrees-with-the-landing while the
+worker landing still said «Не хранит события дольше 90 дней»; B-212 describing a listing line already fixed.
+Fixed: privacy.md and facts.md name the server's own 14-day backups and the weekly DigitalOcean copy whose period is
+not recorded (Copylot `56b2b32f`); the listing says the service deletes after 730/400 days and points to the policy
+for backups (ru `4894e7f9`, en `adb9b4d3`); the worker landing (SCR-17, `apps/proxy/src/router.ts`) gets «Что он
+отправляет» and «Журналы на устройстве стирает через 90 дней» (`b95976f0`), which closes B-212; SCN-050's expected
+result narrowed. Risks taken in: privacy.md says the service may derive a country and a daily device count from the
+IP, not yet confirmed (Caddyfile at 3f8878f, `b95976f0`); the ru listing's timer line matches en; `usageRenewFailed`
+takes the switch label as a substitution (`data-controls.test.ts`). B-203 asks the platform owner for the backup period
+and the GeoIP question; B-214 names the data screen waiting on `usage/state`. The backlog was edited before its lease
+was taken (taken before the commit): a slip, said here.
+Gates on this tree: 3523 passed, 1 red (SCR-14 wireframe, the landing's new sends block; regenerated, SCR-17 record names it); wireframes and listing 38/38; ux:lint, brand:lint, i18n:sweep, package:check exit 0; screenshots retaken (13 GB free). Next: round 9.

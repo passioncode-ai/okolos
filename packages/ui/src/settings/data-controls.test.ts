@@ -568,7 +568,8 @@ describe('usage and error data (B-199, SCN-051, SCN-052)', () => {
 
   it('says when clearing the local data could not replace the install number, and how to get a new one', () => {
     const el = renderDataControls(document, handlers(), kinds, undefined, panel({ renewFailed: true }))
-    expect(role(el, 'usage-renew-failed')?.textContent).toBe(message('usageRenewFailed'))
+    // The switch's own label, substituted: a relabelled switch cannot leave the sentence naming the old one.
+    expect(role(el, 'usage-renew-failed')?.textContent).toBe(message('usageRenewFailed').replace('$SWITCH$', message('usageSwitch')))
   })
 
   it('says a change that did not save did not save', () => {
