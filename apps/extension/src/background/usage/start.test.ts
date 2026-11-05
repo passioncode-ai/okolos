@@ -159,3 +159,26 @@ describe('an audit that cannot be opened', () => {
     expect((p.values.get('usage:state') as UsageState).queue).toHaveLength(2)
   })
 })
+
+describe('the renewal after an erase', () => {
+  const keyed = { appKey: 'A-SH-0000000000', environment: 'sandbox' as const }
+
+  it('renews the install number only when collection is on at that moment, in one step', async () => {
+    const p = platform('chrome', { consent: 'on', iid: '6f0c2b0e-8b5e-4d8c-9a51-2f0f5c3d9e11', queue: [] })
+    const usage = startUsage(p.platform, audit, {}, keyed)
+    expect(await usage.renew()).toBe('on')
+    const renewed = p.values.get('usage:state') as UsageState
+    expect(renewed.iid).not.toBe('6f0c2b0e-8b5e-4d8c-9a51-2f0f5c3d9e11')
+    expect(renewed.queue).toEqual([])
+  })
+
+  it('a switch-off that lands before the renewal stays off: the renewal never turns collection back on', async () => {
+    const p = platform('chrome', { consent: 'on', iid: '6f0c2b0e-8b5e-4d8c-9a51-2f0f5c3d9e11', queue: [] })
+    const usage = startUsage(p.platform, audit, {}, keyed)
+    const off = usage.set(false)
+    const renewal = usage.renew()
+    await Promise.all([off, renewal])
+    expect(await renewal).toBe('off')
+    expect(p.values.get('usage:state')).toEqual({ consent: 'off', iid: null, queue: [] })
+  })
+})

@@ -154,6 +154,8 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
       return usage
         .set(Boolean((message.payload as { on?: unknown }).on))
         .then((state) => ({ state })) as Promise<RpcMap[T]['res']>
+    case 'usage/renew':
+      return usage.renew().then((state) => ({ state })) as Promise<RpcMap[T]['res']>
     case 'password/pending':
       return answerPendingVerdict(from) as Promise<RpcMap[T]['res']>
     case 'leaks/check':

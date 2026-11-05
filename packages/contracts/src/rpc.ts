@@ -204,6 +204,8 @@ export interface RpcMap {
    * `permissions.request` refuses outside a user gesture; the worker then reads the answer.
    */
   'usage/set': { req: { on: boolean }; res: { state: 'on' | 'off' | 'unsupported' } }
+  /** After an erase: a new install number, only if collection is on at that moment (one worker step). */
+  'usage/renew': { req: Record<string, never>; res: { state: 'on' | 'off' | 'unsupported' } }
   /** SHA-1 of a submitted password. The password itself never crosses this line. */
   'password/check': {
     /**

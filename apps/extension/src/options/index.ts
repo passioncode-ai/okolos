@@ -1077,8 +1077,11 @@ async function dataSection(): Promise<HTMLElement> {
         // full wipe whatever the renewal does. The renewal follows (two worker calls, which may wait
         // behind a send), and one that failed repaints the usage block in its own words.
         void renewUsage().then((renewed) => {
+          // Repaint whenever the notice changes, both ways: a renewal that worked takes an earlier
+          // "not replaced" away, and a partial wipe repaints nothing by itself.
+          const was = usageRenewFailed
           usageRenewFailed = !renewed
-          if (!renewed) void reload()
+          if (was !== usageRenewFailed) void reload()
         })
         return wiped
       },
@@ -1107,8 +1110,9 @@ async function dataSection(): Promise<HTMLElement> {
  */
 async function renewUsage(): Promise<boolean> {
   try {
-    const { state } = await platform.runtime.send('usage/state', {})
-    if (state === 'on') await platform.runtime.send('usage/set', { on: true })
+    // One worker step that renews only if collection is on at that moment: a state read followed
+    // by a set would undo a switch-off that landed between the two.
+    await platform.runtime.send('usage/renew', {})
     return true
   } catch (cause) {
     console.warn('okolos: the wipe could not renew the usage install number', cause)

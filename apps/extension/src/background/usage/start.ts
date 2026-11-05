@@ -28,6 +28,11 @@ export interface Usage {
   state(): Promise<ConsentState>
   /** From the settings switch, inside the click: Firefox asks only from a user gesture. */
   set(on: boolean): Promise<ConsentState>
+  /**
+   * After an erase: a new install number and an empty queue, only if collection is on at that
+   * moment. One step, so a switch-off that lands first is never undone by it.
+   */
+  renew(): Promise<ConsentState>
 }
 
 /**
@@ -123,6 +128,14 @@ export function startUsage(
         const next = on && allowed === 'on'
         await s.setConsent(next)
         return next ? 'on' : 'off'
+      }),
+    renew: () =>
+      serial(async () => {
+        const { allowed, s } = await current()
+        if (allowed === 'unsupported') return 'unsupported'
+        if ((await s.consent()) !== 'on') return 'off'
+        await s.setConsent(true)
+        return 'on'
       }),
   }
 }

@@ -314,3 +314,11 @@ the usage block in pages.css (visual layer, sheleg-design's), and a tested modul
 
 Store screenshots retaken on 693e0bd at 8.9 GB free; `pnpm gates` then green in full at 8.8 GB: 216 files,
 3517 tests passed, 2 skipped; ux:lint, brand:lint, i18n:sweep, package:check exit 0. Next: round 6.
+
+## Stage 6: certification, round 6 (2026-11-05, on 89dc27f)
+
+CI on 89dc27f green on all four jobs. Unit tier: **fail** on one `breaks`: the renewal after an erase read the
+state and then set it in two worker calls, so a switch-off landing between them was undone (reproduced by the
+tier). Fixed with one worker step, RPC `usage/renew` (`Usage.renew()` runs inside the serial chain and renews only
+if collection is on at that moment); `start.test.ts` «the renewal after an erase» seen red. Risk taken in: the
+page repaints whenever the renewal changes the notice, so a renewal that worked takes an earlier notice away.
