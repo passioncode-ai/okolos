@@ -126,3 +126,22 @@ describe('the App-Key', () => {
     // Every other way out is the guard's own: tools/keyed-builds.test.ts.
   })
 })
+
+/**
+ * This repository is public, and the operator's personal deployments are not (round 14, seam
+ * tier): the other Aptabase instance, its repository and the agent that answered for it are named
+ * by role in tracked files, never by name. The names are built from parts so this file is not one.
+ */
+describe('private deployments', () => {
+  it('are named in no tracked file', () => {
+    const names = [['sshlg', 'analytics'].join('-'), ['sshlg', 'growth'].join('-'), ['analytics', 'sshlg', 'me'].join('.')]
+    const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean)
+    const hits = tracked.filter((file) => {
+      const full = path.join(root, file)
+      if (!existsSync(full) || /\.(png|jpe?g|webp|ico|zip|woff2?)$/.test(file)) return false
+      const text = readFileSync(full, 'utf8')
+      return names.some((name) => text.includes(name))
+    })
+    expect(hits).toEqual([])
+  })
+})

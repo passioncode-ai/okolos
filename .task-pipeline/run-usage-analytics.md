@@ -22,8 +22,8 @@ Operator decision 2026-11-04 for all PassionCode products, relayed verbatim by s
 | `docs/store/listing.md:56,111` | «Не собирает аналитику» / «Collects no analytics» | stale after this run |
 | ADR-0003 single network choke point | every request leaves through one module | binds: the transport goes through it |
 | ADR-0019 page content never reaches our infrastructure | no page text, no URL | binds: no page-derived prop |
-| `docs/brand/facts.md` network destinations, checked by `tools/docs.test.ts` | the list of hosts the product talks to | stale after this run: add analytics.sshlg.me |
-| skill usage-events 0.3.0 and its `references/consent.md` | Aptabase at analytics.sshlg.me; `iid`, `environment`, `platform` at the sink; on by default per product since 2026-11-04; off deletes `iid` and drops the queue; on again makes a new `iid`; never send IP, file names, typed text | binds; agrees with the operator decision |
+| `docs/brand/facts.md` network destinations, checked by `tools/docs.test.ts` | the list of hosts the product talks to | stale after this run: add the analytics host |
+| skill usage-events 0.3.0 and its `references/consent.md` | Aptabase at another instance; `iid`, `environment`, `platform` at the sink; on by default per product since 2026-11-04; off deletes `iid` and drops the queue; on again makes a new `iid`; never send IP, file names, typed text | binds; agrees with the operator decision |
 | extensionworkshop.com «Firefox built-in data consent» (read 2026-11-04) | new extensions since 2025-11-03 declare `data_collection_permissions`; `technicalAndInteraction` can only be optional, the person turns it on or off in the install flow | binds for Firefox |
 | store state (B-137) | version 0.0.1, never published; no installs exist | so «existing installs on by default» reaches nobody today |
 
@@ -43,7 +43,7 @@ Retro floor: no `docs/evidence/retro.md` in this repository, 0 bytes read.
 | A4 | Every event carries `iid`, `environment`, `platform`, attached at one sink | unit test that fails when the sink stops attaching |
 | A5 | Nothing from the page or the person: no URL, host, page text, file name, hash, password, typed text; props are enumerated strings | unit test over every event in the catalogue; bundle gate |
 | A6 | Error reports as anonymous events (area and kind, enumerated), no stack text with paths or URLs | unit test |
-| A7 | Transport through the single network module (ADR-0003); App-Key injected at build from `sshlg-analytics/prod/APTABASE_APP_KEY_OKOLOS`, never tracked | bundle-scan gate, `git grep` for the key shape |
+| A7 | Transport through the single network module (ADR-0003); App-Key injected at build from a vault slot (now `passioncode-platform/prod/APTABASE_APP_KEY_OKOLOS`), never tracked | bundle-scan gate, `git grep` for the key shape |
 | A8 | Event catalogue `docs/analytics.md` (event, status, screens with file:line, props) | docs test |
 | A9 | Same change: `docs/privacy.md`, `docs/store/listing.md` in every locale, `docs/brand/facts.md`, a new ADR, `docs/ux/scenarios.md`, flows, screens; texts checked with Copylot | `tools/docs.test.ts`, `python3 docs/ux/lint.py`, Copylot report ids |
 | A10 | Growth onboarding: Aptabase app, signed key slot, test event; registering in growth and connecting the source are operator writes asked in this session | growth-onboarding status table |
@@ -59,14 +59,14 @@ Retro floor: no `docs/evidence/retro.md` in this repository, 0 bytes read.
 ## Events
 
 - 2026-11-04: stage 0 started; brief and REQ spine written; stage 1 next: Aptabase client contract
-  (`~/DATA/sshlg-analytics/docs/client-contract.md`), Firefox `permissions` API for data collection, the
+  (the client contract of another Aptabase deployment), Firefox `permissions` API for data collection, the
   extension's network module and options page.
 - 2026-11-04: stage 1, first findings. (1) `packages/net/src/destinations.ts` is a closed map purpose → hosts,
   checked at run time (ADR-0003); analytics needs a new purpose (working name `usage-data`) with exactly
-  `analytics.sshlg.me`, plus its wording in the audit panel, in `@okolos/contracts` `Purpose` and in
+  `another Aptabase instance`, plus its wording in the audit panel, in `@okolos/contracts` `Purpose` and in
   `docs/brand/facts.md`. (2) `apps/extension/manifest.firefox.json` has `strict_min_version` 129, while Firefox's
   built-in data consent exists from 140 (extensionworkshop.com): stage 2 decides between raising the floor to 140
-  and not sending on 129..139. (3) The Aptabase client contract is `~/DATA/sshlg-analytics/docs/client-contract.md`
+  and not sending on 129..139. (3) The Aptabase client contract is that of another deployment
   (237 lines): at most 25 events a batch, events older than 24 h refused, `sdkVersion` required, retry only
   transport errors, 429 and 5xx. Next: read the contract in full, the options page and the first-run surface, then
   stage 2 design.
@@ -86,14 +86,14 @@ Retro floor: no `docs/evidence/retro.md` in this repository, 0 bytes read.
 
 | # | Decision | Why |
 |---|---|---|
-| D1 | Transport: our own small client over `packages/net` with a new purpose `usage-data` whose only host is `analytics.sshlg.me`; batch route `/api/v0/events`, at most 25 a request; retry only transport errors, 429 and 5xx with backoff | ADR-0003 (one choke point, closed purposes, audit entry before the request); client contract |
+| D1 | Transport: our own small client over `packages/net` with a new purpose `usage-data` whose only host is `another Aptabase instance`; batch route `/api/v0/events`, at most 25 a request; retry only transport errors, 429 and 5xx with backoff | ADR-0003 (one choke point, closed purposes, audit entry before the request); client contract |
 | D2 | Consent state in `storage.local`: `on` or `off`, the random `iid` while on. Chrome and Edge: on from the first run, the notice is on the first-run screen (SCR-01). Firefox 140+: on only while `browser.permissions.getAll()` lists `technicalAndInteraction` under `data_collection`; the manifest declares it under `browser_specific_settings.gecko.data_collection_permissions.optional`; the options switch calls `permissions.request` / `permissions.remove`. Firefox 129..139 (no `data_collection` key): nothing is sent, the switch says why | operator 2026-11-04; Firefox platform rule; keeps the 129 floor |
 | D3 | Off: delete `iid`, drop the queue, send nothing; on again: a new `iid`. No erasure promise (Okolos is not on growth's C4 path) | consent.md |
 | D4 | `environment`/`isDebug` from the build: the store build made by `pnpm package` is `production`/`false`; dev, e2e and CI builds are `sandbox`/`true`; a build with no App-Key sends nothing | client contract «Build modes» |
-| D5 | `platform`: asked of sshlg-growth (thread `881757d0`), proposal `browser_extension`; `osName`, `engineName`, `engineVersion` filled from `navigator.userAgent` by the server's map | usage-events; client contract «Web sinks» |
+| D5 | `platform`: asked of the analytics owner (thread `881757d0`), proposal `browser_extension`; `osName`, `engineName`, `engineVersion` filled from `navigator.userAgent` by the server's map | usage-events; client contract «Web sinks» |
 | D6 | Events: a closed catalogue in `docs/analytics.md`; each event's props an enumerated schema checked at the sink; errors as `error_occurred` {`area`, `kind`} events, not the unused `/api/v0/error` route | usage-events; client contract «Error reporting (exists, not yet used)» |
 | D7 | Nothing from the page or the person: no URL, host, page text, file name, hash, password, address, typed text, stack text; a unit test runs every catalogue event through the sink with planted page data and fails if any leaves | ADR-0019; consent.md «Never send» |
-| D8 | App-Key `sshlg-analytics/prod/APTABASE_APP_KEY_OKOLOS` injected by `pnpm package` through `use_secret.py run`; never in a tracked file | usage-events «The transport» |
+| D8 | App-Key a vault slot (now `passioncode-platform/prod/APTABASE_APP_KEY_OKOLOS`) injected by `pnpm package` through `use_secret.py run`; never in a tracked file | usage-events «The transport» |
 | D9 | Same change: `docs/privacy.md` (the «Чего нет» list and a new section), `docs/store/listing.md` ru and en, `docs/brand/facts.md` destinations, ADR-0021, `docs/ux/scenarios.md` (first-run notice, the switch, Firefox both ways), `flows.md`, `screens.md` SCR-01 and the options screen; texts through Copylot | operator 2026-11-04 ~17:25; CLAUDE.md routes |
 
 Next: stage 3, scenarios through super-ux, then the plan and TDD build.
@@ -116,21 +116,21 @@ instead), so the texts say what is sent and what is not, and never call it anony
 
 `docs/privacy.md` (the «Чего нет» bullet and a new section) is written with the code, against the final event
 catalogue, and checked then. Next: stage 4 plan.
-- 2026-11-04 17:30 UTC, sshlg-growth answered (thread `881757d0`): `platform` is `browser_extension` (not `web`:
+- 2026-11-04 17:30 UTC, the analytics owner answered (thread `881757d0`): `platform` is `browser_extension` (not `web`:
   `web` means a site's page), browser and OS through `systemProps`; growth adds the value in manifest revision 34
   (RB-111); until then `POST /v1/config` refuses it, which Okolos does not call. And the server: PassionCode
-  products send to `analytics.passioncode.ai` (passioncode-platform `infra/analytics`), not `analytics.sshlg.me`;
-  growth reads both. The operator's decision names no server, `analytics.sshlg.me` was this run's choice from the
+  products send to `analytics.passioncode.ai` (passioncode-platform `infra/analytics`), not `another Aptabase instance`;
+  growth reads both. The operator's decision names no server, `another Aptabase instance` was this run's choice from the
   usage-events skill, so the design changes: D1 host `analytics.passioncode.ai`; D5 `platform: browser_extension`;
   D8 App-Key slot `passioncode-platform/prod/APTABASE_APP_KEY_OKOLOS`, made by growth with
   passioncode-platform `scripts/app.sh create` (asked, answer pending). `docs/brand/facts.md` and
   `packages/net/src/destinations.ts` will name `analytics.passioncode.ai`.
-- 2026-11-04 17:43 UTC, sshlg-growth: Aptabase app «Okolos» `U2Q3Qa4oUyq3AE7U7qYPnB` on
+- 2026-11-04 17:43 UTC, the analytics owner: Aptabase app «Okolos» `U2Q3Qa4oUyq3AE7U7qYPnB` on
   `https://analytics.passioncode.ai`, App Key in `passioncode-platform/prod/APTABASE_APP_KEY_OKOLOS` (never
   printed), a Debug test event accepted (200). growth-onboarding steps 1..3 hold; growth registration and reading this
   server wait for RB-108 on growth's side (a reader password from the operator). Resource proposed to Observatory as
   `prop:6aa77ea2725844ea`. Revision 34 with `browser_extension` rolls out today.
-- 2026-11-04 18:15 UTC, sshlg-growth: `browser_extension` is live in growth 0.37.0 (manifest revision 34, `279aeaa`):
+- 2026-11-04 18:15 UTC, the analytics owner: `browser_extension` is live in growth 0.37.0 (manifest revision 34, `279aeaa`):
   config request and its targeting, `segment.platform` in stats, funnel and series, `platforms` on an experiment
   card. The usage-events and remote-config skills name it in growth's repository until the sshlg-skills release.
 
@@ -434,7 +434,7 @@ CI on 16e9749 green on all four jobs. Unit tier: **pass** (fifth clean unit roun
 B-206 and B-215). Product tier: **fail** on three `breaks`: docs/README.md still said 49 scenarios, 39 implemented
 (now 53 and 42, and the row no longer claims a gate holds it); its human queue named one decision (now three, with
 B-203 and B-216); the policy named only country from the IP, while the same Aptabase image (`sha256:776a62e0`, as
-sshlg-analytics documents at `de9200c`) stores country, region and a daily device hash for the event's whole life
+another deployment of it documents) stores country, region and a daily device hash for the event's whole life
 (privacy.md and facts.md now say so, Copylot `89af2866`; B-203 asks the platform to write it down). Risks taken in:
 SCR-10's «Used by» names FLW-24, and its flat-list reason excepts the usage rows (B-205).
 Seam tier, round 12: **pass** (four risks, taken in: SCR-10's test count 35; SCR-17 says usage data is the only data
@@ -460,3 +460,18 @@ Seam tier, round 13: **fail** on one `breaks`: the two lines added to the covera
 exact at 6f167c0 (strategy `coverage-matrix.md:161` → `:163`; superpowers backlog `:55`, `:85` pinned `@6f167c0`).
 Risks: `PRIVACY_URL` now held to `PROXY_ORIGIN` by `tools/privacy-served.test.ts` (a planted origin fails it); the
 switch text naming only the header while the policy names country, region and the daily hash, into B-215.
+
+## Stage 6: certification, round 14 (2026-11-05, on fffdaab)
+
+CI on fffdaab green on all four jobs. Unit tier: **pass** (seventh clean unit round; one risk into B-215: the
+served-policy refusal says «both dated» when the dates differ). Seam tier: **pass**, with one risk taken in at once:
+the public repository named the operator's private analytics deployment, its repository and the agent that answered
+for it (facts.md, backlog, `packages/net/src/destinations{,.test}.ts`, this ledger); all are now named by role, and
+`tools/analytics.test.ts` «private deployments» refuses the three names in any tracked file (a planted line fails it).
+Earlier commits of this public branch, and the B-198 row on main since before this run, still carry the names in Git
+history; history is not rewritten (no force-push). Product tier: **fail** on two `breaks`: privacy.md gave «это не
+сведения о вас» as why the usage queue is outside the export, against its own event table (now the real reason, in
+privacy.md and SCN-024); it called the deployment behind the daily-hash fact «другого сервиса организации» (now «в
+другом его развёртывании»). Risk taken in: SECURITY.md's App-Key bullet gives the true boundary (the key only admits
+events; reading needs a dashboard sign-in), Copylot `ac73b697`. Risks into B-215: the export's «ничего не изъято» while
+the usage state stays out; CHANGELOG.md beside usageWhat in the alignment row.
