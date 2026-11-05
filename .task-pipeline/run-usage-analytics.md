@@ -551,3 +551,33 @@ against both clocks for good). Seam tier: **pass** (one risk into B-215: screens
 rule count in the present tense). Product tier: **pass** (two risks into B-215: the service-retention section cites a
 private repository; «хэш» beside «хеш»). Round 21 runs on the commit that records these, which changes only the backlog
 and this ledger.
+
+## Stage 6: certification, round 21 (2026-11-05, on 62a3d48)
+
+CI on 62a3d48 green on all four jobs. **All three tiers pass for the second round running: the certification is
+complete.** Unit tier: **pass** (fourteenth clean unit round; one risk into B-214: a failed save after a successful
+send sends the event again). Seam tier: **pass** (one risk into B-215: analytics.md and a sink comment say a day-old
+event does not stay on the device, while only the next write or send drops it). Product tier: **pass** (two risks into
+B-215: the self-audit row names a usage event but not its values; the first-run tab keeps saying collection is on after
+it was switched off elsewhere).
+
+## Stage 7: integration (2026-11-05)
+
+PR #29 marked ready and merged by squash with `--match-head-commit 62a3d48`: `98734c7` on main, its tree equal to the
+certified commit (`git diff 62a3d48 origin/main` empty), and its message written by hand so it names no private
+deployment (`git log -1 --format=%B origin/main` checked). B-198 and B-199 closed with that receipt. Deleting the
+remote branch `feat/usage-analytics` (the B-213 decision) was refused by this session's permission check; it is left to
+a person and recorded in B-213.
+
+## Handoff
+
+- **Objective:** B-198/B-199, usage and error data on by default with a first-run notice and a switch (ADR-0021).
+- **Done:** shipped to main as `98734c7` (PR #29); certified by rounds 20 and 21; B-198 and B-199 closed.
+- **Open:** B-213 after the merge: fabric-workspace `knowledge/products.md`, `plans.md:127,150` and RM-13's open item
+  still carry the old Okolos wording, org-index `repositories.json` okolos `depends_on` is empty, then
+  `node scripts/workspace.mjs sync`; the worker must be deployed before the first `pnpm package` (the served /privacy
+  is still the 2026-08-08 page, and the package gate refuses until it matches). Accepted risks: B-200..B-216.
+- **Human steps:** delete the remote branch `feat/usage-analytics`; the decisions in B-203, B-216, B-137 and B-186;
+  whether to ask GitHub support to drop private names from `refs/pull/29/head` and B-198's older history.
+- **Checks run:** `pnpm gates` green on every pushed commit (last: 3530 passed on 62a3d48); CI green on 62a3d48.
+- **Exact next task:** B-213, starting with fabric-workspace `knowledge/products.md:49` and `plans.md:127`.
