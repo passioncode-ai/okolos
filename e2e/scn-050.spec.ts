@@ -12,7 +12,7 @@ test('the first run says what is sent, and the notice leads to the switch', asyn
   const page = await context.newPage()
   await page.goto(`chrome-extension://${extensionId}/first-run.html`)
 
-  await expect(page.locator('[data-role=usage-notice]')).toContainText('Okolos sends us data on how the product runs')
+  await expect(page.locator('[data-role=usage-notice]')).toContainText('Okolos sends us usage and error data')
   const opened = context.waitForEvent('page')
   await page.locator('[data-role=usage-off]').click()
   const settings = await opened

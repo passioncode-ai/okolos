@@ -586,6 +586,7 @@ generator, and the sheet declares no colour of its own.
   | blocked | another copy of Okolos holds the store | - | says to close the other window; trying again then works |
   | unknown | anything else | - | says the reason is below, and shows it |
 - **Replaces six errors with one panel.** Every section of the options page reads the store and catches its own failure, so a profile written by a newer build rendered the browser's sentence about requested and existing versions once per panel, in a page that was otherwise empty. The check runs before any area is built
+- **After "Clear the local data" the cleared page is drawn first, then the install number for usage and error data is renewed when collection is on;** a renewal that fails opens «Ваши данные», where the usage block says so (`usageRenewFailed`, SCR-12)
 - **There is no confirmation behind "Clear the local data" — this panel is the confirmation.** The note carries what the wipe dialog's list carries, because a user agreeing to a word is not a user who agreed
 - **Coverage:** packages/ui/src/storage/storage-problem.ts:renderStorageProblem, packages/ui/src/storage/storage-problem.test.ts, apps/extension/src/options/index.ts:storageProblem
 - **Scenarios:** SCN-032

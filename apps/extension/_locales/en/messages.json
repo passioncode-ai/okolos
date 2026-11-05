@@ -454,7 +454,7 @@
     "message": "Your data"
   },
   "dataIntro": {
-    "message": "Everything is stored on this device. Take a copy, or delete all of it — no account is involved either way."
+    "message": "Okolos keeps your data on this device. Take a copy, or delete all of it: no account is involved either way. Usage and error data already sent is not deleted by this."
   },
   "dataKindAudit": {
     "message": "the outbound log of what was sent"
@@ -992,7 +992,7 @@
     "message": "not available yet"
   },
   "firstRunUsageNotice": {
-    "message": "Okolos sends us data on how the product runs and where it breaks, so we can fix it. It contains no page addresses, page text, file names, email or passwords."
+    "message": "Okolos sends us usage and error data so we can fix the product where it breaks. It contains no page addresses, page text, file names, email or passwords."
   },
   "firstRunUsageOff": {
     "message": "Open Your data"

@@ -331,3 +331,13 @@ Fixed: the renewal repaints only after a full wipe (the retry's full wipe repain
 repaints the cleared page first and renews after; four second descriptions reworded (docs/README, the
 privacy-served header, the build.mjs runbook reference, the renewUsage docstring). Not covered by a test: the
 options erase wiring has no harness (recorded since round 4).
+
+Product tier, round 6 (on 89dc27f): three `breaks`, fixed: `dataIntro` («Всё хранится на этом устройстве») narrowed
+to what Okolos keeps and what an erase does not delete (Copylot ru `08b5325f`, en `a272e05c`); SECURITY.md no longer
+counts five purposes; SCN-032 Telemetry and the analytics.md `error_occurred` row say what happens when the store
+cannot open (recorded per worker start, held by AuditWriteError, sent only if the store opens within a day, dropped
+by clearing). Risks taken in: `firstRunUsageNotice` uses the brand term (same reports; e2e/scn-050 matches it);
+ADR-0021 narrows ADR-0019's «ничего не уходит к нам» to page content; SCR-20 and SCN-032 name the reset's renewal;
+privacy.md says private windows count the same (Copylot `a8cd88dc`). Rows widened: B-204 (Mozilla data categories),
+B-206 (the per-wake count). The ADR-0021 lease was taken after its edit and before the commit: a slip, said here.
+Screenshots retaken at 8.9 GB; pnpm gates green in full at 8.7 GB: 216 files, 3522 tests. Next: round 7.
