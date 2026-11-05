@@ -69,6 +69,7 @@ import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 
 import { recordPageRequest } from './page-requests.js'
 import { recordTrap } from './trap-journal.js'
+import type { EventProps } from './usage/catalogue.js'
 import { startUsage } from './usage/start.js'
 import { optionsPageFor } from '../options/views.js'
 
@@ -647,6 +648,11 @@ async function handlePasswordCheck(
     }
   }
 
+  void usage.track('check_done', {
+    check: 'password',
+    result: verdict.offline ? 'unavailable' : verdict.compromised ? 'found' : 'ok',
+  })
+
   const answer: PasswordAnswer = {
     compromised: verdict.compromised,
     count: verdict.count,
@@ -761,6 +767,11 @@ async function handleLeakCheck(payload: { address: string }): Promise<RpcMap['le
   // and does not become "no key saved" (B-125 round 2).
   const breaches = await hibpFromStore(() => readSetting('hibp:apiKey'))
   const inventory = await lookupLeaks(payload.address, [breaches, CAVALIER], await auditDeps())
+  // Found or not, never what: no address, no breach name, no count.
+  void usage.track('check_done', {
+    check: 'leak-inventory',
+    result: !inventory.complete ? 'unavailable' : inventory.leaks.length > 0 ? 'found' : 'ok',
+  })
   return {
     leaks: inventory.leaks.map((leak) => ({ ...leak, classes: [...leak.classes] })),
     sources: inventory.sources.map((source) => ({ ...source })),
@@ -991,6 +1002,8 @@ async function journalTrap(payload: { kind: string; signals: string }): Promise<
   } catch (cause) {
     console.warn('okolos: could not journal a page trap', cause)
   }
+  // The kind only, from the catalogue's list; the sink refuses anything else. No signal, no page.
+  void usage.track('warning_shown', { kind: payload.kind } as EventProps<'warning_shown'>)
   return { ok: true }
 }
 
@@ -1133,6 +1146,7 @@ platform.downloads.onCreated((item, named) => {
       })
     },
     announce: async (verdict, _item, outcome) => {
+      if (verdict.action === 'block' || verdict.action === 'warn') void usage.track('warning_shown', { kind: 'download' })
       /**
        * `tabs.sendToActive`, not `runtime.send`, and the difference is the whole
        * defect this replaces.
@@ -1353,6 +1367,7 @@ async function pullFeed(): Promise<void> {
     })
   } catch (cause) {
     console.warn('okolos: feed sync failed', cause)
+    void usage.track('error_occurred', { area: 'feed', kind: 'unexpected' })
   }
 }
 
