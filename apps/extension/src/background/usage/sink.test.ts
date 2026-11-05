@@ -310,3 +310,27 @@ describe('the queue', () => {
     expect(h.state()?.queue.length).toBeLessThanOrEqual(500)
   })
 })
+
+describe('a flush whose queue head moved during the send (B-215, round 13)', () => {
+  it('removes the event it sent by what it is, so the unsent one behind it stays', async () => {
+    const h = harness()
+    await h.sink.track('extension_installed', { reason: 'install' })
+    await h.sink.track('first_run_completed', { result: 'clean' })
+    // While the first event is in flight, another step drops it from the head (as `track`'s
+    // day-old prune can) and appends a later event: the stored queue no longer starts with it.
+    let first = true
+    h.deps.send = vi.fn(async (spec) => {
+      h.sent.push(spec)
+      if (!first) return new Response('{}', { status: 503 })
+      first = false
+      const now = h.state() as UsageState
+      const [head, ...rest] = now.queue
+      await h.deps.save({ ...now, queue: [...rest, { ...(head as UsageState['queue'][number]), at: (head?.at ?? 0) + 1 }] })
+      return new Response('{}', { status: 200 })
+    })
+    await h.sink.flush()
+
+    // The second event was never accepted and is still queued, ahead of the one appended later.
+    expect(h.state()?.queue.map((event) => event.eventName)).toEqual(['first_run_completed', 'extension_installed'])
+  })
+})
