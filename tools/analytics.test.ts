@@ -20,6 +20,34 @@ const rows = doc
   .filter((line) => /^\| `[a-z_]+` \|/.test(line))
   .map((line) => line.split('|').map((cell) => cell.trim()))
 
+/**
+ * The policy carries the same list (round 13, product tier): the served `/privacy` page drops links
+ * to `.md` files, so a list that lived only in `docs/analytics.md` was one a reader of the policy
+ * could not reach.
+ */
+const policy = readFileSync(path.join(root, 'docs/privacy.md'), 'utf8')
+const policyRows = policy
+  .split('\n')
+  .filter((line) => /^\| `[a-z_]+` \|/.test(line))
+  .map((line) => line.split('|').map((cell) => cell.trim()))
+
+const valuesOf = (cell: string | undefined): string[] => [...(cell ?? '').matchAll(/`([a-z0-9_-]+)`/g)].map((m) => m[1] as string)
+const expectedOf = (name: keyof typeof CATALOGUE): string[] =>
+  Object.entries(CATALOGUE[name]).flatMap(([key, values]) => [key, ...(values as readonly string[])])
+
+describe('the privacy policy lists the events itself', () => {
+  it('names the same events', () => {
+    expect(policyRows.map((cells) => cells[1]?.replaceAll('`', '')).sort()).toEqual(Object.keys(CATALOGUE).sort())
+  })
+
+  it('lists every value of every prop, and no other', () => {
+    for (const cells of policyRows) {
+      const name = cells[1]?.replaceAll('`', '') as keyof typeof CATALOGUE
+      expect(valuesOf(cells[3]).sort(), name).toEqual(expectedOf(name).sort())
+    }
+  })
+})
+
 describe('the event catalogue, for people and for the code', () => {
   it('names the same events', () => {
     expect(rows.map((cells) => cells[1]?.replaceAll('`', '')).sort()).toEqual(Object.keys(CATALOGUE).sort())

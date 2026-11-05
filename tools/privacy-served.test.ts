@@ -34,4 +34,9 @@ describe('the served privacy page, before a store archive', () => {
     const listing = readFileSync(new URL('../docs/store/listing.md', import.meta.url), 'utf8')
     expect(listing).toContain(PRIVACY_URL)
   })
+
+  it('reads it at the worker the extension talks to (round 13, seam tier)', async () => {
+    const { PROXY_ORIGIN } = await import('../apps/extension/src/config.js')
+    expect(PRIVACY_URL).toBe(`${PROXY_ORIGIN}/privacy`)
+  })
 })

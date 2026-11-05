@@ -441,3 +441,22 @@ Seam tier, round 12: **pass** (four risks, taken in: SCR-10's test count 35; SCR
 from the person's use that goes to us, the feed download carrying nothing; `apps/proxy/src/landing.test.ts` now holds
 the landing's usage line equal to the listing's, a planted edit fails it; privacy.md's wipe sentence carries the
 switch-off's caveat about a send under way, Copylot `13747658`).
+
+## Stage 6: certification, round 13 (2026-11-05, on 35ec4bb)
+
+CI on 35ec4bb green on all four jobs. Unit tier: **pass** (sixth clean unit round: 7, 9, 10, 11, 12, 13; one risk into
+B-215: `flush` drops the sent event by position, safe only under `serial`). Product tier: **fail** on two `breaks`:
+the served /privacy page sent the reader to «analytics.md», a link the generator turns into plain text (privacy.md
+now carries the five events and every value itself, and `tools/analytics.test.ts` holds that table equal to the
+catalogue; a planted missing value fails it; the B-205/B-211 ids are gone from the served text); the self-audit's
+weekly summary read «случайный номер установки: 2», a count readable as the number (now «запросов со случайным номером
+установки: N» / «requests carrying the random install number: N», Copylot ru `56ec9055`, en `cc9abed3`). Risks taken
+in (Copylot `f0dd8350`): the policy's opening sentence scoped to the extension, the service paragraph said to restate
+its owner's record; same-day linkage of a new install number by the daily hash, in privacy.md and SCN-051; «сервер» →
+«сервис» in the new paragraphs; facts.md no longer states Firefox's install-prompt default as known (B-211); the human
+queue names the CWS «Privacy practices» form and the AMO data review (B-204); SECURITY.md and ADR-0021 «Цена» record
+the public App-Key; ADR-0019 points at ADR-0021's narrowing.
+Seam tier, round 13: **fail** on one `breaks`: the two lines added to the coverage-matrix legend moved three pointers
+exact at 6f167c0 (strategy `coverage-matrix.md:161` → `:163`; superpowers backlog `:55`, `:85` pinned `@6f167c0`).
+Risks: `PRIVACY_URL` now held to `PROXY_ORIGIN` by `tools/privacy-served.test.ts` (a planted origin fails it); the
+switch text naming only the header while the policy names country, region and the daily hash, into B-215.

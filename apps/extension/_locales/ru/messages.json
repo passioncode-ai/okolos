@@ -2357,7 +2357,7 @@
     }
   },
   "auditSummaryCarriedInstall": {
-    "message": "случайный номер установки: $COUNT$",
+    "message": "запросов со случайным номером установки: $COUNT$",
     "placeholders": {
       "count": {
         "content": "$1"

@@ -2375,7 +2375,7 @@ sideload читался как смена издателя. Теперь это 
 из 42, счёт командой; `pnpm lint`, `pnpm i18n:sweep`, `pnpm brand:lint` — зелёные.
 
 ### B-57. Хэш-проверки загрузок не существует, а матрица помечает её ✓ — **СДЕЛАНО 2026-08-20**
-`docs/coverage-matrix.md:55` (2.2) помечен `✓ REQ-19, unit` при полном
+`docs/coverage-matrix.md@6f167c0:55` (2.2) помечен `✓ REQ-19, unit` при полном
 отсутствии кода: ни MalwareBazaar, ни VirusTotal, ни `crypto.subtle.digest` по
 байтам загрузки (`grep` → 0). В проде `hash` жёстко
 `{ran:false, why:'downloadNotWritten'}`, а ветка провала покрыта тестом и
@@ -5851,7 +5851,7 @@ SCN-015 называется «Leak inventory with one source unavailable», и 
 которое считается где-то ещё.
 
 ### B-128. Матрица покрытия занижает по строке 3.13
-`docs/coverage-matrix.md:85` помечает «Действие (выключить, закрепить версию,
+`docs/coverage-matrix.md@6f167c0:85` помечает «Действие (выключить, закрепить версию,
 добавить в доверенные)» как несделанное. `setEnabled` и `trust` построены и
 достижимы: `packages/ui/src/extensions/extensions.ts:149` и `:266`,
 `packages/platform/src/adapter.ts:249`. Не построено только «закрепить версию».

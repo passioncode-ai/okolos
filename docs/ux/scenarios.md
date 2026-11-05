@@ -652,7 +652,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Steps:**
   1. User turns the switch off -> system deletes the install's random id, drops the unsent events and stops sending; the block says so. A send already under way when the switch moves finishes first (the steps run one at a time), so events of that batch can still leave: seconds normally, longer on a stalled network (each request has 15 s; opening the outbound log before it has no deadline of its own, B-214)
   2. User turns the switch on again -> system makes a new random id and sends from then on
-- **Expected result:** off means nothing leaves for this purpose; on again cannot be joined to the earlier id
+- **Expected result:** off means nothing leaves for this purpose; on again starts a new id; on the same day the service can link it to the earlier one by its daily device hash, from the next day it cannot
 - **Alt paths:** the self-audit log (SCN-019) shows each sent event under its purpose while on, and none after off; «Удалить все данные» (SCN-023) and «Очистить локальные данные» (SCN-032) replace the install number and drops the unsent events, and collection that was on stays on
 - **UI elements:** switch, one sentence on what is sent
 - **States covered:** success, error

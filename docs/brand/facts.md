@@ -114,8 +114,8 @@ Contract: brand-contract v1
 `storage`, `alarms`, `activeTab`, `declarativeNetRequest`, `webNavigation`,
 `downloads`, `management`, плюс доступ к `http://*/*` и `https://*/*`. В Firefox 140 и
 новее ещё необязательное разрешение на сбор данных `technicalAndInteraction`
-(`data_collection_permissions.optional` в `apps/extension/manifest.firefox.json`, ADR-0021): оно
-выключено, пока человек его не выдаст.
+(`data_collection_permissions.optional` в `apps/extension/manifest.firefox.json`, ADR-0021): Firefox
+спрашивает о нём при установке, а предлагает ли он его отмеченным, ещё не записано (B-211).
 
 **`offscreen` снят 2026-08-20.** Он существовал ради третьей ступени, которая не
 выпускается ([ADR-0006](../adr/0006-third-stage-not-shipped.md)), и уезжал в ревью

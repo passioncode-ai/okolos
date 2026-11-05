@@ -2357,7 +2357,7 @@
     }
   },
   "auditSummaryCarriedInstall": {
-    "message": "a random install number: $COUNT$",
+    "message": "requests carrying the random install number: $COUNT$",
     "placeholders": {
       "count": {
         "content": "$1"
