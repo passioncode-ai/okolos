@@ -283,3 +283,7 @@ Risks: the deadline does not abort the fetch (B-214); the keyed-build guard ends
 11 ends its script child is not tested (the unit tier measured pnpm 12.4 doing so); the renewal notice needs
 the usage block, which a worker that does not answer `usage/state` does not draw (accepted with B-214);
 AGENTS.md now cites the tests that hold the per-event writes.
+
+Store screenshots retaken on 78cbc21 (started at 8.1 GB free); `pnpm gates` then green in full: 215 files, 3512
+tests passed, 2 skipped, ux:lint, brand:lint, i18n:sweep, package:check exit 0. The gates run started at 7.5 GB,
+under the coordinator's line, because the screenshots had just used 0.6 GB: a second slip, said here.
