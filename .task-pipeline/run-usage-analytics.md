@@ -583,6 +583,16 @@ a person and recorded in B-213.
 - **B-213 done (2026-11-05):** fabric-workspace PR #663 (`3a17eaa`, `npm test` 172 passed) and org-index PR #89
   (`78bce88`, unittest 302 OK, `check_index.py`'s one finding is the same on main); the wiki publishes at the scheduled
   sync. The closeout of this run is okolos PR #30 (`7087e84`).
-- **Exact next task:** B-215's text items in one Copylot pass: `usageWhat`, `auditKeptUsageData` and CHANGELOG name the
-  build kind, the constant labels and the event values; «хэш» becomes «хеш» in privacy.md and facts.md; the day-old
-  event wording in analytics.md and `sink.ts:94`.
+- **B-215 after the merge (2026-11-05), each its own PR, each with a test seen red where code changed:** #32 texts
+  (in-product lists, «хеш», day-old wording), #33 the sent event leaves the queue by identity, #34 the self-audit row
+  names catalogue values, #35 the first-run tab repaints on return, #36 six hardening items, #37 renew-failed note and
+  password wording, #38 the export says the usage state is not in it, #39 the screenshot digest reads `_locales` and
+  the mounting pages, #40 the policy names the proxy access log, #41 an unreadable Firefox consent keeps the install id,
+  #42 `leakCheckResult` before the first production send, #43 the App-Key looked for in every shipped file, #44 the
+  renew-failed notice only while on, #45 the send limits held to the code, #46 Telemetry lines in the emitting
+  scenarios, #47 `Usage.renew()` tests in Firefox, #48 a stale Firefox answer repaints.
+- **Exact next task:** what B-215 still holds open: the keyed-builds SIGKILL fallback reaches only pnpm, not
+  `tools/build.mjs` (spawn the build in its own process group); a transport error class of its own in `@okolos/net`
+  so a non-transport `TypeError` cannot hold the queue; `01-interstitial.png` and `04-popup.png` show degraded states
+  under captions about full ones; the single ENOENT on `dist` in `pnpm gates` (no test found that rebuilds it). Then
+  B-214: a stable event id the service can drop repeats by, and the timeouts named there.
