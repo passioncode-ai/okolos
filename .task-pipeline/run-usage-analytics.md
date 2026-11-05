@@ -322,3 +322,5 @@ state and then set it in two worker calls, so a switch-off landing between them 
 tier). Fixed with one worker step, RPC `usage/renew` (`Usage.renew()` runs inside the serial chain and renews only
 if collection is on at that moment); `start.test.ts` «the renewal after an erase» seen red. Risk taken in: the
 page repaints whenever the renewal changes the notice, so a renewal that worked takes an earlier notice away.
+
+Gates on b9487dc: 3520 passed, 2 red (analytics line refs moved by the new RPC case; screenshots hash covers the options code). Line refs moved, screenshots retaken at 8.9 GB; tools/listing, analytics, wireframes 44/44; ux:lint, brand:lint, i18n:sweep, package:check exit 0.
