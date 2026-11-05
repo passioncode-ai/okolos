@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -85,7 +85,9 @@ describe('the event catalogue, for people and for the code', () => {
       for (const [, file, line] of sites) {
         const source = readFileSync(path.join(root, file as string), 'utf8').split('\n')
         const around = source.slice(Number(line) - 3, Number(line) + 1).join('\n')
-        expect(around, `${file}:${line} does not send ${name}`).toMatch(new RegExp(`'${name}'|check: '`))
+        // The event's own name, not any `check: '` nearby: a row pointing at another event's line
+        // must fail (B-215).
+        expect(around, `${file}:${line} does not send ${name}`).toMatch(new RegExp(`'${name}'`))
       }
     }
   })
@@ -152,7 +154,9 @@ describe('private deployments', () => {
     const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean)
     const hits = tracked.filter((file) => {
       const full = path.join(root, file)
-      if (!existsSync(full) || /\.(png|jpe?g|webp|ico|zip|woff2?)$/.test(file)) return false
+      // A tracked path that is not a regular file (a submodule, a link to a directory) is skipped,
+      // not read: reading it would throw instead of reporting (B-215).
+      if (!existsSync(full) || !statSync(full).isFile() || /\.(png|jpe?g|webp|ico|zip|woff2?)$/.test(file)) return false
       const text = readFileSync(full, 'utf8')
       return names.some((name) => text.includes(name))
     })

@@ -33,6 +33,12 @@ describe('which browser this is', () => {
     expect(detectPlatform().kind).toBe('firefox')
   })
 
+  it('is Chrome with only a `browser` object that is not Firefox: the Chrome consent rule, by decision (B-215)', () => {
+    vi.stubGlobal('chrome', undefined)
+    vi.stubGlobal('browser', api())
+    expect(detectPlatform().kind).toBe('chrome')
+  })
+
   it('is Chrome with only `chrome`', () => {
     vi.stubGlobal('chrome', api())
     vi.stubGlobal('browser', undefined)

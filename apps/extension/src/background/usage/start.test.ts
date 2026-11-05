@@ -164,7 +164,9 @@ describe('the renewal after an erase', () => {
   const keyed = { appKey: 'A-SH-0000000000', environment: 'sandbox' as const }
 
   it('renews the install number only when collection is on at that moment, in one step', async () => {
-    const p = platform('chrome', { consent: 'on', iid: '6f0c2b0e-8b5e-4d8c-9a51-2f0f5c3d9e11', queue: [] })
+    // A queue that is not empty, so «the unsent events are deleted» (dataConfirmNote) is what is held.
+    const waiting = { eventName: 'extension_installed' as const, at: Date.parse('2026-11-04T20:00:00.000Z'), sessionId: '1', props: { reason: 'install' } }
+    const p = platform('chrome', { consent: 'on', iid: '6f0c2b0e-8b5e-4d8c-9a51-2f0f5c3d9e11', queue: [waiting] })
     const usage = startUsage(p.platform, audit, {}, keyed)
     expect(await usage.renew()).toBe('on')
     const renewed = p.values.get('usage:state') as UsageState

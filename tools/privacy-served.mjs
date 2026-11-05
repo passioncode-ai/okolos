@@ -25,6 +25,10 @@ export function servedPolicyBehind(served, document, html) {
   if (wanted === null) return 'docs/privacy.md has no «Обновлено» date'
   if (got === null) return `${PRIVACY_URL} carries no «Обновлено» date`
   if (got < wanted) return `${PRIVACY_URL} is the policy of ${got}, docs/privacy.md is of ${wanted}`
-  if (!served.includes(html)) return `${PRIVACY_URL} differs from docs/privacy.md (both dated ${wanted})`
+  if (!served.includes(html)) {
+    return got === wanted
+      ? `${PRIVACY_URL} differs from docs/privacy.md (both dated ${wanted})`
+      : `${PRIVACY_URL} (dated ${got}) differs from docs/privacy.md (dated ${wanted})`
+  }
   return null
 }
