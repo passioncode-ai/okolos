@@ -163,3 +163,35 @@ describe('private deployments', () => {
     expect(hits).toEqual([])
   })
 })
+
+/**
+ * The send limits are stated to people in docs/privacy.md and docs/analytics.md; the numbers are
+ * read from the code here, so a constant changed in sink.ts or send.ts fails until both documents
+ * say it too (B-215, round 10).
+ */
+describe('the send limits the documents state', () => {
+  const sink = readFileSync(path.join(root, 'apps/extension/src/background/usage/sink.ts'), 'utf8')
+  const send = readFileSync(path.join(root, 'apps/extension/src/background/usage/send.ts'), 'utf8')
+  const value = (source: string, name: string): number => {
+    const found = new RegExp(`const ${name} = ([0-9_ *]+)`).exec(source)?.[1]
+    expect(found, `${name} is no longer a plain constant this test can read`).toBeTruthy()
+    return (found as string).replaceAll('_', '').split('*').reduce((product, factor) => product * Number(factor.trim()), 1)
+  }
+  const perFlush = value(sink, 'PER_FLUSH')
+  const queueMax = value(sink, 'QUEUE_MAX')
+  const maxAge = value(sink, 'MAX_AGE_MS')
+  const skew = value(sink, 'FUTURE_SKEW_MS')
+  const deadline = value(send, 'SEND_DEADLINE_MS')
+  const analyticsDoc = readFileSync(path.join(root, 'docs/analytics.md'), 'utf8')
+
+  it('names the same numbers as the code', () => {
+    expect(maxAge, 'the documents say «старше суток»').toBe(24 * 60 * 60 * 1000)
+    for (const [file, text] of [['docs/privacy.md', policy], ['docs/analytics.md', analyticsDoc]] as const) {
+      expect(text, `${file}: per flush`).toContain(`не больше ${perFlush} за раз`)
+      expect(text, `${file}: queue cap`).toContain(`не больше ${queueMax}`)
+      expect(text, `${file}: day`).toContain('старше суток')
+    }
+    expect(analyticsDoc).toContain(`без ответа ${deadline / 1000} секунд`)
+    expect(analyticsDoc).toContain(`больше чем на ${skew / 60_000} минут`)
+  })
+})
