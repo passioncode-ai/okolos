@@ -4,6 +4,7 @@ import { detectPlatform } from '@okolos/platform'
 import { openDb } from '@okolos/storage'
 import '../pages.css'
 import { optionsPageFor } from '../options/views.js'
+import { repaintOnReturn } from './return.js'
 
 /**
  * What the first run can honestly check.
@@ -111,3 +112,4 @@ async function paint(): Promise<void> {
 }
 
 void paint()
+repaintOnReturn(document, () => void paint())
