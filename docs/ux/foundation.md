@@ -259,7 +259,7 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 - **Traces:** JTBD-04, JTBD-05, JRN-02/#1
 - **Acceptance criteria:**
   - Given a password is checked, when the check runs, then of the password only a hash prefix ever leaves the device (and, while usage and error data is on, whether it was found, with no password, hash or site: `check_done` in docs/analytics.md), and the journal records exactly what was sent.
-  - Given the password is in the local corpus, when checked, then the verdict is produced with no network request at all.
+  - Given the password is in the local corpus, when checked, then the verdict is produced with no request about the password (while usage and error data is on, whether it was found leaves later as `check_done`, with no password, hash or site).
 - **Priority:** must
 - **Status:** proposed
 

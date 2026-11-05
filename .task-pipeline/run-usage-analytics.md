@@ -488,3 +488,17 @@ branch commits that name the operator's private deployments; `refs/pull/29/head`
 keep them, and removing those is the operator's call (GitHub support, never a force-push). The self-audit comment
 that counts facts.md's rows («six», now seven) goes into B-215: editing it moves the screenshot surface hash that
 `tools/listing.test.ts` holds (seen red in `pnpm gates`), so it waits for the next screenshot run.
+
+## Stage 6: certification, round 16 (2026-11-05, on 8a5252b)
+
+CI on 8a5252b green on all four jobs. Unit tier: **pass** (ninth clean unit round; two risks into B-215: the sender
+check accepts any event beside `check: '`; a synchronous throw from `permissions.request` skips the «unsupported»
+read-back). Product tier: **fail** on two `breaks`: ST-011's second criterion still promised «no network request at
+all» on a local-corpus hit (now qualified like README and FLW-10); the policy's list of what an event carries left out
+the two constant labels on every event, `browser_extension` and `okolos-usage@1`, while saying nothing outside it is
+sent (privacy.md, its destinations row and facts.md now name them, Copylot `8be1c5b9`; `tools/analytics.test.ts`
+reads both from `sink.ts` and fails on a planted version). Risk into B-215: emitting scenarios do not name their event.
+Seam tier, round 16: **fail** on one `breaks`: B-207 pinned its policy pointer at `5f1e365`, a branch-only commit that
+the squash decision keeps off main (now anchored by section and quote, not by commit). Risk taken in: the commits this
+ledger cites as evidence live, after the squash, only in `refs/pull/29/head` on GitHub (also in B-213); pins in tracked
+files go only to commits already on origin/main.

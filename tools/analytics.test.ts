@@ -40,6 +40,20 @@ describe('the privacy policy lists the events itself', () => {
     expect(policyRows.map((cells) => cells[1]?.replaceAll('`', '')).sort()).toEqual(Object.keys(CATALOGUE).sort())
   })
 
+  it('names the constant labels every event carries (round 16, product tier)', () => {
+    const sink = readFileSync(path.join(root, 'apps/extension/src/background/usage/sink.ts'), 'utf8')
+    const labels = [
+      /const SDK_VERSION = '([^']+)'/.exec(sink)?.[1],
+      /platform: '([^']+)'/.exec(sink)?.[1],
+    ]
+    for (const label of labels) {
+      expect(label, 'sink.ts no longer names the label this test reads').toBeTruthy()
+      for (const [file, text] of [['docs/privacy.md', policy], ['docs/brand/facts.md', readFileSync(path.join(root, 'docs/brand/facts.md'), 'utf8')]] as const) {
+        expect(text, `${file} does not name ${label}`).toContain(`\`${label}\``)
+      }
+    }
+  })
+
   it('lists every value of every prop, and no other', () => {
     for (const cells of policyRows) {
       const name = cells[1]?.replaceAll('`', '') as keyof typeof CATALOGUE
