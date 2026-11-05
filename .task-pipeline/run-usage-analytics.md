@@ -591,8 +591,12 @@ a person and recorded in B-213.
   #42 `leakCheckResult` before the first production send, #43 the App-Key looked for in every shipped file, #44 the
   renew-failed notice only while on, #45 the send limits held to the code, #46 Telemetry lines in the emitting
   scenarios, #47 `Usage.renew()` tests in Firefox, #48 a stale Firefox answer repaints.
-- **Exact next task:** what B-215 still holds open: the keyed-builds SIGKILL fallback reaches only pnpm, not
-  `tools/build.mjs` (spawn the build in its own process group); a transport error class of its own in `@okolos/net`
-  so a non-transport `TypeError` cannot hold the queue; `01-interstitial.png` and `04-popup.png` show degraded states
-  under captions about full ones; the single ENOENT on `dist` in `pnpm gates` (no test found that rebuilds it). Then
-  B-214: a stable event id the service can drop repeats by, and the timeouts named there.
+- **Also landed:** #49 this handoff, #50 the build is ended with its whole process group (POSIX), #51 a transport
+  failure is `TransportError` in `@okolos/net`, so a plain `TypeError` no longer holds the usage queue.
+- **Exact next task:** what B-215 still holds open. (1) `01-interstitial.png` and `04-popup.png` show degraded states
+  because of how `tools/screenshots.mjs` takes them: the block page asks the worker for the last navigation and is
+  opened directly with none, and the popup is opened as a tab, so its active tab is itself. Fixing it means a shot
+  recipe with a real blocked navigation and a popup over a web tab, which the script's authors avoided on purpose (a
+  picture of the harness); a visual-tier decision, then a retake. (2) The single ENOENT on `dist` in `pnpm gates`: no
+  test found that rebuilds or removes it. Then B-214: a stable event id the service can drop repeats by (it needs the
+  service's side), and the timeouts named there.
