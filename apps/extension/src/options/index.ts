@@ -1072,8 +1072,8 @@ async function dataSection(): Promise<HTMLElement> {
       onWipe: async () => {
         const db = await openDb()
         const wiped = await wipeAll(db)
-        await renewUsage()
-        return wiped
+        // A renewal that failed leaves the old install number: a partial wipe, said as one.
+        return (await renewUsage()) ? wiped : { ok: false, failed: [...wiped.failed, 'usage'] }
       },
       // The erase took the key, so the leaks screen goes back to its start here and in every
       // other tab: its last result spoke about a key that no longer exists (N-110 round 3).
@@ -1093,22 +1093,26 @@ async function dataSection(): Promise<HTMLElement> {
 }
 
 /**
- * "Delete all data" takes the install number and the unsent events as well (docs/privacy.md):
- * collection that was on stays on, under a new number, so nothing sent later links to what was
- * sent before. Off has no number to take. A renewal that fails is logged, and the wipe it
- * follows still stands.
+ * "Delete all data" and "Clear the local data" take the install number and the unsent events as
+ * well (docs/privacy.md): collection that was on stays on, under a new number, so nothing sent
+ * later links to what was sent before. Off has no number to take. False when the renewal failed,
+ * which the wipe reports as a part it could not do.
  */
-async function renewUsage(): Promise<void> {
+async function renewUsage(): Promise<boolean> {
   try {
     const { state } = await platform.runtime.send('usage/state', {})
     if (state === 'on') await platform.runtime.send('usage/set', { on: true })
+    return true
   } catch (cause) {
     console.warn('okolos: the wipe could not renew the usage install number', cause)
+    return false
   }
 }
 
 /** Whether the last switch did not save, shown once on the repaint that follows it. */
 let usageFailed = false
+/** The latest switch: an earlier one whose Firefox answer arrives late does not overrule it. */
+let usageSwitches = 0
 
 /**
  * The usage and error data switch (B-199). In Firefox the browser keeps the choice and
@@ -1129,17 +1133,26 @@ async function usagePanel(): Promise<UsagePanel | undefined> {
     firefox: platform.kind === 'firefox',
     failed,
     onSwitch: (on: boolean) => {
+      const mine = ++usageSwitches
       const asked = platform.kind === 'firefox' ? switchConsent('firefox', platform.dataConsent, on) : Promise.resolve(null)
       void asked
-        .then(() => platform.runtime.send('usage/set', { on }))
+        .then((answer) => {
+          if (mine !== usageSwitches) return
+          // Firefox kept the grant after "off": the worker follows the grant, so telling it off
+          // would be undone at the next event. Say the change did not go through instead.
+          if (!on && answer === 'on') throw new Error('Firefox kept the data permission')
+          return platform.runtime.send('usage/set', { on })
+        })
         // A Firefox that declined is an answer, not a failure: the repaint shows the switch off.
         .then(() => {
-          usageFailed = false
+          if (mine === usageSwitches) usageFailed = false
         })
         .catch(() => {
-          usageFailed = true
+          if (mine === usageSwitches) usageFailed = true
         })
-        .finally(() => void reload())
+        .finally(() => {
+          if (mine === usageSwitches) void reload()
+        })
     },
   }
 }
@@ -1320,6 +1333,9 @@ async function storageProblem(): Promise<HTMLElement | null> {
         onReset: () => {
           void (async () => {
             await resetStorage()
+            // The install number lives in the worker's storage, which a broken database does not
+            // reach: clearing takes it too (storageResetNote says so).
+            await renewUsage()
             forgetLeakScreen()
             announceKeyChange('erased')
             await reload()

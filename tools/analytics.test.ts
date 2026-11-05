@@ -82,7 +82,7 @@ describe('the App-Key', () => {
     expect(hits).toEqual([])
   })
 
-  it('leaves no keyed build behind it: `pnpm package` rebuilds dist/<target> without the key, and a failure removes them', () => {
+  it('leaves no keyed build behind it: `pnpm package` rebuilds dist/<target> without the key, and any other way out removes them', () => {
     // A store build in dist/chrome would send production events from an unpacked load, and
     // `pnpm test` would go red here after every release until someone rebuilt (round 1, R3).
     const source = readFileSync(path.join(root, 'tools/package.mjs'), 'utf8')
@@ -90,6 +90,11 @@ describe('the App-Key', () => {
     const rebuild = tail.match(/delete process\.env\.APTABASE_APP_KEY_OKOLOS[\s\S]*?delete process\.env\.OKOLOS_USAGE_ENV[\s\S]*?runToCompletion\('pnpm', \['build'\]/)
     expect(rebuild, 'a keyless rebuild after the last archive').not.toBeNull()
     const die = source.slice(source.indexOf('function die('), source.indexOf('process.exit(1)'))
-    expect(die).toContain('dropKeyedBuilds()')
+    expect(die).toContain('keyedBuilds.drop()')
+    // Armed before the first keyed build is spawned, and disarmed only after the keyless one.
+    const firstBuild = source.indexOf("runToCompletion('pnpm', ['build']")
+    expect(source.lastIndexOf('keyedBuilds.arm()', firstBuild), 'armed before the first build').toBeGreaterThan(-1)
+    expect(tail.indexOf('keyedBuilds.disarm()')).toBeGreaterThan(tail.indexOf("runToCompletion('pnpm', ['build']"))
+    // Every other way out is the guard's own: tools/keyed-builds.test.ts.
   })
 })

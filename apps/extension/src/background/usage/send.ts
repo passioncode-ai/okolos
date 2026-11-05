@@ -8,9 +8,9 @@ import type { UsageDeps } from './sink.js'
  * the purpose can reach `analytics.passioncode.ai` only. The audit row names the event that
  * left, which is what a person can check against the self-audit panel.
  */
-export function usageSender(deps: RequestDeps): UsageDeps['send'] {
+export function usageSender(deps: RequestDeps, deadlineMs = SEND_DEADLINE_MS): UsageDeps['send'] {
   return (spec) =>
-    request(
+    withDeadline(request(
       {
         url: spec.url,
         method: 'POST',
@@ -22,7 +22,23 @@ export function usageSender(deps: RequestDeps): UsageDeps['send'] {
         headers: spec.headers,
       },
       deps,
-    )
+    ), deadlineMs)
+}
+
+/**
+ * A send waits at most this long. The usage steps run one at a time, so one request that never
+ * answers would hold the settings switch and the first-run screen behind it; the transport sets
+ * no deadline of its own.
+ */
+const SEND_DEADLINE_MS = 15_000
+
+/** Rejects as a transport failure (`TypeError`) at the deadline, so the event waits for the next send. */
+function withDeadline(sent: Promise<Response>, ms: number): Promise<Response> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new TypeError(`usage send gave no answer within ${ms} ms`)), ms)
+  })
+  return Promise.race([sent, late]).finally(() => clearTimeout(timer))
 }
 
 /** The event's name from the closed catalogue, which is what the self-audit row shows. */

@@ -123,3 +123,21 @@ describe('Firefox, where the browser keeps the choice', () => {
     expect((p.values.get('usage:state') as UsageState).iid).toMatch(/^[0-9a-f-]{36}$/)
   })
 })
+
+describe('the switch, read once', () => {
+  it('reads the Firefox grant once, inside the step, so the answer and what is stored cannot disagree', async () => {
+    const p = platform('firefox')
+    let calls = 0
+    const usage = startUsage(p.platform, audit, {
+      getAll: async () => {
+        calls += 1
+        // Granted at the first read only: a second read would see it taken back.
+        return { data_collection: calls === 1 ? ['technicalAndInteraction'] : [] }
+      },
+    })
+    const answer = await usage.set(true)
+    expect(calls).toBe(1)
+    expect(answer).toBe('on')
+    expect(p.values.get('usage:state')).toMatchObject({ consent: 'on' })
+  })
+})

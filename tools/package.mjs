@@ -29,6 +29,8 @@ import path from 'node:path'
 
 import { archivePlan, compareEntries, zipEntries } from './archive.mjs'
 import { runToCompletion } from './bin.mjs'
+import { guardKeyedBuilds } from './keyed-builds.mjs'
+import { PRIVACY_URL, servedPolicyBehind } from './privacy-served.mjs'
 import { filesUnder } from './tree.mjs'
 import { pruneReleases, RELEASES_KEPT } from './release-prune.mjs'
 import { FEED_MAX_AGE_DAYS, feedAgeDays, feedTooOld, freshestFeed } from './feed-age.mjs'
@@ -41,22 +43,17 @@ const checkOnly = process.argv.includes('--check')
 
 function die(message) {
   console.error(`\npackage: ${message}`)
-  dropKeyedBuilds()
+  keyedBuilds.drop()
   process.exit(1)
 }
 
-/** Set once the store build is in dist/<target>, which then carries the App-Key. */
-let keyed = false
-
 /**
- * A run that stops after the store build removes it: dist/<target> is what an unpacked load
- * and every test read, and it never carries the key (B-199). `pnpm build` puts it back.
+ * dist/<target> carries the App-Key from the moment the store build starts until the keyless
+ * rebuild has finished. Any way out in between (die, an exception, a signal, a first build that
+ * failed half-way) removes it: it is what an unpacked load and every test read (B-199).
  */
-function dropKeyedBuilds() {
-  if (!keyed) return
-  for (const target of TARGETS) rmSync(path.join(dist, target), { recursive: true, force: true })
-  console.error('package: removed the store builds in dist/, which carried the App-Key; `pnpm build` restores them')
-}
+const keyedBuilds = guardKeyedBuilds(TARGETS.map((target) => path.join(dist, target)))
+let keyed = false
 
 const ok = (message) => console.log(`   ok    ${message}`)
 
@@ -135,6 +132,22 @@ if (!checkOnly) {
   ok('--check builds no store archive, so it carries no App-Key')
 }
 
+console.log('\n── the policy the listing names, which must already say what this archive sends')
+if (!checkOnly) {
+  let served
+  try {
+    const response = await fetch(PRIVACY_URL, { signal: AbortSignal.timeout(15_000) })
+    served = await response.text()
+  } catch (cause) {
+    die(`could not read ${PRIVACY_URL} (${cause instanceof Error ? cause.message : String(cause)}); a store archive waits until it can`)
+  }
+  const behind = servedPolicyBehind(served, readFileSync(path.join(root, 'docs/privacy.md'), 'utf8'))
+  if (behind) die(`${behind}. Deploy the worker first (docs/runbooks/worker-deploy.md), then package`)
+  ok(`${PRIVACY_URL} is the policy of docs/privacy.md`)
+} else {
+  ok('--check builds no store archive, so it does not read the served policy')
+}
+
 console.log('\n── build, so the archive is of something this command made')
 // Per target, not per `dist`. `dist` also holds `release/` and the two e2e
 // builds, so it exists long after a target directory has been deleted — and then
@@ -145,8 +158,17 @@ const built = TARGETS.every((target) => existsSync(path.join(dist, target)))
 if (!checkOnly || !built) {
   // pnpm is pnpm.cmd on Windows, which Node will not spawn without a shell (B-163).
   // At the deadline the whole tree ends, not only that cmd.exe (B-164).
+  if (checkOnly) {
+    // A check never builds with the key, whatever the shell it runs in exported.
+    delete process.env.APTABASE_APP_KEY_OKOLOS
+    delete process.env.OKOLOS_USAGE_ENV
+  } else {
+    // Before the first byte: build.mjs writes chrome whole before firefox, so a build that
+    // fails on firefox has already left a keyed chrome.
+    keyed = true
+    keyedBuilds.arm()
+  }
   await runToCompletion('pnpm', ['build'], { cwd: root, timeoutMs: 10 * 60_000 })
-  keyed = !checkOnly
 }
 
 for (const target of TARGETS) {
@@ -275,6 +297,7 @@ if (keyed) {
     }
   }
   keyed = false
+  keyedBuilds.disarm()
   ok('dist/chrome and dist/firefox carry no App-Key')
 }
 

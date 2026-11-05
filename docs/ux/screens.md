@@ -30,7 +30,7 @@ never updated, which is the same drift this file exists to catch.)
 | SCR-07 | Findings queue | FLW-01, FLW-17 | - | built | e2e/scn-020.spec.ts, e2e/scn-002.spec.ts |
 | SCR-08 | Leaks and repair | FLW-10, FLW-11, FLW-16 | - | built | e2e/scn-015.spec.ts |
 | SCR-09 | Extensions watch | FLW-12 | - | built | e2e/scn-017.spec.ts |
-| SCR-10 | Self-audit | FLW-13, FLW-17 | - | built | packages/ui/src/self-audit/panel.ts:renderSelfAudit |
+| SCR-10 | Self-audit | FLW-13, FLW-17, FLW-24 | - | built | packages/ui/src/self-audit/panel.ts:renderSelfAudit |
 | SCR-11 | Journal and weekly diff | FLW-17 | - | built | e2e/scn-020.spec.ts |
 | SCR-12 | Settings | FLW-05, FLW-14, FLW-24 | - | built | packages/ui/src/settings/data-controls.ts:renderDataControls |
 | SCR-13 | Recovery checklist | FLW-06, FLW-07, FLW-16 | - | built | e2e/scn-025.spec.ts |
@@ -186,7 +186,7 @@ generator, and the sheet declares no colour of its own.
 - **Wireframe:** wireframes/SCR-01.md
 - **Coverage:** packages/ui/src/first-run/screen.ts:renderFirstRun, apps/extension/src/first-run/index.ts
 - **Scenarios:** SCN-001, SCN-002, SCN-050
-- **Usage notice (B-199):** one notice sentence that data about use and errors is sent, only to fix the product, and what is not in it, with the link "Изменить в настройках" to SCR-12; shown only while collection is on. The intro above it says that the addresses and text of pages are not sent
+- **Usage notice (B-199):** one notice sentence that data about use and errors is sent, only to fix the product, and what is not in it, with the link «Открыть «Ваши данные»» to SCR-12; shown only while collection is on. The intro above it says that the addresses and text of pages are not sent
 - **Resources:** local corpus loader, extension inventory adapter, tab scanner
 - **Status:** built
 
@@ -422,7 +422,11 @@ generator, and the sheet declares no colour of its own.
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
   | success | default | - | grouped settings |
-  | error | export or wipe failed | - | inline failure with retry; state left unchanged |
+  | error | export or wipe failed | - | inline failure with retry; state left unchanged; a wipe whose new install number could not be made names `usage` among the parts it could not do |
+  | usage on | usage and error data is on (Chrome and Edge from the first run; Firefox while it grants it) | - | the usage block: the switch checked, the sentence on what is sent, no state line |
+  | usage off | the switch was turned off | - | the switch unchecked and `usageOff` (nothing is sent, the install number is deleted) |
+  | usage unsupported | Firefox 129 to 139, with no built-in data consent | - | no switch; `usageFirefoxOld` says nothing is sent and why |
+  | usage not saved | the switch did not go through (the worker did not answer, or Firefox kept the permission after off) | - | `usageSaveFailed` once on the repaint, over the state actually stored |
   | no key | no Have I Been Pwned key saved, the state every install starts in | - | the status line says no key is saved, so the address does not go to Have I Been Pwned (the password check, a separate one, needs no key); an empty field and "Сохранить ключ" |
   | key saved | a key is stored | - | the status line says a key is saved and is not shown; the field is empty; "Заменить ключ" and "Удалить ключ" |
   | refused | "Сохранить ключ" pressed after trimming (spaces around a key are dropped silently) with an empty field (only spaces counts), a space or a non-printing character inside the key, a character outside the Latin layout, or more than 256 characters | - | nothing is saved and the block says which of the four it was (`leak-key-needs`: `leakKeyEmpty`, `leakKeyShape`, `leakKeyLatin`, `leakKeyLong`); the field keeps what was typed so it can be corrected |

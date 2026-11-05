@@ -594,14 +594,14 @@ See [foundation.md](foundation.md) → Personas.
 - **Entry point:** settings screen
 - **Preconditions:** local data exists
 - **Steps:**
-  1. User clicks "Wipe all data" -> system asks for confirmation and lists exactly what will be deleted (the settings kind names the saved Have I Been Pwned key, which goes with the rest and has to be pasted again after the wipe) — **one kind per store, nine of them.** The word "exactly" was here before the list was: the confirmation named five while `wipeAll` cleared nine, so `models`, `feeds`, `snapshots` and the password-reuse index went unmentioned and the user agreed to five while nine went. Safe in direction, and still a confirmation that had not asked. Completeness now lives in `DATA_KIND_KEY: Record<StoreName, string>`, so a new store fails the build until the dialog has words for it
-  2. User confirms -> system deletes all local data
+  1. User clicks "Wipe all data" -> system asks for confirmation and lists exactly what will be deleted (the settings kind names the saved Have I Been Pwned key, which goes with the rest and has to be pasted again after the wipe) — **one kind per store, nine of them.** The word "exactly" was here before the list was: the confirmation named five while `wipeAll` cleared nine, so `models`, `feeds`, `snapshots` and the password-reuse index went unmentioned and the user agreed to five while nine went. Safe in direction, and still a confirmation that had not asked. Completeness now lives in `DATA_KIND_KEY: Record<StoreName, string>`, so a new store fails the build until the dialog has words for it. The note under the list says that the install number for usage data is replaced with a new one too (it lives in the worker's `storage.local`, not in a store; SCN-051)
+  2. User confirms -> system deletes all local data, and when usage and error data is on it gets a new install number and drops the unsent events
   3. User sees the result -> system returns the extension to its first-run state, including the leaks screen: its last result, the credit line and the typed address go with the data, so nothing on it speaks about a Have I Been Pwned key that was just erased (SCN-015)
 - **Expected result:** nothing of the user's remains locally, in one confirmed step
 - **Alt paths:** user cancels -> nothing changes
 - **UI elements:** "Wipe all data" (destructive), confirmation listing data categories, cancel
 - **States covered:** success, error
-- **Errors & recovery:** deletion partially fails -> system names what could not be deleted and offers retry; it never reports success on a partial wipe. **A wipe that could not start says that instead**, and says it differently: the handler opens the database first, so "could not open" is the ordinary failure — and it used to be silence. `void run()` swallowed the rejection with the confirmation already dismissed, so the user clicked "yes, delete it", the dialog vanished, nothing was deleted, and a dialog vanishing is what success looks like on this screen. The two failures are reported apart because they are different facts: a partial wipe leaves some of the user's data gone and names which, a wipe that never began leaves all of it, and naming stores that were never touched would invent a state
+- **Errors & recovery:** deletion partially fails -> system names what could not be deleted and offers retry; it never reports success on a partial wipe, and a new install number that could not be made is one of those parts (`usage` in the list). **A wipe that could not start says that instead**, and says it differently: the handler opens the database first, so "could not open" is the ordinary failure — and it used to be silence. `void run()` swallowed the rejection with the confirmation already dismissed, so the user clicked "yes, delete it", the dialog vanished, nothing was deleted, and a dialog vanishing is what success looks like on this screen. The two failures are reported apart because they are different facts: a partial wipe leaves some of the user's data gone and names which, a wipe that never began leaves all of it, and naming stores that were never touched would invent a state
 - **One answer on the screen, whatever the clicking.** The failure note and the retry are single slots, not appended lines: the first version removed the old note before its `await` and appended the new one after, so three clicks on a failing action produced three identical lines. A success takes both the note and the retry away, because a retry button beside a first-run screen invites a second wipe of nothing
 - **Status:** implemented
 - **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, apps/extension/src/options/index.ts, **e2e/scn-023.spec.ts** — the gate REQ-32 named since 2026-08-04 and which **did not exist** until 2026-08-20: three checks over a profile seeded into all nine stores, asserting that the confirmation names one kind per store, that every store is emptied, that cancelling changes nothing, and that the first click asks rather than deletes. The failure paths stay unit tests, because nothing in a browser makes IndexedDB refuse on request
@@ -633,11 +633,11 @@ See [foundation.md](foundation.md) → Personas.
 - **Preconditions:** no prior local data
 - **Steps:**
   1. User reads the first-run screen -> system shows the notice "Okolos отправляет нам данные о том, как работает продукт и где он ломается, чтобы его исправлять. В них нет адресов страниц, их текста, имён файлов, почты и паролей." under the intro, which says that the addresses and text of pages are not sent
-  2. User follows "Изменить в настройках" -> system opens settings at the switch (SCN-051)
+  2. User follows «Открыть «Ваши данные»» -> system opens «Ваши данные» at the switch (SCN-051)
   3. User closes the first-run screen without acting -> collection stays on; the notice is not shown again
 - **Expected result:** the person learns on the first run what is sent and how to stop it, and nothing they did on a page is part of it
 - **Alt paths:** collection is off (the person switched it off, or Firefox did not grant it) -> the first-run screen shows no notice; there is no install older than the notice: no store build shipped before this change (CHANGELOG), so the first store release is the first build that sends
-- **UI elements:** notice sentence, link "Изменить в настройках", the existing "Что отправляется" link
+- **UI elements:** notice sentence, link «Открыть «Ваши данные»», the existing "Что отправляется" link
 - **States covered:** success
 - **Errors & recovery:** the usage state cannot be read or written -> the event is not recorded and nothing is sent; the worker never fails on it (start.test.ts)
 - **Status:** implemented
@@ -653,7 +653,7 @@ See [foundation.md](foundation.md) → Personas.
   1. User turns the switch off -> system deletes the install's random id, drops the unsent events and stops sending; the block says so
   2. User turns the switch on again -> system makes a new random id and sends from then on
 - **Expected result:** off means nothing leaves for this purpose; on again cannot be joined to the earlier id
-- **Alt paths:** the self-audit log (SCN-019) shows each sent event under its purpose while on, and none after off; "Удалить все данные" (SCN-024) replaces the install number and drops the unsent events, and collection that was on stays on
+- **Alt paths:** the self-audit log (SCN-019) shows each sent event under its purpose while on, and none after off; «Удалить все данные» (SCN-023) and «Очистить локальные данные» (SCN-032) replace the install number and drops the unsent events, and collection that was on stays on
 - **UI elements:** switch, one sentence on what is sent
 - **States covered:** success, error
 - **Errors & recovery:** the switch cannot be saved -> the block says the change did not go through and shows the state actually stored

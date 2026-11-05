@@ -69,7 +69,7 @@ import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 
 import { recordPageRequest } from './page-requests.js'
 import { recordTrap } from './trap-journal.js'
-import { trapWarning } from './usage/catalogue.js'
+import { passwordCheckResult, trapWarning } from './usage/catalogue.js'
 import { startUsage } from './usage/start.js'
 import { optionsPageFor } from '../options/views.js'
 
@@ -650,7 +650,7 @@ async function handlePasswordCheck(
 
   void usage.track('check_done', {
     check: 'password',
-    result: verdict.offline ? 'unavailable' : verdict.compromised ? 'found' : 'ok',
+    result: passwordCheckResult(verdict.explain.code),
   })
 
   const answer: PasswordAnswer = {

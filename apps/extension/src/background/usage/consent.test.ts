@@ -26,8 +26,12 @@ describe('Firefox 140 and later, where the browser asks at install', () => {
     const granted = vi.fn(async () => true)
     expect(await switchConsent('firefox', { getAll: async () => ({ data_collection: [] }), request: granted }, true)).toBe('on')
 
-    const remove = vi.fn(async () => true)
-    expect(await switchConsent('firefox', { getAll: async () => ({ data_collection: ['technicalAndInteraction'] }), remove }, false)).toBe('off')
+    let held = ['technicalAndInteraction']
+    const remove = vi.fn(async () => {
+      held = []
+      return true
+    })
+    expect(await switchConsent('firefox', { getAll: async () => ({ data_collection: held }), remove }, false)).toBe('off')
     expect(remove).toHaveBeenCalledWith(DATA)
   })
 
@@ -37,6 +41,23 @@ describe('Firefox 140 and later, where the browser asks at install', () => {
     const request = vi.fn(async () => true)
     void switchConsent('firefox', { getAll: () => new Promise(() => {}), request }, true)
     expect(request).toHaveBeenCalledWith(DATA)
+  })
+
+  it('does not say off while Firefox still grants it: a removal that did not take is a failure', async () => {
+    const granted = { getAll: async () => ({ data_collection: ['technicalAndInteraction'] }) }
+    expect(await switchConsent('firefox', { ...granted, remove: async () => false }, false)).toBe('on')
+    expect(
+      await switchConsent(
+        'firefox',
+        {
+          ...granted,
+          remove: async () => {
+            throw new Error('nope')
+          },
+        },
+        false,
+      ),
+    ).toBe('on')
   })
 
   it('counts a refused or failed request as off', async () => {

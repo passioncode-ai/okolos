@@ -1,4 +1,4 @@
-import { DestinationError, RedactionError } from '@okolos/net'
+import { AuditWriteError } from '@okolos/net'
 
 import { admissible, type EventName, type EventProps } from './catalogue.js'
 
@@ -49,7 +49,8 @@ export interface UsageDeps {
   send(spec: { url: string; body: string; headers: Record<string, string> }): Promise<Response>
   now(): number
   randomId(): string
-  sessionId(): string
+  /** The session of this install in the current hour (`sessionFor`), the same in every wake. */
+  sessionId(iid: string): string
   /** Injected into the store build only; `null` everywhere else, which sends nothing. */
   readonly appKey: string | null
   /** `production` for the store build, `sandbox` for every other build. */
@@ -83,10 +84,11 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
       const event: QueuedEvent = {
         eventName: name,
         at: deps.now(),
-        sessionId: deps.sessionId(),
+        sessionId: deps.sessionId(iid),
         props: { ...(props as Record<string, string>), iid, environment: deps.environment, platform: 'browser_extension' },
       }
-      const queue = [...state.queue, event].slice(-QUEUE_MAX)
+      // Nothing older than a day stays on the device, sent or not (docs/privacy.md).
+      const queue = [...state.queue.filter((queued) => event.at - queued.at <= MAX_AGE_MS), event].slice(-QUEUE_MAX)
       await deps.save({ consent: 'on', iid, queue })
       return true
     },
@@ -114,10 +116,10 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
           })
           drop = response.ok || !retried(response.status)
         } catch (cause) {
-          // The network module's own refusal (a host off the list, a body the redactor stopped)
-          // would come back the same way every time; a transport error or a failed audit write
-          // may not.
-          drop = cause instanceof DestinationError || cause instanceof RedactionError
+          // Kept only for what may pass next time: a transport failure (fetch throws TypeError,
+          // and so does the sender's deadline) or a failed audit write. Anything else, the net
+          // module's own refusals included, would fail the same way and hold the queue.
+          drop = !(cause instanceof TypeError || cause instanceof AuditWriteError)
         }
         if (!drop) return
         // Re-read: an event tracked while the request was in flight was appended at the end.

@@ -46,7 +46,9 @@ const shared = {
     __OKOLOS_USAGE__: JSON.stringify({
       // The vault slot passioncode-platform/prod/APTABASE_APP_KEY_OKOLOS, set only by the secret
       // runner around `pnpm package` (docs/runbooks/development.md, «Сборка для магазина»).
-      appKey: withTestHooks ? null : (process.env.APTABASE_APP_KEY_OKOLOS || null),
+      // Only together with the production flag `pnpm package` sets: a plain `pnpm build` from a
+      // shell that happens to hold the key builds without it.
+      appKey: withTestHooks || process.env.OKOLOS_USAGE_ENV !== 'production' ? null : (process.env.APTABASE_APP_KEY_OKOLOS || null),
       environment: !withTestHooks && process.env.OKOLOS_USAGE_ENV === 'production' ? 'production' : 'sandbox',
     }),
   },

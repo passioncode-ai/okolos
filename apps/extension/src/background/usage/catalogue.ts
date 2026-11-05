@@ -1,3 +1,5 @@
+import type { PasswordVerdict } from '@okolos/core-credential'
+
 import type { TrapKind } from '../../content/traps.js'
 
 /**
@@ -71,4 +73,22 @@ const TRAP_WARNING: Readonly<Record<TrapKind, EventProps<'warning_shown'>['kind'
 
 export function trapWarning(kind: string): EventProps<'warning_shown'>['kind'] | null {
   return Object.hasOwn(TRAP_WARNING, kind) ? TRAP_WARNING[kind as TrapKind] : null
+}
+
+/**
+ * A password check, by what it found out. Not by where the answer came from: the built-in list
+ * answers offline only when it finds the password, and a range query that failed is a question
+ * not answered, never a clean result.
+ */
+export function passwordCheckResult(code: PasswordVerdict['explain']['code']): EventProps<'check_done'>['result'] {
+  switch (code) {
+    case 'in-common-list':
+    case 'found':
+      return 'found'
+    case 'absent':
+      return 'ok'
+    case 'unreachable':
+    case 'unreadable':
+      return 'unavailable'
+  }
 }

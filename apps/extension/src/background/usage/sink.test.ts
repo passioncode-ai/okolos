@@ -196,6 +196,26 @@ describe('the queue', () => {
     expect(h.state()?.queue).toHaveLength(1)
   })
 
+  it('keeps an event only for a transport failure: any other error drops it, so the head cannot stall the queue', async () => {
+    const kept = harness({
+      send: vi.fn(async () => {
+        throw new TypeError('Failed to fetch')
+      }),
+    })
+    await kept.sink.track('warning_shown', { kind: 'lookalike' })
+    await kept.sink.flush()
+    expect(kept.state()?.queue).toHaveLength(1)
+
+    const dropped = harness({
+      send: vi.fn(async () => {
+        throw new Error('boom')
+      }),
+    })
+    await dropped.sink.track('warning_shown', { kind: 'lookalike' })
+    await dropped.sink.flush()
+    expect(dropped.state()?.queue).toHaveLength(0)
+  })
+
   it('drops an event the network module refused, so it does not hold the queue behind it', async () => {
     let calls = 0
     const send = vi.fn(async () => {
@@ -218,6 +238,21 @@ describe('the queue', () => {
       await h.sink.flush()
       expect(h.state()?.queue).toHaveLength(0)
     }
+  })
+
+  it('keeps no event older than a day on the device, even with no send in between', async () => {
+    const h = harness()
+    await h.sink.track('warning_shown', { kind: 'lookalike' })
+    h.advance(25 * 60 * 60 * 1000)
+    await h.sink.track('warning_shown', { kind: 'clickfix' })
+    expect(h.state()?.queue.map((e) => e.props.kind)).toEqual(['clickfix'])
+  })
+
+  it('a session is named from the install and the hour, so every wake in that hour agrees', async () => {
+    const sessionId = vi.fn((iid: string) => `s-${iid}`)
+    const h = harness({ sessionId })
+    await h.sink.track('warning_shown', { kind: 'lookalike' })
+    expect(sessionId).toHaveBeenCalledWith(h.state()?.iid)
   })
 
   it('is bounded, so a device that never reaches the network does not grow it without end', async () => {

@@ -360,8 +360,17 @@ python3 "$(project-observatory full-path)/tools/use_secret.py" run --vault-only 
 
 Ключ попадает только в `background.js` архива; сборка с `production` отправляет события об
 использовании и ошибках на `analytics.passioncode.ai`. Любая другая сборка (`pnpm build`, e2e, CI)
-идёт без ключа и ничего не отправляет, а `tools/analytics.test.ts` («the App-Key») не пускает
-ключ ни в отслеживаемые файлы, ни в `dist/` вне архива.
+идёт без ключа и ничего не отправляет: `tools/build.mjs` вписывает ключ только вместе с
+`OKOLOS_USAGE_ENV=production`, который ставит одна `pnpm package`. После архивов она пересобирает
+`dist/chrome` и `dist/firefox` без ключа, а при любом другом выходе (ошибка, исключение, Ctrl-C)
+удаляет их (`tools/keyed-builds.mjs`, тест `tools/keyed-builds.test.ts`); `tools/analytics.test.ts`
+(«the App-Key») не пускает ключ ни в отслеживаемые файлы, ни в `dist/` вне архива.
+
+**Сначала воркер, потом архив.** Карточка магазина называет политикой страницу `/privacy` воркера,
+а воркер выкладывается отдельно ([worker-deploy.md](worker-deploy.md)). `pnpm package` читает эту
+страницу и останавливается, если её дата «Обновлено» старше, чем в `docs/privacy.md`, или если
+страница не ответила (`tools/privacy-served.mjs`, тест `tools/privacy-served.test.ts`): архив,
+который отправляет данные, не уходит, пока опубликованная политика говорит, что их нет.
 
 Архивы уходят в `apps/extension/dist/release/okolos-<target>-<version>.zip`.
 Упаковка отказывается от сборки с тестовыми хуками, от манифеста, называющего

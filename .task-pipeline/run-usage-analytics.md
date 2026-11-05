@@ -204,3 +204,26 @@ B-205 (audit volume, carried clause), B-206 (events not wired yet), B-207 (posit
 Not done here: store screenshots (`pnpm screenshots` needs a build, held by the disk stop); `tools/listing.test.ts`
 «the screenshots are of this product» stays red until they are retaken. Next: round 2 (adversarial) on the pushed head,
 screenshots when free disk is 8 GB or more, then CI green on all four jobs and merge.
+
+## Stage 6: certification, round 2, adversarial (2026-11-05, on 3e8b3f5)
+
+Three blind tiers again, read-only, targeted tests only (free disk 5.2 to 6.0 GB, the coordinator's stop holds).
+All three: **fail**, so round 2 does not count as a passing round; round 3 runs on the fixed head.
+
+| Finding | Tiers | Fix, and the test seen red first |
+|---|---|---|
+| Firefox switch-off that Firefox did not honour came back on with a new id | unit, product | `switchConsent` reads the grant back; the page says the change did not go through instead of telling the worker off; `consent.test.ts` «does not say off while Firefox still grants it» |
+| `pnpm package` left keyed `dist/<target>` on an exception, a half-failed first build or a signal | unit, seam | `tools/keyed-builds.mjs` armed before the first build, `exit`/SIGINT/SIGTERM handlers; `tools/keyed-builds.test.ts` (child processes; planted handler removal fails 2 of 4) |
+| Session id per worker start, not per hour | product, seam | `sessionFor(now, iid)`, FNV-1a of install id and hour; `system.test.ts`, `sink.test.ts` |
+| Unsent events older than a day stayed on disk until a send | seam | `track` filters by age; `sink.test.ts` |
+| Password check counted offline as unavailable and an unreachable range as ok | product | `passwordCheckResult(explain.code)`; `catalogue.test.ts` |
+| «ничего не отправлялось» in two password strings | product | narrowed to the password (Copylot ru `5e19a24f`, en `f40e6596`) |
+| SCN-023 silent on the install number; a failed renewal reported as a full wipe; the reset path did not renew | product, seam | `renewUsage` returns false and the wipe names `usage`; reset renews; `dataConfirmNote` and `storageResetNote` say it; SCN-023 |
+| «настройки» instead of «Ваши данные» | product | `firstRunUsageOff` «Открыть «Ваши данные»», listing (Copylot store ru `d5a9cc91`, en `084ebcc6`) |
+| facts.md and ADR misdescribed the narrowed OS gate | product | both reworded |
+| Weekly summary did not name the install number | product | `CARRIED_KEY['usage-data']`; `panel.test.ts` |
+| Served /privacy still says «Нет аналитики»; release flow did not notice | seam | `pnpm package` refuses when the served policy date is older (`tools/privacy-served.mjs`, its test); runbook «Сначала воркер, потом архив»; `router.test.ts` names `usage-data` |
+| Risks taken in: send deadline 15 s, retry only on TypeError and AuditWriteError, grant read once inside `set`, stale switch answers ignored, key only with `OKOLOS_USAGE_ENV=production`, `--check` drops the key, timing wording (overdue alarm at start), per-login password event in privacy.md, docs/README, terminology rows, SCR-12 states, SCR-10 used-by, AGENTS writes | unit, seam, product | tests where code moved (`send.test.ts`, `sink.test.ts`, `start.test.ts`) |
+
+Risks kept out as rows: B-209 (keyless builds show the notice), B-210 (outside-link counted at journal time), B-211
+(start-time flush, Firefox e2e); B-205 widened to the overview count.

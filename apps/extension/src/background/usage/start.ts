@@ -2,10 +2,10 @@ import type { RequestDeps } from '@okolos/net'
 import type { Platform } from '@okolos/platform'
 
 import type { EventName, EventProps } from './catalogue.js'
-import { browserConsent, switchConsent, type ConsentApi, type ConsentState } from './consent.js'
+import { browserConsent, type ConsentApi, type ConsentState } from './consent.js'
 import { usageSender } from './send.js'
 import { createUsageSink, type UsageState } from './sink.js'
-import { sessionIdAt } from './system.js'
+import { sessionFor } from './system.js'
 
 /**
  * Set by the build. The store build made by `pnpm package` carries the App-Key and
@@ -41,7 +41,6 @@ export function startUsage(
   permissions: ConsentApi = platform.dataConsent,
   build: Build = typeof __OKOLOS_USAGE__ === 'undefined' ? { appKey: null, environment: 'sandbox' } : __OKOLOS_USAGE__,
 ): Usage {
-  const suffix = Math.floor(Math.random() * 100_000_000)
   let send: ((spec: { url: string; body: string; headers: Record<string, string> }) => Promise<Response>) | null = null
 
   const sink = (allowed: ConsentState) =>
@@ -54,7 +53,7 @@ export function startUsage(
       },
       now: () => Date.now(),
       randomId: () => crypto.randomUUID(),
-      sessionId: () => sessionIdAt(Date.now(), suffix),
+      sessionId: (iid) => sessionFor(Date.now(), iid),
       appKey: allowed === 'unsupported' ? null : build.appKey,
       environment: build.environment,
       initialConsent: allowed === 'on' ? 'on' : 'off',
@@ -107,18 +106,16 @@ export function startUsage(
         const { allowed, s } = await current()
         return allowed === 'unsupported' ? 'unsupported' : await s.consent()
       }),
-    async set(on) {
-      // Chrome: the switch is the consent. Firefox: the page already asked the browser inside
-      // the click (a worker has no user gesture), so the worker only reads its answer, and an
-      // "on" Firefox did not grant stays off.
-      const answer = platform.kind === 'chrome' ? await switchConsent('chrome', permissions, on) : await browserConsent('firefox', permissions)
-      if (answer === 'unsupported') return 'unsupported'
-      return serial(async () => {
-        const { s } = await current()
-        const next = on && answer === 'on'
+    // Chrome: the switch is the consent. Firefox: the page already asked the browser inside the
+    // click (a worker has no user gesture), so the worker reads its answer once, inside the step,
+    // and an "on" Firefox did not grant stays off.
+    set: (on) =>
+      serial(async () => {
+        const { allowed, s } = await current()
+        if (allowed === 'unsupported') return 'unsupported'
+        const next = on && allowed === 'on'
         await s.setConsent(next)
         return next ? 'on' : 'off'
-      })
-    },
+      }),
   }
 }

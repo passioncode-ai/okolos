@@ -346,6 +346,8 @@ const PURPOSE_KEY: Record<string, string> = {
 const CARRIED_KEY: Record<string, string> = {
   'leak-lookup': 'auditSummaryCarriedAddress',
   'domain-status': 'auditSummaryCarriedDomain',
+  // Usage and error data carries no address and no page, only the random install number (B-199).
+  'usage-data': 'auditSummaryCarriedInstall',
 }
 
 const purposeKey = (purpose: string): string | undefined => PURPOSE_KEY[purpose]

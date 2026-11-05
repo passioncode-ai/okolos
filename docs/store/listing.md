@@ -50,7 +50,7 @@ Okolos ищет такой текст на странице, обезврежи�
 
 Что он отправляет
 
-• Данные об использовании и ошибках, чтобы мы исправляли продукт. Адреса страниц, их текст, почта и пароли туда не попадают. Выключается в настройках.
+• Данные об использовании и ошибках, чтобы мы исправляли продукт. Адреса страниц, их текст, почта и пароли туда не попадают. Выключается в разделе «Ваши данные».
 
 Чего он не делает
 
@@ -109,7 +109,7 @@ What it does
 
 What it sends
 
-• Usage and error data so we can fix what breaks for you, and none of it is a page address, page text, an email or a password. Settings turn it off.
+• Usage and error data so we can fix what breaks for you, and none of it is a page address, page text, an email or a password. Turn it off in Your data.
 
 What it does not do
 

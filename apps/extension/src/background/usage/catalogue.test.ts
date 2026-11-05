@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { TrapKind } from '../../content/traps.js'
 
-import { admissible, CATALOGUE, trapWarning } from './catalogue.js'
+import { admissible, CATALOGUE, passwordCheckResult, trapWarning } from './catalogue.js'
 
 describe('the catalogue', () => {
   it('admits an event with every declared prop at one of its values', () => {
@@ -47,5 +47,16 @@ describe('a page trap', () => {
   it('is not counted when its kind is one nobody mapped', () => {
     expect(trapWarning('browser-lock')).toBeNull()
     expect(trapWarning('https://x.test')).toBeNull()
+  })
+})
+
+describe('a password check', () => {
+  it('is counted by what it found out, not by where the answer came from', () => {
+    expect(passwordCheckResult('in-common-list')).toBe('found')
+    expect(passwordCheckResult('found')).toBe('found')
+    expect(passwordCheckResult('absent')).toBe('ok')
+    // A question that was not answered is not a clean result.
+    expect(passwordCheckResult('unreachable')).toBe('unavailable')
+    expect(passwordCheckResult('unreadable')).toBe('unavailable')
   })
 })

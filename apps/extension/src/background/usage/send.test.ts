@@ -52,4 +52,17 @@ describe('a batch through the network module', () => {
     expect(seen[0]?.url).toBe('https://analytics.passioncode.ai/api/v0/event')
     expect(state?.queue).toHaveLength(0)
   })
+
+  it('gives up on a request that never answers, as a transport failure, so nothing waits behind it', async () => {
+    const send = usageSender(
+      {
+        writeAudit: async () => undefined,
+        now: () => '2026-11-04T20:00:00.000Z',
+        newId: () => 'a1',
+        transport: () => new Promise<Response>(() => {}),
+      },
+      20,
+    )
+    await expect(send({ url: 'https://analytics.passioncode.ai/api/v0/event', body: '{}', headers: {} })).rejects.toBeInstanceOf(TypeError)
+  })
 })
