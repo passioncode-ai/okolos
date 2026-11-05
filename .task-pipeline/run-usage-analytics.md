@@ -395,3 +395,17 @@ Firefox's optional `technicalAndInteraction`; ST-011 points to `check_done` in d
 ADR-0021 delivered; B-204 names the AMO source-build difference (the App-Key). Not taken: Aptabase's own container
 logs and the IP (platform owner, beside B-203); the live worker is behind main (deploy is the first release step).
 pnpm gates green in full on this tree: 216 files, 3524 tests. Next: round 10.
+
+## Stage 6: certification, round 10 (2026-11-05, on 0eba588)
+
+CI on 0eba588 green on all four jobs. Unit tier: **pass** (third clean unit round in a row: 7, 9, 10). Product tier:
+**fail** on one `breaks`: fabric-workspace `knowledge/products.md:49` (`pnpm package` for a source build) and RM-13's
+open «Okolos promises no analytics» go false at merge with no row; B-213 widened, RM-13 named in B-198, B-199 and
+ADR-0021. Seam tier: **fail** on one `breaks`: B-201 still pointed at `adapter.ts:345` (now `:362`); fixed, and the
+history pointers in B-163 and B-198..B-200 are pinned to `@6f167c0`, the two pointers already wrong on main
+(docs/brand/README.md, ADR-0013) name the symbol instead of a line. Risks taken in: ADR-0021 records that the
+ePrivacy question in RM-13 is not visibly covered by the operator's reply (B-216, the operator's decision) and that
+okolos-mail sends nothing; B-198 names the real host. Rows widened: B-204 (one Debug event of the exact wire shape),
+B-205 (the flush not gated by runIfDue), B-213 (org-index depends_on), B-215 (the limits not tied to the constants,
+the stale notice after a partial wipe).
+pnpm gates green in full on this tree: 216 files, 3524 tests. Next: round 11.

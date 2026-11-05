@@ -28,7 +28,7 @@ Sources:
 |---|---|
 | `ui` | строки интерфейса живут в `apps/extension/_locales/*/messages.json`, а линтер читает документы с front matter и телом. Их сходимость с `terminology.md` держит `tools/docs.test.ts`, а не этот линтер. |
 | `marketing` | единственная публичная страница-текст — лендинг, и он собран в `apps/proxy/src/router.ts`. Указать сюда `.ts` значит скормить проверке «каждое число из тела есть в facts.md» каждый числовой литерал TypeScript. |
-| `robots` | `robots.txt` в проекте нет: индексацию запрещает `<meta name="robots" content="noindex">` (`apps/proxy/src/router.ts:785`), а эту форму проверка B050 не читает. |
+| `robots` | `robots.txt` в проекте нет: индексацию запрещает `<meta name="robots" content="noindex">` (`apps/proxy/src/router.ts`, `<meta name="robots"`), а эту форму проверка B050 не читает. |
 | `locales` | проверка паритета берёт код языка из **имени файла** (`path.stem`), а у нас все каталоги называются `messages.json` — объявить ключ значит сравнить `messages` с `messages` и получить 100% на любом состоянии. |
 
 Каждая строка здесь — не отговорка, а адрес: пока проверка не выполняется,
