@@ -207,4 +207,23 @@ describe('the renewal after an erase', () => {
     expect(await renewal).toBe('off')
     expect(p.values.get('usage:state')).toEqual({ consent: 'off', iid: null, queue: [] })
   })
+
+  it('in Firefox follows the browser: a grant over a stored off is on, and the renewal gives a fresh number (B-215)', async () => {
+    // Firefox keeps the choice: the step reconciles the grant first (on, with a new number), then
+    // the renewal replaces that number, so the erase still leaves no number from before it.
+    const p = platform('firefox', { consent: 'off', iid: null, queue: [] })
+    const usage = startUsage(p.platform, audit, { getAll: async () => ({ data_collection: ['technicalAndInteraction'] }) }, keyed)
+    expect(await usage.renew()).toBe('on')
+    const stored = p.values.get('usage:state') as UsageState
+    expect(stored.consent).toBe('on')
+    expect(stored.iid).not.toBeNull()
+    expect(stored.queue).toEqual([])
+  })
+
+  it('in a Firefox with no built-in consent says unsupported and leaves nothing stored (B-215)', async () => {
+    const p = platform('firefox')
+    const usage = startUsage(p.platform, audit, { getAll: async () => ({ origins: [], permissions: [] }) }, keyed)
+    expect(await usage.renew()).toBe('unsupported')
+    expect(p.values.get('usage:state')).toBeUndefined()
+  })
 })
