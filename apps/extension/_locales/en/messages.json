@@ -2420,7 +2420,7 @@
     "message": "The file’s hash. Not its name, not its contents."
   },
   "auditKeptUsageData": {
-    "message": "Names of actions and errors from a fixed list, when they happened, a random install number, a session number for the hour, the extension version and the browser language. No page addresses, no page text, no file names, no email and no passwords."
+    "message": "Names of actions and errors from a fixed list and their outcome (for example, whether a password was found in breaches), when they happened, a random install number, a session number for the hour, the extension version, the build kind, the browser language and two constant product labels. No page addresses, no page text, no file names, no email and no passwords."
   },
   "auditKeptDomainStatus": {
     "message": "The domain you checked. No page address, no page content."
@@ -2664,7 +2664,7 @@
     "message": "Usage and error data"
   },
   "usageWhat": {
-    "message": "What is sent: names of actions and errors from a fixed list, when they happened, a random install number, a session number for the hour, the extension version and the browser language. The service learns the browser and the system from the request header. Page addresses, page text, file names, email and passwords are not sent."
+    "message": "What is sent while collection is on: names of actions and errors from a fixed list and their outcome (for example, whether a password was found in breaches), when they happened, a random install number, a session number for the hour, the extension version, the build kind, the browser language and two constant product labels. The service learns the browser and the system from the request header. Page addresses, page text, file names, email and passwords are not sent."
   },
   "usageSwitch": {
     "message": "Send usage and error data"

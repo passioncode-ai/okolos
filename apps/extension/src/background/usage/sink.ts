@@ -91,7 +91,8 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
         sessionId: deps.sessionId(iid, at),
         props: { ...(props as Record<string, string>), iid, environment: deps.environment, platform: 'browser_extension' },
       }
-      // Nothing older than a day stays on the device, sent or not (docs/privacy.md).
+      // Nothing older than a day is sent (docs/privacy.md); recording drops such events here, and a flush
+      // drops them too, so one lies on the device only until the next of the two.
       const queue = [...state.queue.filter((queued) => event.at - queued.at <= MAX_AGE_MS), event].slice(-QUEUE_MAX)
       await deps.save({ consent: 'on', iid, queue })
       return true
