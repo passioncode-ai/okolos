@@ -83,3 +83,27 @@ describe('a keyed store build in dist/', () => {
     expect(existsSync(target)).toBe(true)
   })
 })
+
+describe('finding the App-Key where it must not be (B-215)', async () => {
+  const { carriesKey, keyedTargets } = await import(guard)
+
+  const tree = (files: Record<string, string>) => {
+    const root = mkdtempSync(path.join(tmpdir(), 'okolos-keyscan-'))
+    made.push(root)
+    for (const [name, text] of Object.entries(files)) {
+      mkdirSync(path.dirname(path.join(root, name)), { recursive: true })
+      writeFileSync(path.join(root, name), text)
+    }
+    return root
+  }
+
+  it('names every file but background.js that carries the key: the MAIN-world watcher and the pages too', () => {
+    const dir = tree({ 'background.js': 'A-SH-0000000000', 'page-watch.js': 'x A-SH-0000000000', 'interstitial.html': 'ok', 'content.js': 'ok' })
+    expect(carriesKey(dir, 'A-SH-0000000000')).toEqual(['page-watch.js'])
+  })
+
+  it('finds a keyed target left by a run that was killed, whatever key it carries', () => {
+    const root = tree({ 'chrome/background.js': 'appKey:"A-SH-0000000000"', 'firefox/background.js': 'appKey:null' })
+    expect(keyedTargets(root, ['chrome', 'firefox'])).toEqual(['chrome'])
+  })
+})
