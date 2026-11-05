@@ -636,12 +636,12 @@ See [foundation.md](foundation.md) → Personas.
   2. User follows «Открыть «Ваши данные»» -> system opens «Ваши данные», where the switch is the last block (SCN-051)
   3. User closes the first-run screen without acting -> collection stays on; the notice is not shown again
 - **Expected result:** the person learns on the first run what is sent and how to stop it; no page address, page text, file name, email or password is part of it, and an event names only an action or an error from the closed list in docs/analytics.md (an install, which warning was shown, how a check ended, which area failed and how), never a page
-- **Alt paths:** collection is off (the person switched it off, or Firefox did not grant it) -> the first-run screen shows no notice; there is no install older than the notice: no store build shipped before this change (CHANGELOG), so the first store release is the first build that sends
+- **Alt paths:** collection is off (the person switched it off, or Firefox did not grant it) -> the first-run screen shows no notice; there is no install older than the notice: no store build shipped before this change (CHANGELOG), so the first store release is the first build that sends; the person switches collection off in «Ваши данные» and comes back to the first-run tab, which stayed open behind it -> the tab paints again when it is shown and the notice is gone (`apps/extension/src/first-run/return.ts`)
 - **UI elements:** notice sentence, link «Открыть «Ваши данные»», the existing "Что отправляется" link
 - **States covered:** success
 - **Errors & recovery:** the usage state cannot be read or written -> the event is not recorded and nothing is sent; the worker never fails on it (start.test.ts)
 - **Status:** implemented
-- **Coverage:** packages/ui/src/first-run/screen.ts:renderFirstRun, apps/extension/src/first-run/index.ts, e2e/scn-050.spec.ts (Chromium: the notice, its way to the switch)
+- **Coverage:** packages/ui/src/first-run/screen.ts:renderFirstRun, apps/extension/src/first-run/index.ts, e2e/scn-050.spec.ts (Chromium: the notice, its way to the switch), apps/extension/src/first-run/return.test.ts
 
 ### SCN-051: The person switches usage and error data off, and on again
 - **Persona:** P-01
