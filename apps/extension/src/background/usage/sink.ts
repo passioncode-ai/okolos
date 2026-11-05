@@ -37,6 +37,17 @@ export interface QueuedEvent {
   readonly props: Readonly<Record<string, string>>
 }
 
+/** The queue without `event`: its first equal entry removed, or the queue as it is when it is gone. */
+function without(queue: readonly QueuedEvent[], event: QueuedEvent): readonly QueuedEvent[] {
+  const key = eventKey(event)
+  const index = queue.findIndex((queued) => eventKey(queued) === key)
+  return index < 0 ? queue : [...queue.slice(0, index), ...queue.slice(index + 1)]
+}
+
+function eventKey(event: QueuedEvent): string {
+  return JSON.stringify([event.eventName, event.at, event.sessionId, Object.entries(event.props).sort()])
+}
+
 export interface UsageState {
   readonly consent: 'on' | 'off'
   /** The random install id while collection is on; deleted when it is switched off. */
@@ -117,7 +128,7 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
         // 15 s each, and an event that turns a day old on the way is dropped, never sent.
         if (!sendable(event.at, deps.now())) {
           const latest = await read()
-          state = { ...latest, queue: latest.queue.slice(1) }
+          state = { ...latest, queue: without(latest.queue, event) }
           await deps.save(state)
           continue
         }
@@ -135,10 +146,12 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
           drop = !(cause instanceof TypeError || cause instanceof AuditWriteError)
         }
         if (!drop) return
-        // Re-read: an event tracked while the request was in flight was appended at the end.
-        // Only a flush takes from the head, so the one just sent is the first stored now.
+        // Re-read: an event tracked while the request was in flight was appended at the end, and
+        // `track` may have dropped events from the head (a day old, or past the cap). The one just
+        // sent is removed by what it is, not by its place, so a head that moved loses nothing else
+        // (round 13 of B-199's certification, B-215).
         const latest = await read()
-        state = { ...latest, queue: latest.queue.slice(1) }
+        state = { ...latest, queue: without(latest.queue, event) }
         await deps.save(state)
       }
     },
