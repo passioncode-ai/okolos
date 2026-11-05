@@ -66,7 +66,7 @@ import {
   type Route,
 } from './views.js'
 import '../pages.css'
-import { switchOutcome } from './usage-switch.js'
+import { runUsageSwitch } from './usage-switch.js'
 
 /**
  * The options page is, first of all, the self-audit panel: the product's
@@ -1151,29 +1151,22 @@ async function usagePanel(): Promise<UsagePanel | undefined> {
     failed,
     renewFailed,
     onSwitch: (on: boolean) => {
-      const mine = ++usageSwitches
-      const asked = platform.kind === 'firefox' ? switchConsent('firefox', platform.dataConsent, on) : Promise.resolve(null)
-      void asked
-        .then((answer) => {
-          if (mine !== usageSwitches) return
-          // i18n-exempt: caught below into usageFailed, which shows usageSaveFailed; this text is never drawn
-          if (switchOutcome(on, answer) === 'not-saved') throw new Error('Firefox did not confirm the switch-off')
-          return platform.runtime.send('usage/set', { on })
-        })
+      void runUsageSwitch(on, {
+        ticket: () => ++usageSwitches,
+        latest: () => usageSwitches,
+        ask: (wanted) => (platform.kind === 'firefox' ? switchConsent('firefox', platform.dataConsent, wanted) : Promise.resolve(null)),
+        set: (wanted) => platform.runtime.send('usage/set', { on: wanted }),
         // A Firefox that declined is an answer, not a failure: the repaint shows the switch off.
-        .then(() => {
-          if (mine === usageSwitches) {
-            usageFailed = false
-            // Off deleted the number, on made a new one: either way the old one is gone.
-            usageRenewFailed = false
-          }
-        })
-        .catch(() => {
-          if (mine === usageSwitches) usageFailed = true
-        })
-        .finally(() => {
-          if (mine === usageSwitches) void reload()
-        })
+        // Off deleted the number, on made a new one: either way the old one is gone.
+        saved: () => {
+          usageFailed = false
+          usageRenewFailed = false
+        },
+        failed: () => {
+          usageFailed = true
+        },
+        repaint: () => void reload(),
+      })
     },
   }
 }
