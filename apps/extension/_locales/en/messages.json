@@ -588,6 +588,9 @@
   "exportNothingWithheld": {
     "message": "Nothing was withheld from this file."
   },
+  "exportUsageOutside": {
+    "message": "The install number and unsent usage and error data are kept apart from the nine stores and are not in this file; switching collection off or “Delete all data” removes them."
+  },
   "exportWithheldBytes": {
     "message": "$COUNT$ bytes",
     "placeholders": {
