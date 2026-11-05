@@ -59,7 +59,7 @@ Okolos ищет такой текст на странице, обезврежи�
 • Не считает «заблокированные угрозы» и не рисует уровень защиты.
 • Не просит аккаунт, не показывает рекламу.
 • Не проверяет ваш адрес почты и пароли в фоне, только по вашему действию.
-• Не хранит ничего дольше 90 дней.
+• Журналы на устройстве стирает через 90 дней. Данные об использовании и ошибках сервис хранит до 730 дней, номер установки удаляет из них через 400.
 
 Что можно проверить
 
@@ -119,7 +119,7 @@ What it does not do
 • Asks for no account, shows no advertising.
 • Does not check your address or passwords on a timer: the address when you press Check, a password
   when you submit a login form.
-• Keeps nothing longer than 90 days.
+• Deletes the logs on your device after 90 days. The service keeps usage and error data for up to 730 days and removes the install number from it after 400.
 
 What is checkable
 

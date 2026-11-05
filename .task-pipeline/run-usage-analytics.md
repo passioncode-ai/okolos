@@ -341,3 +341,20 @@ ADR-0021 narrows ADR-0019's «ничего не уходит к нам» to page
 privacy.md says private windows count the same (Copylot `a8cd88dc`). Rows widened: B-204 (Mozilla data categories),
 B-206 (the per-wake count). The ADR-0021 lease was taken after its edit and before the commit: a slip, said here.
 Screenshots retaken at 8.9 GB; pnpm gates green in full at 8.7 GB: 216 files, 3522 tests. Next: round 7.
+
+## Stage 6: certification, round 7 (2026-11-05, on 08bbd44)
+
+CI on 08bbd44 green on all four jobs. Unit tier: **pass** (five risks). Seam tier: **pass** (three risks). Product
+tier: **fail** on one `breaks`: the listing's «Не хранит ничего дольше 90 дней» while the organisation's analytics
+service keeps events 730 days and the install number 400 (passioncode-platform `infra/analytics/README.md` at
+`3f8878f`; B-203's premise no longer held). Fixed: the listing says the device logs go after 90 days and names the
+service's periods (Copylot ru `faf3cefa`, en `0edf2e7c`; the one blocking hit, «единственное», was the privacy heading
+checked in the store register, and passes in the web register, `2c2ae5b6`); privacy.md and facts.md name the
+periods with their source; B-203 rewritten to what remains (an erasure route, the operator's decision).
+Risks taken in: the privacy heading names the status service; «не дольше суток» stated as the mechanism;
+SCN-023 step 3, SCN-050 step 2 and ST-032 say what the code does; `usageRenewFailed` names the switch by its label;
+two comments still said «two worker calls». Risks kept as rows: B-214 widened (renewal behind a send, the RPC
+deadline), B-215 (the unit tier's round 7 risks).
+
+Two consecutive passing rounds are not yet reached: round 7 failed on the product tier. Next: round 8.
+Screenshots retaken (13 GB free); pnpm gates green in full: 216 files, 3522 tests.

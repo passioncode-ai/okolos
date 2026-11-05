@@ -1074,8 +1074,8 @@ async function dataSection(): Promise<HTMLElement> {
         const db = await openDb()
         const wiped = await wipeAll(db)
         // The stores' outcome is said at once and stands on its own: the leak screen resets after a
-        // full wipe whatever the renewal does. The renewal follows (two worker calls, which may wait
-        // behind a send), and one that failed repaints the usage block in its own words.
+        // full wipe whatever the renewal does. The renewal follows (one worker step, usage/renew,
+        // which may wait behind a send), and one that failed repaints the usage block in its own words.
         void renewUsage().then((renewed) => {
           // Repaint whenever the notice changes, both ways, so a renewal that worked takes an
           // earlier "not replaced" away. Not after a partial wipe: its note and its retry live only
@@ -1356,7 +1356,7 @@ async function storageProblem(): Promise<HTMLElement | null> {
             await resetStorage()
             forgetLeakScreen()
             announceKeyChange('erased')
-            // The cleared page first: the renewal is two worker calls that may wait behind a send.
+            // The cleared page first: the renewal is one worker step (usage/renew) that may wait behind a send.
             await reload()
             // The install number lives in the worker's storage, which a broken database does not
             // reach: clearing takes it too (storageResetNote says so). When it could not, the

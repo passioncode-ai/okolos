@@ -462,7 +462,7 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 - **Story:** As P-01, I want to be told on the first run that the product sends data about its use and its errors, from a closed list, only to improve it, and to switch that off in settings, so that the product can be fixed when it fails for me without my pages, addresses or passwords ever leaving the device.
 - **Traces:** JTBD-05, JRN-01/#4
 - **Acceptance criteria:**
-  - Given a fresh install in Chrome or Edge, when the first-run screen opens, then it says in one sentence what is sent and why, collection is on, and the screen links to the switch.
+  - Given a fresh install in Chrome or Edge, when the first-run screen opens, then it says in one sentence what is sent and why, collection is on, and the screen links to «Ваши данные», where the switch is.
   - Given the switch is turned off, when the product runs, then nothing is sent, the install's random id is deleted and the unsent queue is dropped; turning it on again makes a new id.
   - Given Firefox 140 or later, when the person chose at install whether to share technical and interaction data, then the product sends only while the browser grants it, and the switch asks the browser; given Firefox 129 to 139, nothing is sent.
   - Given any event, when it is sent, then it carries no page address, page text, file name, email, password or anything typed, and it appears in the self-audit log like every other request.

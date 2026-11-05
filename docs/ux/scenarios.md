@@ -596,7 +596,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Steps:**
   1. User clicks "Wipe all data" -> system asks for confirmation and lists exactly what will be deleted (the settings kind names the saved Have I Been Pwned key, which goes with the rest and has to be pasted again after the wipe) — **one kind per store, nine of them.** The word "exactly" was here before the list was: the confirmation named five while `wipeAll` cleared nine, so `models`, `feeds`, `snapshots` and the password-reuse index went unmentioned and the user agreed to five while nine went. Safe in direction, and still a confirmation that had not asked. Completeness now lives in `DATA_KIND_KEY: Record<StoreName, string>`, so a new store fails the build until the dialog has words for it. The note under the list says that the install number for usage data is replaced with a new one too (it lives in the worker's `storage.local`, not in a store; SCN-051)
   2. User confirms -> system deletes all local data, and when usage and error data is on it gets a new install number and drops the unsent events
-  3. User sees the result -> system returns the extension to its first-run state, including the leaks screen: its last result, the credit line and the typed address go with the data, so nothing on it speaks about a Have I Been Pwned key that was just erased (SCN-015)
+  3. User sees the result -> system returns the extension to its first-run state, except the usage and error data choice, which stays as the person set it (a new install number when it is on), and including the leaks screen: its last result, the credit line and the typed address go with the data, so nothing on it speaks about a Have I Been Pwned key that was just erased (SCN-015)
 - **Expected result:** nothing of the user's remains locally, in one confirmed step
 - **Alt paths:** user cancels -> nothing changes
 - **UI elements:** "Wipe all data" (destructive), confirmation listing data categories, cancel
@@ -633,7 +633,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Preconditions:** no prior local data
 - **Steps:**
   1. User reads the first-run screen -> system shows the notice "Okolos отправляет нам данные об использовании и ошибках, чтобы исправлять продукт там, где он ломается. В них нет адресов страниц, их текста, имён файлов, почты и паролей." at the end of the screen, after its actions; the intro above says that the addresses and text of pages are not sent
-  2. User follows «Открыть «Ваши данные»» -> system opens «Ваши данные» at the switch (SCN-051)
+  2. User follows «Открыть «Ваши данные»» -> system opens «Ваши данные», where the switch is the last block (SCN-051)
   3. User closes the first-run screen without acting -> collection stays on; the notice is not shown again
 - **Expected result:** the person learns on the first run what is sent and how to stop it, and nothing they did on a page is part of it
 - **Alt paths:** collection is off (the person switched it off, or Firefox did not grant it) -> the first-run screen shows no notice; there is no install older than the notice: no store build shipped before this change (CHANGELOG), so the first store release is the first build that sends
