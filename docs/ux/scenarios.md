@@ -59,6 +59,10 @@ are specified once in [screens.md](screens.md).
 | SCN-047 | The person takes over a step, hands back, or stops every agent | agent-bridge | P-01 | ST-030, FLW-22 | draft | — |
 | SCN-048 | What agents left behind is cleaned, and nothing in use is touched | agent-bridge | P-01 | ST-031, FLW-23 | draft | — |
 | SCN-049 | A link would open a program outside the browser | web-guard | P-02 | ST-007, FLW-06 | implemented | 2026-10-27 unit |
+| SCN-050 | The first run says what usage and error data is sent, and it is on | privacy | P-01 | ST-032, FLW-24 | implemented | 2026-11-05 e2e |
+| SCN-051 | The person switches usage and error data off, and on again | privacy | P-01 | ST-032, FLW-24 | implemented | 2026-11-05 e2e |
+| SCN-052 | In Firefox the browser asks, and the product obeys | privacy | P-01 | ST-032, FLW-24 | implemented | 2026-11-05 unit |
+| SCN-053 | An error the person hit reaches us without their data | privacy | P-01 | ST-032, FLW-24 | partial | 2026-11-05 unit |
 
 ## Personas
 
@@ -133,7 +137,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Known limit — the wording of the nine signals is matched in English and Russian, and no other language.** Hidden text in a third language reaches stage 1 as a candidate and leaves it without a signal, so no verdict is raised. Russian was added on 2026-08-08 after a sweep found all nine written in English alone: five Russian attack shapes produced zero signals between them, in the detector this product is named for and for the audience its watchlist and interface are written for. **The invisible-character class was described here as carrying no language and therefore never affected, and that was the wrong way round:** carrying no language is exactly what made it fire on five writing systems at once — a family emoji, a Scottish flag, a Persian word, a Hebrew sentence with a Latin brand in it, a phone number in a right-to-left wrapper. Presence of an invisible character is no longer the finding; placement is. What remains genuinely language-free is the DOM-versus-render difference that makes a candidate in the first place
 - **Known limit — a zero-width non-joiner inside an Arabic, Persian or Indic word is not reported.** In those scripts the same character between two letters of a word is the orthography *and* the shape a splitter attack takes, and no placement test separates them. The alternative is reporting the language, which is the failure the placement rule exists to prevent. Pinned by a test in `packages/core-injection/src/chars.test.ts`, so widening the rule to those scripts goes red and the trade is made again on purpose
 - **What one signal is allowed to do.** A single signal used to produce `high` confidence, which the ladder turns into `sanitize`, which edits the page — so a screen-reader label, a specification row and a family emoji each got a paragraph of somebody's page emptied. Measured 2026-08-20: **fourteen of sixteen ordinary strings produced `sanitize`.** Signals now sit in two tiers. The shapes with no innocent reading in hidden text — cancelling prior instructions, claiming to be the system layer, asking for secrecy from the user, a condition only a machine can meet, assigning the reader a model's role — still act alone. A tool noun, a credential, an address or an invisible character corroborate: **one of them is a banner, two are an edit.** The tier is also a property of *how* the signal matched, not only of which signal it is: "use **your** browsing tool" and "open the tools" are the same signal and not the same evidence, and a right-to-left override and an unclosed isolate are both `char-anomaly` while only one is a deception primitive. Recorded as [ADR-0012](../adr/0012-one-signal-is-a-suspicion.md)
-- **Telemetry:** none — no analytics events are emitted by this product
+- **Telemetry:** no event of its own; usage and error data (SCN-050..053, `docs/analytics.md`) carries nothing from this scenario
 - **Status:** implemented
 - **Known limit — a page that deletes the surface wins the page and loses the warning.** Removing the host node in a loop is the one vector CSS armour and an unpredictable element name cannot reach, because the DOM belongs to the page. It is not forbidden, it is **bounded**: three re-mounts a quarter-second apart, and then the extension's own icon carries the warning with a journal line naming the count ([ADR-0001](../adr/0001-closed-shadow-root.md), amended 2026-08-20). A page removing every 30 ms spends that budget in under a second, which is the intended outcome — the reader sees the warning flash, the icon holds it after that, and no timer is left running for the life of the tab. **What this costs the reader:** the banner sits on the page it is about, and half its value is that location; the badge says "open Okolos" instead of "look here". The alternative that would keep it — a system notification — costs a permission the manifest does not have, so it was refused rather than taken quietly
 - **Alt path — the user dismisses the banner.** Closing it also takes the host out of the document, and that is not an attack: the watch stops before the product destroys its own surface, so "gone" always means "gone without us doing it". Otherwise a dismissed banner would come back three times and then mark the icon about it
@@ -590,14 +594,14 @@ See [foundation.md](foundation.md) → Personas.
 - **Entry point:** settings screen
 - **Preconditions:** local data exists
 - **Steps:**
-  1. User clicks "Wipe all data" -> system asks for confirmation and lists exactly what will be deleted (the settings kind names the saved Have I Been Pwned key, which goes with the rest and has to be pasted again after the wipe) — **one kind per store, nine of them.** The word "exactly" was here before the list was: the confirmation named five while `wipeAll` cleared nine, so `models`, `feeds`, `snapshots` and the password-reuse index went unmentioned and the user agreed to five while nine went. Safe in direction, and still a confirmation that had not asked. Completeness now lives in `DATA_KIND_KEY: Record<StoreName, string>`, so a new store fails the build until the dialog has words for it
-  2. User confirms -> system deletes all local data
-  3. User sees the result -> system returns the extension to its first-run state, including the leaks screen: its last result, the credit line and the typed address go with the data, so nothing on it speaks about a Have I Been Pwned key that was just erased (SCN-015)
+  1. User clicks "Wipe all data" -> system asks for confirmation and lists exactly what will be deleted (the settings kind names the saved Have I Been Pwned key, which goes with the rest and has to be pasted again after the wipe) — **one kind per store, nine of them.** The word "exactly" was here before the list was: the confirmation named five while `wipeAll` cleared nine, so `models`, `feeds`, `snapshots` and the password-reuse index went unmentioned and the user agreed to five while nine went. Safe in direction, and still a confirmation that had not asked. Completeness now lives in `DATA_KIND_KEY: Record<StoreName, string>`, so a new store fails the build until the dialog has words for it. The note under the list says that, while usage and error data is on, the install number is replaced with a new one too and the unsent events are deleted (both live in the worker's `storage.local`, not in a store; SCN-051)
+  2. User confirms -> system deletes all local data, and when usage and error data is on it gets a new install number and drops the unsent events
+  3. User sees the result -> system returns the extension to its first-run state, except the usage and error data choice, which stays as the person set it (a new install number when it is on), and including the leaks screen: its last result, the credit line and the typed address go with the data, so nothing on it speaks about a Have I Been Pwned key that was just erased (SCN-015)
 - **Expected result:** nothing of the user's remains locally, in one confirmed step
 - **Alt paths:** user cancels -> nothing changes
 - **UI elements:** "Wipe all data" (destructive), confirmation listing data categories, cancel
 - **States covered:** success, error
-- **Errors & recovery:** deletion partially fails -> system names what could not be deleted and offers retry; it never reports success on a partial wipe. **A wipe that could not start says that instead**, and says it differently: the handler opens the database first, so "could not open" is the ordinary failure — and it used to be silence. `void run()` swallowed the rejection with the confirmation already dismissed, so the user clicked "yes, delete it", the dialog vanished, nothing was deleted, and a dialog vanishing is what success looks like on this screen. The two failures are reported apart because they are different facts: a partial wipe leaves some of the user's data gone and names which, a wipe that never began leaves all of it, and naming stores that were never touched would invent a state
+- **Errors & recovery:** deletion partially fails -> system names what could not be deleted and offers retry; it never reports success on a partial wipe. A new install number that could not be made is said apart, in the usage block («Номер установки не заменился…», with the way to get a new one), because the stores were cleared and the leak screen resets as after any full wipe. **A wipe that could not start says that instead**, and says it differently: the handler opens the database first, so "could not open" is the ordinary failure — and it used to be silence. `void run()` swallowed the rejection with the confirmation already dismissed, so the user clicked "yes, delete it", the dialog vanished, nothing was deleted, and a dialog vanishing is what success looks like on this screen. The two failures are reported apart because they are different facts: a partial wipe leaves some of the user's data gone and names which, a wipe that never began leaves all of it, and naming stores that were never touched would invent a state
 - **One answer on the screen, whatever the clicking.** The failure note and the retry are single slots, not appended lines: the first version removed the old note before its `await` and appended the new one after, so three clicks on a failing action produced three identical lines. A success takes both the note and the retry away, because a retry button beside a first-run screen invites a second wipe of nothing
 - **Status:** implemented
 - **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, apps/extension/src/options/index.ts, **e2e/scn-023.spec.ts** — the gate REQ-32 named since 2026-08-04 and which **did not exist** until 2026-08-20: three checks over a profile seeded into all nine stores, asserting that the confirmation names one kind per store, that every store is emptied, that cancelling changes nothing, and that the first click asks rather than deletes. The failure paths stay unit tests, because nothing in a browser makes IndexedDB refuse on request
@@ -611,8 +615,8 @@ See [foundation.md](foundation.md) → Personas.
 - **Steps:**
   1. User clicks "Export all data" -> system produces a JSON file containing findings, journal, settings, and the outbound log
   2. User saves the file -> system confirms and states what the file contains
-  3. User reads the file -> every value left out of it is marked where it would be, **each with its own reason**: the password-reuse index key because exported beside the tags it would make them reversible; the person's Have I Been Pwned key because it is their own paid credential and stays out of any file they hand on; the model weights by size, because they are a download. The closing note gives only the reasons for what this file actually left out
-- **Expected result:** the user holds a complete, readable copy of everything the product stored
+  3. User reads the file -> every value left out of it is marked where it would be, **each with its own reason** (outside the file is the usage install number and its unsent events, kept in the worker's storage beside the nine stores: they are what waits to be sent (which warnings the person saw, how checks ended, no address or text), described in docs/privacy.md, and switching off or erasing deletes them): the password-reuse index key because exported beside the tags it would make them reversible; the person's Have I Been Pwned key because it is their own paid credential and stays out of any file they hand on; the model weights by size, because they are a download. The closing note gives only the reasons for what this file actually left out
+- **Expected result:** the user holds a complete, readable copy of everything the product stored in its nine stores
 - **Alt paths:** none
 - **UI elements:** "Export all data" (primary), completion confirmation with contents list
 - **States covered:** success, error
@@ -620,6 +624,76 @@ See [foundation.md](foundation.md) → Personas.
 - **Known limit — the retry is the button itself.** There is no separate "try again" for export, unlike the wipe: pressing "Export all data" again *is* the retry, and the stale failure clears when it succeeds. Recorded so the absence is a decision
 - **Status:** implemented
 - **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, apps/extension/src/options/index.ts — PARTIAL: unit-tested including the rejected-export path; the download itself is not yet asserted end-to-end, because a Chromium download in a persistent-context extension test writes to a real path and the assertion would be about Playwright's plumbing rather than the product
+
+### SCN-050: The first run says what usage and error data is sent, and it is on
+- **Persona:** P-01
+- **Feature:** privacy
+- **Traces:** ST-032, FLW-24 (JTBD-05, JRN-01/#4)
+- **Entry point:** extension just installed in Chrome or Edge, the first-run screen opens
+- **Preconditions:** no prior local data
+- **Steps:**
+  1. User reads the first-run screen -> system shows the notice "Okolos отправляет нам данные об использовании и ошибках, чтобы исправлять продукт там, где он ломается. В них нет адресов страниц, их текста, имён файлов, почты и паролей." at the end of the screen, after its actions; the intro above says that the addresses and text of pages are not sent
+  2. User follows «Открыть «Ваши данные»» -> system opens «Ваши данные», where the switch is the last block (SCN-051)
+  3. User closes the first-run screen without acting -> collection stays on; the notice is not shown again
+- **Expected result:** the person learns on the first run what is sent and how to stop it; no page address, page text, file name, email or password is part of it, and an event names only an action or an error from the closed list in docs/analytics.md (an install, which warning was shown, how a check ended, which area failed and how), never a page
+- **Alt paths:** collection is off (the person switched it off, or Firefox did not grant it) -> the first-run screen shows no notice; there is no install older than the notice: no store build shipped before this change (CHANGELOG), so the first store release is the first build that sends
+- **UI elements:** notice sentence, link «Открыть «Ваши данные»», the existing "Что отправляется" link
+- **States covered:** success
+- **Errors & recovery:** the usage state cannot be read or written -> the event is not recorded and nothing is sent; the worker never fails on it (start.test.ts)
+- **Status:** implemented
+- **Coverage:** packages/ui/src/first-run/screen.ts:renderFirstRun, apps/extension/src/first-run/index.ts, e2e/scn-050.spec.ts (Chromium: the notice, its way to the switch)
+
+### SCN-051: The person switches usage and error data off, and on again
+- **Persona:** P-01
+- **Feature:** privacy
+- **Traces:** ST-032, FLW-24 (JTBD-05, JRN-01/#4)
+- **Entry point:** settings (SCR-12), block "Данные об использовании и ошибках"
+- **Preconditions:** collection is on
+- **Steps:**
+  1. User turns the switch off -> system deletes the install's random id, drops the unsent events and stops sending; the block says so. A send already under way when the switch moves finishes first (the steps run one at a time), so events of that batch can still leave: seconds normally, longer on a stalled network (each request has 15 s; opening the outbound log before it has no deadline of its own, B-214)
+  2. User turns the switch on again -> system makes a new random id and sends from then on
+- **Expected result:** off means nothing leaves for this purpose; on again starts a new id; on the same day the service can link it to the earlier one by its daily device hash, from the next day it cannot
+- **Alt paths:** the self-audit log (SCN-019) shows each sent event under its purpose while on, and none after off; «Удалить все данные» (SCN-023) and «Очистить локальные данные» (SCN-032) replace the install number and drops the unsent events, and collection that was on stays on
+- **UI elements:** switch, one sentence on what is sent
+- **States covered:** success, error
+- **Errors & recovery:** the switch cannot be saved -> the block says the change did not go through and shows the state actually stored
+- **Status:** implemented
+- **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, apps/extension/src/options/index.ts, apps/extension/src/background/usage/sink.ts, e2e/scn-050.spec.ts (Chromium: off, on again, and the wipe renewing the install number)
+
+### SCN-052: In Firefox the browser asks, and the product obeys
+- **Persona:** P-01
+- **Feature:** privacy
+- **Traces:** ST-032, FLW-24 (JTBD-05, JRN-01/#4)
+- **Entry point:** Firefox install prompt; settings (SCR-12)
+- **Preconditions:** Firefox 140 or later
+- **Steps:**
+  1. User installs -> Firefox's own prompt offers technical and interaction data as an optional choice
+  2. User grants it or not (whether the prompt offers it ticked is not yet recorded on Firefox 140, B-211) -> the product sends only while Firefox grants it
+  3. User changes the switch in settings -> the product asks Firefox to grant or drop the permission, and follows Firefox's answer
+- **Expected result:** in Firefox the browser's choice is the product's choice, both ways
+- **Alt paths:** Firefox 129 to 139, which has no built-in consent -> nothing is sent, and the settings block says why
+- **UI elements:** the browser's install prompt; the settings switch
+- **States covered:** success, empty
+- **Errors & recovery:** Firefox refuses the request (declined) -> the switch shows off; the request is made first thing in the click, before anything is awaited, because Firefox refuses one made after (consent.test.ts); a grant given again in Firefox's add-on settings turns collection back on with a new install number
+- **Status:** implemented
+- **Coverage:** apps/extension/src/background/usage/consent.ts, apps/extension/src/background/usage/start.test.ts, packages/platform/src/adapter.ts (dataConsent), apps/extension/manifest.firefox.json; unit only, no Firefox e2e yet
+
+### SCN-053: An error the person hit reaches us without their data
+- **Persona:** P-01
+- **Feature:** privacy
+- **Traces:** ST-032, FLW-24 (JTBD-05, JRN-01/#4)
+- **Entry point:** a feed update fails with an exception outside the sync itself (the only wired source today; scans, checks and the sync's own network and signature failures are not reported yet)
+- **Preconditions:** collection is on
+- **Steps:**
+  1. A check fails on the person's device -> system records one event naming the area and the kind of failure from a closed list
+  2. The next scheduled send (the feed alarm, every 6 hours) -> the event leaves through the one network module, one request per event, and is listed in the self-audit log
+- **Expected result:** the team can see that, where and how often the product fails for people, and the event carries no page address, text, file name, email or password
+- **Alt paths:** collection is off -> nothing is recorded or sent
+- **UI elements:** none beyond SCN-019's log
+- **States covered:** error
+- **Errors & recovery:** sending fails with 408, 429, 5xx or a network error -> the event waits for the next scheduled send; a failed write to the outbound log keeps it too, because nothing left; any other 4xx, or a refusal by the network module, drops it; events older than 24 hours are dropped, never sent late
+- **Status:** partial
+- **Coverage:** apps/extension/src/background/usage/sink.ts, apps/extension/src/background/usage/send.ts, docs/analytics.md (error_occurred: feed sync failure); unit only
 
 ## daily-use
 
@@ -795,7 +869,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Errors & recovery:** **this scenario is the error path**, and it had none until 2026-08-20: `openDB` was called with no `catch`, so a `VersionError` propagated into each of the six sections that read the store, and each rendered the browser's own wording. Nothing in the repository recognised the error by name, nothing distinguished it from a damaged store, and there was no way back — `wipeAll` needs a connection, which is precisely what is missing. `resetStorage` deletes the store outright, so the recovery does not depend on the thing that failed
 - **Why refusing is right rather than a fallback:** the newer build may have added a store, an index or a field this one cannot describe, and writing into a schema we do not know is how a downgrade becomes data loss. The panel offers reinstalling that build first, because it is the remedy that keeps everything
 - **Known limit — a store already at the current version whose shape is wrong cannot be repaired.** A browser changes a schema only inside a version-change transaction, so a store or index a half-finished upgrade left out is simply missing: `upgrade` does not run and nothing may create anything. Measured while writing the migration tests. The shape is therefore **verified after opening** and the gap named, because `reuse` without its `by-tag` index answers "where else was this password used" with nothing, quietly and forever. The remedy is clearing, and the panel says so
-- **Telemetry:** none — no analytics events are emitted by this product
+- **Telemetry:** while the store cannot be opened, every worker start records `error_occurred{feed, unexpected}` (the feed pull opens the store first); the event cannot leave, because its outbound-log entry lives in the same store (the send keeps it on `AuditWriteError`), so it goes only if the store opens again within a day (the newer build reinstalled), and «Очистить локальные данные» drops it with the queue and, when collection is on, gives a new install number; when that renewal fails, the page opens «Ваши данные» and the usage block says so (SCR-12, SCR-20). Counted per worker start, not per failure: B-206
 - **Status:** implemented
 - **Coverage:** packages/storage/src/db.ts:openDb, packages/storage/src/db.ts:resetStorage, packages/ui/src/storage/storage-problem.ts:renderStorageProblem, packages/storage/src/db.test.ts (upgrades from versions 1, 2 and 3; a profile from version 9; a shape with a store and an index missing), packages/ui/src/storage/storage-problem.test.ts — unit only: a browser cannot be made to hold a future profile without writing one, which is what the unit tests do directly
 
@@ -857,7 +931,7 @@ See [foundation.md](foundation.md) → Personas.
 - **UI elements:** SCR-17 (landing), SCR-18 (privacy); the store listing is drawn as a boundary because it is not ours
 - **States covered:** success
 - **Errors & recovery:** the pages carry no state that can fail — there is no script on either, by gate, so there is no loading state to get wrong and no error state to render. `/status` failing is SCN-024's path, not this one
-- **Behaviour notes:** **no executable scripts at all**, held by eleven rules in `apps/proxy/src/landing.test.ts`, four of them verified by planted defects; the privacy page is generated from `docs/privacy.md` by `tools/privacy-page.mjs` and `tools/docs.test.ts` refuses when the two disagree, so the claims a reader checks are the claims the repository states
+- **Behaviour notes:** **no executable scripts at all**, held by the rules in `apps/proxy/src/landing.test.ts`, four of them verified by planted defects; the privacy page is generated from `docs/privacy.md` by `tools/privacy-page.mjs` and `tools/docs.test.ts` refuses when the two disagree, so the claims a reader checks are the claims the repository states
 - **Why this was written on 2026-08-20 and not when the pages shipped.** The journey carried the step from the day it was drawn, the pages were built and gated in B-15, and the screen entries recorded on 2026-08-12 that no flow covered them — honestly, rather than inventing one. What was missing was the story in between. Written now as ST-021 → FLW-18 → this scenario (B-22)
 - **Status:** implemented
 - **Coverage:** apps/proxy/src/landing.test.ts, apps/proxy/src/router.test.ts, tools/docs.test.ts

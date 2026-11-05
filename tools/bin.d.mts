@@ -24,5 +24,11 @@ export function endTree(
 export function runToCompletion(
   name: string,
   args: readonly string[],
-  options: { cwd?: string; timeoutMs: number; platform?: string },
+  options: {
+    cwd?: string
+    timeoutMs: number
+    platform?: string
+    /** The child, as soon as it is spawned: `pnpm package` hands it to its keyed-build guard. */
+    onSpawn?: (child: import('node:child_process').ChildProcess) => void
+  },
 ): Promise<void>

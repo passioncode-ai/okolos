@@ -5,6 +5,7 @@ import {
   renderDataControls,
   type DataControlsHandlers,
   type LeakKeyPanel,
+  type UsagePanel,
 } from './data-controls.js'
 
 import { readFileSync } from 'node:fs'
@@ -524,5 +525,55 @@ describe('the Have I Been Pwned key', () => {
     expect(confirm.compareDocumentPosition(role(el, 'leak-key') as Node)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     )
+  })
+})
+
+describe('usage and error data (B-199, SCN-051, SCN-052)', () => {
+  const role = (root: HTMLElement, name: string) => root.querySelector<HTMLElement>(`[data-role=${name}]`)
+  const kinds = ['dataKindFindings']
+  const panel = (overrides: Partial<UsagePanel> = {}): UsagePanel => ({ state: 'on', firefox: false, onSwitch: vi.fn(), ...overrides })
+
+  it('says what is sent and what is not, and shows the switch on while it is on', () => {
+    const el = renderDataControls(document, handlers(), kinds, undefined, panel())
+    expect(role(el, 'usage-title')?.textContent).toBe(message('usageTitle'))
+    expect(role(el, 'usage-what')?.textContent).toBe(message('usageWhat'))
+    const box = el.querySelector<HTMLInputElement>('[data-role=usage-switch]')
+    expect(box?.checked).toBe(true)
+    expect(box?.disabled).toBe(false)
+  })
+
+  it('passes the person’s choice on, and says off sends nothing and deleted the install number', () => {
+    const onSwitch = vi.fn()
+    const el = renderDataControls(document, handlers(), kinds, undefined, panel({ onSwitch }))
+    const box = el.querySelector<HTMLInputElement>('[data-role=usage-switch]')
+    if (box) box.checked = false
+    box?.dispatchEvent(new Event('change'))
+    expect(onSwitch).toHaveBeenCalledWith(false)
+    const off = renderDataControls(document, handlers(), kinds, undefined, panel({ state: 'off' }))
+    expect(role(off, 'usage-state')?.textContent).toBe(message('usageOff'))
+  })
+
+  it('in a Firefox with no built-in consent shows the switch off and unusable, and says why', () => {
+    const el = renderDataControls(document, handlers(), kinds, undefined, panel({ state: 'unsupported', firefox: true }))
+    const box = el.querySelector<HTMLInputElement>('[data-role=usage-switch]')
+    expect(box?.checked).toBe(false)
+    expect(box?.disabled).toBe(true)
+    expect(role(el, 'usage-state')?.textContent).toBe(message('usageFirefoxOld'))
+  })
+
+  it('in Firefox 140 says the browser keeps the choice', () => {
+    const el = renderDataControls(document, handlers(), kinds, undefined, panel({ firefox: true }))
+    expect(role(el, 'usage-firefox')?.textContent).toBe(message('usageFirefox'))
+  })
+
+  it('says when clearing the local data could not replace the install number, and how to get a new one', () => {
+    const el = renderDataControls(document, handlers(), kinds, undefined, panel({ renewFailed: true }))
+    // The switch's own label, substituted: a relabelled switch cannot leave the sentence naming the old one.
+    expect(role(el, 'usage-renew-failed')?.textContent).toBe(message('usageRenewFailed').replace('$SWITCH$', message('usageSwitch')))
+  })
+
+  it('says a change that did not save did not save', () => {
+    const el = renderDataControls(document, handlers(), kinds, undefined, panel({ failed: true }))
+    expect(role(el, 'usage-failed')?.textContent).toBe(message('usageSaveFailed'))
   })
 })

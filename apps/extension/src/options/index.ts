@@ -32,6 +32,7 @@ import {
   type AttentionItem,
   type ExtensionsState,
   type LeakKeyPanel,
+  type UsagePanel,
   type LeaksState,
   type OverviewHandlers,
   type PanelState,
@@ -53,6 +54,7 @@ import { mapJournal } from '../popup/state.js'
 import { answered } from './answered.js'
 import { keepingFocus, markFocus } from './keep-focus.js'
 import { hasLeakKey, removeLeakKey, saveLeakKey } from './leak-key.js'
+import { switchConsent } from '../background/usage/consent.js'
 import { showFailure } from './failure.js'
 import { whilePending } from './pending.js'
 import {
@@ -64,6 +66,7 @@ import {
   type Route,
 } from './views.js'
 import '../pages.css'
+import { switchOutcome } from './usage-switch.js'
 
 /**
  * The options page is, first of all, the self-audit panel: the product's
@@ -1069,7 +1072,19 @@ async function dataSection(): Promise<HTMLElement> {
       onExport: download,
       onWipe: async () => {
         const db = await openDb()
-        return wipeAll(db)
+        const wiped = await wipeAll(db)
+        // The stores' outcome is said at once and stands on its own: the leak screen resets after a
+        // full wipe whatever the renewal does. The renewal follows (one worker step, usage/renew,
+        // which may wait behind a send), and one that failed repaints the usage block in its own words.
+        void renewUsage().then((renewed) => {
+          // Repaint whenever the notice changes, both ways, so a renewal that worked takes an
+          // earlier "not replaced" away. Not after a partial wipe: its note and its retry live only
+          // in the drawn section, and a repaint would erase them; the retry's full wipe repaints.
+          const was = usageRenewFailed
+          usageRenewFailed = !renewed
+          if (wiped.ok && was !== usageRenewFailed) void reload()
+        })
+        return wiped
       },
       // The erase took the key, so the leaks screen goes back to its start here and in every
       // other tab: its last result spoke about a key that no longer exists (N-110 round 3).
@@ -1084,7 +1099,83 @@ async function dataSection(): Promise<HTMLElement> {
     // the build until the confirmation has words for it.
     Object.values(DATA_KIND_KEY),
     await leakKeyPanel(),
+    await usagePanel(),
   )
+}
+
+/**
+ * "Delete all data" and "Clear the local data" take the install number and the unsent events as
+ * well (docs/privacy.md): collection that was on stays on, under a new number, so nothing sent
+ * later links to what was sent before. Off has no number to take. False when the renewal failed,
+ * which the usage block then says (`usageRenewFailed`), apart from the wipe's own outcome.
+ */
+async function renewUsage(): Promise<boolean> {
+  try {
+    // One worker step that renews only if collection is on at that moment: a state read followed
+    // by a set would undo a switch-off that landed between the two.
+    await platform.runtime.send('usage/renew', {})
+    return true
+  } catch (cause) {
+    console.warn('okolos: the wipe could not renew the usage install number', cause)
+    return false
+  }
+}
+
+/** Whether the last switch did not save, shown once on the repaint that follows it. */
+let usageFailed = false
+/** The latest switch: an earlier one whose Firefox answer arrives late does not overrule it. */
+let usageSwitches = 0
+/** The last erase could not replace the install number; said in the usage block until it is. */
+let usageRenewFailed = false
+
+/**
+ * The usage and error data switch (B-199). In Firefox the browser keeps the choice and
+ * `permissions.request` works only inside a user gesture, so this page asks Firefox from the
+ * change event and the worker then reads what Firefox granted.
+ */
+async function usagePanel(): Promise<UsagePanel | undefined> {
+  let state: UsagePanel['state']
+  try {
+    state = (await platform.runtime.send('usage/state', {})).state
+  } catch {
+    return undefined
+  }
+  const failed = usageFailed
+  usageFailed = false
+  // Kept, not consumed: a reset paints twice (its own reload, then the hash change), and the
+  // second paint must still say it. Cleared by a renewal that worked or by the switch.
+  const renewFailed = usageRenewFailed
+  return {
+    state,
+    firefox: platform.kind === 'firefox',
+    failed,
+    renewFailed,
+    onSwitch: (on: boolean) => {
+      const mine = ++usageSwitches
+      const asked = platform.kind === 'firefox' ? switchConsent('firefox', platform.dataConsent, on) : Promise.resolve(null)
+      void asked
+        .then((answer) => {
+          if (mine !== usageSwitches) return
+          // i18n-exempt: caught below into usageFailed, which shows usageSaveFailed; this text is never drawn
+          if (switchOutcome(on, answer) === 'not-saved') throw new Error('Firefox did not confirm the switch-off')
+          return platform.runtime.send('usage/set', { on })
+        })
+        // A Firefox that declined is an answer, not a failure: the repaint shows the switch off.
+        .then(() => {
+          if (mine === usageSwitches) {
+            usageFailed = false
+            // Off deleted the number, on made a new one: either way the old one is gone.
+            usageRenewFailed = false
+          }
+        })
+        .catch(() => {
+          if (mine === usageSwitches) usageFailed = true
+        })
+        .finally(() => {
+          if (mine === usageSwitches) void reload()
+        })
+    },
+  }
 }
 
 /**
@@ -1265,7 +1356,15 @@ async function storageProblem(): Promise<HTMLElement | null> {
             await resetStorage()
             forgetLeakScreen()
             announceKeyChange('erased')
+            // The cleared page first: the renewal is one worker step (usage/renew) that may wait behind a send.
             await reload()
+            // The install number lives in the worker's storage, which a broken database does not
+            // reach: clearing takes it too (storageResetNote says so). When it could not, the
+            // page opens «Ваши данные», where the usage block says so and how to get a new one.
+            const was = usageRenewFailed
+            usageRenewFailed = !(await renewUsage())
+            if (usageRenewFailed && location.hash !== hashFor('data')) location.hash = hashFor('data')
+            else if (was !== usageRenewFailed) await reload()
           })()
         },
       },

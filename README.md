@@ -15,9 +15,10 @@ computed on your device. Okolos is a product of [PassionCode.ai](https://passion
 Every consumer security extension that protects your browsing also *watches*
 your browsing — the incumbents render a server-side history of the pages you
 visited into a web dashboard. Okolos is built the other way round: verdicts
-are computed locally, only anonymous hash prefixes ever leave the device, and
-the extension keeps a log of every outbound request it made, which you can
-read and export.
+are computed locally; what leaves the device is hash prefixes, the address you
+ask it to check (with your Have I Been Pwned key, if you saved one), and, while it is on, usage and error data from a closed list
+([docs/privacy.md](docs/privacy.md)); and the extension keeps a log of every
+outbound request it made, which you can read and export.
 
 That claim is enforced by a test, not by a promise: any outbound request that
 does not pass through the single network choke point and land in the audit log
@@ -31,7 +32,7 @@ fails the build.
 | **Sanitizer & agent gate** | Removes hidden instructions before an assistant reads the page (reversibly), and requires a human decision before an agent acts on a page where an injection was found |
 | **Link & page guard** | Known-phishing blocking, punycode/homoglyph/typosquat lookalikes, open-redirect unwrapping, ClickFix "paste-and-run" fake CAPTCHAs, tech-support lock traps, credential-entry warnings, a stopped click on a link that may open a program on the computer (`ms-msdt:`, `search-ms:`, Office links to a document not over https) |
 | **Download guard** | Reputation of the final URL, type/MIME mismatch, the Windows types attacks start with read as programs (`.dll`, `.one`, `.rdp`, `.search-ms`), and an honest statement of which checks did *not* run (there is no hash check: the file is not written yet when the check runs, `docs/coverage-matrix.md` row 2.2); a doubted file can be deleted from its warning |
-| **Credentials** | Password leak checks against a local corpus (zero network requests on a hit), k-anonymity with padding otherwise, reuse detection, breach and infostealer monitoring |
+| **Credentials** | Password leak checks against a local corpus (no request about the password on a hit; while usage data is on, whether it was found leaves as an event, with no password, hash or site), k-anonymity with padding otherwise, reuse detection, breach and infostealer monitoring |
 | **Extension guard** | Continuous watch: permission deltas between versions, publisher changes, silent updates, static package analysis. One-time vetting is not enough — 34% of extensions gained permissions in a year |
 | **Assistant** | Every verdict explained in plain language with at most three next steps, at least one executable in place. Never more than three items in the queue |
 
@@ -40,12 +41,13 @@ Full vector coverage: [docs/coverage-matrix.md](docs/coverage-matrix.md).
 ## Principles
 
 1. Local-first — browsing history never leaves the device.
-2. Anonymous primitives only — hash prefixes, never URLs or addresses.
+2. Minimal primitives: of a password only a hash prefix leaves, page addresses never leave, an email
+   address only when you ask, and usage data from a closed list while it is on.
 3. No stored third-party breach dumps — hashes and metadata only.
 4. Self-audit — the product shows you what it sent.
 5. Action over alarm — a queue you can finish, not a counter that grows.
 6. Explainable and disputable verdicts — one click to overrule, and it is remembered.
-7. No telemetry, no analytics, no gamification, no paywall.
+7. No gamification, no paywall. Usage and error data from a closed catalogue is on by default and off in settings, and carries no page address, page text or password ([docs/privacy.md](docs/privacy.md)).
 
 ## Documentation
 
@@ -66,7 +68,9 @@ listing, no GitHub release. Build it and load the unpacked extension:
 ```bash
 corepack enable && pnpm install     # Node 22.18+ or 23.6 to 24; also installs the pre-push hook
 pnpm build                          # apps/extension/dist/chrome and apps/extension/dist/firefox
-pnpm package                        # the store zips, checked, in apps/extension/dist/release/
+pnpm package:check                  # every store-archive check, no archive written; what CI runs
+# pnpm package (the store zips) needs the App-Key from the vault and a deployed /privacy:
+# docs/runbooks/development.md, «Выпуск»
 ```
 
 Corepack ships with Node 22 to 24 only, on every OS, Windows included (where `corepack enable` usually

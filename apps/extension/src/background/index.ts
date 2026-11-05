@@ -45,6 +45,11 @@ import { ensureRules, runIfDue, WAKE_ALARMS, type DueStore } from './wake.js'
  */
 
 const platform = detectPlatform()
+/**
+ * Usage and error events (B-198, B-199): on by default by the browser's rules, off in
+ * settings, sent through the audited network path. Read lazily, so a plain wake costs nothing.
+ */
+const usage = startUsage(platform, auditDeps)
 
 /**
  * The worker shows copy too — a download verdict reaches a banner within the
@@ -64,6 +69,8 @@ import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 
 import { recordPageRequest } from './page-requests.js'
 import { recordTrap } from './trap-journal.js'
+import { downloadWarningShown, passwordCheckResult, trapWarning } from './usage/catalogue.js'
+import { startUsage } from './usage/start.js'
 import { optionsPageFor } from '../options/views.js'
 
 /**
@@ -141,6 +148,14 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
       return discardDownload(message.payload, from, (id) => platform.downloads.discard(id)) as Promise<
         RpcMap[T]['res']
       >
+    case 'usage/state':
+      return usage.state().then((state) => ({ state })) as Promise<RpcMap[T]['res']>
+    case 'usage/set':
+      return usage
+        .set(Boolean((message.payload as { on?: unknown }).on))
+        .then((state) => ({ state })) as Promise<RpcMap[T]['res']>
+    case 'usage/renew':
+      return usage.renew().then((state) => ({ state })) as Promise<RpcMap[T]['res']>
     case 'password/pending':
       return answerPendingVerdict(from) as Promise<RpcMap[T]['res']>
     case 'leaks/check':
@@ -306,6 +321,7 @@ async function handleGateDecision(decision: GateDecision): Promise<{ ok: true }>
 // and it is easiest to make in exactly this kind of one-line wiring.
 platform.runtime.onInstalled(() => {
   void platform.tabs.create(platform.runtime.getUrl('first-run.html'))
+  void usage.track('extension_installed', { reason: 'install' })
 })
 
 /**
@@ -634,6 +650,11 @@ async function handlePasswordCheck(
     }
   }
 
+  void usage.track('check_done', {
+    check: 'password',
+    result: passwordCheckResult(verdict.explain.code),
+  })
+
   const answer: PasswordAnswer = {
     compromised: verdict.compromised,
     count: verdict.count,
@@ -748,6 +769,11 @@ async function handleLeakCheck(payload: { address: string }): Promise<RpcMap['le
   // and does not become "no key saved" (B-125 round 2).
   const breaches = await hibpFromStore(() => readSetting('hibp:apiKey'))
   const inventory = await lookupLeaks(payload.address, [breaches, CAVALIER], await auditDeps())
+  // Found or not, never what: no address, no breach name, no count.
+  void usage.track('check_done', {
+    check: 'leak-inventory',
+    result: !inventory.complete ? 'unavailable' : inventory.leaks.length > 0 ? 'found' : 'ok',
+  })
   return {
     leaks: inventory.leaks.map((leak) => ({ ...leak, classes: [...leak.classes] })),
     sources: inventory.sources.map((source) => ({ ...source })),
@@ -978,6 +1004,10 @@ async function journalTrap(payload: { kind: string; signals: string }): Promise<
   } catch (cause) {
     console.warn('okolos: could not journal a page trap', cause)
   }
+  // The kind only, mapped to the catalogue's value; an unmapped kind is not counted. No signal,
+  // no page.
+  const kind = trapWarning(payload.kind)
+  if (kind !== null) void usage.track('warning_shown', { kind })
   return { ok: true }
 }
 
@@ -1150,6 +1180,9 @@ platform.downloads.onCreated((item, named) => {
           ...(outcome ? { stopped: outcome.stopped } : {}),
         })
         .catch(() => false)
+
+      // Counted once a page has the warning, not when it was decided (`downloadWarningShown`).
+      if (downloadWarningShown(verdict.action, told)) void usage.track('warning_shown', { kind: 'download' })
 
       if (!told) {
         // Recorded, because "the banner did not show" and "the check did not run"
@@ -1340,6 +1373,7 @@ async function pullFeed(): Promise<void> {
     })
   } catch (cause) {
     console.warn('okolos: feed sync failed', cause)
+    void usage.track('error_occurred', { area: 'feed', kind: 'unexpected' })
   }
 }
 
@@ -1360,6 +1394,9 @@ void platform.alarms.create(RETENTION_ALARM, RETENTION.periodInMinutes)
 platform.alarms.onFired((name) => {
   if (name === FEED_ALARM) {
     void pullFeed()
+    // Usage events ride the feed's alarm rather than a fourth one: at most four sends a day,
+    // and the wake budget in wake.ts stays as it is. Events live 24 hours in the queue.
+    void usage.flush()
     return
   }
   if (name === INVENTORY_ALARM) {

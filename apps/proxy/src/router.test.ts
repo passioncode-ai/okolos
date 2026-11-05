@@ -577,7 +577,7 @@ describe('the privacy policy, where someone can read it before installing', () =
 
   it('names what actually leaves the device, so the page is not a summary of a summary', async () => {
     const html = await (await handle(get('/privacy'), env())).text()
-    for (const purpose of ['password-range', 'leak-lookup', 'feed-update', 'domain-status']) {
+    for (const purpose of ['password-range', 'leak-lookup', 'feed-update', 'domain-status', 'usage-data']) {
       expect(html, `${purpose} is not on the served page`).toContain(purpose)
     }
   })

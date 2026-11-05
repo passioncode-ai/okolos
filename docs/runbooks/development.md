@@ -346,9 +346,32 @@ node tools/i18n-sweep.mjs --list   # каждая, с файлом и строк
 ## Выпуск
 
 ```bash
-pnpm package         # собирает, проверяет, кладёт zip и печатает размер и sha256
-pnpm package:check   # те же проверки, без записи архива
+pnpm package         # собирает, проверяет, кладёт zip и печатает размер и sha256 (нужен ключ, ниже)
+pnpm package:check   # те же проверки, без записи архива; ключ не нужен, так идёт CI
 ```
+
+Архив для магазина собирается с ключом приложения Aptabase из хранилища, только для этой
+команды (B-198, B-199). Без ключа `pnpm package` останавливается и печатает эту же команду:
+
+```bash
+python3 "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod \
+  passioncode-platform APTABASE_APP_KEY_OKOLOS -- pnpm package
+```
+
+Ключ попадает только в `background.js` архива; сборка с `production` отправляет события об
+использовании и ошибках на `analytics.passioncode.ai`. Любая другая сборка (`pnpm build`, e2e, CI)
+идёт без ключа и ничего не отправляет: `tools/build.mjs` вписывает ключ только вместе с
+`OKOLOS_USAGE_ENV=production`, который ставит одна `pnpm package`. После архивов она пересобирает
+`dist/chrome` и `dist/firefox` без ключа, а при любом другом выходе (ошибка, исключение, Ctrl-C)
+удаляет их (`tools/keyed-builds.mjs`, тест `tools/keyed-builds.test.ts`); `tools/analytics.test.ts`
+(«the App-Key») не пускает ключ ни в отслеживаемые файлы, ни в `dist/` вне архива.
+
+**Сначала воркер, потом архив.** Карточка магазина называет политикой страницу `/privacy` воркера,
+а воркер выкладывается отдельно ([worker-deploy.md](worker-deploy.md)). `pnpm package` читает эту
+страницу и останавливается, если её дата «Обновлено» старше, чем в `docs/privacy.md`, если в ней
+нет текста, который `tools/privacy-page.mjs` делает из `docs/privacy.md` (дата одна на день, а
+документ за день меняется не раз), или если страница не ответила (`tools/privacy-served.mjs`, тест `tools/privacy-served.test.ts`): архив,
+который отправляет данные, не уходит, пока опубликованная политика говорит, что их нет.
 
 Архивы уходят в `apps/extension/dist/release/okolos-<target>-<version>.zip`.
 Упаковка отказывается от сборки с тестовыми хуками, от манифеста, называющего

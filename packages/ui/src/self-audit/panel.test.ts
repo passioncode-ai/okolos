@@ -476,3 +476,24 @@ describe('the summary counts the key when it left', () => {
     )
   })
 })
+
+describe('usage and error data in the summary', () => {
+  it('names the install number those rows carried, as it names an address or a domain', () => {
+    const rows = [1, 2].map((n) =>
+      entry({
+        id: `u${n}`,
+        destination: 'analytics.passioncode.ai',
+        purpose: 'usage-data',
+        payloadShape: 'usage-event:warning_shown',
+        triggeredBy: 'alarm:feeds',
+      }),
+    )
+    const el = renderSelfAudit(
+      document,
+      { kind: 'ready', window: 'week' as const, entries: rows, since: 'Monday', windowStartIso: '2026-08-01T00:00:00.000Z' },
+      handlers,
+    )
+    const summary = el.querySelector('[data-role=summary]')?.textContent ?? ''
+    expect(summary).toContain(message('auditSummaryCarriedInstall').replace('$COUNT$', '2'))
+  })
+})

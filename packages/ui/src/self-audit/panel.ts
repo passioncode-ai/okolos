@@ -314,6 +314,7 @@ const KEPT_KEY: Record<string, string> = {
   'leak-lookup': 'auditKeptLeakLookup',
   'file-hash': 'auditKeptFileHash',
   'domain-status': 'auditKeptDomainStatus',
+  'usage-data': 'auditKeptUsageData',
 }
 
 /** The three outcomes the contract has, in words. A row with none says so instead. */
@@ -332,6 +333,7 @@ const PURPOSE_KEY: Record<string, string> = {
   'leak-lookup': 'auditPurposeLeakLookup',
   'file-hash': 'auditPurposeFileHash',
   'domain-status': 'auditPurposeDomainStatus',
+  'usage-data': 'auditPurposeUsageData',
 }
 
 /**
@@ -344,6 +346,8 @@ const PURPOSE_KEY: Record<string, string> = {
 const CARRIED_KEY: Record<string, string> = {
   'leak-lookup': 'auditSummaryCarriedAddress',
   'domain-status': 'auditSummaryCarriedDomain',
+  // Usage and error data carries no address and no page, only the random install number (B-199).
+  'usage-data': 'auditSummaryCarriedInstall',
 }
 
 const purposeKey = (purpose: string): string | undefined => PURPOSE_KEY[purpose]

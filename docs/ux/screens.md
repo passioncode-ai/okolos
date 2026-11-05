@@ -21,7 +21,7 @@ never updated, which is the same drift this file exists to catch.)
 
 | ID | Screen | Used by | Figma | Status | Coverage |
 |----|--------|---------|-------|--------|----------|
-| SCR-01 | First-run check | FLW-01, FLW-14 | - | built | packages/ui/src/first-run/screen.ts:renderFirstRun |
+| SCR-01 | First-run check | FLW-01, FLW-14, FLW-24 | - | built | packages/ui/src/first-run/screen.ts:renderFirstRun |
 | SCR-02 | Popup | FLW-17, FLW-11, FLW-13 | - | built | e2e/scn-020.spec.ts |
 | SCR-03 | In-page warning banner | FLW-02, FLW-05, FLW-06, FLW-07, FLW-08, FLW-09, FLW-10 | - | built | packages/ui/src/banner/banner.ts:mountBanner |
 | SCR-04 | Finding inspector | FLW-02, FLW-03 | - | built | packages/ui/src/inspector/inspector.ts:mountInspector |
@@ -30,9 +30,9 @@ never updated, which is the same drift this file exists to catch.)
 | SCR-07 | Findings queue | FLW-01, FLW-17 | - | built | e2e/scn-020.spec.ts, e2e/scn-002.spec.ts |
 | SCR-08 | Leaks and repair | FLW-10, FLW-11, FLW-16 | - | built | e2e/scn-015.spec.ts |
 | SCR-09 | Extensions watch | FLW-12 | - | built | e2e/scn-017.spec.ts |
-| SCR-10 | Self-audit | FLW-13, FLW-17 | - | built | packages/ui/src/self-audit/panel.ts:renderSelfAudit |
+| SCR-10 | Self-audit | FLW-13, FLW-17, FLW-24 | - | built | packages/ui/src/self-audit/panel.ts:renderSelfAudit |
 | SCR-11 | Journal and weekly diff | FLW-17 | - | built | e2e/scn-020.spec.ts |
-| SCR-12 | Settings | FLW-05, FLW-14 | - | built | packages/ui/src/settings/data-controls.ts:renderDataControls |
+| SCR-12 | Settings | FLW-05, FLW-14, FLW-24 | - | built | packages/ui/src/settings/data-controls.ts:renderDataControls |
 | SCR-13 | Recovery checklist | FLW-06, FLW-07, FLW-16 | - | built | e2e/scn-025.spec.ts |
 | SCR-14 | Public domain status | FLW-04, FLW-15 | - | built | apps/proxy/src/router.test.ts |
 | SCR-15 | Dashboard overview | FLW-17 | - | built | packages/ui/src/dashboard/overview.ts:renderOverview, e2e/scn-027.spec.ts |
@@ -173,7 +173,7 @@ generator, and the sheet declares no colour of its own.
 ## Screens
 
 ### SCR-01: First-run check
-- **Used by:** FLW-01 (all steps), FLW-14 (post-wipe return)
+- **Used by:** FLW-01 (all steps), FLW-14 (post-wipe return), FLW-24 (the usage and error data notice)
 - **Purpose:** deliver a real, local result within 30 seconds of install — the product's proof of value before any configuration
 - **Elements:** one-line statement of what runs locally; per-check progress list (open tabs / installed extensions / password corpus readiness); findings summary; **primary action: "Показать, с чего начать"**; secondary "Пока пропустить"; link "Что отправляется" → SCR-10
 - **States:**
@@ -185,7 +185,8 @@ generator, and the sheet declares no colour of its own.
   | success | findings exist | - | count by category, primary action into SCR-07 |
 - **Wireframe:** wireframes/SCR-01.md
 - **Coverage:** packages/ui/src/first-run/screen.ts:renderFirstRun, apps/extension/src/first-run/index.ts
-- **Scenarios:** SCN-001, SCN-002
+- **Scenarios:** SCN-001, SCN-002, SCN-050
+- **Usage notice (B-199):** one notice sentence that data about use and errors is sent, only to fix the product, and what is not in it, with the link «Открыть «Ваши данные»» to SCR-12; shown only while collection is on. The intro above it says that the addresses and text of pages are not sent
 - **Resources:** local corpus loader, extension inventory adapter, tab scanner
 - **Status:** built
 
@@ -354,7 +355,7 @@ generator, and the sheet declares no colour of its own.
 - **Status:** built
 
 ### SCR-10: Self-audit
-- **Used by:** FLW-13, FLW-17
+- **Used by:** FLW-13, FLW-17, FLW-24
 - **Purpose:** make "we don't collect your browsing" verifiable rather than promised
 - **Elements:** outbound request log — each row labelled (`когда/куда/зачем/что ушло/источник`) and **openable**, with what that purpose sends and what it holds back plus the outcome in words; a two-position period control (the last seven days / everything kept); **primary action: "Выгрузить журнал"**; a one-line summary that names what left as well as what did not
 - **States:**
@@ -383,11 +384,13 @@ generator, and the sheet declares no colour of its own.
   plaintext addresses would be a secret store of its own — so the row's detail names what left
   for that purpose and what was held back, which is the question a reader has and a stronger
   answer than a byte dump. **A filter by feature** over six purposes at a handful of rows a
-  day is a control that costs a line and answers nothing. **Grouping by purpose** contradicts
+  day was a control that cost a line and answered nothing; since B-199 the log takes up to 100
+  `usage-data` rows a day over seven purposes, and grouping them is B-205. **Grouping by purpose** contradicts
   the newest-first order this screen's own scenario promises in step 1; with a seven-day
-  window the flat list is short enough that grouping only adds nesting
+  window the flat list of requests the person caused is short enough that grouping only adds nesting;
+  the usage-data rows are the exception, B-205
 - **Wireframe:** wireframes/SCR-10.md
-- **Coverage:** packages/ui/src/self-audit/panel.ts:renderSelfAudit, apps/extension/src/options/index.ts, packages/ui/src/self-audit/panel.test.ts (32 checks), e2e/scn-019.spec.ts (four, including opening a row and widening the period), e2e/rendered-instants.spec.ts (nine areas, seeded stores, one row written the way an older build leaves it)
+- **Coverage:** packages/ui/src/self-audit/panel.ts:renderSelfAudit, apps/extension/src/options/index.ts, packages/ui/src/self-audit/panel.test.ts (35 checks), e2e/scn-019.spec.ts (four, including opening a row and widening the period), e2e/rendered-instants.spec.ts (nine areas, seeded stores, one row written the way an older build leaves it)
 - **Scenarios:** SCN-019
 - **Resources:** net layer journal, exporter
 - **Status:** built
@@ -414,7 +417,7 @@ generator, and the sheet declares no colour of its own.
 - **Status:** built
 
 ### SCR-12: Settings
-- **Used by:** FLW-05 (watchlist edit), FLW-11 (the HIBP key), FLW-14
+- **Used by:** FLW-05 (watchlist edit), FLW-11 (the HIBP key), FLW-14, FLW-24 (the usage and error data switch)
 - **Purpose:** the few switches that change behaviour, plus data ownership
 - **Elements:** brand watchlist (add/edit/remove); quiet mode toggle; proxy on/off with a plain explanation of what each option reveals and to whom; retention period; **primary action: "Выгрузить все данные"**; "Удалить все данные" (разрушительное, подтверждается списком того, что удаляется — **по одному виду на каждое хранилище, девять**; список приходит из схемы, а не пишется рядом с ней, и рендерер отказывается рисовать подтверждение, которое не называет ничего). **The trusted domains list moved to SCR-16** on 2026-08-12: the dashboard lists one area per view, the overview names "Доверенные домены" and "Ваши данные" separately, and reviewing what you trusted is a different job from exporting and wiping. **The Have I Been Pwned key block** (`leak-key`), under the export and wipe actions: a heading, a sentence naming where the key goes (only haveibeenpwned.com, in the request header, when a check is pressed) and where it does not (the export, the log), a status line, a masked field (`leak-key-field`), "Сохранить ключ" or, once one is saved, "Заменить ключ" (`leak-key-save`), and "Удалить ключ" (`leak-key-remove`) only when there is something to remove
 - **States:**
@@ -422,6 +425,11 @@ generator, and the sheet declares no colour of its own.
   |-------|---------|-------------|----------|
   | success | default | - | grouped settings |
   | error | export or wipe failed | - | inline failure with retry; state left unchanged |
+  | usage on | usage and error data is on (Chrome and Edge from the first run; Firefox while it grants it) | - | the usage block: the switch checked, the sentence on what is sent, no state line |
+  | usage off | the switch was turned off | - | the switch unchecked and `usageOff` (nothing is sent, the install number is deleted) |
+  | usage unsupported | Firefox 129 to 139, with no built-in data consent | - | the switch unchecked and disabled; `usageFirefoxOld` says nothing is sent and why |
+  | usage not renewed | «Удалить все данные» or «Очистить локальные данные» could not replace the install number (SCN-023, SCN-032) | - | `usageRenewFailed` in the usage block says so and how to get a new one, on every paint until a renewal works or the switch is used (after a reset the page opens here) |
+  | usage not saved | the switch did not go through (the worker did not answer, or Firefox kept the permission after off) | - | `usageSaveFailed` once on the repaint, over the state actually stored |
   | no key | no Have I Been Pwned key saved, the state every install starts in | - | the status line says no key is saved, so the address does not go to Have I Been Pwned (the password check, a separate one, needs no key); an empty field and "Сохранить ключ" |
   | key saved | a key is stored | - | the status line says a key is saved and is not shown; the field is empty; "Заменить ключ" and "Удалить ключ" |
   | refused | "Сохранить ключ" pressed after trimming (spaces around a key are dropped silently) with an empty field (only spaces counts), a space or a non-printing character inside the key, a character outside the Latin layout, or more than 256 characters | - | nothing is saved and the block says which of the four it was (`leak-key-needs`: `leakKeyEmpty`, `leakKeyShape`, `leakKeyLatin`, `leakKeyLong`); the field keeps what was typed so it can be corrected |
@@ -429,7 +437,8 @@ generator, and the sheet declares no colour of its own.
 - **Behavior notes (the key field):** the key is never put back on screen. The field is `type=password`, is emptied the moment a key is accepted, and is never filled from storage: the renderer is told only whether a key exists. Showing even its last characters would put part of a paid credential into every screenshot of this page, and nothing a person does here needs it: replacing pastes a new key over the old, removing needs none
 - **Wireframe:** wireframes/SCR-12.md
 - **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, apps/extension/src/options/leak-key.ts, e2e/scn-024.spec.ts (data controls built; watchlist, quiet mode and the proxy toggle land with their modules), e2e/scn-015.spec.ts (the key block: saved, never shown back, removed)
-- **Scenarios:** SCN-015, SCN-023, SCN-024
+- **Scenarios:** SCN-015, SCN-023, SCN-024, SCN-051, SCN-052
+- **Usage block (B-199):** block "Данные об использовании и ошибках": a switch, one sentence on what is sent; in Firefox the switch asks the browser, and on Firefox 129 to 139 it says nothing is sent because the browser has no consent
 - **Resources:** settings store, exporter, wipe routine
 - **Status:** built
 
@@ -514,12 +523,12 @@ generator, and the sheet declares no colour of its own.
 ### SCR-17: Product landing page
 - **Used by:** FLW-18 (deciding whether to install). **The gap recorded here on 2026-08-12 is closed 2026-08-20 (B-22)** — and the way it was recorded is why closing it was easy: the entry said a flow traced to no story would be a diagram rather than a design, and named the missing piece instead of inventing one. ST-021 is that story, FLW-18 the flow, SCN-033 the scenario
 - **Purpose:** let someone who has never heard of this decide whether to install it — including by reading what it refuses to do
-- **Elements:** what the product is in one sentence; what it does; **what it does not do** (half the page); how to install; links to `/privacy` and `/status`. **Primary action: install**
+- **Elements:** what the product is in one sentence; what it does; what it sends us (`[data-role=sends]`: usage and error data, the only data from the person's use that goes to us; the feed download from our worker carries nothing from them, and the rest of what leaves is in `/privacy`; B-199); **what it does not do** (half the page); how to install; links to `/privacy` and `/status`. **Primary action: install**
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
   | success | any request to `/` | - | the whole page, served as markup |
-- **Behavior notes:** a security tool that lists only its own powers describes a product nobody can check — so half the page is what it does not do. **No executable scripts at all**, and eleven rules in `apps/proxy/src/landing.test.ts` hold that, four of them verified by planted defects (a script appeared, the word "полностью" appeared, the does-not-do list was gutted, the structured block became invalid JSON)
+- **Behavior notes:** a security tool that lists only its own powers describes a product nobody can check — so half the page is what it does not do. **No executable scripts at all**, and the rules in `apps/proxy/src/landing.test.ts` hold that, four of them verified by planted defects (a script appeared, the word "полностью" appeared, the does-not-do list was gutted, the structured block became invalid JSON)
 - **Web surface:**
   - **Route:** `/`
   - **Answers:** what Okolos is, what it does, and what it will not do
@@ -527,14 +536,14 @@ generator, and the sheet declares no colour of its own.
   - **Without JS:** wholly — there is not one script on the page, by gate
   - **Entity:** `schema.org/SoftwareApplication` in `application/ld+json`, repeating the page's own claims in machine form, built in `apps/proxy/src/router.ts:landingPage`
 - **Coverage:** apps/proxy/src/router.ts:landingPage, apps/proxy/src/landing.test.ts
-- **Scenarios:** none — a scenario needs a flow node to cover, and this screen has no flow (see `Used by`). The eleven rules in `landing.test.ts` are what hold it meanwhile, and they are gates rather than scenarios
+- **Scenarios:** none — a scenario needs a flow node to cover, and this screen has no flow (see `Used by`). The rules in `landing.test.ts` are what hold it meanwhile, and they are gates rather than scenarios
 - **Resources:** worker root route
 - **Status:** built
 
 ### SCR-18: Privacy page
 - **Used by:** FLW-18 (deciding whether to install), as the second step. It is also linked from the store listing and from the extension, and it is the document SCR-10 (self-audit) must agree with. **The gap recorded here on 2026-08-12 closed 2026-08-20 (B-22):** the pre-install journey is in the chain now — JRN-01 stages 2 and 3 always carried it, and what was missing was ST-021 between the journey and these pages
 - **Purpose:** state what leaves the device, where to, why, and what is never stored — the document the store requires and the one the self-audit screen must agree with
-- **Elements:** the five outbound destinations with what each carries; what is stored on the device and for how long; the reuse-index paragraph; what does not exist (no analytics, no account, no ads); why the extension asks for every site
+- **Elements:** the six kinds of outbound request with what each carries, usage and error data among them; what is stored on the device and for how long; the reuse-index paragraph; what does not exist (no account, no ads, no browsing tracking); why the extension asks for every site
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
@@ -578,6 +587,7 @@ generator, and the sheet declares no colour of its own.
   | blocked | another copy of Okolos holds the store | - | says to close the other window; trying again then works |
   | unknown | anything else | - | says the reason is below, and shows it |
 - **Replaces six errors with one panel.** Every section of the options page reads the store and catches its own failure, so a profile written by a newer build rendered the browser's sentence about requested and existing versions once per panel, in a page that was otherwise empty. The check runs before any area is built
+- **After "Clear the local data" the cleared page is drawn first, then the install number for usage and error data is renewed when collection is on;** a renewal that fails opens «Ваши данные», where the usage block says so (`usageRenewFailed`, SCR-12)
 - **There is no confirmation behind "Clear the local data" — this panel is the confirmation.** The note carries what the wipe dialog's list carries, because a user agreeing to a word is not a user who agreed
 - **Coverage:** packages/ui/src/storage/storage-problem.ts:renderStorageProblem, packages/ui/src/storage/storage-problem.test.ts, apps/extension/src/options/index.ts:storageProblem
 - **Scenarios:** SCN-032

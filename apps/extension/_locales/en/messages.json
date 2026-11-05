@@ -123,6 +123,9 @@
   "auditPayloadNone": {
     "message": "none"
   },
+  "auditPurposeUsageData": {
+    "message": "sending usage and error data"
+  },
   "auditPurposeDomainStatus": {
     "message": "checking a domain status"
   },
@@ -433,7 +436,7 @@
     "message": "Keep my data"
   },
   "dataConfirmNote": {
-    "message": "It cannot be undone. Export first if you want a copy."
+    "message": "It cannot be undone. If usage and error data is on, the install number is replaced with a new one too, and unsent events are deleted. Export first if you want a copy."
   },
   "dataConfirmTitle": {
     "message": "This deletes, from this device:"
@@ -451,7 +454,7 @@
     "message": "Your data"
   },
   "dataIntro": {
-    "message": "Everything is stored on this device. Take a copy, or delete all of it — no account is involved either way."
+    "message": "Okolos keeps your data on this device. Take a copy, or delete all of it: no account is involved either way. Usage and error data already sent is not deleted by this."
   },
   "dataKindAudit": {
     "message": "the outbound log of what was sent"
@@ -934,7 +937,7 @@
     "message": "Leaked-password check"
   },
   "firstRunCheckPasswordNote": {
-    "message": "runs on submit; the most common ones are answered without any request"
+    "message": "runs on submit; the most common ones are answered with no request about the password"
   },
   "firstRunCheckStorage": {
     "message": "Local storage"
@@ -957,7 +960,7 @@
     "message": "Okolos is on"
   },
   "firstRunIntro": {
-    "message": "Everything below runs on this device. Nothing about the pages you visit is sent anywhere — you can check that yourself at any time."
+    "message": "Every check below runs on this device. The addresses and text of the pages you visit are not sent anywhere, and you can check that yourself at any time."
   },
   "firstRunNothingFound": {
     "message": "Nothing found — $COUNT$ checks ran.",
@@ -987,6 +990,12 @@
   },
   "firstRunStateUnavailable": {
     "message": "not available yet"
+  },
+  "firstRunUsageNotice": {
+    "message": "Okolos sends us usage and error data so we can fix the product where it breaks. It contains no page addresses, page text, file names, email or passwords."
+  },
+  "firstRunUsageOff": {
+    "message": "Open Your data"
   },
   "firstRunWhatSends": {
     "message": "What this sends"
@@ -1741,13 +1750,13 @@
     "message": "This is a storage problem. It is not a statement that this page is fine."
   },
   "pwdExplainAbsent": {
-    "message": "This password does not appear in the breach corpus. Only the first five characters of its fingerprint were sent."
+    "message": "This password does not appear in the breach corpus. The password itself was not sent, only the first five characters of its fingerprint."
   },
   "pwdExplainCommon": {
-    "message": "This password is one of the most common in the world. It was recognised on this device, so nothing was sent anywhere."
+    "message": "This password is one of the most common in the world. It was recognised on this device, so neither the password nor its fingerprint was sent anywhere."
   },
   "pwdExplainFound": {
-    "message": "This password appears $COUNT$ times in breached data. Only the first five characters of its fingerprint were sent.",
+    "message": "This password appears $COUNT$ times in breached data. The password itself was not sent, only the first five characters of its fingerprint.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -1971,7 +1980,7 @@
     "message": "Clear the local data"
   },
   "storageResetNote": {
-    "message": "Clearing removes everything Okolos kept on this device: findings, the journal, the network audit, exceptions, settings with a saved Have I Been Pwned key, extension snapshots, the model, the feeds and the password-reuse index. It cannot be undone."
+    "message": "Clearing removes everything Okolos kept on this device: findings, the journal, the network audit, exceptions, settings with a saved Have I Been Pwned key, extension snapshots, the model, the feeds and the password-reuse index. If usage and error data is on, the install number is replaced with a new one and unsent events are deleted. It cannot be undone."
   },
   "storageRetry": {
     "message": "Try again"
@@ -2287,7 +2296,7 @@
     "message": "Where else this password is used is unknown: this device has not seen it before."
   },
   "warnPasswordSourceOffline": {
-    "message": "a list built into this extension — nothing was sent"
+    "message": "a list built into this extension; neither the password nor its fingerprint was sent"
   },
   "warnPasswordSourceOnline": {
     "message": "Have I Been Pwned (CC BY 4.0), via a range query that sent five characters of the fingerprint"
@@ -2341,6 +2350,14 @@
   },
   "auditSummaryCarriedDomain": {
     "message": "the domain you checked: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "auditSummaryCarriedInstall": {
+    "message": "requests carrying the random install number: $COUNT$",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -2401,6 +2418,9 @@
   },
   "auditKeptFileHash": {
     "message": "The file’s hash. Not its name, not its contents."
+  },
+  "auditKeptUsageData": {
+    "message": "Names of actions and errors from a fixed list, when they happened, a random install number, a session number for the hour, the extension version and the browser language. No page addresses, no page text, no file names, no email and no passwords."
   },
   "auditKeptDomainStatus": {
     "message": "The domain you checked. No page address, no page content."
@@ -2639,5 +2659,34 @@
   },
   "mailSkipNoSender": {
     "message": "the message carries no parsable sender address"
+  },
+  "usageTitle": {
+    "message": "Usage and error data"
+  },
+  "usageWhat": {
+    "message": "What is sent: names of actions and errors from a fixed list, when they happened, a random install number, a session number for the hour, the extension version and the browser language. The service learns the browser and the system from the request header. Page addresses, page text, file names, email and passwords are not sent."
+  },
+  "usageSwitch": {
+    "message": "Send usage and error data"
+  },
+  "usageOff": {
+    "message": "Off: no usage and error data is sent, and there is no install number."
+  },
+  "usageSaveFailed": {
+    "message": "The change was not saved. Try again."
+  },
+  "usageRenewFailed": {
+    "message": "The install number was not replaced. Turn \"$SWITCH$\" off and on again to get a new one.",
+    "placeholders": {
+      "switch": {
+        "content": "$1"
+      }
+    }
+  },
+  "usageFirefoxOld": {
+    "message": "This version of Firefox has no built-in consent to data collection, so Okolos sends no usage and error data. Update Firefox to version 140 to choose."
+  },
+  "usageFirefox": {
+    "message": "In Firefox the browser keeps the choice. The switch asks Firefox to allow or stop sending."
   }
 }

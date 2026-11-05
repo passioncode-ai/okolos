@@ -18,6 +18,7 @@ export interface Platform {
   readonly blocking: Blocking
   readonly downloads: Downloads
   readonly extensions: Extensions
+  readonly dataConsent: DataConsent
   /**
    * Resolves a message key against the browser's own catalogue.
    *
@@ -159,6 +160,18 @@ export interface Runtime {
   /** Absolute URL of a file inside the extension package. */
   getUrl(path: string): string
   openOptionsPage(): Promise<void>
+  /** The extension's own version, from its manifest; '0.0.0' when the browser gives none. */
+  version(): string
+}
+
+/**
+ * Firefox's built-in data consent (Firefox 140+), the `data_collection` half of
+ * `browser.permissions`. Chrome has none, so its adapter offers none of these.
+ */
+export interface DataConsent {
+  getAll?: () => Promise<{ data_collection?: string[] } & Record<string, unknown>>
+  request?: (permissions: { data_collection: string[] }) => Promise<boolean>
+  remove?: (permissions: { data_collection: string[] }) => Promise<boolean>
 }
 
 export interface Tabs {
@@ -225,6 +238,11 @@ export interface WebExtensionApi {
       remove(keys: string | string[]): Promise<void>
     }
   }
+  permissions?: {
+    getAll?(): Promise<{ data_collection?: string[] } & Record<string, unknown>>
+    request?(permissions: { data_collection: string[] }): Promise<boolean>
+    remove?(permissions: { data_collection: string[] }): Promise<boolean>
+  }
   alarms: {
     create(name: string, info: { periodInMinutes: number }): void
     /** Optional so a test double may omit it; both browsers ship it promise-based. */
@@ -233,6 +251,7 @@ export interface WebExtensionApi {
   }
   runtime: {
     getURL(path: string): string
+    getManifest?(): { version?: string }
     openOptionsPage?(): Promise<void> | void
     onInstalled: { addListener(cb: (details: { reason: string }) => void): void }
     onStartup?: { addListener(cb: () => void): void }

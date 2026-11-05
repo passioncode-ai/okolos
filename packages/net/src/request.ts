@@ -12,6 +12,7 @@ const PURPOSES: ReadonlySet<string> = new Set<Purpose>([
   'leak-lookup',
   'file-hash',
   'domain-status',
+  'usage-data',
 ])
 
 export interface RequestSpec {

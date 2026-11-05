@@ -29,6 +29,9 @@ import path from 'node:path'
 
 import { archivePlan, compareEntries, zipEntries } from './archive.mjs'
 import { runToCompletion } from './bin.mjs'
+import { guardKeyedBuilds } from './keyed-builds.mjs'
+import { toHtml } from './privacy-page.mjs'
+import { PRIVACY_URL, servedPolicyBehind } from './privacy-served.mjs'
 import { filesUnder } from './tree.mjs'
 import { pruneReleases, RELEASES_KEPT } from './release-prune.mjs'
 import { FEED_MAX_AGE_DAYS, feedAgeDays, feedTooOld, freshestFeed } from './feed-age.mjs'
@@ -41,8 +44,17 @@ const checkOnly = process.argv.includes('--check')
 
 function die(message) {
   console.error(`\npackage: ${message}`)
+  keyedBuilds.drop()
   process.exit(1)
 }
+
+/**
+ * dist/<target> carries the App-Key from the moment the store build starts until the keyless
+ * rebuild has finished. Any way out in between (die, an exception, a signal, a first build that
+ * failed half-way) removes it: it is what an unpacked load and every test read (B-199).
+ */
+const keyedBuilds = guardKeyedBuilds(TARGETS.map((target) => path.join(dist, target)))
+let keyed = false
 
 const ok = (message) => console.log(`   ok    ${message}`)
 
@@ -99,6 +111,45 @@ console.log('\n── the blocklist, which is the thing this product blocks with
   ok(`${shipped} is ${feedAgeDays(Date.now(), shipped).toFixed(1)} days old, within ${FEED_MAX_AGE_DAYS}`)
 }
 
+console.log('\n── usage and error data: the App-Key is the store archive\'s, and only its')
+/**
+ * B-198, B-199. The store archive sends usage and error events as `production`, with the App-Key
+ * the secret runner puts in the environment for this command only; nothing else ever carries the
+ * key, and a build without it sends nothing. `--check` (CI) builds no store archive, so it
+ * needs no key.
+ */
+const usageKey = process.env.APTABASE_APP_KEY_OKOLOS ?? ''
+if (!checkOnly) {
+  if (!/^A-SH-\d{10}$/i.test(usageKey)) {
+    die(
+      'the store archive needs its App-Key, from the vault and for this command only:\n' +
+        '     python3 "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod ' +
+        'passioncode-platform APTABASE_APP_KEY_OKOLOS -- pnpm package',
+    )
+  }
+  process.env.OKOLOS_USAGE_ENV = 'production'
+  ok('the App-Key is in the environment of this command, and the build will be production')
+} else {
+  ok('--check builds no store archive, so it carries no App-Key')
+}
+
+console.log('\n── the policy the listing names, which must already say what this archive sends')
+if (!checkOnly) {
+  let served
+  try {
+    const response = await fetch(PRIVACY_URL, { signal: AbortSignal.timeout(15_000) })
+    served = await response.text()
+  } catch (cause) {
+    die(`could not read ${PRIVACY_URL} (${cause instanceof Error ? cause.message : String(cause)}); a store archive waits until it can`)
+  }
+  const policy = readFileSync(path.join(root, 'docs/privacy.md'), 'utf8')
+  const behind = servedPolicyBehind(served, policy, toHtml(policy))
+  if (behind) die(`${behind}. Deploy the worker first (docs/runbooks/worker-deploy.md), then package`)
+  ok(`${PRIVACY_URL} is the policy of docs/privacy.md`)
+} else {
+  ok('--check builds no store archive, so it does not read the served policy')
+}
+
 console.log('\n── build, so the archive is of something this command made')
 // Per target, not per `dist`. `dist` also holds `release/` and the two e2e
 // builds, so it exists long after a target directory has been deleted — and then
@@ -109,7 +160,17 @@ const built = TARGETS.every((target) => existsSync(path.join(dist, target)))
 if (!checkOnly || !built) {
   // pnpm is pnpm.cmd on Windows, which Node will not spawn without a shell (B-163).
   // At the deadline the whole tree ends, not only that cmd.exe (B-164).
-  await runToCompletion('pnpm', ['build'], { cwd: root, timeoutMs: 10 * 60_000 })
+  if (checkOnly) {
+    // A check never builds with the key, whatever the shell it runs in exported.
+    delete process.env.APTABASE_APP_KEY_OKOLOS
+    delete process.env.OKOLOS_USAGE_ENV
+  } else {
+    // Before the first byte: build.mjs writes chrome whole before firefox, so a build that
+    // fails on firefox has already left a keyed chrome.
+    keyed = true
+    keyedBuilds.arm()
+  }
+  await runToCompletion('pnpm', ['build'], { cwd: root, timeoutMs: 10 * 60_000, onSpawn: keyedBuilds.watch })
 }
 
 for (const target of TARGETS) {
@@ -130,6 +191,11 @@ for (const target of TARGETS) {
     )
   }
   ok('shadow roots are closed — no test hooks in this build')
+
+  if (usageKey !== '' && content.includes(usageKey)) die(`${target}'s content script carries the App-Key`)
+  if (!checkOnly && !readFileSync(path.join(dir, 'background.js'), 'utf8').includes(usageKey)) {
+    die(`${target}'s background was built without the App-Key, so it would send nothing`)
+  }
 
   const contents = filesIn(dir)
   const present = new Set(contents)
@@ -216,6 +282,25 @@ for (const target of TARGETS) {
   for (const name of pruneReleases(out)) {
     console.log(`   pruned ${name} (keeping the newest ${RELEASES_KEPT} per browser)`)
   }
+}
+
+if (keyed) {
+  console.log('\n── dist/<target> again, without the App-Key: only the archive carries it')
+  delete process.env.APTABASE_APP_KEY_OKOLOS
+  delete process.env.OKOLOS_USAGE_ENV
+  try {
+    await runToCompletion('pnpm', ['build'], { cwd: root, timeoutMs: 10 * 60_000, onSpawn: keyedBuilds.watch })
+  } catch (cause) {
+    die(`the keyless rebuild failed (${cause instanceof Error ? cause.message : String(cause)})`)
+  }
+  for (const target of TARGETS) {
+    if (readFileSync(path.join(dist, target, 'background.js'), 'utf8').includes(usageKey)) {
+      die(`${target} still carries the App-Key after the keyless rebuild`)
+    }
+  }
+  keyed = false
+  keyedBuilds.disarm()
+  ok('dist/chrome and dist/firefox carry no App-Key')
 }
 
 console.log(

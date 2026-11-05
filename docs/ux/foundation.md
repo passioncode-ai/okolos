@@ -258,8 +258,8 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 - **Story:** As P-01, I want to know a password is compromised without sending it anywhere, so that checking my security isn't itself a leak.
 - **Traces:** JTBD-04, JTBD-05, JRN-02/#1
 - **Acceptance criteria:**
-  - Given a password is checked, when the check runs, then only a hash prefix ever leaves the device, and the journal records exactly what was sent.
-  - Given the password is in the local corpus, when checked, then the verdict is produced with no network request at all.
+  - Given a password is checked, when the check runs, then of the password only a hash prefix ever leaves the device (and, while usage and error data is on, whether it was found, with no password, hash or site: `check_done` in docs/analytics.md), and the journal records exactly what was sent.
+  - Given the password is in the local corpus, when checked, then the verdict is produced with no request about the password (while usage and error data is on, whether it was found leaves later as `check_done`, with no password, hash or site).
 - **Priority:** must
 - **Status:** proposed
 
@@ -457,6 +457,18 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
   - Given an agent that finished its task, when it asks to clean up, then its own windows, processes and temporary profiles are gone, and another session's are not.
 - **Priority:** should
 - **Status:** proposed
+
+### ST-032: Help improve the product with usage and error data, and switch it off
+- **Story:** As P-01, I want to be told on the first run that the product sends data about its use and its errors, from a closed list, only to improve it, and to switch that off in settings, so that the product can be fixed when it fails for me without my pages, addresses or passwords ever leaving the device.
+- **Traces:** JTBD-05, JRN-01/#4
+- **Acceptance criteria:**
+  - Given a fresh install in Chrome or Edge, when the first-run screen opens, then it says in one sentence what is sent and why, collection is on, and the screen links to «Ваши данные», where the switch is.
+  - Given the switch is turned off, when the product runs, then nothing is sent, the install's random id is deleted and the unsent queue is dropped; turning it on again makes a new id.
+  - Given Firefox 140 or later, when the person chose at install whether to share technical and interaction data, then the product sends only while the browser grants it, and the switch asks the browser; given Firefox 129 to 139, nothing is sent.
+  - Given any event, when it is sent, then it carries no page address, page text, file name, email, password or anything typed, and it appears in the self-audit log like every other request.
+- **Priority:** must
+- **Status:** proposed
+- **Source:** operator decision 2026-11-04 for all PassionCode products (B-198, B-199); it replaces the old promise "no analytics" in `docs/privacy.md`
 
 ## Assumptions register
 

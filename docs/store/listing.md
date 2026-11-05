@@ -48,14 +48,18 @@ Okolos ищет такой текст на странице, обезврежи�
 • Проверяет утечки по адресу почты и пароли по префиксу хеша.
 • Шаг за шагом ведёт через восстановление после инцидента.
 
+Что он отправляет нам
+
+• Данные об использовании и ошибках, чтобы мы исправляли продукт. Адреса страниц, их текст, почта и пароли туда не попадают. Выключается в разделе «Ваши данные».
+
 Чего он не делает
 
 • Не отправляет историю посещений. Страницы проверяются на устройстве по
   списку, скачанному целиком.
 • Не считает «заблокированные угрозы» и не рисует уровень защиты.
-• Не собирает аналитику, не просит аккаунт, не показывает рекламу.
-• Не проверяет ваш адрес почты и пароли в фоне, только по вашему действию.
-• Не хранит ничего дольше 90 дней.
+• Не просит аккаунт, не показывает рекламу.
+• Не проверяет адрес почты и пароли по таймеру: адрес, когда вы нажимаете «Проверить», пароль, когда вы отправляете форму входа.
+• Журналы на устройстве стирает через 90 дней. Данные об использовании и ошибках сервис удаляет через 730 дней, номер установки из них через 400; про резервные копии сказано в политике.
 
 Что можно проверить
 
@@ -103,15 +107,19 @@ What it does
 • Checks breaches by email address and passwords by hash prefix.
 • Walks you through recovery after an incident.
 
+What it sends us
+
+• Usage and error data so we can fix what breaks for you, and none of it is a page address, page text, an email or a password. Turn it off in Your data.
+
 What it does not do
 
 • Does not send your browsing history. Pages are checked on the device against a
   list downloaded whole.
 • Does not count "threats blocked" and draws no protection score.
-• Collects no analytics, asks for no account, shows no advertising.
-• Does not check your address or passwords in the background — only when you
-  press.
-• Keeps nothing longer than 90 days.
+• Asks for no account, shows no advertising.
+• Does not check your address or passwords on a timer: the address when you press Check, a password
+  when you submit a login form.
+• Deletes the logs on your device after 90 days. The service deletes usage and error data after 730 days and the install number from it after 400; the policy covers backups.
 
 What is checkable
 
