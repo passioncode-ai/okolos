@@ -66,6 +66,7 @@ import {
   type Route,
 } from './views.js'
 import '../pages.css'
+import { switchOutcome } from './usage-switch.js'
 
 /**
  * The options page is, first of all, the self-audit panel: the product's
@@ -1146,10 +1147,8 @@ async function usagePanel(): Promise<UsagePanel | undefined> {
       void asked
         .then((answer) => {
           if (mine !== usageSwitches) return
-          // Firefox kept the grant after "off": the worker follows the grant, so telling it off
-          // would be undone at the next event. Say the change did not go through instead.
           // i18n-exempt: caught below into usageFailed, which shows usageSaveFailed; this text is never drawn
-          if (!on && answer === 'on') throw new Error('Firefox kept the data permission')
+          if (switchOutcome(on, answer) === 'not-saved') throw new Error('Firefox did not confirm the switch-off')
           return platform.runtime.send('usage/set', { on })
         })
         // A Firefox that declined is an answer, not a failure: the repaint shows the switch off.

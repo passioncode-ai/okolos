@@ -368,8 +368,9 @@ python3 "$(project-observatory full-path)/tools/use_secret.py" run --vault-only 
 
 **Сначала воркер, потом архив.** Карточка магазина называет политикой страницу `/privacy` воркера,
 а воркер выкладывается отдельно ([worker-deploy.md](worker-deploy.md)). `pnpm package` читает эту
-страницу и останавливается, если её дата «Обновлено» старше, чем в `docs/privacy.md`, или если
-страница не ответила (`tools/privacy-served.mjs`, тест `tools/privacy-served.test.ts`): архив,
+страницу и останавливается, если её дата «Обновлено» старше, чем в `docs/privacy.md`, если в ней
+нет текста, который `tools/privacy-page.mjs` делает из `docs/privacy.md` (дата одна на день, а
+документ за день меняется не раз), или если страница не ответила (`tools/privacy-served.mjs`, тест `tools/privacy-served.test.ts`): архив,
 который отправляет данные, не уходит, пока опубликованная политика говорит, что их нет.
 
 Архивы уходят в `apps/extension/dist/release/okolos-<target>-<version>.zip`.

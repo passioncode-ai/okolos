@@ -632,7 +632,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Entry point:** extension just installed in Chrome or Edge, the first-run screen opens
 - **Preconditions:** no prior local data
 - **Steps:**
-  1. User reads the first-run screen -> system shows the notice "Okolos отправляет нам данные о том, как работает продукт и где он ломается, чтобы его исправлять. В них нет адресов страниц, их текста, имён файлов, почты и паролей." under the intro, which says that the addresses and text of pages are not sent
+  1. User reads the first-run screen -> system shows the notice "Okolos отправляет нам данные о том, как работает продукт и где он ломается, чтобы его исправлять. В них нет адресов страниц, их текста, имён файлов, почты и паролей." at the end of the screen, after its actions; the intro above says that the addresses and text of pages are not sent
   2. User follows «Открыть «Ваши данные»» -> system opens «Ваши данные» at the switch (SCN-051)
   3. User closes the first-run screen without acting -> collection stays on; the notice is not shown again
 - **Expected result:** the person learns on the first run what is sent and how to stop it, and nothing they did on a page is part of it
@@ -650,7 +650,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Entry point:** settings (SCR-12), block "Данные об использовании и ошибках"
 - **Preconditions:** collection is on
 - **Steps:**
-  1. User turns the switch off -> system deletes the install's random id, drops the unsent events and stops sending; the block says so. A send already under way when the switch moves finishes first (the steps run one at a time), so events of that batch can still leave: seconds normally, at most 25 requests of 15 s each on a stalled network
+  1. User turns the switch off -> system deletes the install's random id, drops the unsent events and stops sending; the block says so. A send already under way when the switch moves finishes first (the steps run one at a time), so events of that batch can still leave: seconds normally, longer on a stalled network (each request has 15 s; opening the outbound log before it has no deadline of its own, B-214)
   2. User turns the switch on again -> system makes a new random id and sends from then on
 - **Expected result:** off means nothing leaves for this purpose; on again cannot be joined to the earlier id
 - **Alt paths:** the self-audit log (SCN-019) shows each sent event under its purpose while on, and none after off; «Удалить все данные» (SCN-023) and «Очистить локальные данные» (SCN-032) replace the install number and drops the unsent events, and collection that was on stays on

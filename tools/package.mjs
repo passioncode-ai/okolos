@@ -30,6 +30,7 @@ import path from 'node:path'
 import { archivePlan, compareEntries, zipEntries } from './archive.mjs'
 import { runToCompletion } from './bin.mjs'
 import { guardKeyedBuilds } from './keyed-builds.mjs'
+import { toHtml } from './privacy-page.mjs'
 import { PRIVACY_URL, servedPolicyBehind } from './privacy-served.mjs'
 import { filesUnder } from './tree.mjs'
 import { pruneReleases, RELEASES_KEPT } from './release-prune.mjs'
@@ -141,7 +142,8 @@ if (!checkOnly) {
   } catch (cause) {
     die(`could not read ${PRIVACY_URL} (${cause instanceof Error ? cause.message : String(cause)}); a store archive waits until it can`)
   }
-  const behind = servedPolicyBehind(served, readFileSync(path.join(root, 'docs/privacy.md'), 'utf8'))
+  const policy = readFileSync(path.join(root, 'docs/privacy.md'), 'utf8')
+  const behind = servedPolicyBehind(served, policy, toHtml(policy))
   if (behind) die(`${behind}. Deploy the worker first (docs/runbooks/worker-deploy.md), then package`)
   ok(`${PRIVACY_URL} is the policy of docs/privacy.md`)
 } else {

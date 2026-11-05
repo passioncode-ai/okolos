@@ -444,7 +444,7 @@ flowchart TD
 flowchart TD
   A[Screen: Settings] -->|export everything| B[JSON file produced]
   A -->|wipe everything| C{Confirm - names what will be deleted}
-  C -->|confirm| D[All local data deleted; extension returns to first-run state]
+  C -->|confirm| D[All local data deleted; extension returns to first-run state; usage and error data, if on, under a new install number with the queue dropped]
   C -->|cancel| A
   B -->|export failed| B_err[Inline: export failed + retry]
   B_err -->|retry| B

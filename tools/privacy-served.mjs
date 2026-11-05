@@ -12,15 +12,18 @@ export function policyDate(text) {
 }
 
 /**
- * Why the served page is not the document's, or null when it is at least as new.
+ * Why the served page is not the document's, or null when it carries it. By content, not by the
+ * date alone: docs/privacy.md changed five times on one day, every version dated that day.
  * @param {string} served the body /privacy answered
  * @param {string} document docs/privacy.md
+ * @param {string} html the document as tools/privacy-page.mjs renders it for the worker
  */
-export function servedPolicyBehind(served, document) {
+export function servedPolicyBehind(served, document, html) {
   const wanted = policyDate(document)
   const got = policyDate(served)
   if (wanted === null) return 'docs/privacy.md has no «Обновлено» date'
   if (got === null) return `${PRIVACY_URL} carries no «Обновлено» date`
   if (got < wanted) return `${PRIVACY_URL} is the policy of ${got}, docs/privacy.md is of ${wanted}`
+  if (!served.includes(html)) return `${PRIVACY_URL} differs from docs/privacy.md (both dated ${wanted})`
   return null
 }

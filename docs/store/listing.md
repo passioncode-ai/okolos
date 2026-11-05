@@ -117,8 +117,8 @@ What it does not do
   list downloaded whole.
 • Does not count "threats blocked" and draws no protection score.
 • Asks for no account, shows no advertising.
-• Does not check your address or passwords in the background — only when you
-  press.
+• Does not check your address or passwords on a timer: the address when you press Check, a password
+  when you submit a login form.
 • Keeps nothing longer than 90 days.
 
 What is checkable

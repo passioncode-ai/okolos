@@ -287,3 +287,20 @@ AGENTS.md now cites the tests that hold the per-event writes.
 Store screenshots retaken on 78cbc21 (started at 8.1 GB free); `pnpm gates` then green in full: 215 files, 3512
 tests passed, 2 skipped, ux:lint, brand:lint, i18n:sweep, package:check exit 0. The gates run started at 7.5 GB,
 under the coordinator's line, because the screenshots had just used 0.6 GB: a second slip, said here.
+
+## Stage 6: certification, round 5 (2026-11-05, on 7dc3ced)
+
+CI on 7dc3ced green on all four jobs. Unit and product tiers: **fail**; seam tier still running at the time.
+
+| Finding | Tier | Fix |
+|---|---|---|
+| A Firefox switch-off skipped when the first read failed, then reported saved | unit | `switchOutcome(on, answer)` in `apps/extension/src/options/usage-switch.ts`: an off is saved only on a confirmed off; `usage-switch.test.ts` seen red |
+| The privacy gate passed any same-day page | unit (risk) | compared by content (`toHtml(docs/privacy.md)` inside the served body); `privacy-served.test.ts` seen red |
+| privacy.md «Ничего не проверяется по таймеру» (the feed and the extension review are) and «с этого момента не уходит ничего» (a send under way finishes) | product | narrowed; Copylot `6cd78d43` |
+| en listing «only when you press» | product | «on a timer: the address when you press Check, a password when you submit a login form» (Copylot `47787fb4`) |
+| AGENTS.md said one read per event | product | two reads and one write per recorded event, one of each per sent event, two reads per flush |
+| «usage data» / «сбор данных об использовании» instead of the brand term | product | the full term in both notes and privacy.md (Copylot ru `3cf2fd24`, en `47787fb4`) |
+| Risks taken in: FLW-14 node D, SCN-050 notice position, SCN-051 window wording, B-211 records the Firefox prompt default, B-212 drops the narrowed password strings | product | — |
+
+Not taken (risks, recorded here): the listing heading «Что он отправляет» lists only usage data; the three lists of
+what is sent differ in the constants they name; scenarios with a send site carry no Telemetry line (B-206's ground).
