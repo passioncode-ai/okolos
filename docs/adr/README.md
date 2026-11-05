@@ -29,3 +29,4 @@
 | [0018](0018-agents-get-their-own-extension.md) | У агентов — своё расширение, Okolos Bridge, в этом же репозитории | `tools/manifest.test.ts` |
 | [0019](0019-page-content-never-reaches-our-infrastructure.md) | Содержимое страниц не попадает на нашу инфраструктуру; агенту — только разрешённое задачей | `packages/net/src/destinations.test.ts` |
 | [0020](0020-okolos-agent-b1-runs-on-macos-only.md) | Okolos Agent фазы Б1 только на macOS; Windows отдельной фазой | `docs/brand/facts.md`, строка B-171 в `docs/backlog.md` |
+| [0021](0021-usage-and-error-data-on-by-default.md) | Данные об использовании и ошибках включены по умолчанию и выключаются в настройках | `apps/extension/src/background/usage/`, `docs/analytics.md`, `docs/privacy.md` |

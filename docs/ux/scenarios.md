@@ -59,10 +59,10 @@ are specified once in [screens.md](screens.md).
 | SCN-047 | The person takes over a step, hands back, or stops every agent | agent-bridge | P-01 | ST-030, FLW-22 | draft | — |
 | SCN-048 | What agents left behind is cleaned, and nothing in use is touched | agent-bridge | P-01 | ST-031, FLW-23 | draft | — |
 | SCN-049 | A link would open a program outside the browser | web-guard | P-02 | ST-007, FLW-06 | implemented | 2026-10-27 unit |
-| SCN-050 | The first run says what anonymous data is sent, and it is on | privacy | P-01 | ST-032, FLW-24 | draft | not yet |
-| SCN-051 | The person switches anonymous data off, and on again | privacy | P-01 | ST-032, FLW-24 | draft | not yet |
-| SCN-052 | In Firefox the browser asks, and the product obeys | privacy | P-01 | ST-032, FLW-24 | draft | not yet |
-| SCN-053 | An error the person hit reaches us without their data | privacy | P-01 | ST-032, FLW-24 | draft | not yet |
+| SCN-050 | The first run says what anonymous data is sent, and it is on | privacy | P-01 | ST-032, FLW-24 | implemented | 2026-11-05 e2e |
+| SCN-051 | The person switches anonymous data off, and on again | privacy | P-01 | ST-032, FLW-24 | implemented | 2026-11-05 e2e |
+| SCN-052 | In Firefox the browser asks, and the product obeys | privacy | P-01 | ST-032, FLW-24 | implemented | 2026-11-05 unit |
+| SCN-053 | An error the person hit reaches us without their data | privacy | P-01 | ST-032, FLW-24 | implemented | 2026-11-05 unit |
 
 ## Personas
 
@@ -637,11 +637,11 @@ See [foundation.md](foundation.md) → Personas.
   3. User closes the first-run screen without acting -> collection stays on; the notice is not shown again
 - **Expected result:** the person learns on the first run what is sent and how to stop it, and nothing they did on a page is part of it
 - **Alt paths:** an install that existed before this release opens the browser -> the same notice is shown once, on the next first-run screen or as a one-time line in the popup, and collection is on unless the person had already switched it off
-- **UI elements:** notice sentence, link "Выключить в настройках", the existing "Что отправляется" link
+- **UI elements:** notice sentence, link "Отключить в настройках", the existing "Что отправляется" link
 - **States covered:** success
 - **Errors & recovery:** the consent state cannot be written -> nothing is sent until it can, and the notice is shown again next time
-- **Status:** draft
-- **Coverage:** none yet, planned in run `feat/usage-analytics` (B-199)
+- **Status:** implemented
+- **Coverage:** packages/ui/src/first-run/screen.ts:renderFirstRun, apps/extension/src/first-run/index.ts, e2e/scn-050.spec.ts (Chromium: the notice, its way to the switch)
 
 ### SCN-051: The person switches anonymous data off, and on again
 - **Persona:** P-01
@@ -657,8 +657,8 @@ See [foundation.md](foundation.md) → Personas.
 - **UI elements:** switch, one sentence on what is sent, link to the privacy text
 - **States covered:** success, error
 - **Errors & recovery:** the switch cannot be saved -> the block says the change did not go through and shows the state actually stored
-- **Status:** draft
-- **Coverage:** none yet, planned in run `feat/usage-analytics` (B-199)
+- **Status:** implemented
+- **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, apps/extension/src/options/index.ts, apps/extension/src/background/usage/sink.ts, e2e/scn-050.spec.ts (Chromium: off, on again)
 
 ### SCN-052: In Firefox the browser asks, and the product obeys
 - **Persona:** P-01
@@ -675,8 +675,8 @@ See [foundation.md](foundation.md) → Personas.
 - **UI elements:** the browser's install prompt; the settings switch
 - **States covered:** success, empty
 - **Errors & recovery:** Firefox refuses the request (no user gesture, or declined) -> the switch shows off
-- **Status:** draft
-- **Coverage:** none yet, planned in run `feat/usage-analytics` (B-199)
+- **Status:** implemented
+- **Coverage:** apps/extension/src/background/usage/consent.ts, apps/extension/src/background/usage/start.test.ts, packages/platform/src/adapter.ts (dataConsent), apps/extension/manifest.firefox.json; unit only, no Firefox e2e yet
 
 ### SCN-053: An error the person hit reaches us without their data
 - **Persona:** P-01
@@ -692,8 +692,8 @@ See [foundation.md](foundation.md) → Personas.
 - **UI elements:** none beyond SCN-019's log
 - **States covered:** error
 - **Errors & recovery:** sending fails -> the batch is retried with backoff; events older than 24 hours are dropped, never sent late
-- **Status:** draft
-- **Coverage:** none yet, planned in run `feat/usage-analytics` (B-198)
+- **Status:** implemented
+- **Coverage:** apps/extension/src/background/usage/sink.ts, apps/extension/src/background/usage/send.ts, docs/analytics.md (error_occurred: feed sync failure); unit only
 
 ## daily-use
 

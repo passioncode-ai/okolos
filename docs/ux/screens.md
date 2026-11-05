@@ -173,7 +173,7 @@ generator, and the sheet declares no colour of its own.
 ## Screens
 
 ### SCR-01: First-run check
-- **Used by:** FLW-01 (all steps), FLW-14 (post-wipe return), FLW-24 (the anonymous-data notice, planned)
+- **Used by:** FLW-01 (all steps), FLW-14 (post-wipe return), FLW-24 (the usage and error data notice)
 - **Purpose:** deliver a real, local result within 30 seconds of install — the product's proof of value before any configuration
 - **Elements:** one-line statement of what runs locally; per-check progress list (open tabs / installed extensions / password corpus readiness); findings summary; **primary action: "Показать, с чего начать"**; secondary "Пока пропустить"; link "Что отправляется" → SCR-10
 - **States:**
@@ -186,7 +186,7 @@ generator, and the sheet declares no colour of its own.
 - **Wireframe:** wireframes/SCR-01.md
 - **Coverage:** packages/ui/src/first-run/screen.ts:renderFirstRun, apps/extension/src/first-run/index.ts
 - **Scenarios:** SCN-001, SCN-002, SCN-050
-- **Planned (B-199, run `feat/usage-analytics`):** one notice sentence that anonymous data about use and errors is sent, only to improve the product, with the link "Выключить в настройках" to SCR-12
+- **Usage notice (B-199):** one notice sentence that anonymous data about use and errors is sent, only to improve the product, with the link "Отключить в настройках" to SCR-12
 - **Resources:** local corpus loader, extension inventory adapter, tab scanner
 - **Status:** built
 
@@ -415,7 +415,7 @@ generator, and the sheet declares no colour of its own.
 - **Status:** built
 
 ### SCR-12: Settings
-- **Used by:** FLW-05 (watchlist edit), FLW-11 (the HIBP key), FLW-14, FLW-24 (the anonymous-data switch, planned)
+- **Used by:** FLW-05 (watchlist edit), FLW-11 (the HIBP key), FLW-14, FLW-24 (the usage and error data switch)
 - **Purpose:** the few switches that change behaviour, plus data ownership
 - **Elements:** brand watchlist (add/edit/remove); quiet mode toggle; proxy on/off with a plain explanation of what each option reveals and to whom; retention period; **primary action: "Выгрузить все данные"**; "Удалить все данные" (разрушительное, подтверждается списком того, что удаляется — **по одному виду на каждое хранилище, девять**; список приходит из схемы, а не пишется рядом с ней, и рендерер отказывается рисовать подтверждение, которое не называет ничего). **The trusted domains list moved to SCR-16** on 2026-08-12: the dashboard lists one area per view, the overview names "Доверенные домены" and "Ваши данные" separately, and reviewing what you trusted is a different job from exporting and wiping. **The Have I Been Pwned key block** (`leak-key`), under the export and wipe actions: a heading, a sentence naming where the key goes (only haveibeenpwned.com, in the request header, when a check is pressed) and where it does not (the export, the log), a status line, a masked field (`leak-key-field`), "Сохранить ключ" or, once one is saved, "Заменить ключ" (`leak-key-save`), and "Удалить ключ" (`leak-key-remove`) only when there is something to remove
 - **States:**
@@ -431,7 +431,7 @@ generator, and the sheet declares no colour of its own.
 - **Wireframe:** wireframes/SCR-12.md
 - **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, apps/extension/src/options/leak-key.ts, e2e/scn-024.spec.ts (data controls built; watchlist, quiet mode and the proxy toggle land with their modules), e2e/scn-015.spec.ts (the key block: saved, never shown back, removed)
 - **Scenarios:** SCN-015, SCN-023, SCN-024, SCN-051, SCN-052
-- **Planned (B-199, run `feat/usage-analytics`):** block "Анонимные данные": a switch, one sentence on what is sent, a link to the privacy text; in Firefox the switch asks the browser, and on Firefox 129 to 139 it says nothing is sent because the browser has no consent
+- **Usage block (B-199):** block "Данные об использовании и ошибках": a switch, one sentence on what is sent, a link to the privacy text; in Firefox the switch asks the browser, and on Firefox 129 to 139 it says nothing is sent because the browser has no consent
 - **Resources:** settings store, exporter, wipe routine
 - **Status:** built
 

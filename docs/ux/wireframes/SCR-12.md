@@ -30,6 +30,13 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 - `leak-key-remove`
 - `leak-key-blurb`
 - `leak-key-state`
+- `usage`
+- `usage-title`
+- `usage-switch`
+- `usage-what`
+- `usage-state`
+- `usage-firefox`
+- `usage-failed`
 
 **States**
 

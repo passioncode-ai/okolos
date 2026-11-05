@@ -53,7 +53,8 @@ Okolos ищет такой текст на странице, обезврежи�
 • Не отправляет историю посещений. Страницы проверяются на устройстве по
   списку, скачанному целиком.
 • Не считает «заблокированные угрозы» и не рисует уровень защиты.
-• Не собирает аналитику, не просит аккаунт, не показывает рекламу.
+• Отправляет данные об использовании и ошибках, чтобы мы исправляли продукт. Адреса страниц, их текст, почта и пароли туда не попадают. Выключается в настройках.
+• Не просит аккаунт, не показывает рекламу.
 • Не проверяет ваш адрес почты и пароли в фоне, только по вашему действию.
 • Не хранит ничего дольше 90 дней.
 
@@ -108,7 +109,8 @@ What it does not do
 • Does not send your browsing history. Pages are checked on the device against a
   list downloaded whole.
 • Does not count "threats blocked" and draws no protection score.
-• Collects no analytics, asks for no account, shows no advertising.
+• Sends usage and error data so we can fix what breaks for you, and none of it is a page address, page text, an email or a password. Settings turn it off.
+• Asks for no account, shows no advertising.
 • Does not check your address or passwords in the background — only when you
   press.
 • Keeps nothing longer than 90 days.

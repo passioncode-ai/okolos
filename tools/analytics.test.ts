@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
 import { CATALOGUE } from '../apps/extension/src/background/usage/catalogue.js'
+import { directoriesIn, filesIn } from './tree.mjs'
 
 /**
  * `docs/analytics.md` and the code's catalogue say the same thing (B-198), and every place the
@@ -70,11 +71,11 @@ describe('the App-Key', () => {
 
   it('is in no build but the store archive: dist/<target> and the e2e builds carry none', () => {
     const dist = path.join(root, 'apps/extension/dist')
-    const builds = existsSync(dist) ? readdirSync(dist).filter((name) => name !== 'release') : []
+    const builds = existsSync(dist) ? directoriesIn(dist).filter((name) => name !== 'release') : []
     const hits: string[] = []
     for (const build of builds) {
       const dir = path.join(dist, build)
-      for (const file of readdirSync(dir).filter((name) => name.endsWith('.js'))) {
+      for (const file of filesIn(dir, '.js')) {
         if (/A-SH-\d{10}/i.test(readFileSync(path.join(dir, file), 'utf8'))) hits.push(`${build}/${file}`)
       }
     }

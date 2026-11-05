@@ -995,7 +995,7 @@
     "message": "Okolos sends us data on how the product runs and where it breaks, so we can fix it. It contains no page addresses, page text, file names, email or passwords."
   },
   "firstRunUsageOff": {
-    "message": "Turn off in settings"
+    "message": "Disable in settings"
   },
   "firstRunWhatSends": {
     "message": "What this sends"
