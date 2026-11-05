@@ -47,8 +47,8 @@ export interface PanelHandlers {
    * The reader asked for a different period.
    *
    * SCR-10 promised "filters by period and feature" from the start. The feature filter is
-   * deliberately not built — over six purposes at a handful of rows a day it is a control
-   * that costs a line and answers nothing — but the period is real: retention is ninety days
+   * deliberately not built — over seven purposes it is a control that costs a line and answers
+   * little; usage rows make the list longer, and grouping them is B-205 — but the period is real: retention is ninety days
    * and the default view is seven, so without this the other eighty-three are reachable only
    * by exporting the file.
    */
@@ -302,7 +302,7 @@ function row(doc: Document, entry: AuditEntry): HTMLLIElement {
 /**
  * What each purpose sends, and what it holds back — the facts table, in code.
  *
- * `docs/brand/facts.md` carries the same six rows under "Что уходит с устройства", and a
+ * `docs/brand/facts.md` carries the same rows under "Что уходит с устройства", and a
  * gate compares that document against the tree. Kept beside `PURPOSE_KEY` because they
  * answer different questions: that one names the request, this one is what a person opens
  * the row to read.
@@ -337,10 +337,10 @@ const PURPOSE_KEY: Record<string, string> = {
 }
 
 /**
- * The two purposes that carry something of the user's, and the sentence each earns.
+ * The purposes that carry something of the user's, and the sentence each earns.
  *
  * Kept beside `PURPOSE_KEY` because they answer different questions — that one names the
- * request, this one names what was in it — and because the pair is what
+ * request, this one names what was in it — and because these are what
  * `docs/brand/facts.md` documents.
  */
 const CARRIED_KEY: Record<string, string> = {

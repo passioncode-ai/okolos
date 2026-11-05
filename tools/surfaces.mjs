@@ -22,11 +22,20 @@ import path from 'node:path'
 
 import { filesUnder, posixRelative } from './tree.mjs'
 
-/** What the four images actually render: the UI package, the options page, the style sheet. */
+/**
+ * What the four images actually render: the UI package, the pages that mount it (options,
+ * first run, popup, interstitial), the style sheet, and the Russian catalogue every string on
+ * them comes from. The pages and the catalogue joined after B-199's certification (B-215): a
+ * first-run note changed in `_locales` and the retake was voluntary, because nothing here moved.
+ */
 export const SURFACES = [
   'packages/ui/src',
   'apps/extension/src/options',
+  'apps/extension/src/first-run',
+  'apps/extension/src/popup',
+  'apps/extension/src/interstitial',
   'apps/extension/src/pages.css',
+  'apps/extension/_locales/ru/messages.json',
 ]
 
 /**
