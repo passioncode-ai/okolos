@@ -324,3 +324,10 @@ if collection is on at that moment); `start.test.ts` «the renewal after an eras
 page repaints whenever the renewal changes the notice, so a renewal that worked takes an earlier notice away.
 
 Gates on b9487dc: 3520 passed, 2 red (analytics line refs moved by the new RPC case; screenshots hash covers the options code). Line refs moved, screenshots retaken at 8.9 GB; tools/listing, analytics, wireframes 44/44; ux:lint, brand:lint, i18n:sweep, package:check exit 0.
+
+Seam tier, round 6 (on 89dc27f): its first `breaks` is the unit tier's (fixed by `usage/renew`). Its second: after
+a partial wipe, the renewal's repaint erased the partial-wipe note and retry, which live only in the drawn section.
+Fixed: the renewal repaints only after a full wipe (the retry's full wipe repaints). Risks taken in: the reset path
+repaints the cleared page first and renews after; four second descriptions reworded (docs/README, the
+privacy-served header, the build.mjs runbook reference, the renewUsage docstring). Not covered by a test: the
+options erase wiring has no harness (recorded since round 4).

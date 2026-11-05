@@ -1,7 +1,8 @@
 // The store listing names the served /privacy page as the policy (docs/store/listing.md). A store
 // archive that sends usage data must not go out while that page still says it does not: the
-// worker is deployed separately (docs/runbooks/worker-deploy.md), so `pnpm package` compares the
-// two dates before it builds anything (round 2 of B-199's certification).
+// worker is deployed separately (docs/runbooks/worker-deploy.md), so `pnpm package` checks, before
+// it builds anything, that the served page carries docs/privacy.md as tools/privacy-page.mjs
+// renders it (rounds 2 and 5 of B-199's certification).
 
 export const PRIVACY_URL = 'https://okolos-proxy.sergeysheleg4.workers.dev/privacy'
 

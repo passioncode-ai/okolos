@@ -57,8 +57,9 @@
 `apps/extension/dist/release`, печатая размер и sha256. Отказывается паковать
 сборку с тестовыми хуками (в ней открыты shadow-корни), манифест, называющий
 отсутствующий файл, и локаль, не отвечающую на `__MSG__` из манифеста. Ему нужен
-ключ приложения Aptabase из хранилища и уже выложенная страница `/privacy` того же
-дня, что и `docs/privacy.md` ([development.md](runbooks/development.md), «Выпуск»);
+ключ приложения Aptabase из хранилища и уже выложенная страница `/privacy` с тем же
+текстом, что `tools/privacy-page.mjs` делает из `docs/privacy.md`
+([development.md](runbooks/development.md), «Выпуск»);
 без них работает `pnpm package:check`, и CI гоняет его на каждый push, до загрузки,
 а не после.
 

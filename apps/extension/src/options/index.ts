@@ -1077,11 +1077,12 @@ async function dataSection(): Promise<HTMLElement> {
         // full wipe whatever the renewal does. The renewal follows (two worker calls, which may wait
         // behind a send), and one that failed repaints the usage block in its own words.
         void renewUsage().then((renewed) => {
-          // Repaint whenever the notice changes, both ways: a renewal that worked takes an earlier
-          // "not replaced" away, and a partial wipe repaints nothing by itself.
+          // Repaint whenever the notice changes, both ways, so a renewal that worked takes an
+          // earlier "not replaced" away. Not after a partial wipe: its note and its retry live only
+          // in the drawn section, and a repaint would erase them; the retry's full wipe repaints.
           const was = usageRenewFailed
           usageRenewFailed = !renewed
-          if (was !== usageRenewFailed) void reload()
+          if (wiped.ok && was !== usageRenewFailed) void reload()
         })
         return wiped
       },
@@ -1106,7 +1107,7 @@ async function dataSection(): Promise<HTMLElement> {
  * "Delete all data" and "Clear the local data" take the install number and the unsent events as
  * well (docs/privacy.md): collection that was on stays on, under a new number, so nothing sent
  * later links to what was sent before. Off has no number to take. False when the renewal failed,
- * which the wipe reports as a part it could not do.
+ * which the usage block then says (`usageRenewFailed`), apart from the wipe's own outcome.
  */
 async function renewUsage(): Promise<boolean> {
   try {
@@ -1353,14 +1354,17 @@ async function storageProblem(): Promise<HTMLElement | null> {
         onReset: () => {
           void (async () => {
             await resetStorage()
+            forgetLeakScreen()
+            announceKeyChange('erased')
+            // The cleared page first: the renewal is two worker calls that may wait behind a send.
+            await reload()
             // The install number lives in the worker's storage, which a broken database does not
             // reach: clearing takes it too (storageResetNote says so). When it could not, the
             // page opens «Ваши данные», where the usage block says so and how to get a new one.
+            const was = usageRenewFailed
             usageRenewFailed = !(await renewUsage())
-            if (usageRenewFailed) location.hash = hashFor('data')
-            forgetLeakScreen()
-            announceKeyChange('erased')
-            await reload()
+            if (usageRenewFailed && location.hash !== hashFor('data')) location.hash = hashFor('data')
+            else if (was !== usageRenewFailed) await reload()
           })()
         },
       },
