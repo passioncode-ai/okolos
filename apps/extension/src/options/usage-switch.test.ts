@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { switchOutcome } from './usage-switch.js'
+import { runUsageSwitch, switchOutcome } from './usage-switch.js'
 
 describe('what the page does with the browser\'s answer to the usage switch', () => {
   it('in Chrome and Edge tells the worker, whatever was asked', () => {
@@ -20,5 +20,33 @@ describe('what the page does with the browser\'s answer to the usage switch', ()
     expect(switchOutcome(true, 'on')).toBe('tell-worker')
     expect(switchOutcome(true, 'off')).toBe('tell-worker')
     expect(switchOutcome(true, 'unsupported')).toBe('tell-worker')
+  })
+})
+
+describe('a switch whose answer comes after a later one (B-215)', () => {
+  it('still repaints: the grant it left stands, and the page must show what the worker now follows', async () => {
+    let latest = 0
+    const repaint = vi.fn()
+    let releaseFirst: (answer: 'on') => void = () => {}
+    const firstAnswer = new Promise<'on'>((resolve) => {
+      releaseFirst = resolve
+    })
+    const deps = (ask: () => Promise<'on' | 'off'>) => ({
+      ticket: () => ++latest,
+      latest: () => latest,
+      ask,
+      set: async () => undefined,
+      saved: () => {},
+      failed: () => {},
+      repaint,
+    })
+    // On (slow Firefox answer), then off at once: the off finishes first and repaints.
+    const first = runUsageSwitch(true, deps(() => firstAnswer))
+    await runUsageSwitch(false, deps(async () => 'off'))
+    expect(repaint).toHaveBeenCalledTimes(1)
+    // The on's answer arrives late: it is not told to the worker, but the page paints again.
+    releaseFirst('on')
+    await first
+    expect(repaint).toHaveBeenCalledTimes(2)
   })
 })
