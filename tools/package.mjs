@@ -138,6 +138,8 @@ if (!checkOnly) {
   let served
   try {
     const response = await fetch(PRIVACY_URL, { signal: AbortSignal.timeout(15_000) })
+    // A delivery failure is named as one, not as a policy that differs (B-215).
+    if (!response.ok) die(`${PRIVACY_URL} answered ${response.status}; a store archive waits until it serves the policy`)
     served = await response.text()
   } catch (cause) {
     die(`could not read ${PRIVACY_URL} (${cause instanceof Error ? cause.message : String(cause)}); a store archive waits until it can`)

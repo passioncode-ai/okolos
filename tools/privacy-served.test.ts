@@ -29,6 +29,12 @@ describe('the served privacy page, before a store archive', () => {
     expect(servedPolicyBehind('<p>Обновлено 2026-11-05.</p><p>Что уходит</p>', doc, html)).toMatch(/differs/)
   })
 
+  it('names both dates when the served page is newer and still differs (B-215)', () => {
+    const behind = servedPolicyBehind('<p>Обновлено 2026-11-06.</p><p>y</p>', doc, '<p>Обновлено 2026-11-05.</p><p>x</p>')
+    expect(behind).toMatch(/2026-11-06/)
+    expect(behind).toMatch(/2026-11-05/)
+  })
+
   it('reads the page the store listing names as the policy, not a copy of its address', async () => {
     const { readFileSync } = await import('node:fs')
     const listing = readFileSync(new URL('../docs/store/listing.md', import.meta.url), 'utf8')

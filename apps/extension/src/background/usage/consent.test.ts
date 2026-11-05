@@ -84,4 +84,13 @@ describe('Firefox 129 to 139, with no built-in consent', () => {
     expect(await browserConsent('firefox', {})).toBe('unsupported')
     expect(await switchConsent('firefox', { getAll: async () => ({}) }, true)).toBe('unsupported')
   })
+
+  it('reads a request that throws at once, as Firefox rejects an unknown permission, as unsupported (B-215)', async () => {
+    const throws = () => {
+      throw new TypeError('Unexpected property "data_collection"')
+    }
+    expect(await switchConsent('firefox', { request: throws, getAll: async () => ({ permissions: [], origins: [] }) }, true)).toBe('unsupported')
+    // And a Firefox that has the consent but threw on the request reads as not granted.
+    expect(await switchConsent('firefox', { request: throws, getAll: async () => ({ permissions: [], origins: [], data_collection: [] }) }, true)).toBe('off')
+  })
 })

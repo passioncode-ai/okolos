@@ -40,7 +40,15 @@ export async function switchConsent(browser: Browser, api: ConsentApi, on: boole
     // First, before any await: the click's moment ends at the first one, and Firefox refuses a
     // request made after it. A Firefox with no built-in consent refuses it too, and getAll then
     // says which of the two it was.
-    const asked = (api.request?.(DATA) ?? Promise.resolve(false)).catch(() => false)
+    // Firefox 129 to 139 rejects the unknown permission by throwing at once, not by a rejected
+    // promise, so the call is guarded as well (B-215).
+    let request: Promise<boolean>
+    try {
+      request = api.request?.(DATA) ?? Promise.resolve(false)
+    } catch {
+      request = Promise.resolve(false)
+    }
+    const asked = request.catch(() => false)
     const granted = await asked
     if ((await firefoxGranted(api)) === null) return 'unsupported'
     return granted ? 'on' : 'off'
