@@ -143,3 +143,34 @@ describe('running a command to completion', () => {
     expect(Date.now() - started).toBeLessThan(20_000)
   }, 30_000)
 })
+
+describe('ending what runToCompletion started, grandchildren included (B-215)', () => {
+  it.skipIf(process.platform === 'win32')('kills the whole process group, so a build under pnpm does not outlive it', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-group-'))
+    const pidFile = path.join(dir, 'grandchild.pid')
+    // The child starts a grandchild and waits on it, as pnpm waits on tools/build.mjs.
+    let child: import('node:child_process').ChildProcess | undefined
+    const done = runToCompletion('sh', ['-c', `sleep 30 & echo $! > ${pidFile}; wait`], {
+      timeoutMs: 60_000,
+      onSpawn: (spawned) => {
+        child = spawned
+      },
+    }).catch(() => undefined)
+    let grandchild = 0
+    for (let tries = 0; tries < 50 && grandchild === 0; tries += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      try {
+        grandchild = Number(execFileSync('cat', [pidFile], { encoding: 'utf8' }).trim())
+      } catch {
+        grandchild = 0
+      }
+    }
+    expect(grandchild).toBeGreaterThan(0)
+    endTree(child as import('node:child_process').ChildProcess, { signal: 'SIGKILL' })
+    await done
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    const alive = spawnSync('kill', ['-0', String(grandchild)]).status === 0
+    if (alive) spawnSync('kill', ['-9', String(grandchild)])
+    expect(alive, 'the grandchild outlived the kill').toBe(false)
+  })
+})
