@@ -48,7 +48,7 @@ Okolos ищет такой текст на странице, обезврежи�
 • Проверяет утечки по адресу почты и пароли по префиксу хеша.
 • Шаг за шагом ведёт через восстановление после инцидента.
 
-Что он отправляет
+Что он отправляет нам
 
 • Данные об использовании и ошибках, чтобы мы исправляли продукт. Адреса страниц, их текст, почта и пароли туда не попадают. Выключается в разделе «Ваши данные».
 
@@ -107,7 +107,7 @@ What it does
 • Checks breaches by email address and passwords by hash prefix.
 • Walks you through recovery after an incident.
 
-What it sends
+What it sends us
 
 • Usage and error data so we can fix what breaks for you, and none of it is a page address, page text, an email or a password. Turn it off in Your data.
 

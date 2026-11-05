@@ -19,7 +19,8 @@
 
 Сколько: события уходят только с будильником фида (`okolos:feeds`, раз в 6 часов; Chrome и Edge, закрытые
 в срок, запускают его один раз при старте, Firefox ещё не проверен, B-211), не больше 25 за раз,
-то есть не больше 100 в сутки; событие старше суток отбрасывается, очередь держит не больше 500. Повтор
+то есть обычно не больше 100 в сутки (после пропущенного будильника возможна пятая отправка, B-205);
+событие старше суток отбрасывается, очередь держит не больше 500. Повтор
 только на 408, 429, 5xx, ошибку сети (в том числе запрос без ответа 15 секунд) и сбой записи в журнал
 отправок; другой ответ 4xx и любая другая ошибка отбрасывают событие. Событие старше суток не держится и на
 устройстве: запись нового события выбрасывает такие из очереди, а отправка проверяет возраст перед каждым
@@ -33,6 +34,6 @@
 |---|---|---|---|
 | `extension_installed` | active | `reason`: `install`, `update` | `apps/extension/src/background/index.ts:324` (установка; `update` пока не отправляется) |
 | `first_run_completed` | planned | `result`: `clean`, `findings`, `partial` | не подключено: экран первого запуска не говорит с приёмником |
-| `warning_shown` | active | `kind`: `hidden-instruction`, `lookalike`, `blocked-page`, `clickfix`, `tech-support`, `browser-lock`, `outside-link`, `credential-guard`, `download`, `leaked-password` | `apps/extension/src/background/index.ts:1010` (ловушки страниц: `clickfix`, `tech-support`, `outside-link`, переведённые из вида ловушки функцией `trapWarning`), `apps/extension/src/background/index.ts:1185` (`download`, только когда страница приняла предупреждение: `downloadWarningShown`); остальные значения, `browser-lock` в том числе, пока не отправляются |
+| `warning_shown` | active | `kind`: `hidden-instruction`, `lookalike`, `blocked-page`, `clickfix`, `tech-support`, `outside-link`, `credential-guard`, `download`, `leaked-password` | `apps/extension/src/background/index.ts:1010` (ловушки страниц: `clickfix`, `tech-support`, `outside-link`, переведённые из вида ловушки функцией `trapWarning`), `apps/extension/src/background/index.ts:1185` (`download`, только когда страница приняла предупреждение: `downloadWarningShown`); остальные значения пока не отправляются; ловушка «браузер заблокирован» (SCN-009) считается как `tech-support`, отдельного значения у неё нет |
 | `check_done` | active | `check`: `password`, `leak-inventory`, `extensions`; `result`: `ok`, `found`, `unavailable` | `apps/extension/src/background/index.ts:654` (`password`: и проверка, которую сама запускает отправленная форма входа), `apps/extension/src/background/index.ts:774` (`leak-inventory`); `extensions` пока не отправляется |
 | `error_occurred` | active | `area`: `scan`, `feed`, `download`, `password`, `leak`, `storage`, `ui`, `usage`; `kind`: `timeout`, `network`, `storage-full`, `refused`, `unexpected` | `apps/extension/src/background/index.ts:1376` (`feed`, `unexpected`: только исключение вне самой синхронизации, например не открылось хранилище: тогда оно записывается при каждом старте фонового скрипта, но уйти не может, пока хранилище не откроется, потому что запись в журнал отправок лежит в нём же, и через сутки отбрасывается (SCN-032); сетевую ошибку и отказ подписи синхронизация записывает в журнал сама и сюда не передаёт); остальные пока не отправляются |

@@ -28,7 +28,7 @@ test('the switch turns it off, and on again', async ({ context, extensionId }) =
   await expect(box).toBeChecked()
 
   await box.uncheck()
-  await expect(page.locator('[data-role=usage-state]')).toHaveText('Off: nothing is sent, and the install number is deleted.')
+  await expect(page.locator('[data-role=usage-state]')).toHaveText('Off: no usage and error data is sent, and there is no install number.')
   await expect(page.locator('[data-role=usage-switch]')).not.toBeChecked()
 
   await page.locator('[data-role=usage-switch]').check()

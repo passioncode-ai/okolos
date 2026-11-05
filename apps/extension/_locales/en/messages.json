@@ -2670,7 +2670,7 @@
     "message": "Send usage and error data"
   },
   "usageOff": {
-    "message": "Off: nothing is sent, and the install number is deleted."
+    "message": "Off: no usage and error data is sent, and there is no install number."
   },
   "usageSaveFailed": {
     "message": "The change was not saved. Try again."
@@ -2684,7 +2684,7 @@
     }
   },
   "usageFirefoxOld": {
-    "message": "This version of Firefox has no built-in consent for data collection, so Okolos sends nothing. Update Firefox to version 140 to choose."
+    "message": "This version of Firefox has no built-in consent to data collection, so Okolos sends no usage and error data. Update Firefox to version 140 to choose."
   },
   "usageFirefox": {
     "message": "In Firefox the browser keeps the choice. The switch asks Firefox to allow or stop sending."

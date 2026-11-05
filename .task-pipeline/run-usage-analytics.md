@@ -409,3 +409,16 @@ okolos-mail sends nothing; B-198 names the real host. Rows widened: B-204 (one D
 B-205 (the flush not gated by runIfDue), B-213 (org-index depends_on), B-215 (the limits not tied to the constants,
 the stale notice after a partial wipe).
 pnpm gates green in full on this tree: 216 files, 3524 tests. Next: round 11.
+
+## Stage 6: certification, round 11 (2026-11-05, on d06d5c8)
+
+CI on d06d5c8 green on all four jobs. Unit tier: **pass** (fourth clean unit round: 7, 9, 10, 11; three risks into
+B-215). Product tier: **fail** on three `breaks`: the «Что он отправляет» heading on the landing and the listing read
+as the whole list (now «Что он отправляет нам» / «What it sends us», Copylot ru `afc29d44`, en `ba48defd`; SCR-17
+says the rest is in /privacy); «не больше 100 в сутки» stated as held by code while B-205 records a possible fifth
+send (qualified in privacy.md, analytics.md, ADR-0021, AGENTS.md); `browser-lock` in the catalogue with no producer
+while SCN-009's browser-lock trap counts as `tech-support` (the value dropped before the first production send,
+analytics.md says it). Risks taken in: `usageFirefoxOld` and `usageOff` scoped to usage data (same reports; e2e
+scn-050 matches); B-203 ties the daily-hash question to SCN-051's «not linked to the old one». The seam tier report
+was still running when these were made.
+pnpm gates green in full on this tree: 216 files, 3524 tests.

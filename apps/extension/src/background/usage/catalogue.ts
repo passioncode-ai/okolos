@@ -23,7 +23,6 @@ export const CATALOGUE = {
       'blocked-page',
       'clickfix',
       'tech-support',
-      'browser-lock',
       'outside-link',
       'credential-guard',
       'download',
