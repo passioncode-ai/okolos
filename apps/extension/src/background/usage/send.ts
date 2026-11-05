@@ -1,4 +1,4 @@
-import { request, type RequestDeps } from '@okolos/net'
+import { request, TransportError, type RequestDeps } from '@okolos/net'
 import { withDeadline } from '@okolos/platform'
 
 import { CATALOGUE } from './catalogue.js'
@@ -40,7 +40,7 @@ const SEND_DEADLINE_MS = 15_000
 
 /**
  * The shared deadline (`@okolos/platform`, one copy of the failure path), its refusal turned into
- * a transport failure (`TypeError`), so the event waits for the next send instead of being dropped.
+ * a transport failure (`TransportError`), so the event waits for the next send instead of being dropped.
  */
 async function sentWithin(sent: Promise<Response>, ms: number): Promise<Response> {
   // i18n-exempt: a transport failure the sink reads to keep the event; never shown to anyone
@@ -48,7 +48,7 @@ async function sentWithin(sent: Promise<Response>, ms: number): Promise<Response
   try {
     return await withDeadline(sent, ms, late)
   } catch (cause) {
-    throw cause instanceof Error && cause.message === late ? new TypeError(late) : cause
+    throw cause instanceof Error && cause.message === late ? new TransportError(new Error(late)) : cause
   }
 }
 

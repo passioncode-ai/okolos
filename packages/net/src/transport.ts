@@ -14,6 +14,18 @@ export interface TransportSpec {
   readonly headers?: Readonly<Record<string, string>>
 }
 
+/**
+ * A request that never reached the server: the network, DNS, TLS, an abort, or the caller's own
+ * deadline. Still a `TypeError`, which is what `fetch` throws, so every existing check holds; its
+ * own class lets a caller tell it from a `TypeError` thrown by a fault in the code (B-215).
+ */
+export class TransportError extends TypeError {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause), { cause })
+    this.name = 'TransportError'
+  }
+}
+
 export async function transport(spec: TransportSpec): Promise<Response> {
   const init: RequestInit = {
     method: spec.method,
@@ -27,5 +39,9 @@ export async function transport(spec: TransportSpec): Promise<Response> {
   if (spec.headers) init.headers = spec.headers
   if (spec.body !== undefined) init.body = spec.body
 
-  return fetch(spec.url, init)
+  try {
+    return await fetch(spec.url, init)
+  } catch (cause) {
+    throw new TransportError(cause)
+  }
 }

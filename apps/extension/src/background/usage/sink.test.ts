@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { AuditWriteError, DestinationError } from '@okolos/net'
+import { AuditWriteError, DestinationError, TransportError } from '@okolos/net'
 
 import { CATALOGUE } from './catalogue.js'
 import { createUsageSink, type UsageDeps, type UsageState } from './sink.js'
@@ -179,7 +179,7 @@ describe('the queue', () => {
       async () => new Response('', { status: 429 }),
       async () => new Response('', { status: 503 }),
       async () => {
-        throw new TypeError('network down')
+        throw new TransportError(new TypeError('network down'))
       },
     ]) {
       const h = harness({ send: vi.fn(fail) })
@@ -229,7 +229,7 @@ describe('the queue', () => {
   it('keeps an event only for a transport failure: any other error drops it, so the head cannot stall the queue', async () => {
     const kept = harness({
       send: vi.fn(async () => {
-        throw new TypeError('Failed to fetch')
+        throw new TransportError(new TypeError('Failed to fetch'))
       }),
     })
     await kept.sink.track('warning_shown', { kind: 'lookalike' })
@@ -244,6 +244,17 @@ describe('the queue', () => {
     await dropped.sink.track('warning_shown', { kind: 'lookalike' })
     await dropped.sink.flush()
     expect(dropped.state()?.queue).toHaveLength(0)
+  })
+
+  it('drops an event on a plain TypeError, a fault in the code rather than the network, so it cannot hold the queue (B-215)', async () => {
+    const h = harness({
+      send: vi.fn(async () => {
+        throw new TypeError('Cannot read properties of undefined')
+      }),
+    })
+    await h.sink.track('warning_shown', { kind: 'lookalike' })
+    await h.sink.flush()
+    expect(h.state()?.queue).toHaveLength(0)
   })
 
   it('keeps an event whose audit entry could not be written: nothing left, so it may go next time', async () => {

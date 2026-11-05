@@ -1,3 +1,4 @@
+import { TransportError } from '@okolos/net'
 import type { AuditEntry } from '@okolos/contracts'
 import { describe, expect, it } from 'vitest'
 
@@ -66,6 +67,6 @@ describe('a batch through the network module', () => {
       },
       20,
     )
-    await expect(send({ url: 'https://analytics.passioncode.ai/api/v0/event', body: '{}', headers: {} })).rejects.toBeInstanceOf(TypeError)
+    await expect(send({ url: 'https://analytics.passioncode.ai/api/v0/event', body: '{}', headers: {} })).rejects.toBeInstanceOf(TransportError)
   })
 })
