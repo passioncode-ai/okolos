@@ -311,3 +311,6 @@ block if it failed (the screen was silent for up to two worker calls); `check_do
 password check a submitted login form starts, before its first production send. Not taken: a separator rule for
 the usage block in pages.css (visual layer, sheleg-design's), and a tested module for the options erase wiring
 (widens B-214's ground).
+
+Store screenshots retaken on 693e0bd at 8.9 GB free; `pnpm gates` then green in full at 8.8 GB: 216 files,
+3517 tests passed, 2 skipped; ux:lint, brand:lint, i18n:sweep, package:check exit 0. Next: round 6.
