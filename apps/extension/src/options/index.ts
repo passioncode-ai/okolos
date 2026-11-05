@@ -1074,7 +1074,7 @@ async function dataSection(): Promise<HTMLElement> {
         const wiped = await wipeAll(db)
         // The stores' outcome stands on its own: the leak screen resets after a full wipe whatever
         // the renewal did. A renewal that failed is said in the usage block, in its own words.
-        if (!(await renewUsage())) usageRenewFailed = true
+        usageRenewFailed = !(await renewUsage())
         return wiped
       },
       // The erase took the key, so the leaks screen goes back to its start here and in every
@@ -1115,7 +1115,7 @@ async function renewUsage(): Promise<boolean> {
 let usageFailed = false
 /** The latest switch: an earlier one whose Firefox answer arrives late does not overrule it. */
 let usageSwitches = 0
-/** An erase could not replace the install number; said once, in the usage block. */
+/** The last erase could not replace the install number; said in the usage block until it is. */
 let usageRenewFailed = false
 
 /**
@@ -1132,8 +1132,9 @@ async function usagePanel(): Promise<UsagePanel | undefined> {
   }
   const failed = usageFailed
   usageFailed = false
+  // Kept, not consumed: a reset paints twice (its own reload, then the hash change), and the
+  // second paint must still say it. Cleared by a renewal that worked or by the switch.
   const renewFailed = usageRenewFailed
-  usageRenewFailed = false
   return {
     state,
     firefox: platform.kind === 'firefox',
@@ -1153,7 +1154,11 @@ async function usagePanel(): Promise<UsagePanel | undefined> {
         })
         // A Firefox that declined is an answer, not a failure: the repaint shows the switch off.
         .then(() => {
-          if (mine === usageSwitches) usageFailed = false
+          if (mine === usageSwitches) {
+            usageFailed = false
+            // Off deleted the number, on made a new one: either way the old one is gone.
+            usageRenewFailed = false
+          }
         })
         .catch(() => {
           if (mine === usageSwitches) usageFailed = true
@@ -1344,10 +1349,8 @@ async function storageProblem(): Promise<HTMLElement | null> {
             // The install number lives in the worker's storage, which a broken database does not
             // reach: clearing takes it too (storageResetNote says so). When it could not, the
             // page opens «Ваши данные», where the usage block says so and how to get a new one.
-            if (!(await renewUsage())) {
-              usageRenewFailed = true
-              location.hash = hashFor('data')
-            }
+            usageRenewFailed = !(await renewUsage())
+            if (usageRenewFailed) location.hash = hashFor('data')
             forgetLeakScreen()
             announceKeyChange('erased')
             await reload()

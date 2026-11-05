@@ -254,3 +254,24 @@ the 15 s deadline (a late answer may count an event twice; recorded in B-205's n
 Checks on the tree pushed after this round: `pnpm gates` (lint, typecheck, build, 215 test files, 3509 tests
 passed, 2 skipped; after the wireframe regeneration `tools/wireframes.test.ts` and `tools/listing.test.ts` 38/38),
 `pnpm ux:lint`, `pnpm brand:lint`, `pnpm i18n:sweep`, `pnpm package:check`, all exit 0; store screenshots retaken.
+
+## Stage 6: certification, round 4 (2026-11-05, on a8fde13)
+
+CI on a8fde13 green on all four jobs. Unit and product tiers: **fail**; the seam tier report was still running
+when these fixes were made.
+
+| Finding | Tier | Fix |
+|---|---|---|
+| A reset's failed renewal was drawn and then painted over (the hash change repaints) | unit | the flag is kept until a renewal works or the switch is used, set from the outcome on both erase paths; not covered by a test (no options-page DOM harness), recorded |
+| An unreadable Firefox read-back after removal read as off | unit (risk) | treated as not confirmed; `consent.test.ts` seen red |
+| privacy.md: «Ничего из этого … не отправляется» over the install number, «их нет», «Только по нажатию», the children sentence, the table row's default | product | narrowed and reworded |
+| dataConfirmNote and storageResetNote said a new number is made when collection is off | product | conditional (Copylot ru `bda962ae`, en `9ebbce4b`) |
+| README principle 2, coverage-matrix 4.1 and legend, project-overview P2/P3 | product | reworded to what leaves |
+| SCN-051 switch-off during a send; SCN-052 Firefox prompt default | product (risk) | the window named; the default recorded as not yet measured (B-211) |
+
+Rows: B-212 widened (the worker landing page), B-213 (fabric-workspace plans.md after merge), B-214 (flush holding
+the steps, audit open without a deadline, double count after the deadline).
+
+`pnpm gates` on this tree: 3510 passed, 1 failed (`tools/listing.test.ts`, screenshots stale after the string
+changes). That run was started at 7.7 GB free, under the coordinator's 8 GB line: a slip, said here. Screenshots
+wait for 8 GB.

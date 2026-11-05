@@ -650,7 +650,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Entry point:** settings (SCR-12), block "Данные об использовании и ошибках"
 - **Preconditions:** collection is on
 - **Steps:**
-  1. User turns the switch off -> system deletes the install's random id, drops the unsent events and stops sending; the block says so
+  1. User turns the switch off -> system deletes the install's random id, drops the unsent events and stops sending; the block says so. A send already under way when the switch moves finishes first (the steps run one at a time), so events of that batch can still leave: seconds normally, at most 25 requests of 15 s each on a stalled network
   2. User turns the switch on again -> system makes a new random id and sends from then on
 - **Expected result:** off means nothing leaves for this purpose; on again cannot be joined to the earlier id
 - **Alt paths:** the self-audit log (SCN-019) shows each sent event under its purpose while on, and none after off; «Удалить все данные» (SCN-023) and «Очистить локальные данные» (SCN-032) replace the install number and drops the unsent events, and collection that was on stays on
@@ -668,7 +668,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Preconditions:** Firefox 140 or later
 - **Steps:**
   1. User installs -> Firefox's own prompt offers technical and interaction data as an optional choice
-  2. User leaves it on or turns it off -> the product sends only while Firefox grants it
+  2. User grants it or not (whether the prompt offers it ticked is not yet recorded on Firefox 140, B-211) -> the product sends only while Firefox grants it
   3. User changes the switch in settings -> the product asks Firefox to grant or drop the permission, and follows Firefox's answer
 - **Expected result:** in Firefox the browser's choice is the product's choice, both ways
 - **Alt paths:** Firefox 129 to 139, which has no built-in consent -> nothing is sent, and the settings block says why

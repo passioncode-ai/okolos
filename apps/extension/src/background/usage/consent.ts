@@ -49,7 +49,8 @@ export async function switchConsent(browser: Browser, api: ConsentApi, on: boole
   await (api.remove?.(DATA) ?? Promise.resolve(false)).catch(() => false)
   // Read back, never assumed: a removal that did not take leaves the grant on, and the worker
   // follows the grant, so "off" here would be undone at the next event with a new install id.
-  return (await firefoxGranted(api)) === true ? 'on' : 'off'
+  // An answer that cannot be read is not a confirmed off either: the page then says not saved.
+  return (await firefoxGranted(api)) === false ? 'off' : 'on'
 }
 
 /** `null` when this Firefox has no built-in data consent. */

@@ -436,7 +436,7 @@
     "message": "Keep my data"
   },
   "dataConfirmNote": {
-    "message": "It cannot be undone. The install number for usage data is replaced with a new one too. Export first if you want a copy."
+    "message": "It cannot be undone. If usage data is on, the install number is replaced with a new one too. Export first if you want a copy."
   },
   "dataConfirmTitle": {
     "message": "This deletes, from this device:"
@@ -1980,7 +1980,7 @@
     "message": "Clear the local data"
   },
   "storageResetNote": {
-    "message": "Clearing removes everything Okolos kept on this device: findings, the journal, the network audit, exceptions, settings with a saved Have I Been Pwned key, extension snapshots, the model, the feeds and the password-reuse index. The install number for usage data is replaced with a new one. It cannot be undone."
+    "message": "Clearing removes everything Okolos kept on this device: findings, the journal, the network audit, exceptions, settings with a saved Have I Been Pwned key, extension snapshots, the model, the feeds and the password-reuse index. If usage data is on, the install number is replaced with a new one. It cannot be undone."
   },
   "storageRetry": {
     "message": "Try again"

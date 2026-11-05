@@ -60,6 +60,16 @@ describe('Firefox 140 and later, where the browser asks at install', () => {
     ).toBe('on')
   })
 
+  it('does not say off when the grant cannot be read back after the removal', async () => {
+    let reads = 0
+    const getAll = async () => {
+      reads += 1
+      if (reads === 1) return { data_collection: ['technicalAndInteraction'] }
+      throw new Error('gone')
+    }
+    expect(await switchConsent('firefox', { getAll, remove: async () => true }, false)).not.toBe('off')
+  })
+
   it('counts a refused or failed request as off', async () => {
     const request = vi.fn(async () => {
       throw new Error('permissions.request may only be called from a user input handler')

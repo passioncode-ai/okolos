@@ -41,7 +41,8 @@ Full vector coverage: [docs/coverage-matrix.md](docs/coverage-matrix.md).
 ## Principles
 
 1. Local-first — browsing history never leaves the device.
-2. Anonymous primitives only — hash prefixes, never URLs or addresses.
+2. Minimal primitives: of a password only a hash prefix leaves, page addresses never leave, an email
+   address only when you ask, and usage data from a closed list while it is on.
 3. No stored third-party breach dumps — hashes and metadata only.
 4. Self-audit — the product shows you what it sent.
 5. Action over alarm — a queue you can finish, not a counter that grows.
