@@ -475,3 +475,16 @@ privacy.md and SCN-024); it called the deployment behind the daily-hash fact «�
 другом его развёртывании»). Risk taken in: SECURITY.md's App-Key bullet gives the true boundary (the key only admits
 events; reading needs a dashboard sign-in), Copylot `ac73b697`. Risks into B-215: the export's «ничего не изъято» while
 the usage state stays out; CHANGELOG.md beside usageWhat in the alignment row.
+
+## Stage 6: certification, round 15 (2026-11-05, on 5f1e365)
+
+CI on 5f1e365 green on all four jobs. Unit tier: **pass** (eighth clean unit round; two risks into B-215:
+`detectPlatform`'s browser-only, non-Firefox branch has no test; the private-names test reads paths without an
+`isFile` check). Product tier: **pass**, no findings (the first clean product round). Seam tier: **fail** on one
+`breaks`: B-207's `docs/privacy.md:11` moved when round 13 added two lines to the policy's head (now pinned
+`docs/privacy.md@5f1e365:13`, the tier's check exits 0). Risk taken in as a decision (the safest reversible option,
+recorded in B-213): PR #29 is integrated by squash, not by a merge commit, so main's history does not gain the ten
+branch commits that name the operator's private deployments; `refs/pull/29/head` and B-198's older history on main
+keep them, and removing those is the operator's call (GitHub support, never a force-push). The self-audit comment
+that counts facts.md's rows («six», now seven) goes into B-215: editing it moves the screenshot surface hash that
+`tools/listing.test.ts` holds (seen red in `pnpm gates`), so it waits for the next screenshot run.
