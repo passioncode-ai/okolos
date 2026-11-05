@@ -358,3 +358,11 @@ deadline), B-215 (the unit tier's round 7 risks).
 
 Two consecutive passing rounds are not yet reached: round 7 failed on the product tier. Next: round 8.
 Screenshots retaken (13 GB free); pnpm gates green in full: 216 files, 3522 tests.
+
+## Stage 6: certification, round 8 (2026-11-05, on e686e8f)
+
+CI on e686e8f green on all four jobs. Unit tier: **fail** on one `breaks`: the day limit was checked once per
+flush, before the loop, so on a slow network an event that turned a day old during the up to 25 sends of up to 15 s
+still went (the tier's probe: 4.6 minutes past a day). Fixed: `sendable(at, now)` before each request; an event
+stamped more than 5 minutes in the future (a corrected clock) is dropped too (the tier's risk). `sink.test.ts`, two
+cases seen red. analytics.md says it.

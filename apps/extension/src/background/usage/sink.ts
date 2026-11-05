@@ -25,6 +25,8 @@ const SDK_VERSION = 'okolos-usage@1'
 const PER_FLUSH = 25
 /** Aptabase refuses an event older than a day; a late one is dropped, never sent. */
 const MAX_AGE_MS = 24 * 60 * 60 * 1000
+/** A clock a few minutes ahead of the one that sends is ordinary; more than this is a wrong clock. */
+const FUTURE_SKEW_MS = 5 * 60 * 1000
 /** A device that never reaches the network must not grow this without end. */
 const QUEUE_MAX = 500
 
@@ -102,7 +104,7 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
         if (state.queue.length > 0) await deps.save({ ...state, queue: [] })
         return
       }
-      const fresh = state.queue.filter((event) => deps.now() - event.at <= MAX_AGE_MS)
+      const fresh = state.queue.filter((event) => sendable(event.at, deps.now()))
       if (fresh.length !== state.queue.length) {
         state = { ...state, queue: fresh }
         await deps.save(state)
@@ -110,6 +112,14 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
       for (let sent = 0; sent < PER_FLUSH && state.queue.length > 0; sent += 1) {
         const event = state.queue[0] as QueuedEvent
         let drop: boolean
+        // Checked again before each request, not only before the loop: up to 25 sends of up to
+        // 15 s each, and an event that turns a day old on the way is dropped, never sent.
+        if (!sendable(event.at, deps.now())) {
+          const latest = await read()
+          state = { ...latest, queue: latest.queue.slice(1) }
+          await deps.save(state)
+          continue
+        }
         try {
           const response = await deps.send({
             url: ENDPOINT,
@@ -140,6 +150,15 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
       return (await read()).consent
     },
   }
+}
+
+/**
+ * Whether an event may still go: not older than a day, and not stamped in the future beyond a few
+ * minutes (a clock that was ahead when it was recorded and was corrected since).
+ */
+function sendable(at: number, now: number): boolean {
+  const age = now - at
+  return age <= MAX_AGE_MS && age >= -FUTURE_SKEW_MS
 }
 
 /** Kept for the next flush only on 408, 429 and 5xx; any other 4xx would fail the same way again. */

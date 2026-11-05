@@ -189,6 +189,36 @@ describe('the queue', () => {
     }
   })
 
+  it('never sends an event that turned a day old during a slow send loop: the age is checked before each request', async () => {
+    let clock = Date.parse('2026-11-04T20:00:00.000Z')
+    const sentAt: number[] = []
+    const h = harness({
+      now: () => clock,
+      send: vi.fn(async (spec) => {
+        const body = JSON.parse(spec.body) as { timestamp: string }
+        sentAt.push(clock - Date.parse(body.timestamp))
+        clock += 14_000
+        return new Response('{}', { status: 200 })
+      }),
+    })
+    for (let i = 0; i < 25; i += 1) await h.sink.track('warning_shown', { kind: 'lookalike' })
+    clock += 24 * 60 * 60 * 1000 - 60_000
+    await h.sink.flush()
+    expect(sentAt.length).toBeGreaterThan(0)
+    expect(Math.max(...sentAt)).toBeLessThanOrEqual(24 * 60 * 60 * 1000)
+    expect(h.state()?.queue).toHaveLength(0)
+  })
+
+  it('does not send an event stamped in the future, from a clock that was ahead and was corrected', async () => {
+    let clock = Date.parse('2026-11-04T22:00:00.000Z')
+    const h = harness({ now: () => clock })
+    await h.sink.track('warning_shown', { kind: 'lookalike' })
+    clock = Date.parse('2026-11-04T20:00:00.000Z')
+    await h.sink.flush()
+    expect(h.sent).toHaveLength(0)
+    expect(h.state()?.queue).toHaveLength(0)
+  })
+
   it('keeps an event for later on 408 too: the server timed out, the event was fine', async () => {
     const h = harness({ send: vi.fn(async () => new Response('', { status: 408 })) })
     await h.sink.track('warning_shown', { kind: 'lookalike' })
