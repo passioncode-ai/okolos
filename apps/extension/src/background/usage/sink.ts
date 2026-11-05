@@ -1,4 +1,4 @@
-import { AuditWriteError } from '@okolos/net'
+import { AuditWriteError, TransportError } from '@okolos/net'
 
 import { admissible, type EventName, type EventProps } from './catalogue.js'
 
@@ -140,10 +140,11 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
           })
           drop = response.ok || !retried(response.status)
         } catch (cause) {
-          // Kept only for what may pass next time: a transport failure (fetch throws TypeError,
-          // and so does the sender's deadline) or a failed audit write. Anything else, the net
-          // module's own refusals included, would fail the same way and hold the queue.
-          drop = !(cause instanceof TypeError || cause instanceof AuditWriteError)
+          // Kept only for what may pass next time: a transport failure (the network module's
+          // TransportError, and the sender's deadline) or a failed audit write. Anything else, a
+          // plain TypeError from a fault in the code and the module's own refusals included, would
+          // fail the same way and hold the queue (B-215).
+          drop = !(cause instanceof TransportError || cause instanceof AuditWriteError)
         }
         if (!drop) return
         // Re-read: an event tracked while the request was in flight was appended at the end, and

@@ -14,4 +14,4 @@ export {
   type RedactionFinding,
   type RedactionReason,
 } from './redactor.js'
-export { transport, type TransportSpec } from './transport.js'
+export { transport, TransportError, type TransportSpec } from './transport.js'
