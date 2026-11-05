@@ -304,3 +304,10 @@ CI on 7dc3ced green on all four jobs. Unit and product tiers: **fail**; seam tie
 
 Not taken (risks, recorded here): the listing heading «Что он отправляет» lists only usage data; the three lists of
 what is sent differ in the constants they name; scenarios with a send site carry no Telemetry line (B-206's ground).
+
+Seam tier, round 5 (arrived after 3eac228): one `breaks`, screens.md SCR-12 still said the renewal notice shows
+once; reworded. Risks taken in: the wipe outcome is drawn at once and the renewal follows, repainting the usage
+block if it failed (the screen was silent for up to two worker calls); `check_done` defined to include the
+password check a submitted login form starts, before its first production send. Not taken: a separator rule for
+the usage block in pages.css (visual layer, sheleg-design's), and a tested module for the options erase wiring
+(widens B-214's ground).

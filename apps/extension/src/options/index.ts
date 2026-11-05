@@ -1073,9 +1073,13 @@ async function dataSection(): Promise<HTMLElement> {
       onWipe: async () => {
         const db = await openDb()
         const wiped = await wipeAll(db)
-        // The stores' outcome stands on its own: the leak screen resets after a full wipe whatever
-        // the renewal did. A renewal that failed is said in the usage block, in its own words.
-        usageRenewFailed = !(await renewUsage())
+        // The stores' outcome is said at once and stands on its own: the leak screen resets after a
+        // full wipe whatever the renewal does. The renewal follows (two worker calls, which may wait
+        // behind a send), and one that failed repaints the usage block in its own words.
+        void renewUsage().then((renewed) => {
+          usageRenewFailed = !renewed
+          if (!renewed) void reload()
+        })
         return wiped
       },
       // The erase took the key, so the leaks screen goes back to its start here and in every

@@ -30,7 +30,10 @@ export const CATALOGUE = {
       'leaked-password',
     ],
   },
-  /** A check the person asked for finished. */
+  /**
+   * A check finished: one the person asked for, or the password check a submitted login form starts
+   * by itself. Fixed before the first production send (the event-history rule).
+   */
   check_done: {
     check: ['password', 'leak-inventory', 'extensions'],
     result: ['ok', 'found', 'unavailable'],
