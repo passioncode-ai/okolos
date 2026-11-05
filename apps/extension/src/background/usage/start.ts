@@ -2,7 +2,7 @@ import { AuditWriteError, type RequestDeps } from '@okolos/net'
 import type { Platform } from '@okolos/platform'
 
 import type { EventName, EventProps } from './catalogue.js'
-import { browserConsent, type ConsentApi, type ConsentState } from './consent.js'
+import { browserConsent, ConsentUnreadable, type ConsentApi, type ConsentState } from './consent.js'
 import { usageSender } from './send.js'
 import { createUsageSink, type UsageState } from './sink.js'
 import { sessionFor } from './system.js'
@@ -47,7 +47,7 @@ export function startUsage(
   build: Build = typeof __OKOLOS_USAGE__ === 'undefined' ? { appKey: null, environment: 'sandbox' } : __OKOLOS_USAGE__,
 ): Usage {
 
-  const sink = (allowed: ConsentState) =>
+  const sink = (allowed: ConsentState | 'unreadable') =>
     createUsageSink({
       load: () => platform.storage.get<UsageState>(STATE_KEY),
       save: (state) => platform.storage.set(STATE_KEY, state),
@@ -66,7 +66,8 @@ export function startUsage(
       now: () => Date.now(),
       randomId: () => crypto.randomUUID(),
       sessionId: (iid, at) => sessionFor(at, iid),
-      appKey: allowed === 'unsupported' ? null : build.appKey,
+      // Nothing leaves while the browser's answer is unknown, and nothing stored is touched.
+      appKey: allowed === 'unsupported' || allowed === 'unreadable' ? null : build.appKey,
       environment: build.environment,
       initialConsent: allowed === 'on' ? 'on' : 'off',
       extensionVersion: platform.runtime.version(),
@@ -76,7 +77,14 @@ export function startUsage(
   // Firefox: the browser keeps the choice. A grant taken back drops the stored "on" with its
   // install id; a grant given again (in about:addons) turns it back on with a new one.
   const current = async () => {
-    const allowed = await browserConsent(platform.kind, permissions)
+    let allowed: ConsentState | 'unreadable'
+    try {
+      allowed = await browserConsent(platform.kind, permissions)
+    } catch (cause) {
+      if (!(cause instanceof ConsentUnreadable)) throw cause
+      // A failed read is not a grant taken back: keep the stored state, send nothing (B-215).
+      return { allowed: 'unreadable' as const, s: sink('unreadable') }
+    }
     const s = sink(allowed)
     const stored = await s.consent()
     if (allowed !== 'on' && stored === 'on') await s.setConsent(false)
@@ -116,6 +124,7 @@ export function startUsage(
     state: () =>
       serial(async () => {
         const { allowed, s } = await current()
+        // Unreadable: the person's stored choice, which nothing changed.
         return allowed === 'unsupported' ? 'unsupported' : await s.consent()
       }),
     // Chrome: the switch is the consent. Firefox: the page already asked the browser inside the
@@ -124,6 +133,8 @@ export function startUsage(
     set: (on) =>
       serial(async () => {
         const { allowed, s } = await current()
+        // i18n-exempt: the RPC refusal the page turns into usageSaveFailed; never shown as is
+        if (allowed === 'unreadable') throw new Error('the browser data consent could not be read; the switch was not saved')
         if (allowed === 'unsupported') return 'unsupported'
         const next = on && allowed === 'on'
         await s.setConsent(next)
@@ -132,6 +143,8 @@ export function startUsage(
     renew: () =>
       serial(async () => {
         const { allowed, s } = await current()
+        // i18n-exempt: the RPC refusal the page turns into usageRenewFailed; never shown as is
+        if (allowed === 'unreadable') throw new Error('the browser data consent could not be read; the install number was not replaced')
         if (allowed === 'unsupported') return 'unsupported'
         if ((await s.consent()) !== 'on') return 'off'
         await s.setConsent(true)

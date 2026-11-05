@@ -39,6 +39,30 @@ describe('the worker wiring', () => {
     expect(p.values.get('usage:state')).toEqual({ consent: 'off', iid: null, queue: [] })
   })
 
+  it('keeps the install id and the queue when Firefox cannot be read for a moment (B-215)', async () => {
+    const waiting = { eventName: 'extension_installed' as const, at: Date.parse('2026-11-04T20:00:00.000Z'), sessionId: '1', props: { reason: 'install' } }
+    const on: UsageState = { consent: 'on', iid: '6f0c2b0e-8b5e-4d8c-9a51-2f0f5c3d9e11', queue: [waiting] }
+    const p = platform('firefox', on)
+    let fail = true
+    const usage = startUsage(p.platform, audit, {
+      getAll: async () => {
+        if (fail) throw new Error('permissions.getAll failed')
+        return { data_collection: ['technicalAndInteraction'] }
+      },
+    })
+    await usage.track('first_run_completed', { result: 'clean' })
+    await usage.flush()
+    // A read that failed is not a grant taken back: nothing stored changes.
+    expect(p.values.get('usage:state')).toEqual(on)
+    expect(await usage.state()).toBe('on')
+    // The switch and the renewal are refused rather than guessed.
+    await expect(usage.set(false)).rejects.toThrow()
+    await expect(usage.renew()).rejects.toThrow()
+    fail = false
+    expect(await usage.state()).toBe('on')
+    expect((p.values.get('usage:state') as UsageState).iid).toBe(on.iid)
+  })
+
   it('says unsupported on a Firefox with no built-in consent, and the switch cannot change that', async () => {
     const p = platform('firefox')
     const usage = startUsage(p.platform, audit, { getAll: async () => ({ origins: [], permissions: [] }) })
