@@ -931,7 +931,7 @@ See [foundation.md](foundation.md) → Personas.
 - **UI elements:** SCR-17 (landing), SCR-18 (privacy); the store listing is drawn as a boundary because it is not ours
 - **States covered:** success
 - **Errors & recovery:** the pages carry no state that can fail — there is no script on either, by gate, so there is no loading state to get wrong and no error state to render. `/status` failing is SCN-024's path, not this one
-- **Behaviour notes:** **no executable scripts at all**, held by eleven rules in `apps/proxy/src/landing.test.ts`, four of them verified by planted defects; the privacy page is generated from `docs/privacy.md` by `tools/privacy-page.mjs` and `tools/docs.test.ts` refuses when the two disagree, so the claims a reader checks are the claims the repository states
+- **Behaviour notes:** **no executable scripts at all**, held by the rules in `apps/proxy/src/landing.test.ts`, four of them verified by planted defects; the privacy page is generated from `docs/privacy.md` by `tools/privacy-page.mjs` and `tools/docs.test.ts` refuses when the two disagree, so the claims a reader checks are the claims the repository states
 - **Why this was written on 2026-08-20 and not when the pages shipped.** The journey carried the step from the day it was drawn, the pages were built and gated in B-15, and the screen entries recorded on 2026-08-12 that no flow covered them — honestly, rather than inventing one. What was missing was the story in between. Written now as ST-021 → FLW-18 → this scenario (B-22)
 - **Status:** implemented
 - **Coverage:** apps/proxy/src/landing.test.ts, apps/proxy/src/router.test.ts, tools/docs.test.ts

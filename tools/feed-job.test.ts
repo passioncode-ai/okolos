@@ -441,9 +441,12 @@ describe('after a publish the agent proposes the committed snapshot (B-158)', ()
     return { tool, seen }
   }
   const ghMissing = (command: string) => (command === 'gh' ? { code: null as unknown as number, error: 'Error: spawn gh ENOENT' } : null)
+  // Old against the real clock and against the fixed clocks below (2026-11-03) alike. It was nine days before the real
+  // now, so from 2026-11-05T09:00Z it was under seven days before a fixed clock and read as fresh: the tests that pin
+  // the clock failed on every branch from that hour.
   const oldSnapshot = (command: string, args: string[]) =>
     command === 'git' && args.includes('show')
-      ? { code: 0, stdout: JSON.stringify({ kind: 'snapshot', body: { name: 'phishing', version: 51, updatedAt: new Date(Date.now() - 9 * 86_400_000).toISOString(), entries: [] } }) }
+      ? { code: 0, stdout: JSON.stringify({ kind: 'snapshot', body: { name: 'phishing', version: 51, updatedAt: '2026-10-01T00:00:00.000Z', entries: [] } }) }
       : null
 
   it('records a failed snapshot step beside a successful publish, which stays published', async () => {

@@ -528,7 +528,7 @@ generator, and the sheet declares no colour of its own.
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
   | success | any request to `/` | - | the whole page, served as markup |
-- **Behavior notes:** a security tool that lists only its own powers describes a product nobody can check — so half the page is what it does not do. **No executable scripts at all**, and eleven rules in `apps/proxy/src/landing.test.ts` hold that, four of them verified by planted defects (a script appeared, the word "полностью" appeared, the does-not-do list was gutted, the structured block became invalid JSON)
+- **Behavior notes:** a security tool that lists only its own powers describes a product nobody can check — so half the page is what it does not do. **No executable scripts at all**, and the rules in `apps/proxy/src/landing.test.ts` hold that, four of them verified by planted defects (a script appeared, the word "полностью" appeared, the does-not-do list was gutted, the structured block became invalid JSON)
 - **Web surface:**
   - **Route:** `/`
   - **Answers:** what Okolos is, what it does, and what it will not do
@@ -536,7 +536,7 @@ generator, and the sheet declares no colour of its own.
   - **Without JS:** wholly — there is not one script on the page, by gate
   - **Entity:** `schema.org/SoftwareApplication` in `application/ld+json`, repeating the page's own claims in machine form, built in `apps/proxy/src/router.ts:landingPage`
 - **Coverage:** apps/proxy/src/router.ts:landingPage, apps/proxy/src/landing.test.ts
-- **Scenarios:** none — a scenario needs a flow node to cover, and this screen has no flow (see `Used by`). The eleven rules in `landing.test.ts` are what hold it meanwhile, and they are gates rather than scenarios
+- **Scenarios:** none — a scenario needs a flow node to cover, and this screen has no flow (see `Used by`). The rules in `landing.test.ts` are what hold it meanwhile, and they are gates rather than scenarios
 - **Resources:** worker root route
 - **Status:** built
 

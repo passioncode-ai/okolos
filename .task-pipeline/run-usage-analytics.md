@@ -528,3 +528,17 @@ the screenshot freshness digest does not read `_locales` or `first-run`; CHANGEL
 CHANGELOG lists; the ru `usageWhat` reads as a present-tense send in the off state; the listing's key count and two
 degraded store screenshots). Round 19 runs on the commit that records these, which changes only the backlog and this
 ledger.
+
+## Stage 6: certification, round 19 (2026-11-05, on d49a1cd)
+
+CI on d49a1cd green on all four jobs. Unit tier: **pass**, no findings (twelfth clean unit round). Product tier:
+**pass** (two risks into B-215: the in-product lists name events but not their values; the policy does not name the
+service's proxy access log). Seam tier: **fail** on one `breaks`: the branch added a twelfth rule to
+`apps/proxy/src/landing.test.ts`, and SCR-17 (twice) and the landing scenario still said «eleven rules»; the number is
+dropped, so it cannot drift again (screens.md:127 stays as the dated 2026-08-12 record). Risk into B-215: two self-audit
+comments resting on the old counts. The run of clean rounds restarts: rounds 20 and 21 must both pass on all tiers.
+Adjacent defect found by `pnpm gates` on this round's fix (not caused by this branch; `git diff 6f167c0 -- tools/feed*`
+is empty): two tests in `tools/feed-job.test.ts` fail on every branch from 2026-11-05T09:00Z. Their «old» main snapshot
+was dated nine days before the real now, while the job ran on a clock fixed at 2026-11-03T09:00Z, so from that hour the
+snapshot read as under seven days old (`skipped-fresh`). Seen red twice in isolation; the fixture is now a fixed
+2026-10-01, old against both clocks; 41 of 41 pass.
