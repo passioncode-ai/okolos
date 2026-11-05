@@ -542,3 +542,12 @@ is empty): two tests in `tools/feed-job.test.ts` fail on every branch from 2026-
 was dated nine days before the real now, while the job ran on a clock fixed at 2026-11-03T09:00Z, so from that hour the
 snapshot read as under seven days old (`skipped-fresh`). Seen red twice in isolation; the fixture is now a fixed
 2026-10-01, old against both clocks; 41 of 41 pass.
+
+## Stage 6: certification, round 20 (2026-11-05, on 107af85)
+
+CI on 107af85 green on all four jobs. **All three tiers pass**, the first of the two consecutive rounds the
+certification needs. Unit tier: **pass**, no findings (thirteenth clean unit round; the feed-job fixture confirmed old
+against both clocks for good). Seam tier: **pass** (one risk into B-215: screens.md:126-127 still states the landing
+rule count in the present tense). Product tier: **pass** (two risks into B-215: the service-retention section cites a
+private repository; «хэш» beside «хеш»). Round 21 runs on the commit that records these, which changes only the backlog
+and this ledger.
