@@ -1,5 +1,5 @@
 import type { Platform } from '@okolos/platform'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { UsageState } from './sink.js'
 import { startUsage } from './start.js'
@@ -181,6 +181,23 @@ describe('an audit that cannot be opened', () => {
     await usage.track('warning_shown', { kind: 'clickfix' })
     await usage.flush()
     expect((p.values.get('usage:state') as UsageState).queue).toHaveLength(2)
+  })
+})
+
+describe('a send whose outbound log does not open (B-214)', () => {
+  it('gives up within 5 seconds as a failed audit write, and the event is kept', async () => {
+    vi.useFakeTimers()
+    try {
+      const p = platform('chrome')
+      const usage = startUsage(p.platform, () => new Promise<never>(() => {}), {}, { appKey: 'A-SH-0000000000', environment: 'sandbox' as const })
+      await usage.track('extension_installed', { reason: 'install' })
+      const flushed = usage.flush()
+      await vi.advanceTimersByTimeAsync(5_000)
+      await flushed
+      expect((p.values.get('usage:state') as UsageState).queue).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

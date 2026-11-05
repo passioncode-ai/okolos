@@ -27,6 +27,12 @@ const PER_FLUSH = 25
 const MAX_AGE_MS = 24 * 60 * 60 * 1000
 /** A clock a few minutes ahead of the one that sends is ordinary; more than this is a wrong clock. */
 const FUTURE_SKEW_MS = 5 * 60 * 1000
+/**
+ * No request starts later than this into a flush: with the 15 s send deadline and 5 s to open the
+ * outbound log, one flush ends within 28 s, inside the page's 30 s RPC, so a switch or a state read
+ * waiting behind it is not reported as failed (B-214). The rest waits for the next flush.
+ */
+const FLUSH_START_BUDGET_MS = 8_000
 /** A device that never reaches the network must not grow this without end. */
 const QUEUE_MAX = 500
 
@@ -121,7 +127,9 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
         state = { ...state, queue: fresh }
         await deps.save(state)
       }
+      const started = deps.now()
       for (let sent = 0; sent < PER_FLUSH && state.queue.length > 0; sent += 1) {
+        if (deps.now() - started >= FLUSH_START_BUDGET_MS) return
         const event = state.queue[0] as QueuedEvent
         let drop: boolean
         // Checked again before each request, not only before the loop: up to 25 sends of up to
