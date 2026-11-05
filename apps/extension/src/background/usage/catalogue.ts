@@ -92,3 +92,13 @@ export function passwordCheckResult(code: PasswordVerdict['explain']['code']): E
       return 'unavailable'
   }
 }
+
+/**
+ * A download verdict counts as `warning_shown{download}` only when it warned and a page took it:
+ * from a bookmark or a background tab no content script answers (`tabs.sendToActive` is false),
+ * the journal records it as unseen, and nobody was warned. The event's meaning is fixed at its
+ * first production send (the event-history rule), so it means "shown", not "decided".
+ */
+export function downloadWarningShown(action: 'block' | 'warn' | 'inform', told: boolean): boolean {
+  return told && (action === 'block' || action === 'warn')
+}

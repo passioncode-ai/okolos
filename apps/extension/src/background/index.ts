@@ -69,7 +69,7 @@ import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 
 import { recordPageRequest } from './page-requests.js'
 import { recordTrap } from './trap-journal.js'
-import { passwordCheckResult, trapWarning } from './usage/catalogue.js'
+import { downloadWarningShown, passwordCheckResult, trapWarning } from './usage/catalogue.js'
 import { startUsage } from './usage/start.js'
 import { optionsPageFor } from '../options/views.js'
 
@@ -1148,7 +1148,6 @@ platform.downloads.onCreated((item, named) => {
       })
     },
     announce: async (verdict, _item, outcome) => {
-      if (verdict.action === 'block' || verdict.action === 'warn') void usage.track('warning_shown', { kind: 'download' })
       /**
        * `tabs.sendToActive`, not `runtime.send`, and the difference is the whole
        * defect this replaces.
@@ -1179,6 +1178,9 @@ platform.downloads.onCreated((item, named) => {
           ...(outcome ? { stopped: outcome.stopped } : {}),
         })
         .catch(() => false)
+
+      // Counted once a page has the warning, not when it was decided (`downloadWarningShown`).
+      if (downloadWarningShown(verdict.action, told)) void usage.track('warning_shown', { kind: 'download' })
 
       if (!told) {
         // Recorded, because "the banner did not show" and "the check did not run"

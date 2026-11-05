@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { TrapKind } from '../../content/traps.js'
 
-import { admissible, CATALOGUE, passwordCheckResult, trapWarning } from './catalogue.js'
+import { admissible, CATALOGUE, downloadWarningShown, passwordCheckResult, trapWarning } from './catalogue.js'
 
 describe('the catalogue', () => {
   it('admits an event with every declared prop at one of its values', () => {
@@ -58,5 +58,15 @@ describe('a password check', () => {
     // A question that was not answered is not a clean result.
     expect(passwordCheckResult('unreachable')).toBe('unavailable')
     expect(passwordCheckResult('unreadable')).toBe('unavailable')
+  })
+})
+
+describe('a download warning', () => {
+  it('is counted only when a page showed it: a verdict no page received is a warning nobody saw', () => {
+    expect(downloadWarningShown('block', true)).toBe(true)
+    expect(downloadWarningShown('warn', true)).toBe(true)
+    expect(downloadWarningShown('block', false)).toBe(false)
+    expect(downloadWarningShown('warn', false)).toBe(false)
+    expect(downloadWarningShown('inform', true)).toBe(false)
   })
 })

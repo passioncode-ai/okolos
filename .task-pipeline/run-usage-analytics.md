@@ -275,3 +275,11 @@ the steps, audit open without a deadline, double count after the deadline).
 `pnpm gates` on this tree: 3510 passed, 1 failed (`tools/listing.test.ts`, screenshots stale after the string
 changes). That run was started at 7.7 GB free, under the coordinator's 8 GB line: a slip, said here. Screenshots
 wait for 8 GB.
+
+Seam tier, round 4 (arrived after the fixes above): its two `breaks` on the renewal flag are the unit tier's,
+fixed in 7dfe2a4. Its third, `warning_shown{download}` counted before any page took the warning, is fixed:
+`downloadWarningShown(action, told)`, tracked after `tabs.sendToActive` answers (`catalogue.test.ts` seen red).
+Risks: the deadline does not abort the fetch (B-214); the keyed-build guard ends `pnpm build`, and whether pnpm
+11 ends its script child is not tested (the unit tier measured pnpm 12.4 doing so); the renewal notice needs
+the usage block, which a worker that does not answer `usage/state` does not draw (accepted with B-214);
+AGENTS.md now cites the tests that hold the per-event writes.
