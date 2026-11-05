@@ -516,3 +516,15 @@ measured); the partial wipe with a failed renewal (B-215). Seam tier: **fail** o
 «with no request about the password», Copylot ru `c0cc32b7`, en `ccc6d5b6`; the store screenshots retaken, since
 `02-first-run.png` shows the note and the surface digest does not cover `_locales`). Slip: ADR-0003 was edited before
 its lease was taken (third time in this run); the lease was taken at once and released after the edit.
+
+## Stage 6: certification, round 18 (2026-11-05, on 90dc447)
+
+CI on 90dc447 green on all four jobs. **The first round with all three tiers passing.** Unit tier: **pass**, no
+findings (eleventh clean unit round). Seam tier: **pass** (the run hit the session limit and was resumed from its own
+transcript; five risks into B-215: the renew-failed text and records do not name the unsent events left; no test
+starts a renewal from a non-empty queue; two «ноль сетевых запросов» lines in product-vision.md and data-sources.md;
+the screenshot freshness digest does not read `_locales` or `first-run`; CHANGELOG's erase line). Product tier:
+**pass** (resumed the same way; three risks into B-215: the constant labels missing from the settings, self-audit and
+CHANGELOG lists; the ru `usageWhat` reads as a present-tense send in the off state; the listing's key count and two
+degraded store screenshots). Round 19 runs on the commit that records these, which changes only the backlog and this
+ledger.
