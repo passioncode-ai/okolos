@@ -28,10 +28,18 @@ const message = (key: string): string => {
 }
 
 describe('the note that says what the file does not contain', () => {
+  it('says that the install number and the unsent usage events are not in the file, whatever else was withheld (B-215)', () => {
+    // They live in the worker's storage.local, outside the nine stores the file copies; a note
+    // that said «nothing was withheld» and stopped there would be false while collection is on.
+    for (const withheld of [[], [{ path: 'settings/hibpApiKey' }]]) {
+      expect(EXPORT_WORDS.note(withheld)).toContain(message('exportUsageOutside'))
+    }
+  })
+
   it('states plainly that nothing was withheld, when nothing was', () => {
     // Otherwise the note becomes decoration: present on every file, therefore read on
     // none. It has to be a sentence, not an empty string.
-    expect(EXPORT_WORDS.note([])).toBe(message('exportNothingWithheld'))
+    expect(EXPORT_WORDS.note([])).toBe(`${message('exportNothingWithheld')} ${message('exportUsageOutside')}`)
   })
 
   it('names every path it was given, and says why they are missing', () => {

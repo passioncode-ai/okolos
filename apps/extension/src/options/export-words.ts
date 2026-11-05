@@ -39,12 +39,17 @@ export const EXPORT_WORDS: ExportWords = {
    * are — a person asking us about one has to be able to quote it back.
    */
   note: (withheld) =>
-    withheld.length === 0
-      ? t('exportNothingWithheld')
-      : [
-          t('exportWithheldNote', withheld.map((item) => item.path).join(', ')),
-          ...[...new Set(withheld.map(kindOf))].map((kind) => WHY[kind]()),
-        ].join(' '),
+    [
+      ...(withheld.length === 0
+        ? [t('exportNothingWithheld')]
+        : [
+            t('exportWithheldNote', withheld.map((item) => item.path).join(', ')),
+            ...[...new Set(withheld.map(kindOf))].map((kind) => WHY[kind]()),
+          ]),
+      // Always: the usage state is in the worker's storage.local, outside the nine stores, so
+      // «nothing was withheld» alone would be false while collection is on (B-215).
+      t('exportUsageOutside'),
+    ].join(' '),
 }
 
 /**
