@@ -64,6 +64,8 @@ export interface UsagePanel {
   readonly firefox: boolean
   /** The last change did not save; the switch shows what is stored. */
   readonly failed?: boolean
+  /** An erase (SCN-023, SCN-032) could not replace the install number. */
+  readonly renewFailed?: boolean
   readonly onSwitch: (on: boolean) => void
 }
 
@@ -365,6 +367,7 @@ function renderUsage(doc: Document, panel: UsagePanel): HTMLElement {
   if (panel.state === 'unsupported') block.append(text(doc, 'usage-state', t('usageFirefoxOld')))
   else if (panel.firefox) block.append(text(doc, 'usage-firefox', t('usageFirefox')))
   if (panel.failed) block.append(text(doc, 'usage-failed', t('usageSaveFailed')))
+  if (panel.renewFailed) block.append(text(doc, 'usage-renew-failed', t('usageRenewFailed')))
   return block
 }
 

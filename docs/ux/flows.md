@@ -295,7 +295,7 @@ rather than from anything the frame said about itself.
 flowchart TD
   A[Password submitted or entered manually] --> B[SHA-1 computed in page context]
   B --> C{In local top-N corpus?}
-  C -->|yes| D[Verdict: compromised - zero network requests]
+  C -->|yes| D[Verdict: compromised - no request about the password]
   C -->|no| E[k-anonymity query: 5-char prefix, padded]
   E --> F{Suffix match?}
   F -->|yes| D

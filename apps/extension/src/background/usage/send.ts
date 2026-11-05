@@ -1,4 +1,5 @@
 import { request, type RequestDeps } from '@okolos/net'
+import { withDeadline } from '@okolos/platform'
 
 import type { UsageDeps } from './sink.js'
 
@@ -10,19 +11,22 @@ import type { UsageDeps } from './sink.js'
  */
 export function usageSender(deps: RequestDeps, deadlineMs = SEND_DEADLINE_MS): UsageDeps['send'] {
   return (spec) =>
-    withDeadline(request(
-      {
-        url: spec.url,
-        method: 'POST',
-        purpose: 'usage-data',
-        payloadShape: `usage-event:${eventName(spec.body)}`,
-        // Sent with the feed alarm, the only one that flushes: the row names it as it is.
-        triggeredBy: 'alarm:feeds',
-        body: spec.body,
-        headers: spec.headers,
-      },
-      deps,
-    ), deadlineMs)
+    sentWithin(
+      request(
+        {
+          url: spec.url,
+          method: 'POST',
+          purpose: 'usage-data',
+          payloadShape: `usage-event:${eventName(spec.body)}`,
+          // Sent with the feed alarm, the only one that flushes: the row names it as it is.
+          triggeredBy: 'alarm:feeds',
+          body: spec.body,
+          headers: spec.headers,
+        },
+        deps,
+      ),
+      deadlineMs,
+    )
 }
 
 /**
@@ -32,13 +36,18 @@ export function usageSender(deps: RequestDeps, deadlineMs = SEND_DEADLINE_MS): U
  */
 const SEND_DEADLINE_MS = 15_000
 
-/** Rejects as a transport failure (`TypeError`) at the deadline, so the event waits for the next send. */
-function withDeadline(sent: Promise<Response>, ms: number): Promise<Response> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const late = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new TypeError(`usage send gave no answer within ${ms} ms`)), ms)
-  })
-  return Promise.race([sent, late]).finally(() => clearTimeout(timer))
+/**
+ * The shared deadline (`@okolos/platform`, one copy of the failure path), its refusal turned into
+ * a transport failure (`TypeError`), so the event waits for the next send instead of being dropped.
+ */
+async function sentWithin(sent: Promise<Response>, ms: number): Promise<Response> {
+  // i18n-exempt: a transport failure the sink reads to keep the event; never shown to anyone
+  const late = `usage send gave no answer within ${ms} ms`
+  try {
+    return await withDeadline(sent, ms, late)
+  } catch (cause) {
+    throw cause instanceof Error && cause.message === late ? new TypeError(late) : cause
+  }
 }
 
 /** The event's name from the closed catalogue, which is what the self-audit row shows. */

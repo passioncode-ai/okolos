@@ -566,6 +566,11 @@ describe('usage and error data (B-199, SCN-051, SCN-052)', () => {
     expect(role(el, 'usage-firefox')?.textContent).toBe(message('usageFirefox'))
   })
 
+  it('says when clearing the local data could not replace the install number, and how to get a new one', () => {
+    const el = renderDataControls(document, handlers(), kinds, undefined, panel({ renewFailed: true }))
+    expect(role(el, 'usage-renew-failed')?.textContent).toBe(message('usageRenewFailed'))
+  })
+
   it('says a change that did not save did not save', () => {
     const el = renderDataControls(document, handlers(), kinds, undefined, panel({ failed: true }))
     expect(role(el, 'usage-failed')?.textContent).toBe(message('usageSaveFailed'))

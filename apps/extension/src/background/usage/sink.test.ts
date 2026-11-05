@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { DestinationError } from '@okolos/net'
+import { AuditWriteError, DestinationError } from '@okolos/net'
 
 import { CATALOGUE } from './catalogue.js'
 import { createUsageSink, type UsageDeps, type UsageState } from './sink.js'
@@ -216,6 +216,25 @@ describe('the queue', () => {
     expect(dropped.state()?.queue).toHaveLength(0)
   })
 
+  it('keeps an event whose audit entry could not be written: nothing left, so it may go next time', async () => {
+    const h = harness({
+      send: vi.fn(async () => {
+        throw new AuditWriteError(new Error('quota'))
+      }),
+    })
+    await h.sink.track('warning_shown', { kind: 'lookalike' })
+    await h.sink.flush()
+    expect(h.state()?.queue).toHaveLength(1)
+  })
+
+  it('names the session from the event\'s own time, so an event at 10:59:59 is in the 10:00 session', async () => {
+    const at = Date.parse('2026-11-05T10:59:59.999Z')
+    const sessionId = vi.fn((iid: string, when: number) => `${iid}@${when}`)
+    const h = harness({ sessionId, now: () => at })
+    await h.sink.track('warning_shown', { kind: 'lookalike' })
+    expect(sessionId).toHaveBeenCalledWith(h.state()?.iid, at)
+  })
+
   it('drops an event the network module refused, so it does not hold the queue behind it', async () => {
     let calls = 0
     const send = vi.fn(async () => {
@@ -249,10 +268,10 @@ describe('the queue', () => {
   })
 
   it('a session is named from the install and the hour, so every wake in that hour agrees', async () => {
-    const sessionId = vi.fn((iid: string) => `s-${iid}`)
+    const sessionId = vi.fn((iid: string, at: number) => `s-${iid}-${at}`)
     const h = harness({ sessionId })
     await h.sink.track('warning_shown', { kind: 'lookalike' })
-    expect(sessionId).toHaveBeenCalledWith(h.state()?.iid)
+    expect(sessionId).toHaveBeenCalledWith(h.state()?.iid, Date.parse('2026-11-04T20:00:00.000Z'))
   })
 
   it('is bounded, so a device that never reaches the network does not grow it without end', async () => {

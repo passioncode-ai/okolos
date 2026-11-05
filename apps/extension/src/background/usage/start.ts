@@ -1,4 +1,4 @@
-import type { RequestDeps } from '@okolos/net'
+import { AuditWriteError, type RequestDeps } from '@okolos/net'
 import type { Platform } from '@okolos/platform'
 
 import type { EventName, EventProps } from './catalogue.js'
@@ -41,19 +41,26 @@ export function startUsage(
   permissions: ConsentApi = platform.dataConsent,
   build: Build = typeof __OKOLOS_USAGE__ === 'undefined' ? { appKey: null, environment: 'sandbox' } : __OKOLOS_USAGE__,
 ): Usage {
-  let send: ((spec: { url: string; body: string; headers: Record<string, string> }) => Promise<Response>) | null = null
 
   const sink = (allowed: ConsentState) =>
     createUsageSink({
       load: () => platform.storage.get<UsageState>(STATE_KEY),
       save: (state) => platform.storage.set(STATE_KEY, state),
       send: async (spec) => {
-        send ??= usageSender(await audit())
-        return send(spec)
+        // The audit is opened per send, as every other caller does: a handle kept for the
+        // worker's life would write to a connection a reset or the browser closed. One that
+        // cannot be opened is an audit write that failed: nothing left, so the event is kept.
+        let deps: RequestDeps
+        try {
+          deps = await audit()
+        } catch (cause) {
+          throw new AuditWriteError(cause)
+        }
+        return usageSender(deps)(spec)
       },
       now: () => Date.now(),
       randomId: () => crypto.randomUUID(),
-      sessionId: (iid) => sessionFor(Date.now(), iid),
+      sessionId: (iid, at) => sessionFor(at, iid),
       appKey: allowed === 'unsupported' ? null : build.appKey,
       environment: build.environment,
       initialConsent: allowed === 'on' ? 'on' : 'off',

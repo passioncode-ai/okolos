@@ -384,7 +384,8 @@ generator, and the sheet declares no colour of its own.
   plaintext addresses would be a secret store of its own — so the row's detail names what left
   for that purpose and what was held back, which is the question a reader has and a stronger
   answer than a byte dump. **A filter by feature** over six purposes at a handful of rows a
-  day is a control that costs a line and answers nothing. **Grouping by purpose** contradicts
+  day was a control that cost a line and answered nothing; since B-199 the log takes up to 100
+  `usage-data` rows a day over seven purposes, and grouping them is B-205. **Grouping by purpose** contradicts
   the newest-first order this screen's own scenario promises in step 1; with a seven-day
   window the flat list is short enough that grouping only adds nesting
 - **Wireframe:** wireframes/SCR-10.md
@@ -422,10 +423,11 @@ generator, and the sheet declares no colour of its own.
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
   | success | default | - | grouped settings |
-  | error | export or wipe failed | - | inline failure with retry; state left unchanged; a wipe whose new install number could not be made names `usage` among the parts it could not do |
+  | error | export or wipe failed | - | inline failure with retry; state left unchanged |
   | usage on | usage and error data is on (Chrome and Edge from the first run; Firefox while it grants it) | - | the usage block: the switch checked, the sentence on what is sent, no state line |
   | usage off | the switch was turned off | - | the switch unchecked and `usageOff` (nothing is sent, the install number is deleted) |
-  | usage unsupported | Firefox 129 to 139, with no built-in data consent | - | no switch; `usageFirefoxOld` says nothing is sent and why |
+  | usage unsupported | Firefox 129 to 139, with no built-in data consent | - | the switch unchecked and disabled; `usageFirefoxOld` says nothing is sent and why |
+  | usage not renewed | «Удалить все данные» or «Очистить локальные данные» could not replace the install number (SCN-023, SCN-032) | - | `usageRenewFailed` in the usage block says so and how to get a new one, once (after a reset the page opens here) |
   | usage not saved | the switch did not go through (the worker did not answer, or Firefox kept the permission after off) | - | `usageSaveFailed` once on the repaint, over the state actually stored |
   | no key | no Have I Been Pwned key saved, the state every install starts in | - | the status line says no key is saved, so the address does not go to Have I Been Pwned (the password check, a separate one, needs no key); an empty field and "Сохранить ключ" |
   | key saved | a key is stored | - | the status line says a key is saved and is not shown; the field is empty; "Заменить ключ" and "Удалить ключ" |

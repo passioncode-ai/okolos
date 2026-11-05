@@ -1072,8 +1072,10 @@ async function dataSection(): Promise<HTMLElement> {
       onWipe: async () => {
         const db = await openDb()
         const wiped = await wipeAll(db)
-        // A renewal that failed leaves the old install number: a partial wipe, said as one.
-        return (await renewUsage()) ? wiped : { ok: false, failed: [...wiped.failed, 'usage'] }
+        // The stores' outcome stands on its own: the leak screen resets after a full wipe whatever
+        // the renewal did. A renewal that failed is said in the usage block, in its own words.
+        if (!(await renewUsage())) usageRenewFailed = true
+        return wiped
       },
       // The erase took the key, so the leaks screen goes back to its start here and in every
       // other tab: its last result spoke about a key that no longer exists (N-110 round 3).
@@ -1113,6 +1115,8 @@ async function renewUsage(): Promise<boolean> {
 let usageFailed = false
 /** The latest switch: an earlier one whose Firefox answer arrives late does not overrule it. */
 let usageSwitches = 0
+/** An erase could not replace the install number; said once, in the usage block. */
+let usageRenewFailed = false
 
 /**
  * The usage and error data switch (B-199). In Firefox the browser keeps the choice and
@@ -1128,10 +1132,13 @@ async function usagePanel(): Promise<UsagePanel | undefined> {
   }
   const failed = usageFailed
   usageFailed = false
+  const renewFailed = usageRenewFailed
+  usageRenewFailed = false
   return {
     state,
     firefox: platform.kind === 'firefox',
     failed,
+    renewFailed,
     onSwitch: (on: boolean) => {
       const mine = ++usageSwitches
       const asked = platform.kind === 'firefox' ? switchConsent('firefox', platform.dataConsent, on) : Promise.resolve(null)
@@ -1140,6 +1147,7 @@ async function usagePanel(): Promise<UsagePanel | undefined> {
           if (mine !== usageSwitches) return
           // Firefox kept the grant after "off": the worker follows the grant, so telling it off
           // would be undone at the next event. Say the change did not go through instead.
+          // i18n-exempt: caught below into usageFailed, which shows usageSaveFailed; this text is never drawn
           if (!on && answer === 'on') throw new Error('Firefox kept the data permission')
           return platform.runtime.send('usage/set', { on })
         })
@@ -1334,8 +1342,12 @@ async function storageProblem(): Promise<HTMLElement | null> {
           void (async () => {
             await resetStorage()
             // The install number lives in the worker's storage, which a broken database does not
-            // reach: clearing takes it too (storageResetNote says so).
-            await renewUsage()
+            // reach: clearing takes it too (storageResetNote says so). When it could not, the
+            // page opens «Ваши данные», where the usage block says so and how to get a new one.
+            if (!(await renewUsage())) {
+              usageRenewFailed = true
+              location.hash = hashFor('data')
+            }
             forgetLeakScreen()
             announceKeyChange('erased')
             await reload()

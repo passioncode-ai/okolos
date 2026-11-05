@@ -49,8 +49,8 @@ export interface UsageDeps {
   send(spec: { url: string; body: string; headers: Record<string, string> }): Promise<Response>
   now(): number
   randomId(): string
-  /** The session of this install in the current hour (`sessionFor`), the same in every wake. */
-  sessionId(iid: string): string
+  /** The session of this install in the hour of `at` (`sessionFor`), the same in every wake. */
+  sessionId(iid: string, at: number): string
   /** Injected into the store build only; `null` everywhere else, which sends nothing. */
   readonly appKey: string | null
   /** `production` for the store build, `sandbox` for every other build. */
@@ -81,10 +81,12 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
       if (state.consent !== 'on') return false
       if (!admissible(name, props as Readonly<Record<string, unknown>>)) return false
       const iid = state.iid ?? deps.randomId()
+      // One reading of the clock: the time and the session cannot fall in two different hours.
+      const at = deps.now()
       const event: QueuedEvent = {
         eventName: name,
-        at: deps.now(),
-        sessionId: deps.sessionId(iid),
+        at,
+        sessionId: deps.sessionId(iid, at),
         props: { ...(props as Record<string, string>), iid, environment: deps.environment, platform: 'browser_extension' },
       }
       // Nothing older than a day stays on the device, sent or not (docs/privacy.md).

@@ -1750,13 +1750,13 @@
     "message": "This is a storage problem. It is not a statement that this page is fine."
   },
   "pwdExplainAbsent": {
-    "message": "This password does not appear in the breach corpus. Only the first five characters of its fingerprint were sent."
+    "message": "This password does not appear in the breach corpus. The password itself was not sent, only the first five characters of its fingerprint."
   },
   "pwdExplainCommon": {
-    "message": "This password is one of the most common in the world. It was recognised on this device, so nothing about it was sent anywhere."
+    "message": "This password is one of the most common in the world. It was recognised on this device, so neither the password nor its fingerprint was sent anywhere."
   },
   "pwdExplainFound": {
-    "message": "This password appears $COUNT$ times in breached data. Only the first five characters of its fingerprint were sent.",
+    "message": "This password appears $COUNT$ times in breached data. The password itself was not sent, only the first five characters of its fingerprint.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -2296,7 +2296,7 @@
     "message": "Where else this password is used is unknown: this device has not seen it before."
   },
   "warnPasswordSourceOffline": {
-    "message": "a list built into this extension; nothing about the password was sent"
+    "message": "a list built into this extension; neither the password nor its fingerprint was sent"
   },
   "warnPasswordSourceOnline": {
     "message": "Have I Been Pwned (CC BY 4.0), via a range query that sent five characters of the fingerprint"
@@ -2674,6 +2674,9 @@
   },
   "usageSaveFailed": {
     "message": "The change was not saved. Try again."
+  },
+  "usageRenewFailed": {
+    "message": "The install number was not replaced. Turn collection off and on again to get a new one."
   },
   "usageFirefoxOld": {
     "message": "This version of Firefox has no built-in consent for data collection, so Okolos sends nothing. Update Firefox to version 140 to choose."

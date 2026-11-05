@@ -96,13 +96,15 @@ function runTaskkill(command, args) {
  *
  * @param {string} name
  * @param {readonly string[]} args
- * @param {{ cwd?: string, timeoutMs: number, platform?: string }} options
+ * @param {{ cwd?: string, timeoutMs: number, platform?: string,
+ *   onSpawn?: (child: import('node:child_process').ChildProcess) => void }} options
  * @returns {Promise<void>}
  */
-export function runToCompletion(name, args, { cwd, timeoutMs, platform = process.platform }) {
+export function runToCompletion(name, args, { cwd, timeoutMs, platform = process.platform, onSpawn }) {
   const invocation = binInvocation(name, args, platform)
   return new Promise((resolve, reject) => {
     const child = spawn(invocation.command, invocation.args, { cwd, stdio: 'inherit', shell: invocation.shell })
+    onSpawn?.(child)
     let timedOut = false
     const timer = setTimeout(() => {
       timedOut = true

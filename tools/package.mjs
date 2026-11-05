@@ -168,7 +168,7 @@ if (!checkOnly || !built) {
     keyed = true
     keyedBuilds.arm()
   }
-  await runToCompletion('pnpm', ['build'], { cwd: root, timeoutMs: 10 * 60_000 })
+  await runToCompletion('pnpm', ['build'], { cwd: root, timeoutMs: 10 * 60_000, onSpawn: keyedBuilds.watch })
 }
 
 for (const target of TARGETS) {
@@ -287,7 +287,7 @@ if (keyed) {
   delete process.env.APTABASE_APP_KEY_OKOLOS
   delete process.env.OKOLOS_USAGE_ENV
   try {
-    await runToCompletion('pnpm', ['build'], { cwd: root, timeoutMs: 10 * 60_000 })
+    await runToCompletion('pnpm', ['build'], { cwd: root, timeoutMs: 10 * 60_000, onSpawn: keyedBuilds.watch })
   } catch (cause) {
     die(`the keyless rebuild failed (${cause instanceof Error ? cause.message : String(cause)})`)
   }

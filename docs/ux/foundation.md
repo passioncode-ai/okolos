@@ -258,7 +258,7 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 - **Story:** As P-01, I want to know a password is compromised without sending it anywhere, so that checking my security isn't itself a leak.
 - **Traces:** JTBD-04, JTBD-05, JRN-02/#1
 - **Acceptance criteria:**
-  - Given a password is checked, when the check runs, then only a hash prefix ever leaves the device, and the journal records exactly what was sent.
+  - Given a password is checked, when the check runs, then of the password only a hash prefix ever leaves the device (and, while usage and error data is on, whether it was found, with no password, hash or site: SCN-053's catalogue), and the journal records exactly what was sent.
   - Given the password is in the local corpus, when checked, then the verdict is produced with no network request at all.
 - **Priority:** must
 - **Status:** proposed

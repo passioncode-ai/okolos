@@ -141,3 +141,21 @@ describe('the switch, read once', () => {
     expect(p.values.get('usage:state')).toMatchObject({ consent: 'on' })
   })
 })
+
+describe('an audit that cannot be opened', () => {
+  it('keeps the events: nothing was sent, so they may go next time', async () => {
+    const p = platform('chrome')
+    const usage = startUsage(
+      p.platform,
+      async () => {
+        throw new Error('the database is blocked')
+      },
+      {},
+      { appKey: 'A-SH-0000000000', environment: 'sandbox' },
+    )
+    await usage.track('warning_shown', { kind: 'lookalike' })
+    await usage.track('warning_shown', { kind: 'clickfix' })
+    await usage.flush()
+    expect((p.values.get('usage:state') as UsageState).queue).toHaveLength(2)
+  })
+})

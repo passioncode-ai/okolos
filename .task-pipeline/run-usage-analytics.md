@@ -227,3 +227,30 @@ All three: **fail**, so round 2 does not count as a passing round; round 3 runs 
 
 Risks kept out as rows: B-209 (keyless builds show the notice), B-210 (outside-link counted at journal time), B-211
 (start-time flush, Firefox e2e); B-205 widened to the overview count.
+
+## Stage 6: certification, round 3, adversarial (2026-11-05, on 62c6b56)
+
+Three blind tiers; all three **fail**. CI on 62c6b56 also caught three gates this machine had not run
+(one-deadline, the SCR-12 wireframe, keyed-builds on Windows): the local check before a push is now the
+whole `pnpm gates` once free disk is over 8 GB, not a targeted subset.
+
+| Finding | Tiers | Fix, and the test seen red first |
+|---|---|---|
+| A second deadline helper in send.ts | seam, CI | `@okolos/platform` withDeadline, its refusal mapped to TypeError; `tools/one-deadline.test.ts` |
+| SCR-12 wireframe stale | seam, CI | regenerated (`node tools/wireframes.mjs`) |
+| keyed-builds test imported a drive-letter path on Windows | seam, CI | `pathToFileURL`; the SIGTERM case is POSIX-only (Windows ends the child with no handler) |
+| SIGHUP not handled; a SIGTERM to package.mjs alone let the running keyed build write again | unit, seam | SIGHUP 129; `runToCompletion({ onSpawn })` hands the child to the guard, which ends its tree first (bounded SIGKILL); two new cases in `tools/keyed-builds.test.ts` |
+| Reset path ignored a failed renewal | unit, seam | the page opens «Ваши данные» and `usageRenewFailed` says so (Copylot ru `1ba647ca`, en `0660f403`); `data-controls.test.ts` |
+| A wipe with a failed renewal returned `failed: ['usage']`, skipped the leak-screen reset and printed a raw token | seam | the stores' outcome stands; the renewal failure is said in the usage block |
+| i18n sweep: two thrown sentences without a reason | seam | `i18n-exempt:` at both |
+| Password strings still read as the whole account of what the check sends | seam, product | narrowed to the password and its hash (Copylot ru `e5805a4d`, en `f1fe57ce`) |
+| README told contributors to run `pnpm package` | seam | `pnpm package:check`, with the release requirements named in README and docs/README |
+| README «only anonymous hash prefixes», three «zero network requests» lines, SCN-024 «everything the product stored», SCR-12 unsupported row, SCR-10 «a handful of rows», CHANGELOG frame, ADR and SCN-053 retry wording | product | each reworded to what the code does |
+| Risks taken in: AuditWriteError retry under test, an audit that cannot open keeps events, one clock reading per event, the audit opened per send, the policy URL tied to the listing, Firefox alarm claims qualified to Chrome and Edge, ADR «видит каждый, у кого сбор включён», `environment` always production in what leaves, coverage-matrix legend | unit, seam, product | tests where code moved |
+
+Risks kept out as rows: B-212 (listing 90 days, two more password strings). Not taken: an idempotency key across
+the 15 s deadline (a late answer may count an event twice; recorded in B-205's neighbourhood as accepted).
+
+Checks on the tree pushed after this round: `pnpm gates` (lint, typecheck, build, 215 test files, 3509 tests
+passed, 2 skipped; after the wireframe regeneration `tools/wireframes.test.ts` and `tools/listing.test.ts` 38/38),
+`pnpm ux:lint`, `pnpm brand:lint`, `pnpm i18n:sweep`, `pnpm package:check`, all exit 0; store screenshots retaken.

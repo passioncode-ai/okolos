@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { policyDate, servedPolicyBehind } from './privacy-served.mjs'
+import { policyDate, PRIVACY_URL, servedPolicyBehind } from './privacy-served.mjs'
 
 describe('the served privacy page, before a store archive', () => {
   const doc = '# Что Okolos отправляет\n\nОбновлено 2026-11-05.\n'
@@ -22,5 +22,11 @@ describe('the served privacy page, before a store archive', () => {
   it('lets a served page as new as the document, or newer, through', () => {
     expect(servedPolicyBehind('<p>Обновлено 2026-11-05.</p>', doc)).toBeNull()
     expect(servedPolicyBehind('<p>Обновлено 2026-11-06.</p>', doc)).toBeNull()
+  })
+
+  it('reads the page the store listing names as the policy, not a copy of its address', async () => {
+    const { readFileSync } = await import('node:fs')
+    const listing = readFileSync(new URL('../docs/store/listing.md', import.meta.url), 'utf8')
+    expect(listing).toContain(PRIVACY_URL)
   })
 })
