@@ -422,3 +422,8 @@ analytics.md says it). Risks taken in: `usageFirefoxOld` and `usageOff` scoped t
 scn-050 matches); B-203 ties the daily-hash question to SCN-051's «not linked to the old one». The seam tier report
 was still running when these were made.
 pnpm gates green in full on this tree: 216 files, 3524 tests.
+Seam tier, round 11 (on d06d5c8): **fail** on two `breaks`, both backlog pointers. The five pins added in round 10
+were wrong at their commit (`privacy.md@6f167c0:162` is a table rule; the promise is at `:179`; the B-163 evidence is
+at `package.mjs@4c22375:108,192`, the audit's tree), and four unpinned pointers had moved (B-199 listing, B-137
+README, B-165 adapter, B-166 README). Fixed and checked with the tier's own commands (all three exit 0); three
+imprecise pointers (B-196, B-210, B-215) corrected too; B-214 names the paint chain waiting on `usage/state`.
