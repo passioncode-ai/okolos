@@ -2,14 +2,18 @@
   "surfaces": [
     "packages/ui/src",
     "apps/extension/src/options",
-    "apps/extension/src/pages.css"
+    "apps/extension/src/first-run",
+    "apps/extension/src/popup",
+    "apps/extension/src/interstitial",
+    "apps/extension/src/pages.css",
+    "apps/extension/_locales/ru/messages.json"
   ],
-  "surfacesDigest": "6245ba026cc9e2d3deb2461463cb4b5c",
+  "surfacesDigest": "37e0e10c72281a922fd3108f7ecbc17b",
   "images": {
     "01-interstitial.png": "8ff0de8221729c00",
     "02-first-run.png": "52a901bcba52b159",
-    "03-self-audit.png": "8e96f84226dd11d4",
-    "04-popup.png": "76e727da574bda33"
+    "03-self-audit.png": "6e81268fe8e1c85b",
+    "04-popup.png": "80b7355961ee62d2"
   },
   "shown": {
     "01-interstitial.png": "interstitial",
