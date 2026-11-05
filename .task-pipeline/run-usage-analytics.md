@@ -427,3 +427,17 @@ were wrong at their commit (`privacy.md@6f167c0:162` is a table rule; the promis
 at `package.mjs@4c22375:108,192`, the audit's tree), and four unpinned pointers had moved (B-199 listing, B-137
 README, B-165 adapter, B-166 README). Fixed and checked with the tier's own commands (all three exit 0); three
 imprecise pointers (B-196, B-210, B-215) corrected too; B-214 names the paint chain waiting on `usage/state`.
+
+## Stage 6: certification, round 12 (2026-11-05, on 16e9749)
+
+CI on 16e9749 green on all four jobs. Unit tier: **pass** (fifth clean unit round: 7, 9, 10, 11, 12; two risks into
+B-206 and B-215). Product tier: **fail** on three `breaks`: docs/README.md still said 49 scenarios, 39 implemented
+(now 53 and 42, and the row no longer claims a gate holds it); its human queue named one decision (now three, with
+B-203 and B-216); the policy named only country from the IP, while the same Aptabase image (`sha256:776a62e0`, as
+sshlg-analytics documents at `de9200c`) stores country, region and a daily device hash for the event's whole life
+(privacy.md and facts.md now say so, Copylot `89af2866`; B-203 asks the platform to write it down). Risks taken in:
+SCR-10's «Used by» names FLW-24, and its flat-list reason excepts the usage rows (B-205).
+Seam tier, round 12: **pass** (four risks, taken in: SCR-10's test count 35; SCR-17 says usage data is the only data
+from the person's use that goes to us, the feed download carrying nothing; `apps/proxy/src/landing.test.ts` now holds
+the landing's usage line equal to the listing's, a planted edit fails it; privacy.md's wipe sentence carries the
+switch-off's caveat about a send under way, Copylot `13747658`).

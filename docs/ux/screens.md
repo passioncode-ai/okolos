@@ -355,7 +355,7 @@ generator, and the sheet declares no colour of its own.
 - **Status:** built
 
 ### SCR-10: Self-audit
-- **Used by:** FLW-13, FLW-17
+- **Used by:** FLW-13, FLW-17, FLW-24
 - **Purpose:** make "we don't collect your browsing" verifiable rather than promised
 - **Elements:** outbound request log — each row labelled (`когда/куда/зачем/что ушло/источник`) and **openable**, with what that purpose sends and what it holds back plus the outcome in words; a two-position period control (the last seven days / everything kept); **primary action: "Выгрузить журнал"**; a one-line summary that names what left as well as what did not
 - **States:**
@@ -387,9 +387,10 @@ generator, and the sheet declares no colour of its own.
   day was a control that cost a line and answered nothing; since B-199 the log takes up to 100
   `usage-data` rows a day over seven purposes, and grouping them is B-205. **Grouping by purpose** contradicts
   the newest-first order this screen's own scenario promises in step 1; with a seven-day
-  window the flat list is short enough that grouping only adds nesting
+  window the flat list of requests the person caused is short enough that grouping only adds nesting;
+  the usage-data rows are the exception, B-205
 - **Wireframe:** wireframes/SCR-10.md
-- **Coverage:** packages/ui/src/self-audit/panel.ts:renderSelfAudit, apps/extension/src/options/index.ts, packages/ui/src/self-audit/panel.test.ts (32 checks), e2e/scn-019.spec.ts (four, including opening a row and widening the period), e2e/rendered-instants.spec.ts (nine areas, seeded stores, one row written the way an older build leaves it)
+- **Coverage:** packages/ui/src/self-audit/panel.ts:renderSelfAudit, apps/extension/src/options/index.ts, packages/ui/src/self-audit/panel.test.ts (35 checks), e2e/scn-019.spec.ts (four, including opening a row and widening the period), e2e/rendered-instants.spec.ts (nine areas, seeded stores, one row written the way an older build leaves it)
 - **Scenarios:** SCN-019
 - **Resources:** net layer journal, exporter
 - **Status:** built
@@ -522,7 +523,7 @@ generator, and the sheet declares no colour of its own.
 ### SCR-17: Product landing page
 - **Used by:** FLW-18 (deciding whether to install). **The gap recorded here on 2026-08-12 is closed 2026-08-20 (B-22)** — and the way it was recorded is why closing it was easy: the entry said a flow traced to no story would be a diagram rather than a design, and named the missing piece instead of inventing one. ST-021 is that story, FLW-18 the flow, SCN-033 the scenario
 - **Purpose:** let someone who has never heard of this decide whether to install it — including by reading what it refuses to do
-- **Elements:** what the product is in one sentence; what it does; what it sends us (`[data-role=sends]`: usage and error data, the only thing that goes to PassionCode; the rest of what leaves, to other services, is in `/privacy`; B-199); **what it does not do** (half the page); how to install; links to `/privacy` and `/status`. **Primary action: install**
+- **Elements:** what the product is in one sentence; what it does; what it sends us (`[data-role=sends]`: usage and error data, the only data from the person's use that goes to us; the feed download from our worker carries nothing from them, and the rest of what leaves is in `/privacy`; B-199); **what it does not do** (half the page); how to install; links to `/privacy` and `/status`. **Primary action: install**
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
