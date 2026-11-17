@@ -66,6 +66,15 @@ const RTL_OVERRIDE = /[\u202A-\u202E\u2066-\u2069]/u
 /** Elements whose text is code or styling, not something anyone reads. */
 const NOT_PROSE = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT'])
 
+/** Carriers read from attributes; they share one part of the candidate ceiling (B-187). */
+const ATTRIBUTE_KINDS: ReadonlySet<CarrierKind> = new Set<CarrierKind>([
+  'alt',
+  'title',
+  'aria-label',
+  'meta',
+  'data-attr',
+])
+
 const ATTRIBUTE_CARRIERS: ReadonlyArray<{ attr: string; carrier: CarrierKind }> = [
   { attr: 'alt', carrier: 'alt' },
   { attr: 'title', carrier: 'title' },
@@ -99,6 +108,19 @@ export function collect(doc: Document, options: CollectOptions): PageCandidates 
    */
   const nodeShare = Math.floor(budget.maxNodes / 2)
   const candidateShare = Math.floor(budget.maxCandidates / 2)
+  /**
+   * The third carrier class that could spend the allowance for the others: attributes.
+   *
+   * Every non-empty `alt`, `title`, `aria-label`, `meta` and `data-*` is a candidate, and
+   * ordinary pages carry hundreds. Measured in Chromium on Wikipedia: the scan stopped after
+   * 83 elements with 50 harmless attribute candidates and never reached a hidden instruction
+   * at the end of the page; sixty `<img alt>` in front of one do the same on purpose (B-187).
+   *
+   * So attributes keep a quarter of the ceiling, the walk goes on while hidden text still has
+   * room, and an attribute refused for want of room says the scan was cut short.
+   */
+  const attributeShare = Math.floor(budget.maxCandidates / 4)
+  let attributeCount = 0
 
   const outOfBudget = (nodeLimit: number, candidateLimit: number): boolean =>
     nodeCount >= nodeLimit ||
@@ -130,6 +152,13 @@ export function collect(doc: Document, options: CollectOptions): PageCandidates 
     if (candidates.length >= budget.maxCandidates) {
       truncated = true
       return
+    }
+    if (ATTRIBUTE_KINDS.has(carrier)) {
+      if (attributeCount >= attributeShare) {
+        truncated = true
+        return
+      }
+      attributeCount += 1
     }
     candidates.push({
       locator,
@@ -184,7 +213,10 @@ export function collect(doc: Document, options: CollectOptions): PageCandidates 
         // Once the ceiling is reached, reading the rest of an element's attributes buys
         // nothing: `add` will refuse every one. The 20 000-attribute element cost 84.9 ms
         // mostly here, in `getAttribute` calls whose results were about to be discarded.
-        if (truncated) break
+        if (attributeCount >= attributeShare) {
+          truncated = true
+          break
+        }
         if (!name.startsWith('data-')) continue
         const value = element.getAttribute(name)
         if (value) add(value, locatorFor(element), 'data-attr', ['non-rendered'])
@@ -201,7 +233,7 @@ export function collect(doc: Document, options: CollectOptions): PageCandidates 
       if (element.getAttribute('type') === 'application/ld+json') {
         add(element.textContent ?? '', locatorFor(element), 'json-ld', ['non-rendered'])
       }
-    } else if (!NOT_PROSE.has(tag)) {
+    } else if (!NOT_PROSE.has(tag) && !inHead(element, doc)) {
       const concealment = concealmentOf(element, doc)
       if (concealment.length > 0) {
         add(ownText(element), locatorFor(element), 'text-node', concealment)
@@ -232,6 +264,19 @@ function stripQueryAndFragment(raw: string): string {
   } catch {
     return raw
   }
+}
+
+/**
+ * Whether the element is the document head or inside it.
+ *
+ * The browser's own stylesheet gives `<head>` and everything in it `display: none`, so the
+ * title a person reads on the tab was a `display-none` candidate on every page in Chrome, and
+ * spent a slot of the ceiling doing it (B-193). Nothing in the head renders by design, so
+ * `display: none` there conceals nothing; its attributes and `meta` are still read.
+ */
+function inHead(element: Element, doc: Document): boolean {
+  const head = doc.head
+  return head !== null && (element === head || head.contains(element))
 }
 
 /** Text belonging to this element itself, not to its descendants. */

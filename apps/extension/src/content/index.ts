@@ -370,6 +370,23 @@ window.addEventListener('message', (event) => {
   })
 })
 
+/**
+ * The scan stopped on its budget without a finding: journalled once per page, not bannered.
+ *
+ * In the page, beside `okolos:collect`, for the same reason `okolos:scan-failed` is: from
+ * outside, "no banner" looks identical whether nothing was found, the answer never came, or
+ * the walk stopped before asking.
+ */
+function noteBlinded(): void {
+  performance.mark(MARK_BLINDED)
+  void journal.record('scan-blinded', async () => {
+    await platform.runtime.send('page/note', {
+      kind: 'scan-blinded',
+      explain: t('noteScanBlinded'),
+    })
+  })
+}
+
 async function scan(): Promise<void> {
   const started = performance.now()
   performance.mark(MARK_START)
@@ -400,18 +417,7 @@ async function scan(): Promise<void> {
      * same `journal.record` that keeps a mutating page from writing the same line all
      * afternoon.
      */
-    if (page.truncated) {
-      // In the page, beside `okolos:collect`, for the same reason `okolos:scan-failed`
-      // is: from outside, "no banner" looks identical whether nothing was found, the
-      // answer never came, or the walk stopped before asking.
-      performance.mark(MARK_BLINDED)
-      void journal.record('scan-blinded', async () => {
-        await platform.runtime.send('page/note', {
-          kind: 'scan-blinded',
-          explain: t('noteScanBlinded'),
-        })
-      })
-    }
+    if (page.truncated) noteBlinded()
     scanSettled(started, false)
     return
   }
@@ -424,6 +430,12 @@ async function scan(): Promise<void> {
 
   const verdicts: Verdict[] = response?.verdicts ?? []
   if (verdicts.length === 0) {
+    /**
+     * Candidates were found and none was a finding, but the walk stopped on its budget: the
+     * rest of the page was not read. On Wikipedia that was 83 elements of thousands, and a
+     * page with nothing to show must not read as a page that was checked (B-187).
+     */
+    if (page.truncated) noteBlinded()
     scanSettled(started, true)
     return
   }
