@@ -1118,9 +1118,9 @@ if (isTopFrame) {
     recover: (kind) => {
       void platform.runtime.send('recovery/open', { kind }).catch(() => undefined)
     },
-    warned: (kind, signals) => {
+    warned: (kind, signals, shown = true) => {
       void platform.runtime
-        .send('trap/warned', { kind, signals: signals.join(',') })
+        .send('trap/warned', { kind, signals: signals.join(','), shown })
         .catch(() => undefined)
     },
     judged: () => {

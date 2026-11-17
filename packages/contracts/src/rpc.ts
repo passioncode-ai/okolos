@@ -303,7 +303,12 @@ export interface RpcMap {
   /** Not today. It ranks last until the given time rather than disappearing. */
   'finding/defer': { req: { id: string; until: string }; res: { ok: true } }
   'site/facts': { req: { host: string }; res: { trusted: boolean; firstSeen: string | null } }
-  'trap/warned': { req: { kind: string; signals: string }; res: { ok: true } }
+  /**
+   * A trap warning, journalled. `shown` is false when another warning already held the panel, so
+   * the journal keeps the stopped click and `warning_shown` does not count it (B-210); absent from
+   * an older content script, which is read as shown.
+   */
+  'trap/warned': { req: { kind: string; signals: string; shown?: boolean }; res: { ok: true } }
   /**
    * A state-changing request the page made while a finding on it was
    * unresolved. Observed, never held — see apps/extension/src/page-watch.
