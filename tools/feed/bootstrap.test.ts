@@ -2,7 +2,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import { EXIT as JOB_EXIT, WATCHDOG_MS } from '../feed-job.mjs'
 import { runBounded } from './bounded.mjs'
@@ -20,8 +20,19 @@ import {
   signalRecord,
 } from './bootstrap.mjs'
 import { acquireLock } from './lock.mjs'
-import { feedPaths } from './paths.mjs'
+import { CHECKOUT_LOCK_REASON, feedPaths } from './paths.mjs'
 import { readStatus } from './status.mjs'
+
+/** Every temporary folder a test makes, removed after it: they piled up by the thousand (B-179). */
+const madeDirs: string[] = []
+function tempDir(prefix: string): string {
+  const dir = mkdtempSync(prefix)
+  madeDirs.push(dir)
+  return dir
+}
+afterEach(() => {
+  for (const dir of madeDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+})
 
 /**
  * The feed agent's entry point (B-159): what launchd starts, from outside the
@@ -43,7 +54,7 @@ const failed = (stderr: string, code = 128) => ({ code, signal: null, stdout: ''
 function world() {
   // The long, real form: on Windows os.tmpdir() can be an 8.3 short name
   // (RUNNER~1) that git never prints back.
-  const base = realpathSync.native(mkdtempSync(path.join(os.tmpdir(), 'okolos-bootstrap-')))
+  const base = realpathSync.native(tempDir(path.join(os.tmpdir(), 'okolos-bootstrap-')))
   const paths = feedPaths(
     {
       OKOLOS_STATE_DIR: path.join(base, 'state'),
@@ -78,6 +89,8 @@ function fakeTool({ fetchFails = false, addFails = false, sourceIsRepo = true, c
     if (verb === 'rev-parse' && args.includes('--git-dir')) return sourceIsRepo ? ok('.git\n') : failed('fatal: not a git repository')
     if (verb === 'rev-parse') return ok(`${'d'.repeat(40)}\n`)
     if (verb === 'worktree' && args[3] === 'prune') return ok()
+    // Refused when there is nothing to unlock; the bootstrap does not depend on its answer.
+    if (verb === 'worktree' && args[3] === 'unlock') return failed(`fatal: '${args[4]}' is not a working tree`)
     if (verb === 'fetch') return fetchFails ? failed('fatal: unable to access origin: Could not resolve host') : ok()
     if (verb === 'worktree' && args[3] === 'add') {
       if (addFails) return failed(`fatal: '${args.at(-2)}' is a missing but already registered worktree`)
@@ -150,9 +163,11 @@ describe('a missing checkout is recreated, and the record says so (B-159)', () =
     // `worktree add` refuses ("missing but already registered").
     expect(ran).toEqual([
       `git -C ${w.source} rev-parse --git-dir`,
+      `git -C ${w.source} worktree unlock ${w.paths.agentCheckout}`,
       `git -C ${w.source} worktree prune`,
       `git -C ${w.source} fetch --quiet origin main`,
-      `git -C ${w.source} worktree add --detach ${w.paths.agentCheckout} origin/main`,
+      // Locked, so a machine cleanup that takes idle clean worktrees leaves it (B-150).
+      `git -C ${w.source} worktree add --detach --lock --reason ${CHECKOUT_LOCK_REASON} ${w.paths.agentCheckout} origin/main`,
       'pnpm install --frozen-lockfile --filter @okolos/proxy',
       `git -C ${w.paths.agentCheckout} rev-parse HEAD`,
     ])

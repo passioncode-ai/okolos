@@ -97,7 +97,7 @@ Files the feed agent writes — all outside the working tree, all bounded (LC-12
 `tools/feed/`, and `is-main.mjs` from `tools/is-main.mjs`, not the re-export in `tools/feed/`;
 replaced whole at each install;
 `--status` says when they differ from the checkout's); its own checkout `~/.okolos/agent-checkout`
-at origin/main (a worktree of the clone `pnpm feed:agent` ran from, or a clone of that clone's origin
+at origin/main (a locked worktree of the clone `pnpm feed:agent` ran from, so a machine cleanup that takes idle clean worktrees leaves it (B-150); or a clone of that clone's origin
 when the clone is gone; recreated by the bootstrap when it is missing; a broken one is moved to
 `~/.okolos/agent-checkout.broken`, one kept, removed by `--purge`); in the clone `pnpm feed:agent`
 ran from, the installer's and the bootstrap's `git worktree prune`, `git fetch origin main` and

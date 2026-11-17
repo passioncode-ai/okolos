@@ -43,7 +43,7 @@ import { killAllGroups, runBounded, withoutSecrets } from './bounded.mjs'
 import { isMain } from './is-main.mjs'
 import { acquireLock, LockHeldError } from './lock.mjs'
 import { capFile, cleanLine, openLog } from './log.mjs'
-import { feedPaths } from './paths.mjs'
+import { CHECKOUT_LOCK_REASON, feedPaths } from './paths.mjs'
 import { offMainFacts, readStatus, stampRunId, writeStatus } from './status.mjs'
 
 /** What the installer copies beside launchd: this file and every module it imports. */
@@ -162,12 +162,18 @@ export async function recoverCheckout({ checkout, sourceRepo, origin, tool = run
   let how
   if (sourceUsable) {
     // A folder deleted under git still has its worktree entry; `add` refuses that
-    // path ("missing but already registered") until the entry is pruned.
+    // path ("missing but already registered") until the entry is pruned, and a locked
+    // entry is pruned only once unlocked. The unlock's refusal (no such worktree, not
+    // locked) changes nothing, so it is not checked (B-150).
+    await git(['-C', sourceRepo, 'worktree', 'unlock', checkout])
     must('git worktree prune', await git(['-C', sourceRepo, 'worktree', 'prune']))
     must('git fetch', await git(['-C', sourceRepo, 'fetch', '--quiet', 'origin', 'main']))
     must(
       'git worktree add',
-      await git(['-C', sourceRepo, 'worktree', 'add', '--detach', checkout, 'origin/main'], RECOVERY_DEADLINES.worktree),
+      await git(
+        ['-C', sourceRepo, 'worktree', 'add', '--detach', '--lock', '--reason', CHECKOUT_LOCK_REASON, checkout, 'origin/main'],
+        RECOVERY_DEADLINES.worktree,
+      ),
     )
     how = `a worktree of ${sourceRepo}`
   } else if (origin) {

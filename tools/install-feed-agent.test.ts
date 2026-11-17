@@ -2,12 +2,13 @@ import { spawn, spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { feedPaths } from './feed/paths.mjs'
+import { CHECKOUT_LOCK_REASON, feedPaths } from './feed/paths.mjs'
 import { snapshotPrFile, writeSnapshotPr } from './feed/snapshot-pr.mjs'
 import { readStatus, stampRunId, writeStatus } from './feed/status.mjs'
 import { filesIn } from './tree.mjs'
+
 // @ts-expect-error: a plain .mjs tool, typed by its use here (as in feed-agent-credential.test.ts)
 import { discover } from './feed-agent-credential.mjs'
 import { BOOTSTRAP_FILES, BOOTSTRAP_SOURCES } from './feed/bootstrap.mjs'
@@ -28,6 +29,17 @@ import {
   stableNode,
   uninstallAgent,
 } from './install-feed-agent.mjs'
+
+/** Every temporary folder a test makes, removed after it: they piled up by the thousand (B-179). */
+const madeDirs: string[] = []
+function tempDir(prefix: string): string {
+  const dir = mkdtempSync(prefix)
+  madeDirs.push(dir)
+  return dir
+}
+afterEach(() => {
+  for (const dir of madeDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+})
 
 /**
  * Installing and removing the feed agent (LC-14: uninstall is symmetric; the
@@ -72,7 +84,7 @@ function fakeLaunchd({ loaded = true, disabled = false, staysLoaded = false } = 
 
 /** A throwaway HOME: every path the installer writes resolves under it, never the real one. */
 function home() {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-agent-home-'))
+  const dir = tempDir(path.join(os.tmpdir(), 'okolos-agent-home-'))
   const target = path.join(dir, 'Library/LaunchAgents', `${TEST_LABEL}.plist`)
   mkdirSync(path.dirname(target), { recursive: true })
   return { dir, target, paths: feedPaths({}, dir) }
@@ -163,7 +175,7 @@ describe('uninstall is symmetric (F5, LC-14)', () => {
       purge: { repo: '/repo', paths: h.paths, tool },
     })
     expect(result.ok).toBe(true)
-    expect(tools).toContainEqual(['git', '-C', '/repo', 'worktree', 'remove', '--force', h.paths.agentCheckout])
+    expect(tools).toContainEqual(['git', '-C', '/repo', 'worktree', 'remove', '--force', '--force', h.paths.agentCheckout])
     expect(tools).toContainEqual(['git', '-C', '/repo', 'worktree', 'prune'])
     for (const dir of [h.paths.agentCheckout, `${h.paths.agentCheckout}.broken`, h.paths.state, h.paths.logs]) {
       expect(existsSync(dir), dir).toBe(false)
@@ -209,10 +221,13 @@ describe('the agent runs from its own checkout at origin/main (F2)', () => {
     }
     await ensureCheckout({ repo: '/repo', checkout: h.paths.agentCheckout, tool, log: quiet })
     expect(tools).toEqual([
-      // A folder deleted under git leaves its worktree entry; `add` refuses that path until it is pruned (B-150).
+      // A folder deleted under git leaves its worktree entry; `add` refuses that path until it is pruned,
+      // and a locked entry is pruned only once unlocked (B-150).
+      ['git', '-C', '/repo', 'worktree', 'unlock', h.paths.agentCheckout],
       ['git', '-C', '/repo', 'worktree', 'prune'],
       ['git', '-C', '/repo', 'fetch', '--quiet', 'origin', 'main'],
-      ['git', '-C', '/repo', 'worktree', 'add', '--detach', h.paths.agentCheckout, 'origin/main'],
+      // Locked, so a machine cleanup that takes idle clean worktrees leaves it (B-150).
+      ['git', '-C', '/repo', 'worktree', 'add', '--detach', '--lock', '--reason', CHECKOUT_LOCK_REASON, h.paths.agentCheckout, 'origin/main'],
       ['pnpm', 'install', '--frozen-lockfile', '--filter', '@okolos/proxy'],
     ])
   })
@@ -226,7 +241,7 @@ describe('the agent runs from its own checkout at origin/main (F2)', () => {
     }
     const env = { PATH: '/bin', CLOUDFLARE_API_TOKEN: 't', CLOUDFLARE_API_KEY: 'k' }
     await ensureCheckout({ repo: '/repo', checkout: h.paths.agentCheckout, tool, env, log: quiet })
-    expect(envs).toHaveLength(4)
+    expect(envs).toHaveLength(5)
     for (const seen of envs) {
       expect(seen).toMatchObject({ PATH: '/bin', GIT_TERMINAL_PROMPT: '0' })
       expect(seen).not.toHaveProperty('CLOUDFLARE_API_TOKEN')
@@ -243,7 +258,8 @@ describe('the agent runs from its own checkout at origin/main (F2)', () => {
       return { code: 0, signal: null, stdout: '', stderr: '', timedOut: false }
     }
     await ensureCheckout({ repo: '/repo', checkout: h.paths.agentCheckout, tool, log: quiet })
-    expect(tools).toEqual([])
+    // Only locked, so an install made before B-150 is kept from a machine cleanup too.
+    expect(tools).toEqual([['git', '-C', '/repo', 'worktree', 'lock', '--reason', CHECKOUT_LOCK_REASON, h.paths.agentCheckout]])
   })
 })
 
@@ -296,7 +312,7 @@ describe('the plist launchd reads', () => {
 
   // plutil and launchd exist only on macOS; elsewhere there is nothing to load the plist.
   it.skipIf(process.platform !== 'darwin')('is a plist plutil accepts', () => {
-    const file = path.join(mkdtempSync(path.join(os.tmpdir(), 'okolos-plist-')), 'agent.plist')
+    const file = path.join(tempDir(path.join(os.tmpdir(), 'okolos-plist-')), 'agent.plist')
     writeFileSync(file, plist())
     const lint = spawnSync('plutil', ['-lint', file], { encoding: 'utf8' })
     expect(lint.status, lint.stdout + lint.stderr).toBe(0)
@@ -705,7 +721,7 @@ setInterval(() => {}, 1000)
 describe('the node the plist falls back to', () => {
   /** A Homebrew-like layout: a versioned binary and a stable link to it on PATH. */
   function brew() {
-    const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-node-'))
+    const dir = tempDir(path.join(os.tmpdir(), 'okolos-node-'))
     const versioned = path.join(dir, 'Cellar/node/26.10.0_2/bin/node')
     mkdirSync(path.dirname(versioned), { recursive: true })
     writeFileSync(versioned, '#!/bin/sh\n')
@@ -961,7 +977,7 @@ describe('the installer compares what it installs with HEAD, with real git', () 
 
   /** A clone at a freshly pushed origin/main holding every installed source, and one file that is not installed. */
   function clone() {
-    const base = mkdtempSync(path.join(os.tmpdir(), 'okolos-install-git-'))
+    const base = tempDir(path.join(os.tmpdir(), 'okolos-install-git-'))
     const origin = path.join(base, 'origin.git')
     const repo = path.join(base, 'clone')
     run('init', '--quiet', '--bare', '--initial-branch=main', origin)
@@ -1022,7 +1038,7 @@ describe('where the agent recreates its checkout from', () => {
  */
 describe.skipIf(process.platform === 'win32')('no installer child gets the Cloudflare credential', () => {
   function standIns() {
-    const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-installer-env-'))
+    const dir = tempDir(path.join(os.tmpdir(), 'okolos-installer-env-'))
     const bin = path.join(dir, 'bin')
     const dumps = path.join(dir, 'dumps')
     mkdirSync(bin)
@@ -1038,7 +1054,8 @@ describe.skipIf(process.platform === 'win32')('no installer child gets the Cloud
     mkdirSync(path.join(root, 'tools'), { recursive: true })
     writeFileSync(path.join(root, 'tools/use_secret.py'), `${dump}`)
     // `worktree add` makes the folder, as git would: pnpm install runs in it.
-    script('git', '[ "$3 $4" = "worktree add" ] && /bin/mkdir -p "$6"\nexit 0\n')
+    // The folder is the argument before the last (`… <checkout> origin/main`), whatever the flags.
+    script('git', '[ "$3 $4" = "worktree add" ] && { for a; do p=$q; q=$a; done; /bin/mkdir -p "$p"; }\nexit 0\n')
     script('pnpm')
     script('launchctl')
     script('which', `echo ${path.join(bin, 'project-observatory')}\n`)
@@ -1068,7 +1085,8 @@ describe.skipIf(process.platform === 'win32')('no installer child gets the Cloud
     const seen = filesIn(s.dumps, '.env')
     const by = (name: string) => seen.filter((file) => file.startsWith(`${name}-`)).length
     // Every path ran: checkBranch 5, originUrl 1, ensureCheckout 3, the purge 2.
-    expect(by('git')).toBe(11)
+    // One more than before B-150: the checkout's entry is unlocked before it is pruned.
+    expect(by('git')).toBe(12)
     expect(by('pnpm')).toBe(1)
     // install 3, status 1, uninstall 2.
     expect(by('launchctl')).toBe(6)

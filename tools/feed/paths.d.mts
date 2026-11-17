@@ -15,3 +15,6 @@ export interface FeedPaths {
 }
 
 export function feedPaths(env?: Record<string, string | undefined>, home?: string): FeedPaths
+
+/** The reason the agent's checkout is a locked worktree, so a machine cleanup leaves it (B-150). */
+export const CHECKOUT_LOCK_REASON: string

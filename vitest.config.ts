@@ -15,6 +15,8 @@ export default defineConfig({
     testTimeout: 30_000,
     // The pre-push hook's GIT_DIR must not reach a test's git child (B-160): see the file.
     setupFiles: ['tools/vitest-git-env.ts'],
+    // One temporary folder per run, removed at its end, so tests cannot fill the disk (B-179).
+    globalSetup: ['tools/vitest-tmp.ts'],
     coverage: {
       provider: 'v8',
       include: ['packages/*/src/**/*.ts'],

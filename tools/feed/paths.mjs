@@ -31,3 +31,14 @@ export function feedPaths(env = process.env, home = os.homedir()) {
     bootstrap: path.join(agentBin, 'bootstrap.mjs'),
   }
 }
+
+/**
+ * Why the agent's checkout is a locked worktree (B-150).
+ *
+ * The checkout is a clean, detached worktree of the clone it was installed from, idle between
+ * runs, and a machine cleanup removes exactly that shape: Project Observatory's cleanup takes clean
+ * worktrees idle for a day and skips locked ones (`tools/cleanup.py`, `w.get("locked")`). Twice the
+ * checkout vanished, and the old plist failed every run after it without a word. A lock names the
+ * owner to every tool that reads `git worktree list`.
+ */
+export const CHECKOUT_LOCK_REASON = 'okolos feed agent checkout; removed only by install-feed-agent --purge (B-150)'

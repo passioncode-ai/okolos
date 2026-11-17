@@ -1,13 +1,24 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import { acquireLock } from './feed/lock.mjs'
 import { feedPaths } from './feed/paths.mjs'
 import { readSnapshotPr, snapshotPrFile } from './feed/snapshot-pr.mjs'
 import { readStatus, writeStatus } from './feed/status.mjs'
 import { runJob, signalRecord, STALE_AFTER_MS, sweepLeftovers, WATCHDOG_MS, watchdogFrom } from './feed-job.mjs'
+
+/** Every temporary folder a test makes, removed after it: they piled up by the thousand (B-179). */
+const madeDirs: string[] = []
+function tempDir(prefix: string): string {
+  const dir = mkdtempSync(prefix)
+  madeDirs.push(dir)
+  return dir
+}
+afterEach(() => {
+  for (const dir of madeDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+})
 
 /**
  * The feed agent's run: bounded, exclusive, observable (LC-03), pinned (F2), with
@@ -61,7 +72,7 @@ process.exit(result.status ?? 1)
 `
 
 function world() {
-  const base = mkdtempSync(path.join(os.tmpdir(), 'okolos-job-'))
+  const base = tempDir(path.join(os.tmpdir(), 'okolos-job-'))
   const root = path.join(base, 'repo')
   mkdirSync(path.join(root, 'tools'), { recursive: true })
   mkdirSync(path.join(root, 'apps/proxy/node_modules/.bin'), { recursive: true })
@@ -645,7 +656,7 @@ describe('after a publish the agent proposes the committed snapshot (B-158)', ()
 
 describe('leftovers from older runs are swept at start (LC-12, F8)', () => {
   it('removes the fixed-name temp files and dead runs’ directories, and keeps a live one', () => {
-    const tmp = mkdtempSync(path.join(os.tmpdir(), 'okolos-sweep-'))
+    const tmp = tempDir(path.join(os.tmpdir(), 'okolos-sweep-'))
     writeFileSync(path.join(tmp, 'okolos-feed-signed.json'), '{}')
     writeFileSync(path.join(tmp, 'okolos-feed-publish.sql'), '')
     mkdirSync(path.join(tmp, 'okolos-feed-old'))
