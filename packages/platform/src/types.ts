@@ -84,15 +84,6 @@ export interface Downloads {
    * is left; false when the file could not be deleted or the download is unknown.
    */
   discard(id: number): Promise<boolean>
-  /** One download by id, as `onCreated` reports it plus its state, or null when unknown. */
-  find(id: number): Promise<{
-    id: number
-    url: string
-    finalUrl?: string
-    filename: string
-    mime: string | null
-    state: 'in_progress' | 'interrupted' | 'complete'
-  } | null>
   /** True when this browser exposes the API at all. */
   available(): boolean
 }
@@ -206,7 +197,11 @@ export interface Tabs {
    * tab that has since navigated. The caller decides what to do about that; what
    * it must not do is assume the message landed.
    */
-  sendToActive<T extends RpcType>(type: T, payload: RpcMap[T]['req']): Promise<boolean>
+  /**
+   * The tab that took the message, or null when no page did. The id is how a later request
+   * from a page is matched to the warning it was shown (B-181).
+   */
+  sendToActive<T extends RpcType>(type: T, payload: RpcMap[T]['req']): Promise<number | null>
   /**
    * Delivers to one frame of one tab, addressed rather than guessed.
    *

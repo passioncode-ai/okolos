@@ -36,10 +36,30 @@ export interface DownloadDeps {
    * browser reports (the adapter's `discard`). `true` only when nothing of it is left on disk.
    */
   stop(id: number): Promise<boolean>
-  journal(entry: { explain: string; outcome: string }): Promise<void>
+  /**
+   * One journal line. `whatKey` is a catalogue key resolved when the line is read, so the
+   * reader's language decides; the line used to store the headline code itself, and a person
+   * read "blocked: setup.exe" in their journal.
+   */
+  journal(entry: { whatKey: string; file: string; outcome: string }): Promise<void>
   /** `stopped` is present on a block only: whether the stop is confirmed (B-180, round 9). */
   announce(verdict: DownloadVerdict, item: DownloadItem, outcome?: { stopped: boolean }): Promise<void>
 }
+
+/**
+ * Headline codes to the catalogue's sentences, for the journal line. A `*_KEY` table, the form
+ * the locale gate reads; the content script keeps its own for the warning it draws.
+ */
+export const DOWNLOAD_HEADLINE_KEY: Record<DownloadVerdict['headline'], string> = {
+  blocked: 'downloadHeadlineBlocked',
+  unchecked: 'downloadHeadlineUnchecked',
+  'needs-a-look': 'downloadHeadlineNeedsLook',
+  'passed-all': 'downloadHeadlinePassedAll',
+  'passed-what-ran': 'downloadHeadlinePassedWhatRan',
+}
+
+/** The journal's sentence for a block the browser outran (B-202); a table, for the locale gate. */
+const JOURNAL_DOWNLOAD_KEY = { leftOnDisk: 'journalDownloadLeftOnDisk' } as const
 
 /**
  * The verdict on one download, from its addresses, name, type and the feed. Pure: the same
@@ -121,10 +141,14 @@ export async function handleDownload(
     verdict = item === created ? byAddress : judgeItem(item, feed)
   }
 
+  // A block the browser outran is its own outcome: the file may be on the disk, and the line
+  // says so even when no page was open to show the warning (B-202).
+  const leftOnDisk = outcome !== undefined && !outcome.stopped
   await deps
     .journal({
-      explain: `${verdict.headline}: ${item.filename || item.url}`,
-      outcome: verdict.action,
+      whatKey: leftOnDisk ? JOURNAL_DOWNLOAD_KEY.leftOnDisk : DOWNLOAD_HEADLINE_KEY[verdict.headline],
+      file: item.filename || item.url,
+      outcome: leftOnDisk ? 'block-left-on-disk' : verdict.action,
     })
     .catch(() => undefined)
 
@@ -142,12 +166,50 @@ export async function handleDownload(
  */
 export async function discardDownload(
   payload: unknown,
-  from: { frameId?: number },
+  from: { frameId?: number; tabId?: number },
   discard: (id: number) => Promise<boolean>,
+  warnedTab: (id: number) => Promise<number | undefined>,
 ): Promise<{ ok: boolean }> {
   const downloadId = (payload as { downloadId?: unknown } | null)?.downloadId
   if (from.frameId !== 0 || typeof downloadId !== 'number' || !Number.isInteger(downloadId)) {
     return { ok: false }
   }
+  /**
+   * Only the tab the warning was shown in (B-181). Any top frame used to be able to name any
+   * download id and have its file deleted; the id is a small counter, so a content script of
+   * another tab could reach a file the person never saw a warning about.
+   */
+  const shownIn = await warnedTab(downloadId).catch(() => undefined)
+  if (shownIn === undefined || from.tabId !== shownIn) return { ok: false }
   return { ok: await discard(downloadId).catch(() => false) }
+}
+
+/** How many warned downloads are remembered: enough for any session, bounded for storage. */
+export const WARNED_DOWNLOADS_MAX = 50
+
+/** Download id and the tab its warning went to. */
+export type WarnedTabs = ReadonlyArray<readonly [number, number]>
+
+/**
+ * The record of which tab each download warning went to, newest last, bounded. Kept in the
+ * extension's storage rather than memory, because the worker sleeps after half a minute and a
+ * person may press "Delete file" later than that. A list of pairs, not an object: an object
+ * orders integer keys by value, not by when they were written.
+ */
+export function rememberWarnedTab(
+  record: WarnedTabs | undefined,
+  downloadId: number,
+  tabId: number,
+): Array<[number, number]> {
+  const kept: Array<[number, number]> = (Array.isArray(record) ? record : [])
+    .filter((pair) => pair[0] !== downloadId)
+    .map((pair) => [pair[0], pair[1]])
+  kept.push([downloadId, tabId])
+  return kept.slice(-WARNED_DOWNLOADS_MAX)
+}
+
+/** The tab the warning for this download went to, if it is still remembered. */
+export function warnedTabOf(record: WarnedTabs | undefined, downloadId: number): number | undefined {
+  if (!Array.isArray(record)) return undefined
+  return record.find((pair) => pair[0] === downloadId)?.[1]
 }

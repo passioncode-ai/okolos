@@ -2470,6 +2470,23 @@
       }
     }
   },
+  "journalDownload": {
+    "message": "$WHAT$ («$FILE$»)",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      },
+      "file": {
+        "content": "$2"
+      }
+    }
+  },
+  "journalDownloadLeftOnDisk": {
+    "message": "Остановить опасную загрузку вовремя не удалось, файл мог остаться на диске"
+  },
+  "journalDownloadUnseen": {
+    "message": "Предупреждение о загрузке не показано: открытой страницы не было"
+  },
   "mailHeader": {
     "message": "От $WHO$ <$ADDRESS$> — «$SUBJECT$» — $DATE$",
     "placeholders": {

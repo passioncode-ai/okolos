@@ -208,6 +208,15 @@ describe('the shapes this list is a claim about', () => {
     }
   })
 
+  it('recognises the Windows types the N-107 review named (B-181)', () => {
+    // A theme and a theme pack that point the desktop at a remote file, an Internet
+    // Explorer pinned site, an XAML browser application, a PowerShell module, a OneNote
+    // table of contents and a WMI script that compiles and runs on import.
+    for (const ext of ['theme', 'themepack', 'website', 'xbap', 'psm1', 'onetoc2', 'mof']) {
+      expect(named(`invoice.${ext}`).shape.map((entry) => entry.code), ext).toContain('is-a-program')
+    }
+  })
+
   it('reads the type past a trailing dot or space, which Windows drops', () => {
     // Windows strips trailing dots and spaces from a name and runs the file by the
     // extension that is left; a list anchored at the very end missed all three.

@@ -169,16 +169,39 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
    */
   let insideHeldClick = false
 
+  /**
+   * True while any click on the page is being dispatched (B-191).
+   *
+   * The fake CAPTCHA does not need a link: its "I am not a robot" button runs
+   * `execCommand('copy')` in its click handler, Chromium sends that copy as trusted, and it
+   * read as the person's own. A person copies with keys or a menu, never with a left click,
+   * so a copy that arrives inside a click is the page's. Set in the capture phase, before the
+   * page's handlers, and cleared by a task for the same reason as `insideHeldClick`.
+   */
+  let insidePageClick = false
+
+  const onPageClick = () => {
+    if (insidePageClick) return
+    insidePageClick = true
+    setTimeout(() => {
+      insidePageClick = false
+    }, 0)
+  }
+
   const onCopy = (event: Event) => {
-    if (event.isTrusted && !insideHeldClick) {
+    if (event.isTrusted && !insideHeldClick && !insidePageClick) {
       deps.judged?.()
       return
     }
     scriptedCopy = true
     try {
-      // An execCommand copy carries no data of its own yet: empty is unreadable, and
-      // the warning says so rather than showing an empty box.
-      copied = (event as ClipboardEvent).clipboardData?.getData('text/plain') || null
+      // An execCommand copy carries no data of its own yet: what it copies is the
+      // selection the page made, often in a hidden field. Empty is unreadable, and the
+      // warning says so rather than showing an empty box.
+      copied =
+        (event as ClipboardEvent).clipboardData?.getData('text/plain') ||
+        selectedText(deps.doc) ||
+        null
     } catch {
       // Reading the clipboard through the event is best-effort. The warning
       // stands on the write itself; it just cannot show the payload.
@@ -445,6 +468,7 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
   for (const type of ['pointerdown', 'keydown']) {
     deps.doc.addEventListener(type, gesture, true)
   }
+  deps.doc.addEventListener('click', onPageClick, true)
   deps.doc.addEventListener('copy', onCopy, true)
   deps.doc.addEventListener('fullscreenchange', onFullscreen, true)
   deps.doc.addEventListener('click', onLinkClick, true)
@@ -462,6 +486,7 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
       for (const type of ['pointerdown', 'keydown']) {
         deps.doc.removeEventListener(type, gesture, true)
       }
+      deps.doc.removeEventListener('click', onPageClick, true)
       deps.doc.removeEventListener('copy', onCopy, true)
       deps.doc.removeEventListener('fullscreenchange', onFullscreen, true)
       deps.doc.removeEventListener('click', onLinkClick, true)
@@ -583,4 +608,18 @@ function linkAddress(element: Element): string | null {
   } catch {
     return raw
   }
+}
+
+/**
+ * What an `execCommand('copy')` copies: the selection in a focused text field, where pages
+ * put the command, or else the document's selection. Bounded, like every payload shown.
+ */
+function selectedText(doc: Document): string {
+  const active = doc.activeElement
+  if (active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement) {
+    const start = active.selectionStart ?? 0
+    const end = active.selectionEnd ?? 0
+    if (end > start) return active.value.slice(start, end).slice(0, 2000)
+  }
+  return (doc.defaultView?.getSelection()?.toString() ?? '').slice(0, 2000)
 }
