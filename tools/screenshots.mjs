@@ -21,7 +21,9 @@ import { SURFACES, surfacesDigest } from './surfaces.mjs'
 import { filesIn } from './tree.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
-const BUILD = path.join(root, 'apps/extension/dist/chrome')
+// The store-shots build (`tools/build.mjs --store-shots`): what the store build shows, with no key
+// (B-209). Removed at the end, so no unpacked build that says it sends is left behind.
+const BUILD = path.join(root, 'apps/extension/dist/chrome-shots')
 
 /**
  * A copy of the build with the English catalogue removed.
@@ -316,6 +318,10 @@ writeFileSync(
   )}\n`,
 )
 console.log('   taken-at.json')
+
+for (const target of ['chrome', 'firefox']) {
+  rmSync(path.join(root, `apps/extension/dist/${target}-shots`), { recursive: true, force: true })
+}
 
 if (untranslated.length > 0) {
   console.error(

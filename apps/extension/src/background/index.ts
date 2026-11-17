@@ -5,6 +5,7 @@ import { detectPlatform, type RpcSender } from '@okolos/platform'
 import { buildRules, matchUrl, type FeedSnapshot,
 } from '@okolos/core-feeds'
 import {
+  FEED_INTERVAL_MS,
   INVENTORY_INTERVAL_MS,
   LAST_FEED_KEY,
   LAST_INVENTORY_KEY,
@@ -37,7 +38,7 @@ import {
 } from './extensions.js'
 import { CAVALIER, hibpFromStore, lookupLeaks } from './leaks.js'
 import { checkSubmittedPassword } from './password.js'
-import { ensureRules, runIfDue, WAKE_ALARMS, type DueStore } from './wake.js'
+import { ensureRules, runIfDue, USAGE_FLUSH_KEY, WAKE_ALARMS, type DueStore } from './wake.js'
 
 /**
  * The background context holds no state between wake-ups.
@@ -1265,6 +1266,14 @@ async function settingsDueStore(): Promise<DueStore> {
  * was reset by every wake-up before it could fire, and the review itself ran at the
  * top of this file on every wake (LC-08).
  */
+async function flushIfDue(): Promise<void> {
+  try {
+    await runIfDue(await settingsDueStore(), USAGE_FLUSH_KEY, FEED_INTERVAL_MS, Date.now(), () => usage.flush())
+  } catch (cause) {
+    console.warn('okolos: could not decide whether usage events are owed', cause)
+  }
+}
+
 async function reviewIfDue(): Promise<void> {
   try {
     await runIfDue(await settingsDueStore(), LAST_INVENTORY_KEY, INVENTORY_INTERVAL_MS, Date.now(), reviewExtensions)
@@ -1410,6 +1419,7 @@ async function pullFeed(): Promise<void> {
  * page, so an unconditional pull at start *is* a pull per page.
  */
 void pullFeed()
+void flushIfDue()
 void platform.alarms.create(FEED_ALARM, FEED.periodInMinutes)
 
 void sweepIfDue()
@@ -1417,9 +1427,9 @@ void platform.alarms.create(RETENTION_ALARM, RETENTION.periodInMinutes)
 platform.alarms.onFired((name) => {
   if (name === FEED_ALARM) {
     void pullFeed()
-    // Usage events ride the feed's alarm rather than a fourth one: at most four sends a day,
-    // and the wake budget in wake.ts stays as it is. Events live 24 hours in the queue.
-    void usage.flush()
+    // Usage events ride the feed's alarm rather than a fourth one, owed by their own timestamp
+    // as at worker start: at most four sends a day (B-205, B-211). Events live 24 hours.
+    void flushIfDue()
     return
   }
   if (name === INVENTORY_ALARM) {

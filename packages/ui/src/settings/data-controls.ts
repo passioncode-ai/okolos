@@ -60,7 +60,7 @@ export const LEAK_KEY_MAX = 256
  * the page asks it from the click (`onSwitch` runs inside the change event).
  */
 export interface UsagePanel {
-  readonly state: 'on' | 'off' | 'unsupported'
+  readonly state: 'on' | 'off' | 'unsupported' | 'not-sent'
   readonly firefox: boolean
   /** The last change did not save; the switch shows what is stored. */
   readonly failed?: boolean
@@ -356,7 +356,7 @@ function renderUsage(doc: Document, panel: UsagePanel): HTMLElement {
   box.type = 'checkbox'
   box.setAttribute('data-role', 'usage-switch')
   box.checked = panel.state === 'on'
-  box.disabled = panel.state === 'unsupported'
+  box.disabled = panel.state === 'unsupported' || panel.state === 'not-sent'
   box.addEventListener('change', () => panel.onSwitch(box.checked))
   const caption = doc.createElement('span')
   caption.textContent = t('usageSwitch')
@@ -365,6 +365,7 @@ function renderUsage(doc: Document, panel: UsagePanel): HTMLElement {
   block.append(heading, text(doc, 'usage-what', t('usageWhat')), label)
   if (panel.state === 'off') block.append(text(doc, 'usage-state', t('usageOff')))
   if (panel.state === 'unsupported') block.append(text(doc, 'usage-state', t('usageFirefoxOld')))
+  else if (panel.state === 'not-sent') block.append(text(doc, 'usage-state', t('usageNotSent')))
   else if (panel.firefox) block.append(text(doc, 'usage-firefox', t('usageFirefox')))
   if (panel.failed) block.append(text(doc, 'usage-failed', t('usageSaveFailed')))
   // Only while collection is on: off and unsupported keep no install number to replace (B-215).

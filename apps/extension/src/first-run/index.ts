@@ -83,14 +83,28 @@ async function checks(): Promise<{ rows: CheckRow[]; findings: number }> {
   return { rows, findings }
 }
 
-/** What the worker says about usage and error data; anything else reads as off (no notice). */
-async function usageState(): Promise<'on' | 'off' | 'unsupported'> {
-  try {
-    return (await platform.runtime.send('usage/state', {})).state
-  } catch {
-    return 'off'
+/**
+ * What the worker says about usage and error data.
+ *
+ * Asked again rather than read as off (B-209): a worker that did not answer the first time hid
+ * the notice in a build where collection was on, and the first run is the one moment the notice
+ * is owed. Three tries a second apart; after them the notice is shown, because saying too much
+ * about sending is the side a first run can afford, and a build that sends nothing answers at
+ * once with `not-sent`.
+ */
+async function usageState(): Promise<'on' | 'off' | 'unsupported' | 'not-sent'> {
+  for (let attempt = 0; attempt < USAGE_STATE_TRIES; attempt += 1) {
+    try {
+      return (await platform.runtime.send('usage/state', {})).state
+    } catch {
+      if (attempt < USAGE_STATE_TRIES - 1) await new Promise((resolve) => setTimeout(resolve, USAGE_STATE_RETRY_MS))
+    }
   }
+  return 'on'
 }
+
+const USAGE_STATE_TRIES = 3
+const USAGE_STATE_RETRY_MS = 1_000
 
 async function paint(): Promise<void> {
   if (!root) return

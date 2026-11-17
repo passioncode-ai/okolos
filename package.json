@@ -33,7 +33,7 @@
     "prepare": "git config core.hooksPath .githooks || exit 0",
     "package": "node tools/package.mjs",
     "package:check": "node tools/package.mjs --check",
-    "screenshots": "pnpm build && node tools/screenshots.mjs",
+    "screenshots": "node tools/build.mjs --store-shots && node tools/screenshots.mjs",
     "access:list": "node tools/access.mjs",
     "access:check": "node tools/access.mjs --check",
     "i18n:sweep": "node tools/i18n-sweep.mjs",

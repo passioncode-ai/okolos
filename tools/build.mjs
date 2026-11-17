@@ -31,6 +31,12 @@ const targets = ['chrome', 'firefox']
  * gate asserts that.
  */
 const withTestHooks = process.argv.includes('--with-test-hooks')
+/**
+ * The build the store screenshots are taken from (`pnpm screenshots`): closed shadow roots and no
+ * key, like `dist/<target>`, but the usage notice and switch as the store build shows them
+ * (B-209). Written to `dist/<target>-shots`, which the screenshot tool removes when it is done.
+ */
+const forStoreShots = process.argv.includes('--store-shots')
 
 const shared = {
   configFile: false,
@@ -50,12 +56,15 @@ const shared = {
       // shell that happens to hold the key builds without it.
       appKey: withTestHooks || process.env.OKOLOS_USAGE_ENV !== 'production' ? null : (process.env.APTABASE_APP_KEY_OKOLOS || null),
       environment: !withTestHooks && process.env.OKOLOS_USAGE_ENV === 'production' ? 'production' : 'sandbox',
+      // The test build shows the switch and the notice as the store build does, with no key to
+      // send with (B-209); every other keyless build says it sends nothing.
+      asIfSending: withTestHooks || forStoreShots,
     }),
   },
 }
 
 for (const target of targets) {
-  const outDir = path.join(app, 'dist', withTestHooks ? `${target}-e2e` : target)
+  const outDir = path.join(app, 'dist', withTestHooks ? `${target}-e2e` : forStoreShots ? `${target}-shots` : target)
   await rm(outDir, { recursive: true, force: true })
   await mkdir(outDir, { recursive: true })
 

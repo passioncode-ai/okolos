@@ -1,10 +1,11 @@
-import { expect, test } from './fixtures.js'
+import { expect, test } from './hooks.js'
 
 /**
  * SCN-050 and SCN-051 — usage and error data (B-199), in Chromium, on the built extension.
  *
- * The test build carries no App-Key, so nothing is sent from here; what is checked is what a
- * person sees and does: the notice on the first run, its way to the switch, and the switch
+ * The test build (`hooks.js`, `dist/chrome-e2e`) carries no App-Key and behaves as the store
+ * build (`asIfSending`, B-209), so nothing is sent from here; what is checked is what a person
+ * sees and does: the notice on the first run, its way to the switch, and the switch
  * turning collection off and on again, each answered by the worker and repainted from it.
  */
 

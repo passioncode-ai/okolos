@@ -43,6 +43,15 @@ export function memoryDueStore(): DueStore {
  * something is already wrong. The work's own failure is caught and reported here so
  * one broken job cannot stop the others a wake-up starts.
  */
+/**
+ * Usage events are sent on the feed's cadence, owed by a timestamp like the feed (B-205, B-211).
+ *
+ * They rode the feed's alarm alone: a Firefox that does not keep alarms across restarts sent
+ * nothing from a session shorter than six hours, and an alarm caught up off its grid could send a
+ * fifth time in a day. At worker start and on the alarm, each at most once per interval.
+ */
+export const USAGE_FLUSH_KEY = 'usage:lastFlushedAt'
+
 export async function runIfDue(
   store: DueStore,
   key: string,

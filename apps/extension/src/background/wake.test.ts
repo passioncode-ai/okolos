@@ -3,7 +3,7 @@ import { createPlatform } from '@okolos/platform'
 import type { WebExtensionApi } from '@okolos/platform'
 import { FEED_INTERVAL_MS, INVENTORY_INTERVAL_MS, SWEEP_INTERVAL_MS } from '@okolos/storage'
 
-import { ensureRules, memoryDueStore, runIfDue, WAKE_ALARMS } from './wake.js'
+import { ensureRules, memoryDueStore, runIfDue, USAGE_FLUSH_KEY, WAKE_ALARMS } from './wake.js'
 
 /**
  * What a service-worker wake-up costs (LC-08: idle means idle).
@@ -64,12 +64,13 @@ async function wake(
   platform: ReturnType<typeof createPlatform>,
   store: ReturnType<typeof memoryDueStore>,
   now: number,
-  work: { feed: () => Promise<void>; sweep: () => Promise<void>; review: () => Promise<void> },
+  work: { feed: () => Promise<void>; sweep: () => Promise<void>; review: () => Promise<void>; flush?: () => Promise<void> },
 ): Promise<void> {
   await Promise.all([
     runIfDue(store, 'feed:lastAttemptedAt', FEED_INTERVAL_MS, now, work.feed),
     runIfDue(store, 'retention:lastSweptAt', SWEEP_INTERVAL_MS, now, work.sweep),
     runIfDue(store, 'inventory:lastReviewedAt', INVENTORY_INTERVAL_MS, now, work.review),
+    runIfDue(store, USAGE_FLUSH_KEY, FEED_INTERVAL_MS, now, work.flush ?? (async () => undefined)),
     ...WAKE_ALARMS.map((alarm) => platform.alarms.create(alarm.name, alarm.periodInMinutes)),
   ])
 }
@@ -81,6 +82,7 @@ describe('a day of wake-ups on a fake clock', () => {
     const store = memoryDueStore()
     let feeds = 0
     let sweeps = 0
+    let flushes = 0
     const review = async () => {
       await (chrome.api.management as { getAll(): Promise<unknown> }).getAll()
     }
@@ -91,6 +93,7 @@ describe('a day of wake-ups on a fake clock', () => {
         feed: async () => void (feeds += 1),
         sweep: async () => void (sweeps += 1),
         review,
+        flush: async () => void (flushes += 1),
       })
     }
 
@@ -98,6 +101,7 @@ describe('a day of wake-ups on a fake clock', () => {
     expect(chrome.calls.managementGetAll, 'the inventory is a daily review').toBe(1)
     expect(feeds, 'a feed pull every six hours').toBe(4)
     expect(sweeps, 'a retention sweep every twelve hours').toBe(2)
+    expect(flushes, 'usage events sent at worker start and then every six hours, never more (B-205, B-211)').toBe(4)
     expect(chrome.calls.dnrUpdate, 'no wake-up rebuilds the rules').toBe(0)
   })
 })
