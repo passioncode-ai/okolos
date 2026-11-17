@@ -308,6 +308,11 @@ export interface RpcMap {
    * the journal keeps the stopped click and `warning_shown` does not count it (B-210); absent from
    * an older content script, which is read as shown.
    */
+  /**
+   * A warning went up on screen: the surface's kind, or `blocked-page` from the block page. The
+   * worker counts it as `warning_shown` when the kind maps to the catalogue (B-206); no page.
+   */
+  'warning/shown': { req: { kind: string }; res: { ok: true } }
   'trap/warned': { req: { kind: string; signals: string; shown?: boolean }; res: { ok: true } }
   /**
    * A state-changing request the page made while a finding on it was

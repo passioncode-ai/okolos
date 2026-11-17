@@ -73,7 +73,7 @@ import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 
 import { recordPageRequest } from './page-requests.js'
 import { recordTrap } from './trap-journal.js'
-import { downloadWarningShown, leakCheckResult, passwordCheckResult, trapWarning } from './usage/catalogue.js'
+import { downloadWarningShown, leakCheckResult, passwordCheckResult, surfaceWarning, trapWarning } from './usage/catalogue.js'
 import { startUsage } from './usage/start.js'
 import { optionsPageFor } from '../options/views.js'
 
@@ -186,6 +186,8 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
       ) as Promise<RpcMap[T]['res']>
     case 'trap/warned':
       return journalTrap(message.payload as { kind: string; signals: string; shown?: boolean }) as Promise<RpcMap[T]['res']>
+    case 'warning/shown':
+      return countShownWarning(message.payload as { kind: string }) as Promise<RpcMap[T]['res']>
     case 'recovery/open':
       return openRecovery(message.payload as { kind: string }) as Promise<RpcMap[T]['res']>
     case 'password/change':
@@ -329,6 +331,10 @@ async function handleGateDecision(decision: GateDecision): Promise<{ ok: true }>
 platform.runtime.onInstalled(() => {
   void platform.tabs.create(platform.runtime.getUrl('first-run.html'))
   void usage.track('extension_installed', { reason: 'install' })
+})
+// The catalogue's other value, sent by nobody until B-206: a store update of this extension.
+platform.runtime.onUpdated(() => {
+  void usage.track('extension_installed', { reason: 'update' })
 })
 
 /**
@@ -1017,6 +1023,13 @@ async function journalTrap(payload: { kind: string; signals: string; shown?: boo
   // Counted when it was shown, not when it was journalled: a link clicked under a ClickFix
   // warning is stopped and recorded, and its own warning never appears (B-210).
   if (kind !== null && payload.shown !== false) void usage.track('warning_shown', { kind })
+  return { ok: true }
+}
+
+async function countShownWarning(payload: { kind: string }): Promise<{ ok: true }> {
+  // The kind only, mapped to the catalogue's value; an unmapped kind is not counted (B-206).
+  const kind = surfaceWarning(String(payload?.kind ?? ''))
+  if (kind !== null) void usage.track('warning_shown', { kind })
   return { ok: true }
 }
 

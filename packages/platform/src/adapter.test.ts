@@ -177,6 +177,19 @@ describe('install-time wiring goes through the adapter too', () => {
     expect(onInstall).toHaveBeenCalledOnce()
   })
 
+  it('fires onUpdated only on an update of this extension (B-206)', () => {
+    const listeners: Array<(d: { reason: string }) => void> = []
+    const api = fakeApi({ runtime: { onInstalled: { addListener: (cb) => void listeners.push(cb) } } })
+    const platform = createPlatform('chrome', api)
+    const onUpdate = vi.fn()
+    platform.runtime.onUpdated(onUpdate)
+    listeners[0]?.({ reason: 'install' })
+    listeners[0]?.({ reason: 'chrome_update' })
+    expect(onUpdate).not.toHaveBeenCalled()
+    listeners[0]?.({ reason: 'update' })
+    expect(onUpdate).toHaveBeenCalledOnce()
+  })
+
   it('resolves a packaged file to an extension url', () => {
     const platform = createPlatform('chrome', fakeApi())
     expect(platform.runtime.getUrl('first-run.html')).toBe('chrome-extension://test/first-run.html')

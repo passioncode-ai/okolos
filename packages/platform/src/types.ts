@@ -146,6 +146,8 @@ export interface Runtime {
   onMessage(handler: RpcHandler): void
   /** Fires once, on a fresh install — not on updates or browser restarts. */
   onInstalled(handler: () => void): void
+  /** Fires when this extension was updated to a new version; not on install or browser restart. */
+  onUpdated(handler: () => void): void
   /** Fires on browser start and on every install reason (install, update, browser update). */
   onBrowserStart(handler: () => void): void
   /** Absolute URL of a file inside the extension package. */

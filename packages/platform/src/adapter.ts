@@ -190,6 +190,12 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
         })
       },
 
+      onUpdated(handler: () => void): void {
+        api.runtime.onInstalled.addListener((details) => {
+          if (details.reason === 'update') handler()
+        })
+      },
+
       onBrowserStart(handler: () => void): void {
         // Browser start, install, update and browser update: the only moments the
         // installed rules can differ from what the stored feed says. A plain worker
