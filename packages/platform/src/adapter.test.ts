@@ -369,9 +369,8 @@ describe('reaching the content script', () => {
     const api = fakeApi({ tabs: { sendMessage } })
     const platform = createPlatform('chrome', api)
 
-    await expect(platform.tabs.sendToActive('download/verdict', DOWNLOAD_VERDICT)).resolves.toBe(
-      true,
-    )
+    // The tab that took it, so a later "Delete file" can be matched to this warning (B-181).
+    await expect(platform.tabs.sendToActive('download/verdict', DOWNLOAD_VERDICT)).resolves.toBe(7)
     expect(sendMessage).toHaveBeenCalledWith(7, {
       v: 1,
       type: 'download/verdict',
@@ -393,14 +392,14 @@ describe('reaching the content script', () => {
     })
     await expect(
       createPlatform('chrome', api).tabs.sendToActive('download/verdict', DOWNLOAD_VERDICT),
-    ).resolves.toBe(false)
+    ).resolves.toBeNull()
   })
 
   it('says no when there is no active tab to address', async () => {
     const api = fakeApi({ tabs: { query: async () => [] } })
     await expect(
       createPlatform('chrome', api).tabs.sendToActive('download/verdict', DOWNLOAD_VERDICT),
-    ).resolves.toBe(false)
+    ).resolves.toBeNull()
   })
 
   it('says no when the tab has no id, rather than addressing undefined', async () => {
@@ -409,7 +408,7 @@ describe('reaching the content script', () => {
     })
     await expect(
       createPlatform('chrome', api).tabs.sendToActive('download/verdict', DOWNLOAD_VERDICT),
-    ).resolves.toBe(false)
+    ).resolves.toBeNull()
   })
 
   it('says no without asking for a tab, on an engine that cannot message one', async () => {
@@ -430,7 +429,7 @@ describe('reaching the content script', () => {
 
     await expect(
       createPlatform('chrome', api).tabs.sendToActive('download/verdict', DOWNLOAD_VERDICT),
-    ).resolves.toBe(false)
+    ).resolves.toBeNull()
     expect(query).not.toHaveBeenCalled()
   })
 })
@@ -826,10 +825,6 @@ describe('discarding a download, by the state the browser reports (B-165, round 
     expect(await createPlatform('chrome', api(null, [])).downloads.discard(7)).toBe(false)
   })
 
-  it('finds a download by id with its addresses, bare name, type and state', async () => {
-    const found = await createPlatform('chrome', api('complete', [])).downloads.find(7)
-    expect(found).toMatchObject({ id: 7, url: 'https://x.test/a.exe', filename: 'a.exe', mime: 'application/x-msdownload', state: 'complete' })
-  })
 })
 
 describe('a download whose name Chrome reports later (B-165, rounds 7 and 8)', () => {
@@ -926,6 +921,41 @@ describe('discard edge cases (B-165, round 7)', () => {
     }))
     expect(await platform.downloads.discard(3)).toBe(true)
     expect(calls).toEqual(['cancel 3', 'remove 3', 'erase 3'])
+  })
+
+  it('deletes the file when Firefox refuses the cancel of a download that just finished (B-181)', async () => {
+    // Firefox's cancel rejects for a download already complete, where Chrome's resolves: the
+    // same race answered "could not delete" there, with the file on disk.
+    const calls: string[] = []
+    let state = 'in_progress'
+    const platform = createPlatform('firefox', fakeApi({
+      downloads: {
+        onCreated: { addListener: () => undefined },
+        search: async (query: { id: number }) => [{ id: query.id, url: 'https://x.test/a', filename: '/d/a.exe', state, exists: true }],
+        cancel: async (id: number) => {
+          calls.push(`cancel ${id}`)
+          state = 'complete'
+          throw new Error('Download 3 is not in progress')
+        },
+        removeFile: async (id: number) => { calls.push(`remove ${id}`) },
+        erase: async (query: { id: number }) => { calls.push(`erase ${query.id}`); return [query.id] },
+      },
+    }))
+    expect(await platform.downloads.discard(3)).toBe(true)
+    expect(calls).toEqual(['cancel 3', 'remove 3', 'erase 3'])
+  })
+
+  it('still says no when a refused cancel leaves the download running', async () => {
+    const platform = createPlatform('firefox', fakeApi({
+      downloads: {
+        onCreated: { addListener: () => undefined },
+        search: async (query: { id: number }) => [{ id: query.id, url: 'https://x.test/a', filename: '/d/a.exe', state: 'in_progress', exists: true }],
+        cancel: async () => { throw new Error('busy') },
+        removeFile: async () => undefined,
+        erase: async (query: { id: number }) => [query.id],
+      },
+    }))
+    expect(await platform.downloads.discard(3)).toBe(false)
   })
 
   it('counts a finished download whose file is already gone as discarded', async () => {

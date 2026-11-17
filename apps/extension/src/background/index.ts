@@ -25,7 +25,10 @@ import type {
   Verdict,
 } from '@okolos/contracts'
 
-import { discardDownload, handleDownload } from './downloads.js'
+import { discardDownload, handleDownload, rememberWarnedTab, warnedTabOf, type WarnedTabs } from './downloads.js'
+
+/** `storage.local` key: download id to the tab its warning went to (B-181). */
+const WARNED_TABS_KEY = 'downloads:warnedTabs'
 import {
   acceptInventoryChange,
   compareInventory,
@@ -145,9 +148,12 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
     case 'password/shown':
       return forgetHeldVerdict(from) as Promise<RpcMap[T]['res']>
     case 'download/discard':
-      return discardDownload(message.payload, from, (id) => platform.downloads.discard(id)) as Promise<
-        RpcMap[T]['res']
-      >
+      return discardDownload(
+        message.payload,
+        from,
+        (id) => platform.downloads.discard(id),
+        async (id) => warnedTabOf(await platform.storage.get<WarnedTabs>(WARNED_TABS_KEY), id),
+      ) as Promise<RpcMap[T]['res']>
     case 'usage/state':
       return usage.state().then((state) => ({ state })) as Promise<RpcMap[T]['res']>
     case 'usage/set':
@@ -1145,8 +1151,11 @@ platform.downloads.onCreated((item, named) => {
       await db.put('journal', {
         id: `download:${item.id}:${now}`,
         createdAt: now,
-        kind: entry.outcome === 'block' ? 'verdict' : 'action',
-        detail: { explain: entry.explain, outcome: entry.outcome },
+        kind: entry.outcome.startsWith('block') ? 'verdict' : 'action',
+        detail: {
+          ...explained('journalDownload', [{ messageKey: entry.whatKey }, entry.file]),
+          outcome: entry.outcome,
+        },
       })
     },
     announce: async (verdict, _item, outcome) => {
@@ -1167,7 +1176,7 @@ platform.downloads.onCreated((item, named) => {
        * cases. `false` says so; it does not throw, because a handler deciding
        * whether to cancel a download has no use for an exception about a banner.
        */
-      const told = await platform.tabs
+      const toldTab = await platform.tabs
         .sendToActive('download/verdict', {
           action: verdict.action,
           // Codes, not sentences: the words are the content script's, which has the
@@ -1179,7 +1188,15 @@ platform.downloads.onCreated((item, named) => {
           downloadId: item.id,
           ...(outcome ? { stopped: outcome.stopped } : {}),
         })
-        .catch(() => false)
+        .catch(() => null)
+      const told = toldTab !== null
+      if (told) {
+        // Which tab may ask to delete this file (B-181).
+        await platform.storage
+          .get<WarnedTabs>(WARNED_TABS_KEY)
+          .then((record) => platform.storage.set(WARNED_TABS_KEY, rememberWarnedTab(record, item.id, toldTab)))
+          .catch(() => undefined)
+      }
 
       // Counted once a page has the warning, not when it was decided (`downloadWarningShown`).
       if (downloadWarningShown(verdict.action, told)) void usage.track('warning_shown', { kind: 'download' })
@@ -1195,7 +1212,13 @@ platform.downloads.onCreated((item, named) => {
             id: `download-unseen:${item.id}:${now}`,
             createdAt: now,
             kind: 'action',
-            detail: { explain: verdict.headline, outcome: 'unseen' },
+            detail: {
+              ...explained('journalDownload', [
+                { messageKey: 'journalDownloadUnseen' },
+                item.filename || item.url,
+              ]),
+              outcome: 'unseen',
+            },
           })
         } catch (cause) {
           console.warn('okolos: could not journal an unseen download verdict', cause)

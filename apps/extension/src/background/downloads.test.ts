@@ -1,7 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { FeedSnapshot } from '@okolos/core-feeds'
 
-import { discardDownload, handleDownload, type DownloadDeps, type DownloadItem } from './downloads.js'
+import {
+  discardDownload,
+  handleDownload,
+  rememberWarnedTab,
+  WARNED_DOWNLOADS_MAX,
+  warnedTabOf,
+  type DownloadDeps,
+  type DownloadItem,
+} from './downloads.js'
 
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -172,13 +180,21 @@ describe('a redirect, which is how a malicious file is usually served', () => {
 })
 
 
-describe('discardDownload (B-165, round 7)', () => {
+describe('discardDownload (B-165, round 7; B-181)', () => {
+  /** The warning for download 7 was shown in tab 3. */
+  const shown = async (id: number) => (id === 7 ? 3 : undefined)
+
   it('deletes the download the top frame names, without judging it again', async () => {
     const asked: number[] = []
-    const result = await discardDownload({ downloadId: 7 }, { frameId: 0 }, async (id) => {
-      asked.push(id)
-      return true
-    })
+    const result = await discardDownload(
+      { downloadId: 7 },
+      { frameId: 0, tabId: 3 },
+      async (id) => {
+        asked.push(id)
+        return true
+      },
+      shown,
+    )
     expect(result).toEqual({ ok: true })
     expect(asked).toEqual([7])
   })
@@ -189,21 +205,69 @@ describe('discardDownload (B-165, round 7)', () => {
       asked.push(id)
       return true
     }
-    expect(await discardDownload({ downloadId: 7 }, { frameId: 3 }, discard)).toEqual({ ok: false })
-    expect(await discardDownload({ downloadId: 7 }, {}, discard)).toEqual({ ok: false })
-    expect(await discardDownload({ downloadId: '7' }, { frameId: 0 }, discard)).toEqual({ ok: false })
-    expect(await discardDownload({ downloadId: 1.5 }, { frameId: 0 }, discard)).toEqual({ ok: false })
-    expect(await discardDownload(null, { frameId: 0 }, discard)).toEqual({ ok: false })
+    expect(await discardDownload({ downloadId: 7 }, { frameId: 3, tabId: 3 }, discard, shown)).toEqual({ ok: false })
+    expect(await discardDownload({ downloadId: 7 }, {}, discard, shown)).toEqual({ ok: false })
+    expect(await discardDownload({ downloadId: '7' }, { frameId: 0, tabId: 3 }, discard, shown)).toEqual({ ok: false })
+    expect(await discardDownload({ downloadId: 1.5 }, { frameId: 0, tabId: 3 }, discard, shown)).toEqual({ ok: false })
+    expect(await discardDownload(null, { frameId: 0, tabId: 3 }, discard, shown)).toEqual({ ok: false })
+    expect(asked).toEqual([])
+  })
+
+  it('refuses another tab, and a download no tab was warned about (B-181)', async () => {
+    const asked: number[] = []
+    const discard = async (id: number) => {
+      asked.push(id)
+      return true
+    }
+    expect(await discardDownload({ downloadId: 7 }, { frameId: 0, tabId: 4 }, discard, shown)).toEqual({ ok: false })
+    expect(await discardDownload({ downloadId: 8 }, { frameId: 0, tabId: 3 }, discard, shown)).toEqual({ ok: false })
+    expect(
+      await discardDownload({ downloadId: 7 }, { frameId: 0, tabId: 3 }, discard, async () => {
+        throw new Error('storage unreadable')
+      }),
+    ).toEqual({ ok: false })
     expect(asked).toEqual([])
   })
 
   it('reports a failed deletion as not done', async () => {
-    expect(await discardDownload({ downloadId: 7 }, { frameId: 0 }, async () => false)).toEqual({ ok: false })
+    expect(await discardDownload({ downloadId: 7 }, { frameId: 0, tabId: 3 }, async () => false, shown)).toEqual({
+      ok: false,
+    })
     expect(
-      await discardDownload({ downloadId: 7 }, { frameId: 0 }, async () => {
-        throw new Error('gone')
-      }),
+      await discardDownload(
+        { downloadId: 7 },
+        { frameId: 0, tabId: 3 },
+        async () => {
+          throw new Error('gone')
+        },
+        shown,
+      ),
     ).toEqual({ ok: false })
+  })
+})
+
+describe('rememberWarnedTab (B-181)', () => {
+  it('keeps the newest warnings, bounded', () => {
+    let record: Array<[number, number]> | undefined
+    for (let id = 1; id <= WARNED_DOWNLOADS_MAX + 5; id += 1) record = rememberWarnedTab(record, id, id * 10)
+    expect(record).toHaveLength(WARNED_DOWNLOADS_MAX)
+    expect(warnedTabOf(record, 1)).toBeUndefined()
+    expect(warnedTabOf(record, WARNED_DOWNLOADS_MAX + 5)).toBe((WARNED_DOWNLOADS_MAX + 5) * 10)
+  })
+
+  it('moves a download warned again to the newest place, with its new tab', () => {
+    const record = rememberWarnedTab(rememberWarnedTab([[1, 10], [2, 20]], 1, 11), 3, 30)
+    expect(record).toEqual([
+      [2, 20],
+      [1, 11],
+      [3, 30],
+    ])
+  })
+
+  it('reads a record that is missing or not a list as empty', () => {
+    expect(warnedTabOf(undefined, 1)).toBeUndefined()
+    expect(warnedTabOf({ '1': 10 } as unknown as [number, number][], 1)).toBeUndefined()
+    expect(rememberWarnedTab({ '1': 10 } as unknown as [number, number][], 2, 20)).toEqual([[2, 20]])
   })
 })
 
@@ -232,7 +296,7 @@ describe('a download Chrome names after creating it (B-165, round 8)', () => {
     expect(verdict.action).toBe('warn')
     expect(verdict.shape.map((s) => s.code)).toContain('double-extension')
     expect(d.stop).not.toHaveBeenCalled()
-    expect(d.journal).toHaveBeenCalledWith(expect.objectContaining({ explain: expect.stringContaining('invoice.pdf.exe') }))
+    expect(d.journal).toHaveBeenCalledWith(expect.objectContaining({ file: 'invoice.pdf.exe' }))
     expect(announce).toHaveBeenCalledWith(verdict, expect.objectContaining({ filename: 'invoice.pdf.exe' }))
   })
 
@@ -257,6 +321,24 @@ describe('a listed file the browser finished before it could be stopped (B-180, 
     expect(verdict.action).toBe('block')
     expect(d.stop).toHaveBeenCalledWith(1)
     expect(announce).toHaveBeenCalledWith(verdict, expect.anything(), { stopped: false })
+  })
+
+  it('writes a journal line that says the file may be on the disk (B-202)', async () => {
+    // With no page open the warning is never drawn, and this line is the only record left.
+    const d = deps({ stop: vi.fn(async () => false) })
+    await handleDownload(item({ url: 'https://malware.test/x.lnk', filename: 'x.lnk' }), d)
+    expect(d.journal).toHaveBeenCalledWith({
+      whatKey: 'journalDownloadLeftOnDisk',
+      file: 'x.lnk',
+      outcome: 'block-left-on-disk',
+    })
+    expect(message('journalDownloadLeftOnDisk')).toContain('диске')
+  })
+
+  it('writes the headline as a catalogue key, not as its code', async () => {
+    const d = deps()
+    await handleDownload(item({ url: 'https://malware.test/x.exe', filename: 'x.exe' }), d)
+    expect(d.journal).toHaveBeenCalledWith({ whatKey: 'downloadHeadlineBlocked', file: 'x.exe', outcome: 'block' })
   })
 
   it('is announced as stopped when the browser confirms nothing is left', async () => {

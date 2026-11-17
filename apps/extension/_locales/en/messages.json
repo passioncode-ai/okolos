@@ -2470,6 +2470,23 @@
       }
     }
   },
+  "journalDownload": {
+    "message": "$WHAT$ ($FILE$)",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      },
+      "file": {
+        "content": "$2"
+      }
+    }
+  },
+  "journalDownloadLeftOnDisk": {
+    "message": "A dangerous download could not be stopped in time, so the file may be on your disk"
+  },
+  "journalDownloadUnseen": {
+    "message": "The download warning was not shown, because no page was open"
+  },
   "mailHeader": {
     "message": "From $WHO$ <$ADDRESS$> — “$SUBJECT$” — $DATE$",
     "placeholders": {

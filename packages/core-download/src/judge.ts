@@ -98,6 +98,10 @@ export interface DownloadVerdict {
  * `ms-msdt` payload as a file (`.diagcab`), the OneNote package (`.onepkg`),
  * Excel's web query and SYLK formats (`.iqy`, `.slk`), the Office add-in
  * manifest (`.vsto`) and the script components `regsvr32` loads (`.wsc`, `.sct`).
+ * The review of N-107 (B-181) named seven more: theme files that point the desktop at a
+ * remote file (`.theme`, `.themepack`), the pinned-site shortcut (`.website`), the XAML
+ * browser application (`.xbap`), the PowerShell module (`.psm1`), the OneNote table of
+ * contents (`.onetoc2`) and the WMI script `mofcomp` compiles and runs (`.mof`).
  */
 const EXECUTABLE =
   new RegExp(
@@ -105,15 +109,15 @@ const EXECUTABLE =
       // Native programs, libraries and installers.
       'exe|dll|msi|msp|com|scr|pif|apk|dmg|pkg|deb|rpm|appx|appxbundle|msix|msixbundle|gadget|' +
       // Manifests that install or launch from an address written inside them.
-      'appinstaller|application|appref-ms|jnlp|vsto|' +
+      'appinstaller|application|appref-ms|jnlp|vsto|xbap|' +
       // Shell and scripting hosts.
-      'bat|cmd|ps1|ps2|psc1|vbs|vbe|js|jse|wsf|wsh|wsc|sct|sh|jar|hta|mshxml|' +
+      'bat|cmd|ps1|psm1|ps2|psc1|vbs|vbe|js|jse|wsf|wsh|wsc|sct|sh|jar|hta|mshxml|' +
       // Formats Windows opens with a program attached to them.
-      'lnk|scf|url|reg|msc|cpl|chm|inf|ade|adp|rdp|diagcab|iqy|slk|' +
+      'lnk|scf|url|website|reg|msc|cpl|chm|inf|ade|adp|rdp|diagcab|iqy|slk|theme|themepack|mof|' +
       'library-ms|search-ms|searchconnector-ms|settingcontent-ms|' +
       // Office documents and add-ins that carry code. They look like documents,
       // which is the point of using them.
-      'docm|dotm|xlsm|xltm|xlsb|xlam|xll|pptm|potm|ppam|one|onepkg' +
+      'docm|dotm|xlsm|xltm|xlsb|xlam|xll|pptm|potm|ppam|one|onepkg|onetoc2' +
       ')$',
     'i',
   )
