@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url'
 import { BOOTSTRAP_FILES, BOOTSTRAP_SOURCES } from './feed/bootstrap.mjs'
 import { runBounded, withoutSecrets } from './feed/bounded.mjs'
 import { openLog } from './feed/log.mjs'
-import { feedPaths } from './feed/paths.mjs'
+import { CHECKOUT_LOCK_REASON, feedPaths } from './feed/paths.mjs'
 import { readSnapshotPr, snapshotPrFile } from './feed/snapshot-pr.mjs'
 import { readStatus } from './feed/status.mjs'
 import { discover, quote, runnerArgv, xml } from './feed-agent-credential.mjs'
@@ -159,18 +159,27 @@ export function isDisabled(printDisabled, label = LABEL) {
  * fast-forwards it before every run.
  */
 export async function ensureCheckout({ repo = root, checkout, tool = runBounded, env: from = process.env, log = console.log }) {
+  // No credential for git or pnpm (installerEnv).
+  const run = installerTool(tool, from)
   if (existsSync(checkout)) {
+    // An install made before B-150 has an unlocked worktree; lock it so a cleanup leaves it. A
+    // refusal (already locked, or a clone rather than a worktree) changes nothing.
+    await run('git', ['-C', repo, 'worktree', 'lock', '--reason', CHECKOUT_LOCK_REASON, checkout], { timeoutMs: 90_000 })
     log(`agent checkout: ${checkout} (kept; the job fast-forwards it)`)
     return
   }
-  // No credential for git or pnpm (installerEnv).
-  const run = installerTool(tool, from)
+  // A folder deleted under git leaves its worktree entry, and `add` refuses that path until the
+  // entry is pruned; a locked entry is not pruned until it is unlocked, so that comes first and
+  // its refusal (no such worktree) changes nothing (B-150).
+  await run('git', ['-C', repo, 'worktree', 'unlock', checkout], { timeoutMs: 90_000 })
   const steps = [
-    // A folder deleted under git leaves its worktree entry, and `add` refuses that
-    // path until the entry is pruned (B-150).
     ['git', ['-C', repo, 'worktree', 'prune'], { timeoutMs: 90_000 }],
     ['git', ['-C', repo, 'fetch', '--quiet', 'origin', 'main'], { timeoutMs: 90_000 }],
-    ['git', ['-C', repo, 'worktree', 'add', '--detach', checkout, 'origin/main'], { timeoutMs: 120_000 }],
+    [
+      'git',
+      ['-C', repo, 'worktree', 'add', '--detach', '--lock', '--reason', CHECKOUT_LOCK_REASON, checkout, 'origin/main'],
+      { timeoutMs: 120_000 },
+    ],
     ['pnpm', ['install', '--frozen-lockfile', '--filter', '@okolos/proxy'], { cwd: checkout, timeoutMs: 600_000 }],
   ]
   for (const [command, args, options] of steps) {
@@ -382,7 +391,10 @@ export async function uninstallAgent({ label = LABEL, domain, target, bin, launc
     const { repo, paths, tool: purgeTool = runBounded } = purge
     const tool = installerTool(purgeTool)
     if (existsSync(paths.agentCheckout)) {
-      const removed = await tool('git', ['-C', repo, 'worktree', 'remove', '--force', paths.agentCheckout], { timeoutMs: 60_000 })
+      // Twice: a locked worktree is removed only with a doubled force (B-150).
+      const removed = await tool('git', ['-C', repo, 'worktree', 'remove', '--force', '--force', paths.agentCheckout], {
+        timeoutMs: 60_000,
+      })
       if (removed.code !== 0) log(`git worktree remove failed (${(removed.stderr || '').trim()}); removing the directory`)
       rmSync(paths.agentCheckout, { recursive: true, force: true })
     }

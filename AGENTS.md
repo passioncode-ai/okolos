@@ -97,7 +97,7 @@ Files the feed agent writes — all outside the working tree, all bounded (LC-12
 `tools/feed/`, and `is-main.mjs` from `tools/is-main.mjs`, not the re-export in `tools/feed/`;
 replaced whole at each install;
 `--status` says when they differ from the checkout's); its own checkout `~/.okolos/agent-checkout`
-at origin/main (a worktree of the clone `pnpm feed:agent` ran from, or a clone of that clone's origin
+at origin/main (a locked worktree of the clone `pnpm feed:agent` ran from, so a machine cleanup that takes idle clean worktrees leaves it (B-150); or a clone of that clone's origin
 when the clone is gone; recreated by the bootstrap when it is missing; a broken one is moved to
 `~/.okolos/agent-checkout.broken`, one kept, removed by `--purge`); in the clone `pnpm feed:agent`
 ran from, the installer's and the bootstrap's `git worktree prune`, `git fetch origin main` and
@@ -158,25 +158,25 @@ and in every record the job writes after it, until a newer step replaces it, and
 `node tools/install-feed-agent.mjs --status` prints it (`snapshotPr`, and a note naming the pull
 request, its link and since when it waits).
 
-**Until the operator decides B-186 (the row B-186 on branch sw/sw-08 until the branches merge),
-every one of these pull requests waits for a person.** On
-2026-10-29 the repository does not allow auto-merge and main's ruleset `protect-default-branch`
-requires no status check, so the agent records `auto-merge-unavailable`; GitHub does not notify the
-author of their own pull request and nothing reads the record, so `--status` is where it shows. With
-v65 (`body.updatedAt` 2026-10-26T21:08Z) on main, the first pull request comes at the first publish
-after 2026-11-02T21:08Z, and no earlier than one run after this change lands on origin/main (the
-job that fast-forwards the checkout runs the previous commit's code), and main turns red at
-2026-11-09T21:08Z unless it is merged. The steps (merge method, the side effect of a required check,
-a snapshot committed by hand while the agent's pull request is open, a `failed` step that does not
-mean there is no pull request) are in
+**Until the operator decides B-186, every one of these pull requests is merged by hand.** The
+repository does not allow auto-merge and main's ruleset `protect-default-branch` requires no status
+check, so the agent records `auto-merge-unavailable`; GitHub does not notify the author of their own
+pull request and nothing reads the record, so `--status` is where it shows (the version in the tree,
+its age, the open pull request). The agent opens its pull request when the snapshot on main is 7 days
+old and the release gate turns main red at 14, so a pull request waits at most a week: merge it with a
+merge commit once its CI is green (done that way for PR #55 on 2026-11-12 and PR #59 on 2026-11-17).
+The steps (merge method, the side effect of a required check, a snapshot committed by hand while the
+agent's pull request is open, a `failed` step that does not mean there is no pull request) are in
 [docs/runbooks/feed-signing.md](docs/runbooks/feed-signing.md).
 
-**After this lands (B-159), once, by a person:** the Mac keeps running the old plist (`cd` into the
-checkout) until the agent is reinstalled. From the main clone, at origin/main: `pnpm feed:agent`,
-then `node tools/install-feed-agent.mjs --status` must show `"bootstrap": true`,
-`"plistStartsBootstrap": true` and `"loaded": true`, and
+**Reinstalling the agent (B-159), done 2026-11-17.** An install made before B-159 keeps running the
+old plist (`cd` into the checkout), which fails silently once the checkout is gone. From the main
+clone, at origin/main: `pnpm feed:agent`, then `node tools/install-feed-agent.mjs --status` must show
+`"bootstrap": true`, `"plistStartsBootstrap": true` and `"loaded": true`, and
 `plutil -extract ProgramArguments.2 raw -o - ~/Library/LaunchAgents/app.okolos.feed.plist` must
-name `~/.okolos/bin/feed-agent/bootstrap.mjs`. B-159 closes only after that check. Decision: [ADR-0017](docs/adr/0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md).
+name `~/.okolos/bin/feed-agent/bootstrap.mjs`. On 2026-11-17 the checkout had been removed again (B-150)
+and the old plist had failed every run since 2026-11-11; after the reinstall the next run published v88
+and opened PR #59. Decision: [ADR-0017](docs/adr/0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md).
 
 **Build retention (LC-15).** Release archives go to `apps/extension/dist/release/`, and
 `pnpm package` keeps the current and the previous one per browser itself
