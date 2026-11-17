@@ -15,6 +15,14 @@ import type { Verdict } from './verdict.js'
  * way (B-75, B-77), and a frame is one more boundary — the words belong to whoever
  * draws them.
  */
+
+/**
+ * Whether usage and error data is sent, as the settings switch and the first-run notice show it.
+ * `unsupported` is a Firefox with no built-in data consent; `not-sent` is a build that carries no
+ * App-Key (every build but the store's), which sends nothing whatever the switch says (B-209).
+ */
+export type UsageDataState = 'on' | 'off' | 'unsupported' | 'not-sent'
+
 export interface FrameLine {
   readonly explainKey: string
   readonly explainArgs: readonly string[]
@@ -196,16 +204,16 @@ export interface RpcMap {
   'download/discard': { req: { downloadId: number }; res: { ok: boolean } }
   /**
    * Usage and error data (B-198, B-199): what the settings switch and the first-run notice
-   * show. `unsupported` is a Firefox with no built-in data consent, where nothing is sent.
+   * show (`UsageDataState`).
    */
-  'usage/state': { req: Record<string, never>; res: { state: 'on' | 'off' | 'unsupported' } }
+  'usage/state': { req: Record<string, never>; res: { state: UsageDataState } }
   /**
    * The settings switch. In Firefox the page asks the browser inside the click first, because
    * `permissions.request` refuses outside a user gesture; the worker then reads the answer.
    */
-  'usage/set': { req: { on: boolean }; res: { state: 'on' | 'off' | 'unsupported' } }
+  'usage/set': { req: { on: boolean }; res: { state: UsageDataState } }
   /** After an erase: a new install number, only if collection is on at that moment (one worker step). */
-  'usage/renew': { req: Record<string, never>; res: { state: 'on' | 'off' | 'unsupported' } }
+  'usage/renew': { req: Record<string, never>; res: { state: UsageDataState } }
   /** SHA-1 of a submitted password. The password itself never crosses this line. */
   'password/check': {
     /**

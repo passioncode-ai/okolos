@@ -667,7 +667,7 @@ See [foundation.md](foundation.md) → Personas.
 - **Alt paths:** the self-audit log (SCN-019) shows each sent event under its purpose while on, and none after off; «Удалить все данные» (SCN-023) and «Очистить локальные данные» (SCN-032) replace the install number and drops the unsent events, and collection that was on stays on
 - **UI elements:** switch, one sentence on what is sent
 - **States covered:** success, error
-- **Errors & recovery:** the switch cannot be saved -> the block says the change did not go through and shows the state actually stored
+- **Errors & recovery:** the switch cannot be saved -> the block says the change did not go through and shows the state actually stored. **A build that sends nothing says so (B-209):** every build but the store's carries no App-Key, so an install from source sends nothing; the worker answers `not-sent`, the first run shows no notice, and «Ваши данные» shows the switch off and disabled with `usageNotSent` («Эта сборка Okolos не из магазина и данные об использовании и ошибках не отправляет, что бы ни показывал переключатель»). Until 2026-11-17 it showed the notice and a switch that was on. The test build keeps the store build's behaviour (`asIfSending`) with no key, so these scenarios stay testable
 - **Status:** implemented
 - **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, apps/extension/src/options/index.ts, apps/extension/src/background/usage/sink.ts, e2e/scn-050.spec.ts (Chromium: off, on again, and the wipe renewing the install number)
 

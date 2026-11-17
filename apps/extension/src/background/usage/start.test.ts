@@ -244,3 +244,23 @@ describe('the renewal after an erase', () => {
     expect(p.values.get('usage:state')).toBeUndefined()
   })
 })
+
+describe('a build with no App-Key says it sends nothing (B-209)', () => {
+  const keyless = { appKey: null, environment: 'sandbox' as const }
+
+  it('answers not-sent to every step, and leaves the stored state as it was', async () => {
+    const p = platform('chrome')
+    const usage = startUsage(p.platform, audit, {}, keyless)
+    expect(await usage.state()).toBe('not-sent')
+    expect(await usage.set(false)).toBe('not-sent')
+    expect(await usage.set(true)).toBe('not-sent')
+    expect(await usage.renew()).toBe('not-sent')
+    expect(p.values.get('usage:state')).toBeUndefined()
+  })
+
+  it('answers as the store build when the test build asks it to', async () => {
+    const p = platform('chrome')
+    const usage = startUsage(p.platform, audit, {}, { ...keyless, asIfSending: true })
+    expect(await usage.state()).toBe('on')
+  })
+})

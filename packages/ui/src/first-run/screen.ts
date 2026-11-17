@@ -29,7 +29,7 @@ export interface FirstRunProps {
    * `on`: off, a Firefox that did not grant it and a Firefox with no built-in consent send
    * nothing, and a sentence saying something is sent would be untrue there.
    */
-  readonly usage?: 'on' | 'off' | 'unsupported'
+  readonly usage?: 'on' | 'off' | 'unsupported' | 'not-sent'
 }
 
 export interface FirstRunHandlers {

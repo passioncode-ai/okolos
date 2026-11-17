@@ -50,6 +50,9 @@ const shared = {
       // shell that happens to hold the key builds without it.
       appKey: withTestHooks || process.env.OKOLOS_USAGE_ENV !== 'production' ? null : (process.env.APTABASE_APP_KEY_OKOLOS || null),
       environment: !withTestHooks && process.env.OKOLOS_USAGE_ENV === 'production' ? 'production' : 'sandbox',
+      // The test build shows the switch and the notice as the store build does, with no key to
+      // send with (B-209); every other keyless build says it sends nothing.
+      asIfSending: withTestHooks,
     }),
   },
 }

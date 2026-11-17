@@ -1,3 +1,4 @@
+import type { UsageDataState } from '@okolos/contracts'
 import { AuditWriteError, type RequestDeps } from '@okolos/net'
 import { withDeadline, type Platform } from '@okolos/platform'
 
@@ -15,6 +16,11 @@ import { sessionFor } from './system.js'
 interface Build {
   readonly appKey: string | null
   readonly environment: 'production' | 'sandbox'
+  /**
+   * The test build only: the switch and the notice behave as in the store build, and nothing is
+   * sent, because there is still no key. Without it a keyless build answers `not-sent`.
+   */
+  readonly asIfSending?: boolean
 }
 
 declare const __OKOLOS_USAGE__: Build | undefined
@@ -25,14 +31,14 @@ export interface Usage {
   track<E extends EventName>(name: E, props: EventProps<E>): Promise<void>
   flush(): Promise<void>
   /** What the settings switch shows, by the browser's rules and the person's choice. */
-  state(): Promise<ConsentState>
+  state(): Promise<UsageDataState>
   /** From the settings switch, inside the click: Firefox asks only from a user gesture. */
-  set(on: boolean): Promise<ConsentState>
+  set(on: boolean): Promise<UsageDataState>
   /**
    * After an erase: a new install number and an empty queue, only if collection is on at that
    * moment. One step, so a switch-off that lands first is never undone by it.
    */
-  renew(): Promise<ConsentState>
+  renew(): Promise<UsageDataState>
 }
 
 /**
@@ -47,8 +53,18 @@ export function startUsage(
   platform: Platform,
   audit: () => Promise<RequestDeps>,
   permissions: ConsentApi = platform.dataConsent,
-  build: Build = typeof __OKOLOS_USAGE__ === 'undefined' ? { appKey: null, environment: 'sandbox' } : __OKOLOS_USAGE__,
+  // Every bundle defines it (tools/build.mjs); only a unit test runs without, and there the
+  // switch is exercised as in the store build, with no key to send with.
+  build: Build = typeof __OKOLOS_USAGE__ === 'undefined'
+    ? { appKey: null, environment: 'sandbox', asIfSending: true }
+    : __OKOLOS_USAGE__,
 ): Usage {
+  /**
+   * A build with no App-Key sends nothing, whatever the switch says: every build but the store's,
+   * so every install from source. It used to show "Okolos sends us usage and error data" and a
+   * switch that was on (B-209); it says what is true now, and the stored state is not touched.
+   */
+  const sendsNothing = build.appKey === null && build.asIfSending !== true
 
   const sink = (allowed: ConsentState | 'unreadable') =>
     createUsageSink({
@@ -129,6 +145,7 @@ export function startUsage(
       ),
     state: () =>
       serial(async () => {
+        if (sendsNothing) return 'not-sent'
         const { allowed, s } = await current()
         // Unreadable: the person's stored choice, which nothing changed.
         return allowed === 'unsupported' ? 'unsupported' : await s.consent()
@@ -138,6 +155,7 @@ export function startUsage(
     // and an "on" Firefox did not grant stays off.
     set: (on) =>
       serial(async () => {
+        if (sendsNothing) return 'not-sent'
         const { allowed, s } = await current()
         // i18n-exempt: the RPC refusal the page turns into usageSaveFailed; never shown as is
         if (allowed === 'unreadable') throw new Error('the browser data consent could not be read; the switch was not saved')
@@ -148,6 +166,7 @@ export function startUsage(
       }),
     renew: () =>
       serial(async () => {
+        if (sendsNothing) return 'not-sent'
         const { allowed, s } = await current()
         // i18n-exempt: the RPC refusal the page turns into usageRenewFailed; never shown as is
         if (allowed === 'unreadable') throw new Error('the browser data consent could not be read; the install number was not replaced')

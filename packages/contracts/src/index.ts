@@ -34,6 +34,7 @@ export type {
   RpcError,
   RpcMap,
   RpcType,
+  UsageDataState,
 } from './rpc.js'
 export { isEnvelope } from './rpc.js'
 export type {

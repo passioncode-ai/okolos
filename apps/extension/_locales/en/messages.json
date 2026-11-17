@@ -2708,5 +2708,8 @@
   },
   "usageFirefox": {
     "message": "In Firefox the browser keeps the choice. The switch asks Firefox to allow or stop sending."
+  },
+  "usageNotSent": {
+    "message": "This build of Okolos is not from a store and sends no usage and error data, whatever the switch shows."
   }
 }
