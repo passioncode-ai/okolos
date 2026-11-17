@@ -57,6 +57,15 @@ const REAL: ReadonlyArray<readonly [string, string]> = [
   ['ups.com', 'a watched host itself, three letters'],
   ['mos.ru', 'a watched host itself, three letters, ccTLD'],
   ['web.telegram.org', 'a subdomain of a watched host'],
+  // Investment and giveaway scams impersonate these (Fabric Inbox, 2026-11-17).
+  ['tesla.com', 'a watched host itself'],
+  ['shop.tesla.com', 'a subdomain of a watched host'],
+  ['x.com', 'a watched host itself, one letter'],
+  ['x.ai', 'a brand of the same owner on another ending, more than one edit away'],
+  ['x.example.com', 'a one-letter subdomain the whole web uses, which is not the brand standing alone'],
+  ['cdn.x.com', 'a subdomain of a watched host whose label is one letter'],
+  ['developer.nvidia.com', 'a subdomain of a watched host'],
+  ['blackrock.com', 'a watched host itself'],
 ]
 
 const ATTACKS: ReadonlyArray<readonly [string, string, string]> = [
@@ -71,6 +80,12 @@ const ATTACKS: ReadonlyArray<readonly [string, string, string]> = [
   ['g00gle.com', 'homograph', 'digits standing in for letters'],
   ['gooogle.com', 'typo', 'one letter too many'],
   ['wildberies.ru', 'typo', 'one letter too few, in the market this list serves'],
+  ['tesla.com.invest-bonus.test', 'brand-subdomain', 'the investment scam shape (Fabric Inbox, 2026-11-17)'],
+  ['tesla.evil.test', 'brand-subdomain', 'the brand alone in front of a stranger'],
+  ['spacex.giveaway.test', 'brand-subdomain', 'the crypto giveaway shape'],
+  ['x.com.giveaway.test', 'brand-subdomain', 'the full one-letter name as a run is still caught'],
+  ['nvidla.com', 'typo', 'l for i: one edit, which the skeleton does not fold'],
+  ['blackrocks.com', 'typo', 'one letter too many, for a fund'],
   /**
    * Recovered in B-67: the brand's own name under an ending that is itself a word
    * about accounts. These three were named in SCN-006 as passing silently, and the

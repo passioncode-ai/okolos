@@ -77,4 +77,13 @@ export const DEFAULT_WATCHLIST: readonly string[] = [
   'yandex.ru',
   'mail.ru',
   'vk.com',
+
+  // Investment and giveaway scams: a fund, a carmaker and a rocket company promising returns,
+  // and the network where the giveaway is posted. Asked for by Fabric Inbox on 2026-11-17 after
+  // a forged enquiry whose sender's site, registered that April, named Tesla in its title.
+  'tesla.com',
+  'spacex.com',
+  'x.com',
+  'nvidia.com',
+  'blackrock.com',
 ]
