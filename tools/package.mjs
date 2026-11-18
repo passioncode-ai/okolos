@@ -30,6 +30,7 @@ import path from 'node:path'
 import { archivePlan, compareEntries, zipEntries } from './archive.mjs'
 import { runToCompletion } from './bin.mjs'
 import { carriesKey, guardKeyedBuilds, keyedTargets } from './keyed-builds.mjs'
+import { carriesLiteral } from './quoted.mjs'
 import { toHtml } from './privacy-page.mjs'
 import { PRIVACY_URL, servedPolicyBehind } from './privacy-served.mjs'
 import { filesUnder } from './tree.mjs'
@@ -192,7 +193,8 @@ for (const target of TARGETS) {
 
   // The one that would ship the vulnerability.
   const content = readFileSync(path.join(dir, 'content.js'), 'utf8')
-  if (content.includes('"open"') || content.includes("'open'")) {
+  // In any quote: Vite 8 writes literals in backticks, and `"open"` alone missed them (B-225).
+  if (carriesLiteral(content, 'open')) {
     die(
       `${target} carries the test hooks: its shadow roots are open, which lets a page ` +
         `read and remove the warning about itself. Build without --with-test-hooks.`,

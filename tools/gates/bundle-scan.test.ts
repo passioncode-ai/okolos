@@ -9,6 +9,7 @@ import { KNOWN_HASHES, routeFor } from '../../apps/extension/src/options/views.j
 import { binInvocation } from '../bin.mjs'
 import { posixRelative } from '../tree.mjs'
 import { buildTooOld } from '../build-age.mjs'
+import { carriesLiteral } from '../quoted.mjs'
 
 /**
  * The gates that read what actually ships.
@@ -245,8 +246,9 @@ describe('what the shipped extension is made of', () => {
         path.join(root, `apps/extension/dist/${browser}/content.js`),
         'utf8',
       )
-      expect(content, `${browser} build must use a closed shadow root`).toContain('"closed"')
-      expect(content, `${browser} build must not carry the test hook`).not.toContain('"open"')
+      // In any quote a bundler writes: `"open"` alone passed a Vite 8 bundle carrying the hook (B-225).
+      expect(carriesLiteral(content, 'closed'), `${browser} build must use a closed shadow root`).toBe(true)
+      expect(carriesLiteral(content, 'open'), `${browser} build must not carry the test hook`).toBe(false)
     }
   })
 
