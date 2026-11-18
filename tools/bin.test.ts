@@ -5,7 +5,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-import { binInvocation, endTree, runToCompletion, shCandidates } from './bin.mjs'
+import { binInvocation, endTree, runToCompletion, shCandidates, spawnTree } from './bin.mjs'
 
 /**
  * `pnpm` and `npx` are `.cmd` files on Windows, which Node will not spawn without a
@@ -172,5 +172,28 @@ describe('ending what runToCompletion started, grandchildren included (B-215)', 
     const alive = spawnSync('kill', ['-0', String(grandchild)]).status === 0
     if (alive) spawnSync('kill', ['-9', String(grandchild)])
     expect(alive, 'the grandchild outlived the kill').toBe(false)
+  })
+})
+
+describe('a background tool started with spawnTree ends with its children (B-177)', () => {
+  it.skipIf(process.platform === 'win32')('ends the grandchild too, as geckodriver under npx', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-tree-'))
+    const pidFile = path.join(dir, 'grandchild.pid')
+    const child = spawnTree('sh', ['-c', `sleep 30 & echo $! > ${pidFile}; wait`], { stdio: 'ignore' })
+    let grandchild = 0
+    for (let tries = 0; tries < 50 && grandchild === 0; tries += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      try {
+        grandchild = Number(execFileSync('cat', [pidFile], { encoding: 'utf8' }).trim())
+      } catch {
+        grandchild = 0
+      }
+    }
+    expect(grandchild).toBeGreaterThan(0)
+    endTree(child)
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    const alive = spawnSync('kill', ['-0', String(grandchild)]).status === 0
+    if (alive) spawnSync('kill', ['-9', String(grandchild)])
+    expect(alive, 'the grandchild outlived endTree, the orphan B-177 names').toBe(false)
   })
 })

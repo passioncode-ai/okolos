@@ -407,6 +407,8 @@ describe('the bootstrap launchd starts lives outside the checkout (B-159)', () =
       OKOLOS_AGENT_BIN: h.paths.agentBin,
       OKOLOS_SOURCE_REPO: path.join(h.dir, 'no-such-clone'),
       OKOLOS_ORIGIN_URL: '',
+      // Every child is faked here, so the Windows runner proves the record keeping too (B-175).
+      OKOLOS_FEED_TEST_PROCESS: '1',
     }
     const result = spawnSync(process.execPath, [h.paths.bootstrap], { env, encoding: 'utf8', timeout: 20_000 })
     expect(result.status, result.stderr).toBe(1)

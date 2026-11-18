@@ -18,3 +18,6 @@ export function feedPaths(env?: Record<string, string | undefined>, home?: strin
 
 /** The reason the agent's checkout is a locked worktree, so a machine cleanup leaves it (B-150). */
 export const CHECKOUT_LOCK_REASON: string
+
+/** The sentence a feed tool refuses with on Windows, or null elsewhere (B-175). */
+export function windowsRefusal(tool: string, platform?: string, env?: Record<string, string | undefined>): string | null

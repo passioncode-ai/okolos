@@ -32,3 +32,10 @@ export function runToCompletion(
     onSpawn?: (child: import('node:child_process').ChildProcess) => void
   },
 ): Promise<void>
+
+/** A background tool in its own process group on POSIX, so `endTree` ends its children (B-177). */
+export function spawnTree(
+  name: string,
+  args: readonly string[],
+  options?: { stdio?: import('node:child_process').StdioOptions; platform?: string },
+): import('node:child_process').ChildProcess
