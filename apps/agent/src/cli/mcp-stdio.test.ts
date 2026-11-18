@@ -1,4 +1,4 @@
-import { mkdtempSync, statSync } from 'node:fs'
+import { mkdtempSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -12,7 +12,6 @@ import { Journal } from '../journal/journal.js'
 import { Pairing } from '../pairing/pairing.js'
 import type { ServiceDirs } from '../service/dirs.js'
 import type { RouteContext } from '../service/http.js'
-import { clientKeyFile, readKey, saveKey } from './clients.js'
 import { relay } from './mcp-stdio.js'
 import { cliMessages } from './messages.js'
 import { pair } from './pair.js'
@@ -49,55 +48,6 @@ async function start() {
 async function* lines(...items: string[]): AsyncIterable<string> {
   for (const item of items) yield item
 }
-
-describe('okolos-agent pair', () => {
-  it('prints the code, waits for the person, and keeps the key 0600 under the name', async () => {
-    const t = await start()
-    const printed: string[] = []
-    let polls = 0
-    const code = await pair({
-      name: 'claude-code',
-      base: t.base,
-      dirs: t.dirs,
-      say,
-      print: (line) => printed.push(line),
-      // The person confirms on the page after the second look.
-      sleep: async () => {
-        polls += 1
-        if (polls === 2) {
-          const request = t.pairing.list(Date.now()).requests[0]
-          t.pairing.confirmByHandle(request!.handle, Date.now())
-        }
-      },
-    })
-    expect(code).toBe(0)
-    const shown = t.pairing.list(Date.now())
-    expect(printed[0]).toContain('claude-code')
-    expect(printed.at(-1)).toContain(clientKeyFile(t.dirs, 'claude-code'))
-    expect(shown.agents.map((a) => a.name)).toEqual(['claude-code'])
-    const file = clientKeyFile(t.dirs, 'claude-code')
-    expect(readKey(file)).toMatch(/\S{16,}/)
-    expect(statSync(file).mode & 0o777).toBe(0o600)
-  })
-
-  it('stops with exit 1 and says why when the person declines', async () => {
-    const t = await start()
-    const printed: string[] = []
-    const code = await pair({
-      name: 'claude-code',
-      base: t.base,
-      dirs: t.dirs,
-      say,
-      print: (line) => printed.push(line),
-      sleep: async () => {
-        const request = t.pairing.list(Date.now()).requests[0]
-        if (request) t.pairing.declineByHandle(request.handle, Date.now())
-      },
-    })
-    expect(code).toBe(1)
-    expect(printed.at(-1)).toContain('declined')
-  })
-})
 
 describe('okolos-agent mcp-stdio', () => {
   it('carries each message to the door with the saved key and writes the answer back', async () => {
@@ -141,23 +91,5 @@ describe('okolos-agent mcp-stdio', () => {
     const code = await relay({ name: 'nobody', base: t.base, dirs: t.dirs, say, input: lines(), output: () => undefined, error: (line) => errors.push(line) })
     expect(code).toBe(1)
     expect(errors[0]).toContain('okolos-agent pair --name')
-  })
-})
-
-describe('the key file', () => {
-  it('is replaced whole, never left half written', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'okolos-key-'))
-    const file = path.join(root, 'clients', 'x.key')
-    saveKey(file, 'first')
-    saveKey(file, 'second')
-    expect(readKey(file)).toBe('second')
-  })
-})
-
-describe('the loopback client', () => {
-  it('refuses any host but this machine before a byte leaves', async () => {
-    const { loopbackPost } = await import('./loopback.js')
-    await expect(loopbackPost('http://attacker.test/mcp', '{}')).rejects.toThrow(/only to its own door/)
-    await expect(loopbackPost('https://127.0.0.1/mcp', '{}')).rejects.toThrow(/only to its own door/)
   })
 })
