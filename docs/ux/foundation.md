@@ -16,7 +16,9 @@ Daily driver of AI assistants in the browser — sidebar summaries, an agentic
 browser, coding agents. Technically literate: knows what prompt injection is
 in theory, has no way to see it in practice. Runs 15–25 extensions, holds
 crypto wallets, lives outside the US. Wants control and evidence, distrusts
-security vendors that ship telemetry. **[data]** — agentic browsers in
+security vendors whose telemetry they cannot see or stop. Okolos sends usage and error data
+since 2026-11-04 (ADR-0021), so what holds for this persona is that every event is from a closed
+list, shown in the outbound log and stopped by one switch. **[data]** — agentic browsers in
 production at 27.7% of enterprises; AI extensions installed by ~15% of users
 ([evidence/02](../evidence/02-ai-agent-threats.md) §2.4,
 [evidence/03](../evidence/03-extensions.md) §3.3).
