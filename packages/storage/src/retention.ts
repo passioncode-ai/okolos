@@ -148,6 +148,14 @@ export async function pruneExpired(db: OkolosDatabase, nowMs: number): Promise<v
     }
   }
 
+  // Refreshed on every submission, so only a password not typed on that host for the
+  // whole window ages out (B-134).
+  for (const row of await db.getAll('reuse')) {
+    if (olderThan(row.seenAt, RETENTION_DAYS.reuse, nowMs)) {
+      await db.delete('reuse', [row.tag, row.host])
+    }
+  }
+
   for (const finding of await db.getAll('findings')) {
     if (finding.resolvedAt === null) continue
     if (olderThan(finding.resolvedAt, RETENTION_DAYS.resolvedFinding, nowMs)) {
@@ -179,6 +187,37 @@ export async function pruneExpired(db: OkolosDatabase, nowMs: number): Promise<v
     // that is over.
     if (setting.key.startsWith('defer:') && pastDeadline(setting.value, nowMs)) {
       await db.delete('settings', setting.key)
+    }
+  }
+}
+
+/**
+ * The snapshots of extensions that are no longer installed (B-134).
+ *
+ * Not in `pruneExpired`, because only the inventory review knows what is installed, and a
+ * sweep that guessed would delete the baseline of an extension that is still there. The
+ * first review that misses an extension marks its row with `goneSince`; the row is deleted
+ * once that is older than the window, and the mark is taken back if the extension returns.
+ * Until then the removal is reported as before: a change nobody has seen yet is not
+ * forgotten on the day it happens.
+ */
+export async function pruneRemovedSnapshots(
+  db: OkolosDatabase,
+  installed: ReadonlySet<string>,
+  nowMs: number,
+): Promise<void> {
+  for (const row of await db.getAll('snapshots')) {
+    const { goneSince, ...rest } = row
+    if (installed.has(row.extensionId)) {
+      if (goneSince !== undefined) await db.put('snapshots', rest)
+      continue
+    }
+    if (goneSince === undefined) {
+      await db.put('snapshots', { ...row, goneSince: new Date(nowMs).toISOString() })
+      continue
+    }
+    if (olderThan(goneSince, RETENTION_DAYS.removedExtension, nowMs)) {
+      await db.delete('snapshots', row.extensionId)
     }
   }
 }

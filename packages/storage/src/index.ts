@@ -21,6 +21,7 @@ export {
   dueForInventory,
   dueForSweep,
   pruneExpired,
+  pruneRemovedSnapshots,
   FEED_INTERVAL_MS,
   INVENTORY_INTERVAL_MS,
   LAST_FEED_KEY,

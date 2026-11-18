@@ -116,7 +116,8 @@ describe('the reuse index, and what it puts on disk', () => {
    * The index answers a question the product refused to answer for two
    * releases, so what it stores is the part worth pinning: a tag that is an
    * HMAC over the digest — never a password, never the digest itself — a host,
-   * and the date it was first seen there.
+   * and the date it was last submitted there, which the sweep ages out after a
+   * year (B-134).
    */
   it('stores a tag, a host and a date, and nothing that resembles a password', async () => {
     const db = await openDb()
