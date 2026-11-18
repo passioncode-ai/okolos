@@ -2115,7 +2115,7 @@
     }
   },
   "warnDownloadBlockedHeadline": {
-    "message": "A download was stopped before it was saved"
+    "message": "A download was stopped and removed"
   },
   "warnDownloadCancelled": {
     "message": "The download was cancelled, and nothing of it is left on your disk."
