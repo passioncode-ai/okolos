@@ -29,7 +29,21 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const BUILD = path.join(root, 'apps/extension/dist/chrome')
-const AREAS = ['', '#queue', '#journal', '#leaks', '#extensions', '#trusted', '#audit', '#data']
+/**
+ * Each area with the element its finished paint carries, the same pairs `e2e/no-flush-text.spec.ts`
+ * waits for. An area is painted once, after its reads; the overview paints a counting shell
+ * first, so it is finished when the counting line is gone.
+ */
+const AREAS = [
+  { hash: '', role: 'overview' },
+  { hash: '#queue', role: 'queue-section' },
+  { hash: '#journal', role: 'journal' },
+  { hash: '#leaks', role: 'leaks-section' },
+  { hash: '#extensions', role: 'extensions' },
+  { hash: '#trusted', role: 'trusted' },
+  { hash: '#audit', role: 'self-audit' },
+  { hash: '#data', role: 'data-controls' },
+]
 
 /** Two element siblings carrying text, on one line, with nothing between them. */
 const FLUSH = () => {
@@ -76,10 +90,13 @@ const css = readFileSync(path.join(staged, href.replace(/^\//, '')), 'utf8')
 
 const markup = {}
 const page = await context.newPage()
-for (const area of AREAS) {
-  await page.goto(`chrome-extension://${id}/options.html${area}`)
-  await page.waitForTimeout(600)
-  markup[area || 'overview'] = await page.evaluate(() => document.getElementById('root')?.outerHTML ?? '')
+for (const { hash, role } of AREAS) {
+  await page.goto(`chrome-extension://${id}/options.html${hash}`)
+  // The page's own word that it has painted, not 600 ms: a fixed wait read whatever was there
+  // when it ran out, the counting shell included on a loaded machine (B-189).
+  await page.locator(`#root [data-role=${role}]`).first().waitFor({ state: 'attached', timeout: 30_000 })
+  await page.locator('[data-role=attention-counting]').waitFor({ state: 'detached', timeout: 30_000 })
+  markup[hash || 'overview'] = await page.evaluate(() => document.getElementById('root')?.outerHTML ?? '')
 }
 await context.close()
 

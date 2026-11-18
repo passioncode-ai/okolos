@@ -31,17 +31,9 @@ const KNOWN: Record<string, { sites: number; why: string }> = {
     sites: 1,
     why: 'the gap between reads of the installed rules inside a polling loop with its own deadline; not a wait before an assertion',
   },
-  'e2e/scn-023.spec.ts': {
-    sites: 2,
-    why: 'a wipe that must not happen has no completion signal to wait for; same class as B-169, left open under it',
-  },
   'e2e/scn-049.spec.ts': {
     sites: 6,
-    why: 'a link warning that must not come back after a dispute, a right click that must not be stopped and a page that must not raise anything before the click have no completion signal to wait for; same class as B-169, left open under B-189',
-  },
-  'e2e/scn-037.spec.ts': {
-    sites: 1,
-    why: 'a blocked frame whose document never loads has no signal of its own; same class as B-169, left open under it',
+    why: 'a link warning that must not come back after a dispute, a right click that must not be stopped and a page that must not raise anything before the click have no completion signal to wait for; same class as B-169, left open under B-224',
   },
 }
 
@@ -60,6 +52,53 @@ const GECKO_KNOWN = {
   sites: 1,
   why: 'the pause before asserting that a scripted submit raised the gate: a wait before a presence check, which can only fail late, never pass early',
 }
+
+/**
+ * The same wait in other spellings (B-189): `await new Promise((r) => setTimeout(r, …))` in
+ * a spec or a helper, and `waitForTimeout` in `tools/gecko-layout.mjs`, which the walk above
+ * did not read. Each remaining site is a pause inside a loop with its own deadline, which can
+ * only make a check late, never let it pass early.
+ */
+const TIMER = new RegExp('set' + 'Timeout\\(', 'g')
+
+const TIMER_KNOWN: Record<string, { sites: number; why: string }> = {
+  'e2e/surfaces.ts': {
+    sites: 1,
+    why: 'the poll in expectSettled, between reads of a settle mark, inside its own deadline',
+  },
+  'tools/firefox-e2e.mjs': {
+    sites: 1,
+    why: 'the poll for geckodriver to answer /status, inside its own deadline',
+  },
+}
+
+/** Every file that drives a browser for a check: specs, their helpers, both Gecko tools. */
+function drivers(): string[] {
+  const e2e = globSync('e2e/*.ts', { cwd: root }).map((file) => file.split(path.sep).join('/'))
+  return [...e2e, 'tools/firefox-e2e.mjs', 'tools/gecko-layout.mjs']
+}
+
+describe('timers standing in for a signal', () => {
+  it('appear only where they are named, and no more often', () => {
+    const found: Record<string, number> = {}
+    for (const file of drivers()) {
+      const count = readFileSync(path.join(root, file), 'utf8').match(TIMER)?.length ?? 0
+      if (count > 0) found[file] = count
+    }
+    const allowed = Object.fromEntries(Object.entries(TIMER_KNOWN).map(([file, { sites }]) => [file, sites]))
+    expect(found, 'wait for the product to say the check settled, not for a timer').toEqual(allowed)
+  })
+
+  it('reads the Gecko layout tool for the Playwright spelling too', () => {
+    const text = readFileSync(path.join(root, 'tools/gecko-layout.mjs'), 'utf8')
+    expect(text.match(FIXED_WAIT)?.length ?? 0, 'tools/gecko-layout.mjs: wait for the area to paint').toBe(0)
+  })
+
+  it('refuses the shape it exists for', () => {
+    const planted = '  await new Promise((resolve) => setTimeout(resolve, 500))'
+    expect(planted.match(TIMER)?.length).toBe(1)
+  })
+})
 
 describe('fixed waits in e2e specs', () => {
   it('appear only where they are named, and no more often', () => {

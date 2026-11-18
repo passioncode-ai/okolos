@@ -42,9 +42,21 @@ test('the page cannot read the inspector when it is open', async ({ context }) =
   await page.goto('https://fixture.test/')
   await expectBanner(page, context)
 
+  /**
+   * Opened the way a keyboard user opens it, because the banner's root is closed and no
+   * locator reaches its button. Focus navigation enters a closed shadow root, so the first
+   * Tab on a page with nothing else to focus lands on the banner's primary, and Enter
+   * presses it. Until 2026-11-18 this test never opened the inspector at all, so it read
+   * `null` from an element that did not exist and passed on that (B-189).
+   */
+  await page.keyboard.press('Tab')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('okolos-inspector')).toHaveCount(1)
+
   const leak = await page.evaluate(() => {
     const host = document.querySelector('okolos-inspector')
     return { present: host !== null, shadow: host?.shadowRoot ?? null }
   })
+  expect(leak.present).toBe(true)
   expect(leak.shadow).toBeNull()
 })
