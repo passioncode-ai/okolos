@@ -16,6 +16,7 @@
     "@okolos/storage": "workspace:*",
     "@okolos/ui": "workspace:*",
     "@okolos/core-sanitizer": "workspace:*",
+    "@okolos/core-collect": "workspace:*",
     "@okolos/core-gate": "workspace:*",
     "@okolos/core-queue": "workspace:*",
     "@okolos/core-feeds": "workspace:*",

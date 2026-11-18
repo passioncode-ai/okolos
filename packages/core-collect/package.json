@@ -1,0 +1,11 @@
+{
+  "name": "@okolos/core-collect",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "description": "Finds text kept from a person and left for an AI agent, over an abstract view of a page. Pure: no DOM.",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "build": "tsc -b" },
+  "dependencies": { "@okolos/contracts": "workspace:*" }
+}

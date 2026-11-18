@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "dist" },
+  "include": ["src/**/*.ts"],
+  // Tests are not part of a built package, and shipping them puts their
+  // fixtures inside the artefact the bundle gates read.
+  "exclude": ["src/**/*.test.ts"],
+  "references": [{ "path": "../contracts" }]
+}
