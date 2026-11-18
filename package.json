@@ -45,7 +45,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.57.0",
+    "@playwright/test": "^1.65.1",
     "@types/chrome": "^0.3.7",
     "@types/node": "^22.18.0",
     "@types/selenium-webdriver": "^4.35.7",
@@ -53,7 +53,7 @@
     "eslint": "^10.15.0",
     "fake-indexeddb": "^6.2.8",
     "fast-check": "^4.10.2",
-    "geckodriver": "^6.1.1",
+    "geckodriver": "^8.0.0",
     "happy-dom": "^21.0.4",
     "selenium-webdriver": "^4.53.0",
     "typescript": "^5.9.3",
