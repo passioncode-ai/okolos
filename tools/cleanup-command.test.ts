@@ -14,7 +14,7 @@
  * same command.
  */
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -86,5 +86,40 @@ describe('the LC-15 cleanup command (AGENTS.md)', () => {
 
   it.each(cleaned)('a removed outDir takes its tsconfig.tsbuildinfo with it: $dir', ({ dir }) => {
     expect(removedBy(targets, `${dir}/tsconfig.tsbuildinfo`)).toBe(true)
+  })
+})
+
+/** Every project `tsc -b` reaches from the root, through each project's own references. */
+function graph(): Set<string> {
+  const seen = new Set<string>()
+  const visit = (dir: string, config: string): void => {
+    const refs = (readJsonc(path.join(root, config)) as { references?: { path: string }[] }).references ?? []
+    for (const ref of refs) {
+      const next = path.posix.normalize(path.posix.join(dir, ref.path))
+      if (seen.has(next)) continue
+      seen.add(next)
+      visit(next, path.posix.join(next, 'tsconfig.json'))
+    }
+  }
+  visit('.', 'tsconfig.json')
+  return seen
+}
+
+describe('the tsc -b graph builds every core package (B-223)', () => {
+  // `tools/gates/bundle-scan.test.ts` reads `packages/core-*/dist`, which only
+  // `tsc -b` writes. A core package outside the graph has no dist, and the
+  // "no browser API / no network call inside any core-* bundle" gates pass
+  // without reading it: four packages were outside until 2026-11-18.
+  const core = readdirSync(path.join(root, 'packages'))
+    .filter((name) => name.startsWith('core-') && existsSync(path.join(root, 'packages', name, 'tsconfig.json')))
+    .map((name) => `packages/${name}`)
+  const built = graph()
+
+  it('finds the core packages to check', () => {
+    expect(core.length).toBeGreaterThan(10)
+  })
+
+  it.each(core)('%s is in the graph', (dir) => {
+    expect(built.has(dir), `${dir} is not reachable from the root tsconfig.json references`).toBe(true)
   })
 })

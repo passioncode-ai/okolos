@@ -26,6 +26,18 @@
       "path": "packages/core-sanitizer"
     },
     {
+      "path": "packages/core-credential"
+    },
+    {
+      "path": "packages/core-download"
+    },
+    {
+      "path": "packages/core-gate"
+    },
+    {
+      "path": "packages/core-traps"
+    },
+    {
       "path": "packages/model"
     },
     {
