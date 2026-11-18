@@ -121,7 +121,7 @@ describe('a wait in a browser spec is named', () => {
     const literals: string[] = []
     for (const file of specs()) {
       const name = path.basename(file)
-      for (const [i, line] of readFileSync(file, 'utf8').split('\n').entries()) {
+      for (const [i, line] of readFileSync(file, 'utf8').split(/\r?\n/).entries()) {
         const code = line.trim()
         if (code.startsWith('//') || code.startsWith('*')) continue
         if (!/\btimeout:\s*\d/.test(code)) continue

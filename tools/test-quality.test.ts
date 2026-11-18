@@ -54,7 +54,7 @@ describe('no end-to-end test can pass by giving up', () => {
 
   for (const name of specs) {
     it(`${name} contains no bare early return`, () => {
-      const lines = readFileSync(path.join(root, 'e2e', name), 'utf8').split('\n')
+      const lines = readFileSync(path.join(root, 'e2e', name), 'utf8').split(/\r?\n/)
       const offenders = lines
         .map((line, index) => ({ line: line.trim(), number: index + 1 }))
         .filter((entry) => /^if\s*\(.*\)\s*return\s*;?$/.test(entry.line))
@@ -74,7 +74,7 @@ describe('no unit test hides its assertions behind a branch', () => {
 
   for (const file of units) {
     it(`${file} asserts unconditionally`, () => {
-      const lines = readFileSync(path.join(root, file), 'utf8').split('\n')
+      const lines = readFileSync(path.join(root, file), 'utf8').split(/\r?\n/)
       const offenders: string[] = []
 
       lines.forEach((raw, index) => {

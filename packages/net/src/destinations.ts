@@ -65,6 +65,15 @@ export const DESTINATIONS: Readonly<Record<Purpose, readonly string[]>> = {
    * If it ever becomes a fetch, this list is where it has to be admitted.
    */
   'domain-status': [],
+
+  /**
+   * Usage and error events (B-198, B-199): names of actions and errors from a closed
+   * catalogue, a random install id, the extension version, browser and system, and never
+   * a page address, page text, file name, email or password. The organisation's Aptabase,
+   * not another Aptabase instance: PassionCode products send to their own server
+   * (the analytics owner, 2026-11-04).
+   */
+  'usage-data': ['analytics.passioncode.ai'],
 }
 
 /**

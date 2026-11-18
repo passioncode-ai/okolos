@@ -127,7 +127,7 @@ describe('a frame reports through the background, not through the page', () => {
     const posts: string[] = []
     for (const file of contentSources()) {
       const source = readFileSync(file, 'utf8')
-      for (const line of source.split('\n')) {
+      for (const line of source.split(/\r?\n/)) {
         // A comment may name the thing it refuses; a call may not exist. The difference is
         // the leading `//` or `*`, which is why the trimmed line is tested rather than the
         // file: this file's own subject appears in three comments in `content/index.ts`.

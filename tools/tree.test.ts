@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { directoriesIn, filesIn, filesUnder } from './tree.mjs'
+import { directoriesIn, filesIn, filesUnder, posixRelative, toPosix } from './tree.mjs'
 
 let dir: string
 
@@ -109,21 +109,21 @@ describe('filesUnder', () => {
   })
 
   it('finds every depth, and sorts', () => {
-    const found = filesUnder(deep, '.ts').map((file) => path.relative(deep, file))
+    const found = filesUnder(deep, '.ts').map((file) => posixRelative(deep, file))
     expect(found).toEqual(['src/middle.ts', 'src/nested/bottom.ts', 'top.ts'].sort())
   })
 
   it('skips node_modules and dist by default, because every caller did', () => {
     // Six gates walked the tree themselves and all six skipped exactly these two. The
     // parameter exists so a caller can say otherwise, not so each can invent a list.
-    const found = filesUnder(deep, '.ts').map((file) => path.relative(deep, file))
+    const found = filesUnder(deep, '.ts').map((file) => posixRelative(deep, file))
     expect(found.some((file) => file.startsWith('node_modules/'))).toBe(false)
     expect(found.some((file) => file.startsWith('dist/'))).toBe(false)
   })
 
   it('honours a caller that wants a different skip', () => {
     const found = filesUnder(deep, '.ts', { skip: ['node_modules'] }).map((file) =>
-      path.relative(deep, file),
+      posixRelative(deep, file),
     )
     expect(found).toContain('dist/built.ts')
     expect(found.some((file) => file.startsWith('node_modules/'))).toBe(false)
@@ -145,5 +145,20 @@ describe('filesUnder', () => {
     // caller that will accept `.DS_Store` as one.
     expect(filesUnder(deep, '.ts').every((file) => file.endsWith('.ts'))).toBe(true)
     expect(filesUnder(deep, '.md').map((file) => path.basename(file))).toEqual(['notes.md'])
+  })
+})
+
+describe('naming a file the way the repository does (B-164)', () => {
+  it('turns a Windows separator into /, which is how every gate spells a path', () => {
+    // The separator is a parameter so the Windows spelling is checked on every machine.
+    expect(toPosix('packages\\ui\\src\\x.ts', '\\')).toBe('packages/ui/src/x.ts')
+  })
+
+  it('leaves a POSIX path exactly as it was', () => {
+    expect(toPosix('packages/ui/src/x.ts', '/')).toBe('packages/ui/src/x.ts')
+  })
+
+  it('answers relative paths with / on this platform too', () => {
+    expect(posixRelative(path.join('a', 'b'), path.join('a', 'b', 'c', 'd.ts'))).toBe('c/d.ts')
   })
 })

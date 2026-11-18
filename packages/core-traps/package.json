@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
-  "description": "Recognises ClickFix and tech-support traps from page evidence. Pure.",
+  "description": "Recognises ClickFix, tech-support and outside-the-browser link traps from page evidence. Pure.",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "build": "tsc -b" }
 }

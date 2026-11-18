@@ -9,16 +9,38 @@
 `package.json` не остался здесь неназванным. Возможность, о которой никто не
 знает, отличается от отсутствующей только тем, что за неё уже заплатили.
 
+## На каких ОС
+
+Решение прогона стабильности и Windows от 2026-10-27, принятое по умолчанию (B-166): на вопрос
+1 «Поддержка Windows» канва прогона записала сразу с пометкой «принято по умолчанию» (коммит `4c22375`), ответа оператора нет, и действует её рекомендация. Что из
+этого можно обещать пользователю и откуда решение, записано в
+[facts.md](../brand/facts.md#где-работает); здесь то же для того, кто собирает и проверяет.
+Столбец «Обещано» и есть решение, столбец справа говорит, что его доказывает, и где
+доказательства пока нет. Что делается на Windows иначе и что там проверено, записано один раз,
+в разделе [«Windows»](#windows) ниже; таблица на него ссылается.
+
+| Что | Обещано | Чем подтверждено |
+|---|---|---|
+| Расширение | Chrome 137+, Edge 137+ и Firefox 129+ на Windows, macOS и Linux | пороги версий из манифестов и [ADR-0011](../adr/0011-the-signature-primitive-decides-the-supported-range.md); кода, зависящего от ОС, в сборке нет (`tools/docs.test.ts`); Edge получает сборку Chrome; браузерный прогон есть в CI только на Linux, в Chromium и Firefox из Playwright; прогона в Edge, на Windows или на macOS с записанным коммитом нет; такие прогоны: строка B-172 |
+| `okolos-mail scan` | Windows, macOS и Linux (B-161 закрыт) | исправления запуска в этом дереве; тест, который запускает саму команду, проходит в CI на Linux и Windows (прогон 40572549603 на `3276f2c`); B-161 закрыт, последний прогон 40625746452 на `46a5752` ([facts.md](../brand/facts.md#где-работает)) |
+| Наблюдение за почтой (SCN-042) | только Apple Mail на macOS | не построено, `docs/ux/scenarios.md` |
+| `pnpm gates` и хук pre-push | macOS, Linux и Windows | Linux и Windows: задачи `gates` и `gates (windows)` в `.github/workflows/ci.yml`, прогон 40572549603 на `3276f2c` зелёный; что гоняет задача Windows и чего она не проверяет (полный прогон хука в том числе), в разделе [«Windows»](#windows). macOS: задачи в CI нет; гейты на macOS гоняет хук pre-push при каждой отправке, но сохранённой записи такого прогона нет |
+| `pnpm package` | macOS, Linux и Windows | прогона с записью архива и с записанным коммитом нет ни на одной ОС; на Windows архив пишет `tar.exe` (раздел [«Windows»](#windows), `tools/archive.test.ts`). CI гоняет `pnpm package:check`, те же проверки без записи архива; сам `pnpm package` в CI не идёт ни на одной ОС |
+| `pnpm test:e2e`, `pnpm test:e2e:firefox` | macOS, Linux и Windows | задачи `e2e (chromium)` и `e2e (firefox)` только на `ubuntu-latest`; на macOS и Windows e2e в CI нет (раздел [«Windows»](#windows)) |
+| Агент фида (`pnpm feed:agent`) | только macOS | launchd, [ADR-0017](../adr/0017-the-feed-agent-publishes-from-a-pinned-checkout-and-counts-from-what-is-served.md) |
+| Okolos Agent (мост, фаза Б1) | только macOS; Windows отдельной фазой | [ADR-0020](../adr/0020-okolos-agent-b1-runs-on-macos-only.md); Windows: B-171 |
+
 ## Что нужно на машине
 
 | Что | Версия | Зачем |
 |---|---|---|
-| Node | `>=22.18` (гейты проверены на 26.10.0; импорт `.ts` из `tools/*.mjs` также на 22.23.1): с 22.18 Node снимает типы по умолчанию, а `tools/agent-window-spike.mjs` и `tools/sign-feed.mjs` импортируют `.ts` напрямую | всё остальное |
-| pnpm | `11.10.0`, задан в `packageManager` | воркспейс из 22 пакетов |
-| Python 3 | любой 3.x (проверено на 3.14.6) | `docs/ux/lint.py`, `tools/model/evaluate.py` |
+| Node | `^22.18.0 \|\| >=23.6.0` (`engines` в `package.json`; проверено на 26.4.0 и 26.10.0): ниже `okolos-mail` не запускается, и его тест в `pnpm test` краснеет | всё остальное; с этих версий node снимает типы с TypeScript без флага, а `okolos-mail` запускается из исходников (B-161) |
+| pnpm | `11.10.0`, задан в `packageManager` | воркспейс из 27 пакетов (`apps/*` и `packages/*`) |
+| Python 3 | 3.7 и новее для линтеров (`tools/python.mjs` берёт первый такой), 3.9 и новее для `tools/model/evaluate.py` (проверено на 3.14.6), под именем `python3`, `python` или `py -3` | `docs/ux/lint.py`, `docs/brand/lint.py`, `tools/model/evaluate.py` |
 | Браузеры Playwright | ставятся командой ниже | e2e в Chromium и Firefox |
 
-Corepack включит нужный pnpm сам:
+Corepack включит нужный pnpm сам (Node 22–24; с Node 25 corepack в поставку Node не
+входит, и pnpm ставится сам, см. «Windows» ниже, на macOS и Linux так же):
 
 ```bash
 corepack enable
@@ -30,6 +52,89 @@ pnpm exec playwright install chromium firefox
 `.githooks`, и с этого момента `git push` не уходит без гейтов. Это не
 формальность — 2026-08-07 красный коммит ушёл именно потому, что правило жило в
 документе, а push в шелле.
+
+### Windows
+
+`pnpm gates` и хук pre-push рассчитаны и на Windows-чекаут (B-162, B-163). Сверх
+таблицы выше нужны:
+
+- **Git for Windows.** Хук запускает его `sh`; `tools/ci.test.ts` находит этот `sh`
+  рядом с `git` (`git --exec-path`), даже когда в PATH его нет, как в PowerShell и cmd.
+- **Оболочка: Git Bash или PowerShell 7** (`pwsh`). Команды этого раннбука идут в обеих,
+  кроме трёх, которым нужен Git Bash (или macOS и Linux), замера окна агента, который работает только на macOS, и инструментов фида, которые на Windows не работают вовсе (таблица ниже): запись доступа
+  `printf %s "$VALUE" | node tools/access.mjs set …` в разделе «Доступы» (в PowerShell нет
+  `printf`); проверка `git ls-files --eol | grep w/crlf` в рецепте для старого клона (в
+  PowerShell нет `grep`; там `git ls-files --eol | Select-String w/crlf`); обход хука
+  `OKOLOS_SKIP_GATES=1 git push` (в PowerShell: `$env:OKOLOS_SKIP_GATES=1; git push`, затем
+  `Remove-Item Env:OKOLOS_SKIP_GATES`). Только на macOS: замер окна агента `node tools/agent-window-spike.mjs`
+  в разделе «Прочее» (Chrome из `/Applications`, сравнение с Chrome for Testing из его места на
+  Mac и чтение переднего приложения через `osascript`: на Linux фокус не читается). В `cmd.exe` и Windows PowerShell 5.1 часть команд читается иначе.
+- **Node и pnpm.** На Node 22–24 corepack включает pnpm, как выше; на Windows, где Node стоит в
+  Program Files, `corepack enable` обычно требует оболочку администратора, иначе ставьте pnpm
+  как для Node 25 ниже (CI на Windows ставит его `pnpm/action-setup`). С Node 25 corepack
+  в Node не входит: pnpm ставится `npm i -g pnpm` или автономным установщиком с
+  pnpm.io (`iwr https://get.pnpm.io/install.ps1 -useb | iex` в PowerShell); версию
+  всё равно задаёт `packageManager`.
+- **Python 3 под одним из имён `py -3`, `python`, `python3`.** Гейты зовут Python через
+  `tools/python.mjs`: он берёт первое имя, которое докажет, что это Python 3, поэтому
+  заглушка из Microsoft Store не проходит. На Windows линтеры получают `PYTHONUTF8=1`,
+  иначе русский вывод через трубу хука падает в cp1252.
+
+Что на Windows делается иначе, и где это проверено:
+
+| Что | macOS, Linux | Windows | Проверка |
+|---|---|---|---|
+| Python | `python3`, затем `python` | `py -3`, `python`, `python3` | `tools/python.test.ts` |
+| `pnpm`, `npx` из инструментов разработки (гейты, `pnpm package`, e2e, `deploy-worker`) | без оболочки | через cmd.exe одной строкой команды; аргумент со спецсимволом cmd отклоняется. Инструменты фида на Windows не работают: `feed:refresh` и публикация для машины с ключом подписи на macOS или Linux (ADR-0002), агент фида `feed:agent` только для macOS (launchd, ADR-0017) | `tools/bin.test.ts` |
+| архив `pnpm package` | `zip -q -r -X` | `%SystemRoot%\System32\tar.exe -a` | `tools/archive.test.ts` |
+| дерево процессов фида | сигнал группе | `taskkill /T`, через паузу `/T /F` | `tools/feed/bounded.test.ts` |
+| geckodriver в e2e Firefox, сборка в `pnpm package` по сроку | `child.kill()` | `taskkill /PID <pid> /T /F`: иначе кончается только cmd.exe | `tools/bin.test.ts` |
+| права 0600 на файлы с секретами | проверяются | тесты пропущены с причиной, `access.mjs` пишет `n/a` | `tools/feed/log.test.ts`, `tools/access.test.ts` |
+| Firefox для e2e | кэш Playwright в домашней папке | `%LOCALAPPDATA%\ms-playwright\firefox-*\firefox\firefox.exe` | `tools/find-firefox.test.ts` |
+
+Клон, сделанный до появления `.gitattributes`, держит в рабочем дереве CRLF: Git не
+переписывает файл, который не менялся, а `git add --renormalize .` трогает только индекс
+(индекс этого репозитория и так в LF, это держит `tools/ci.test.ts`, «holds no CRLF in the
+index»). Рабочее дерево переводят один раз, на чистом дереве: сначала закоммитьте или
+спрячьте (`git stash`) свою работу, потому что `reset --hard` выбрасывает незакоммиченное.
+
+```bash
+git status --porcelain                          # пусто: работа закоммичена или спрятана
+git rm -r --cached -q . && git reset -q --hard  # индекс заново из HEAD, файлы заново по .gitattributes
+git ls-files --eol | grep w/crlf                # ничего не печатает: на диске нет CRLF
+```
+
+Эти три строки исполняет `tools/ci.test.ts` («a clone made before .gitattributes is
+converted by the runbook's own commands»): берёт их из этого блока и гоняет во временном
+репозитории с `core.autocrlf=true`, где хук до перевода лежит с CRLF.
+
+Firefox для e2e на Windows лежит в `%LOCALAPPDATA%\ms-playwright`; порядок поиска один на
+все платформы и записан ниже, в разделе «Тесты, которые не входят в `gates`».
+
+`pnpm package` сверяет архив со сборкой по списку файлов из центрального каталога zip,
+а не по байтам: `zip` и `tar` пишут разные байты. Концы строк держит `.gitattributes`
+(`* text=auto eol=lf`): чекаут получает LF при любом `core.autocrlf`. `tools/ci.test.ts`
+проверяет это дважды: «line endings are LF on every checkout» читает `.gitattributes` и
+индекс, а тест рецепта для старого клона прогоняет его во временном репозитории с
+`core.autocrlf=true` и смотрит файлы на диске.
+
+На Windows гейты гоняет задача CI `gates (windows)` на `windows-latest`
+(`.github/workflows/ci.yml`, B-164; первый зелёный прогон
+[40517607494](https://github.com/passioncode-ai/okolos/actions/runs/40517607494) на
+`714e336`; дерево с исправлениями B-162 и B-163 проверил прогон
+[40572549603](https://github.com/passioncode-ai/okolos/actions/runs/40572549603) на `3276f2c`,
+зелёный во всех четырёх задачах; дерево с последними документами по Windows проверил
+[40625746452](https://github.com/passioncode-ai/okolos/actions/runs/40625746452) на `46a5752`,
+тоже зелёный). Её шаги: `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`,
+`pnpm build`, `pnpm test` (в нём архив через `tar.exe` из System32 и решение хука под `sh`
+из Git for Windows), `pnpm ux:lint`, `pnpm brand:lint`, `pnpm i18n:sweep` и
+`pnpm package:check` (проверки архива без записи). На Windows не проверены: e2e в Chromium и
+Firefox (обе задачи e2e идут только на Linux, решение записано в `ci.yml`), полный прогон
+хука pre-push со всеми гейтами, `pnpm package` с записью архива и загрузка в магазины архива,
+собранного на Windows, поиск Firefox в настоящем кэше Windows. Строки таблицы выше про e2e
+(geckodriver, Firefox в `%LOCALAPPDATA%`) доказаны только тестами, которым платформа
+передаётся параметром. Агент фида работает только под launchd на macOS (ADR-0017), на
+Windows его нет.
 
 ## Цикл разработки
 
@@ -111,7 +216,65 @@ elements» и больше ничего, а между навигацией и �
 дошло до воркера, воркер взял и не ответил, ответил и ответ потерялся. Правило на будущее —
 `tools/marks-read.test.ts`: метка, которую продукт пишет, обязана читаться отчётом. Оно
 завелось на двух настоящих пробелах (`okolos:scan-partial`, `okolos:banner`), а класс — самый
-дорогой в B-78: ответ лежал на странице, и никто его не спрашивал.
+дорогой в B-78: ответ лежал на странице, и никто его не спрашивал. С 2026-10-29 отчёт читает
+и `okolos:scan`. Фразу «ответ вернулся и обработан на странице» он печатает, только если
+последний скан спрашивал (`detail.asked`), страница не ослеплена и воркер говорит, что ответил;
+тогда потеря в монтировании, а не в обратном пути. Иначе он пишет, что скан осел без ответа.
+
+**Отсутствие проверяется после сигнала, а не после паузы.** Спека, которая утверждает «баннера
+нет», раньше ждала фиксированное время (одну, две, три секунды) и проверяла
+`toHaveCount(0)`. Под нагрузкой пауза кончалась раньше проверки, и утверждение проходило на
+проверке, которая ещё не выполнилась: зелёное ровно тогда, когда должно быть красным (B-169).
+Теперь продукт сам говорит, что проверка осела, уже после того, как предупреждение (если оно
+есть) нарисовано, а спека ждёт этого через `expectSettled` и `expectPageSettled` из
+`e2e/surfaces.ts`:
+
+| Метка | Где | Что значит |
+|---|---|---|
+| `okolos:scan` | страница и каждый фрейм | скан и то, что он запустил (вердикт нарисован, отчёт фрейма дошёл до страницы или сдан), осели; одна запись на документ, последняя |
+| `okolos:lookalike` | верхний фрейм | проверка адреса осела |
+| `okolos:pending` | верхний фрейм | вопрос «нет ли у вкладки непоказанного вердикта о пароле» отвечен |
+| `okolos:password` | воркер | пароль проверен, скомпрометированный вердикт сохранён для вкладки и предложен ей |
+| `okolos:focus-judged`, `okolos:trap-judged` | только сборка с хуками | фокус оценён паузой перед паролем (повторный фокус после первого решения, во фрейме после доставки отчёта); страница осмотрена ловушками |
+| `okolos:password-handled` | только сборка с хуками, документ, отправивший пароль | этот документ обработал ответ о пароле: нарисовал предупреждение, передал его странице (или сдал) или решил молчать |
+
+Ни одна метка не пишется для проверки, которая упала, поэтому незавершённая проверка даёт
+падение с фразой «проверка не закончилась», а не пустое отсутствие.
+
+**Сколько записей это оставляет в странице.** Страницу, которая всё время меняется, продукт
+пересканирует до двух раз в секунду, а записи User Timing не вытесняются. Поэтому `okolos:scan`
+перед записью стирает предыдущую: в документе всегда одна запись, о последнем скане, и ожидание
+«осел хотя бы раз» видит её так же. `okolos:lookalike` и `okolos:pending` пишутся один раз на
+документ, `okolos:password` один раз на проверку пароля в воркере. `okolos:collect` с двумя
+метками-концами по-прежнему пишется на каждый скан, как и до этой правки. Три метки из
+последних двух строк таблицы пишутся на каждое событие и поэтому есть только в
+`dist/<target>-e2e`; ждать их надо от счёта до действия плюс один, потому что более раннее
+событие тоже удовлетворяет «хотя бы одна».
+
+`tools/gates/bundle-scan.test.ts` проверяет, что в поставляемом бандле этих трёх меток нет.
+Вторая половина проверки, что в тестовой сборке они есть, читает `dist/*-e2e`, которую
+`pnpm test` и `pnpm gates` не собирают. Когда этой сборки нет или она старше исходников, тест
+**пропускается**, и причина с командой `pnpm build:e2e` стоит в его имени; после
+`pnpm build:e2e` или `pnpm test:e2e` он выполняется. `tools/fixed-waits.test.ts` отказывает
+`waitForTimeout` в спеках и `driver.sleep` в `tools/firefox-e2e.mjs`, кроме названных мест с
+причиной; чистая страница в Firefox теперь тоже ждёт `okolos:scan` и `okolos:lookalike`.
+
+**Строку журнала ждут перезагрузкой, а не по контейнеру.** Экран журнала снимается в момент
+открытия, поэтому «дождаться `[data-role=journal]` и сразу прочитать строку» читает то, что
+было записано до открытия: так `panel-shape.spec.ts` упал на CI с «no journal row to measure».
+`expectJournalRows(journal, selector)` перезагружает экран, пока строка не появится.
+
+**Спека действует на странице только после того, как контент-скрипт слушает.** Скрипты идут на
+`document_idle`, а Chrome может поставить его после события `load`, которого ждёт `page.goto`.
+Фокус или клик раньше этого не доходит ни до кого, а пауза перед паролем спрашивается один раз
+на страницу. `expectScriptReady(page или frame)` ждёт `okolos:collect`, который ставится после
+регистрации всех слушателей; фрейм находит `frameAt(page, origin)`. До 2026-10-29 так не ждали
+`scn-011`, `scn-034` и первый тест `scn-036`, а помощник в `scn-035` искал фрейм по чужому
+адресу и ждал скрипт верхнего документа (B-78).
+
+**Обе обвязки не пускают набор в интернет.** `e2e/hooks.ts` отвечает 503 на любой адрес,
+кроме тех, что спека подала сама, как `e2e/fixtures.ts` с SCN-007. Без этого пароль не из
+общего списка уходил в настоящий сервис диапазонов, и проверка ждала сеть.
 
 **Спека не навигирует раньше, чем расширение зарегистрировано.** Ожидание воркера —
 в фикстуре `context` обоих харнессов, одно определение в `e2e/ready.ts`. До
@@ -135,9 +298,17 @@ elements» и больше ничего, а между навигацией и �
 это проверка, а не соглашение — закрытый корень и есть граница доверия
 ([ADR-0001](../adr/0001-closed-shadow-root.md)).
 
-Firefox-прогон ищет бинарник в кэше Playwright, иначе — `FIREFOX_BINARY`. Он
-поднимает geckodriver на порту 4444; занятый порт — самая частая причина
-непонятного падения.
+Firefox-прогон берёт бинарник так (`tools/find-firefox.mjs`, тест
+`tools/find-firefox.test.ts`, «lets FIREFOX_BINARY win»): `FIREFOX_BINARY`, когда переменная
+задана, на любой платформе; иначе самый новый Firefox из всех кэшей Playwright
+(`PLAYWRIGHT_BROWSERS_PATH`, на macOS и Linux `~/Library/Caches/ms-playwright`,
+`~/.cache/ms-playwright` и `/root/.cache/ms-playwright`, на Windows
+`%LOCALAPPDATA%\ms-playwright`). Нет ни одного: прогон отказывает с командой
+`pnpm exec playwright install firefox`. Это касается только первого шага
+`pnpm test:e2e:firefox`; второй шаг, `gecko-layout`, берёт Firefox и Chromium Playwright сам, и
+`FIREFOX_BINARY` его не меняет: нужен `pnpm exec playwright install firefox chromium`. Первый шаг
+(`tools/firefox-e2e.mjs`) поднимает geckodriver на порту 4444; занятый порт бывает самой частой
+причиной непонятного падения.
 
 ## Генерируемое — руками не править
 
@@ -163,7 +334,7 @@ pnpm i18n:sweep              # входит в gates: отказывает, ес
 pnpm feed:ingest             # собрать блок-лист из OpenPhish в ~/.okolos/state/feeds/phishing.json
 pnpm feed:refresh            # собрать и опубликовать одной командой (ключ подписи, чекаут на origin/main)
 pnpm feed:agent              # поставить launchd-агента: обновляет фид каждые 12 часов
-pnpm feed:snapshot           # скопировать опубликованный фид в feeds/phishing.json — для коммита
+pnpm feed:snapshot           # скопировать опубликованный фид в feeds/phishing.json для коммита; агент сам открывает PR со снимком через 7 дней (B-158)
 node tools/i18n-sweep.mjs --list   # каждая, с файлом и строкой
 ```
 
@@ -175,9 +346,32 @@ node tools/i18n-sweep.mjs --list   # каждая, с файлом и строк
 ## Выпуск
 
 ```bash
-pnpm package         # собирает, проверяет, кладёт zip и печатает размер и sha256
-pnpm package:check   # те же проверки, без записи архива
+pnpm package         # собирает, проверяет, кладёт zip и печатает размер и sha256 (нужен ключ, ниже)
+pnpm package:check   # те же проверки, без записи архива; ключ не нужен, так идёт CI
 ```
+
+Архив для магазина собирается с ключом приложения Aptabase из хранилища, только для этой
+команды (B-198, B-199). Без ключа `pnpm package` останавливается и печатает эту же команду:
+
+```bash
+python3 "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod \
+  passioncode-platform APTABASE_APP_KEY_OKOLOS -- pnpm package
+```
+
+Ключ попадает только в `background.js` архива; сборка с `production` отправляет события об
+использовании и ошибках на `analytics.passioncode.ai`. Любая другая сборка (`pnpm build`, e2e, CI)
+идёт без ключа и ничего не отправляет: `tools/build.mjs` вписывает ключ только вместе с
+`OKOLOS_USAGE_ENV=production`, который ставит одна `pnpm package`. После архивов она пересобирает
+`dist/chrome` и `dist/firefox` без ключа, а при любом другом выходе (ошибка, исключение, Ctrl-C)
+удаляет их (`tools/keyed-builds.mjs`, тест `tools/keyed-builds.test.ts`); `tools/analytics.test.ts`
+(«the App-Key») не пускает ключ ни в отслеживаемые файлы, ни в `dist/` вне архива.
+
+**Сначала воркер, потом архив.** Карточка магазина называет политикой страницу `/privacy` воркера,
+а воркер выкладывается отдельно ([worker-deploy.md](worker-deploy.md)). `pnpm package` читает эту
+страницу и останавливается, если её дата «Обновлено» старше, чем в `docs/privacy.md`, если в ней
+нет текста, который `tools/privacy-page.mjs` делает из `docs/privacy.md` (дата одна на день, а
+документ за день меняется не раз), или если страница не ответила (`tools/privacy-served.mjs`, тест `tools/privacy-served.test.ts`): архив,
+который отправляет данные, не уходит, пока опубликованная политика говорит, что их нет.
 
 Архивы уходят в `apps/extension/dist/release/okolos-<target>-<version>.zip`.
 Упаковка отказывается от сборки с тестовыми хуками, от манифеста, называющего
@@ -273,6 +467,7 @@ pnpm suffix:gap      # таблица суффиксов против насто
 каждый процесс перед выходом. Окно может на секунду появиться на экране:
 
 ```bash
+# только на macOS: Chrome из /Applications, фокус читается через osascript
 node tools/agent-window-spike.mjs --out /tmp/b0.json   # инфобар, CDP, размер снимка, фокус
 ```
 

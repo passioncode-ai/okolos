@@ -45,6 +45,17 @@ const rel = (p: string) => path.relative(root, p)
  * their feature never shipped.
  */
 const EXEMPT: ReadonlyArray<{ readonly file: string; readonly why: string }> = [
+  // The model stage is not shipped (ADR-0006), so nothing that ships may import its
+  // library: until B-131 the background did, and both background bundles carried a
+  // classifier that could never run. The package stays as tested library code for the
+  // day the stage is measured again; `tools/model-stage.test.ts` holds the other side,
+  // that no shipped source imports it and no background bundle carries it.
+  ...['index', 'host', 'manager', 'runtime', 'session'].map((name) => ({
+    file: `packages/model/src/${name}.ts`,
+    why:
+      'ADR-0006: the third stage is not shipped, and B-131 took its library out of the ' +
+      'background bundles; kept as tested library code, held out by tools/model-stage.test.ts',
+  })),
   { file: 'apps/extension/src/agent-probe.ts', why: 'Okolos Bridge Б1: the daemon apps/agent (module K3, B-142) is the caller and is not written yet. Branch bridge/b1 does not merge to main until K3 removes this row' },
   { file: 'packages/core-snapshot/src/index.ts', why: 'Okolos Bridge Б1: the daemon apps/agent (module K3, B-142) is the caller and is not written yet. Branch bridge/b1 does not merge to main until K3 removes this row' },
   { file: 'packages/core-snapshot/src/snapshot.ts', why: 'Okolos Bridge Б1: the daemon apps/agent (module K3, B-142) is the caller and is not written yet. Branch bridge/b1 does not merge to main until K3 removes this row' },

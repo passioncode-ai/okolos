@@ -73,6 +73,37 @@ const PRETEXT =
 /** What a copied ClickFix payload looks like. */
 const PAYLOAD = /\b(powershell|iex|invoke-expression|curl\s|wget\s|mshta|certutil|bitsadmin|base64|cmd\s*\/c|bash\s+-c|\/bin\/sh)\b/i
 
+/**
+ * The Windows programs that run something for a payload (B-165, audit 2026-10-27).
+ *
+ * The campaigns moved past PowerShell to programs every Windows machine already has:
+ * `msiexec` installing a package from a URL, `rundll32` and `regsvr32` loading a
+ * library, `conhost --headless` hiding the window, `forfiles /c` and
+ * `wmic process call create` starting a process. Unlike the words above, these are
+ * matched **with the switch or the argument that makes them a command**, because the
+ * names alone are ordinary prose on every administrator's how-to page: "use msiexec to
+ * repair the installer" is not a payload, `msiexec /q /i https://…` is.
+ *
+ * Round 1 of the certification tightened each form against what it had missed and
+ * what it had read wrongly. Windows takes `-i` as readily as `/i`. `msiexec` counts
+ * when its switches are followed by a package (an address, a shared folder, a drive
+ * path, a `.msi` or `.msp`), so "run msiexec /x to uninstall" stays prose. `rundll32`
+ * counts when the part before the comma is a library or a path, so "see rundll32
+ * docs, chapter 3" stays prose. `regsvr32` loads a library from another computer with
+ * no switch at all, and `wmic /node:` aims the same process call at another machine.
+ */
+const MSIEXEC = String.raw`msiexec(?:\.exe)?(?:\s+["']?[/-][a-z]+["']?)+\s+["']?(?:https?://|\\\\|[a-z]:\\|[^\s"']+\.ms[ip]\b)`
+const RUNDLL32 = String.raw`rundll32(?:\.exe)?\s+["']?(?:[^\s,"']*[\\/][^\s,"']*|[^\s,"']+\.dll)["']?\s*,|rundll32(?:\.exe)?\s+javascript:`
+const REGSVR32 = String.raw`regsvr32(?:\.exe)?\s+["']?(?:[/-][a-z]|\\\\|https?://)`
+const CONHOST = String.raw`conhost(?:\.exe)?\s+--headless\b`
+const FORFILES = String.raw`forfiles(?:\.exe)?\s+(?:[/-][a-z]\s+\S+\s+)*[/-]c\b`
+const WMIC = String.raw`wmic(?:\.exe)?\s+(?:/[a-z]+(?::(?:"[^"]*"|\S+))?\s+)*process\s+call\s+create\b`
+const LAUNCHER = new RegExp(String.raw`\b(?:${[MSIEXEC, RUNDLL32, REGSVR32, CONHOST, FORFILES, WMIC].join('|')})`, 'i')
+
+function isCommand(copied: string): boolean {
+  return PAYLOAD.test(copied) || LAUNCHER.test(copied)
+}
+
 export function detectClickFix(evidence: ClickFixEvidence): ClickFixVerdict | null {
   const signals: string[] = []
   const text = evidence.text
@@ -81,7 +112,7 @@ export function detectClickFix(evidence: ClickFixEvidence): ClickFixVerdict | nu
   if (RUN_TARGET.test(text)) signals.push('names-a-place-outside-the-browser')
   if (PASTE_STEP.test(text)) signals.push('tells-you-to-paste')
   if (PRETEXT.test(text)) signals.push('fake-verification')
-  if (evidence.copied !== null && PAYLOAD.test(evidence.copied)) signals.push('copied-text-is-a-command')
+  if (evidence.copied !== null && isCommand(evidence.copied)) signals.push('copied-text-is-a-command')
 
   const pagePattern =
     signals.includes('names-a-place-outside-the-browser') && signals.includes('tells-you-to-paste')

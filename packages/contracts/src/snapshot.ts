@@ -39,6 +39,32 @@ export interface HiddenTextCandidate {
   readonly concealment: readonly ConcealmentTechnique[]
   readonly carrier: CarrierKind
   readonly charClasses: readonly CharClass[]
+  /**
+   * The caller's own name for the node the candidate came from, echoed unchanged and never
+   * interpreted (B-222). PassionView passes its `backendNodeId` in the abstract tree it hands
+   * `@okolos/core-collect`, and maps a finding back to its snapshot by it. Absent when the
+   * input carried none, which is how the extension's DOM adapter calls the collector: a key
+   * is never guessed.
+   */
+  readonly key?: string
+}
+
+/**
+ * A stable name for one candidate: its locator and a hash of its text (B-222).
+ *
+ * The locator alone is not enough, because one element yields two candidates when it carries
+ * text in an attribute and hidden text of its own, and a caller that marks or cuts what was
+ * found has to tell them apart. The hash is FNV-1a over the UTF-16 code units of the text the
+ * candidate reports, so the same candidate gets the same name in every runtime and on every
+ * run; it is a name, not a secret, and it is not meant to resist anyone choosing a collision.
+ */
+export function candidateSpanId(candidate: Pick<HiddenTextCandidate, 'locator' | 'text'>): string {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < candidate.text.length; i += 1) {
+    hash ^= candidate.text.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  return `${candidate.locator}@${hash.toString(16).padStart(8, '0')}`
 }
 
 export interface PageCandidates {

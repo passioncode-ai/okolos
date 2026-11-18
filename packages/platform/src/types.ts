@@ -4,8 +4,8 @@ import type { Envelope, RpcMap, RpcType } from '@okolos/contracts'
  * The surface the rest of the product is allowed to see.
  *
  * Everything that differs between Chrome and Firefox is absorbed here: Chrome
- * runs a service worker with no DOM and needs an offscreen document to run
- * inference, Firefox keeps a background page and a blocking webRequest. A
+ * runs a service worker with no DOM, Firefox keeps a background page and a
+ * blocking webRequest. A
  * detector that knew any of that would have to be rewritten per browser; one
  * that takes candidates and returns verdicts does not.
  */
@@ -15,10 +15,10 @@ export interface Platform {
   readonly alarms: Alarms
   readonly runtime: Runtime
   readonly tabs: Tabs
-  readonly inference: Inference
   readonly blocking: Blocking
   readonly downloads: Downloads
   readonly extensions: Extensions
+  readonly dataConsent: DataConsent
   /**
    * Resolves a message key against the browser's own catalogue.
    *
@@ -55,19 +55,35 @@ export interface Extensions {
   selfId(): string
 }
 
+/** A download as `onCreated` reports it. */
+export interface CreatedDownload {
+  id: number
+  url: string
+  finalUrl?: string
+  filename: string
+  mime: string | null
+}
+
 /** Downloads, where the only moment to intervene is before the bytes land. */
 export interface Downloads {
-  /** Fires as an item is created, before it is written. */
-  onCreated(
-    handler: (item: {
-      id: number
-      url: string
-      finalUrl?: string
-      filename: string
-      mime: string | null
-    }) => void,
-  ): void
+  /**
+   * Fires as an item is created, before it is written. `named` resolves to the same item with
+   * the file name the browser decides later (Chrome reports a new download with an empty name
+   * and fills it in through `downloads.onChanged`), or to the item as it is after five seconds
+   * without one; for an item that already has its name it resolves to that item at once. The
+   * item comes first so that a check that needs no name (the feed, by address) can cancel the
+   * download before the bytes land (round 8 of the B-165 certification: waiting for the name
+   * first let a listed file finish before its cancel).
+   */
+  onCreated(handler: (item: CreatedDownload, named: Promise<CreatedDownload>) => void): void
   cancel(id: number): Promise<void>
+  /**
+   * Discards a download by the state the browser reports: a running one is cancelled (the
+   * browser drops the partial file), a finished one has its file deleted, an interrupted one
+   * has nothing on disk; each is then dropped from the browser's list. True when no file of it
+   * is left; false when the file could not be deleted or the download is unknown.
+   */
+  discard(id: number): Promise<boolean>
   /** True when this browser exposes the API at all. */
   available(): boolean
 }
@@ -130,26 +146,25 @@ export interface Runtime {
   onMessage(handler: RpcHandler): void
   /** Fires once, on a fresh install — not on updates or browser restarts. */
   onInstalled(handler: () => void): void
+  /** Fires when this extension was updated to a new version; not on install or browser restart. */
+  onUpdated(handler: () => void): void
   /** Fires on browser start and on every install reason (install, update, browser update). */
   onBrowserStart(handler: () => void): void
   /** Absolute URL of a file inside the extension package. */
   getUrl(path: string): string
   openOptionsPage(): Promise<void>
+  /** The extension's own version, from its manifest; '0.0.0' when the browser gives none. */
+  version(): string
 }
 
-/** Where a model is allowed to run in this browser. */
-export type InferenceHostKind = 'offscreen' | 'background' | 'none'
-
-export interface Inference {
-  /**
-   * Makes sure a context exists that can run a model, and says which one it is.
-   *
-   * Chrome's service worker has no DOM and no WebGPU, so inference needs an
-   * offscreen document; Firefox keeps a background page and can run it there.
-   * `none` is a real answer — a browser that offers neither must be told apart
-   * from one where the model simply has not been fetched yet.
-   */
-  ensureHost(): Promise<InferenceHostKind>
+/**
+ * Firefox's built-in data consent (Firefox 140+), the `data_collection` half of
+ * `browser.permissions`. Chrome has none, so its adapter offers none of these.
+ */
+export interface DataConsent {
+  getAll?: () => Promise<{ data_collection?: string[] } & Record<string, unknown>>
+  request?: (permissions: { data_collection: string[] }) => Promise<boolean>
+  remove?: (permissions: { data_collection: string[] }) => Promise<boolean>
 }
 
 export interface Tabs {
@@ -184,7 +199,11 @@ export interface Tabs {
    * tab that has since navigated. The caller decides what to do about that; what
    * it must not do is assume the message landed.
    */
-  sendToActive<T extends RpcType>(type: T, payload: RpcMap[T]['req']): Promise<boolean>
+  /**
+   * The tab that took the message, or null when no page did. The id is how a later request
+   * from a page is matched to the warning it was shown (B-181).
+   */
+  sendToActive<T extends RpcType>(type: T, payload: RpcMap[T]['req']): Promise<number | null>
   /**
    * Delivers to one frame of one tab, addressed rather than guessed.
    *
@@ -216,6 +235,11 @@ export interface WebExtensionApi {
       remove(keys: string | string[]): Promise<void>
     }
   }
+  permissions?: {
+    getAll?(): Promise<{ data_collection?: string[] } & Record<string, unknown>>
+    request?(permissions: { data_collection: string[] }): Promise<boolean>
+    remove?(permissions: { data_collection: string[] }): Promise<boolean>
+  }
   alarms: {
     create(name: string, info: { periodInMinutes: number }): void
     /** Optional so a test double may omit it; both browsers ship it promise-based. */
@@ -224,6 +248,7 @@ export interface WebExtensionApi {
   }
   runtime: {
     getURL(path: string): string
+    getManifest?(): { version?: string }
     openOptionsPage?(): Promise<void> | void
     onInstalled: { addListener(cb: (details: { reason: string }) => void): void }
     onStartup?: { addListener(cb: () => void): void }
@@ -299,7 +324,16 @@ export interface WebExtensionApi {
         }) => void,
       ): void
     }
+    /** Where Chrome reports the file name it decided after `onCreated`, which carries none. */
+    onChanged?: {
+      addListener(cb: (delta: { id: number; filename?: { current?: string } }) => void): void
+    }
     cancel(id: number): Promise<void>
+    removeFile?(id: number): Promise<void>
+    erase?(query: { id: number }): Promise<number[]>
+    search?(query: { id: number }): Promise<
+      Array<{ id: number; url: string; finalUrl?: string; filename?: string; mime?: string; state?: string; exists?: boolean }>
+    >
   }
   management?: {
     getAll(): Promise<
@@ -324,14 +358,5 @@ export interface WebExtensionApi {
         filter?: unknown,
       ): void
     }
-  }
-  /** Chrome only. Absent in Firefox, which runs the model on its background page. */
-  offscreen?: {
-    hasDocument(): Promise<boolean>
-    createDocument(info: {
-      url: string
-      reasons: string[]
-      justification: string
-    }): Promise<void>
   }
 }

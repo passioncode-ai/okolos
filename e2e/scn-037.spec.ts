@@ -39,10 +39,24 @@ test('a page that embeds the block page gets nothing of ours', async ({
 
   // Set from the page, the way an attacker would. The id is fixed and public; what is not
   // reachable is the resource behind it.
-  await page.evaluate((id) => {
-    const frame = document.getElementById('framed') as HTMLIFrameElement
-    frame.src = `chrome-extension://${id}/interstitial.html`
-  }, extensionId)
+  /**
+   * The frame's own `load` is the signal that the browser has finished with the navigation,
+   * refusal included: measured in Chromium 2026-11-18, a refused extension resource still
+   * ends in `load` on the frame. Until then this waited three fixed seconds before asserting
+   * absence, which passes early on a loaded machine (B-189). The listener is attached before
+   * `src` is set, so a fast refusal cannot slip past it.
+   */
+  const settled = await page.evaluate(
+    (id) =>
+      new Promise<string>((resolve) => {
+        const frame = document.getElementById('framed') as HTMLIFrameElement
+        frame.addEventListener('load', () => resolve('load'), { once: true })
+        frame.addEventListener('error', () => resolve('error'), { once: true })
+        frame.src = `chrome-extension://${id}/interstitial.html`
+      }),
+    extensionId,
+  )
+  expect(settled).toBe('load')
 
   /**
    * **Two defences, and this asserts the outer one.**
@@ -55,7 +69,6 @@ test('a page that embeds the block page gets nothing of ours', async ({
    * outer one were ever configured away.
    */
   const framed = page.frameLocator('#framed')
-  await page.waitForTimeout(3_000)
 
   // None of the block page — and the control that matters least of all.
   await expect(framed.locator('[data-role=continue]')).toHaveCount(0)

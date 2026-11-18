@@ -54,3 +54,6 @@ apps/extension/.tsc/
 
 # task-pipeline graph lock (run-local)
 .task-pipeline/.graph.lock
+
+# Python bytecode the task-pipeline tools leave behind
+__pycache__/

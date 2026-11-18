@@ -20,7 +20,7 @@
 | **M0** | Каркас и контракты | REQ-01, REQ-02, REQ-27, REQ-30, REQ-31 | `contracts`, `platform`, `storage`, конфиги, CI | — |
 | **M1** | Сеть и самоаудит | REQ-08, REQ-28 | `net`, `ui/self-audit` | M0 |
 | **M2** | Стенд производительности | REQ-09 | `tools/gates/`, `e2e/budget.spec.ts`, `e2e/memory.spec.ts` | M0 |
-| **M3** | Детект инъекций | REQ-03, REQ-04, REQ-05 | `core-injection`, `corpora/injections` | M0 |
+| **M3** | Детект инъекций | REQ-03, REQ-04, REQ-05 | `core-collect`, `core-injection`, `corpora/injections` | M0 |
 | **M4** | Поверхности AI Shield | REQ-06, REQ-07 | `ui/banner`, `ui/inspector`, `ui/first-run` | M0, M1, M3 |
 | **M5** | Санитайзер и гейт агента | REQ-10, REQ-11 | `core-sanitizer`, `core-gate`, `ui/gate`, `content/agent-gate`, `content/sanitize` | M3, M4 |
 | **M6** | Ежедневные поверхности | REQ-12 | `core-queue`, `ui/popup`, `ui/queue`, `ui/journal`, `popup/state` | M0, M1 |

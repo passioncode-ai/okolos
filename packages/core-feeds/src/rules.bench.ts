@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest'
+import { describe, test } from 'vitest'
 
 import { buildRules, RULE_LIMIT } from './rules.js'
 import type { FeedSnapshot } from './apply.js'
@@ -33,19 +33,27 @@ describe('turning a feed into blocking rules', () => {
   const over = feed(RULE_LIMIT * 2)
   const exceptions = Array.from({ length: 50 }, (_, index) => `trusted-${index}.example.test`)
 
-  bench('2000 entries, no exceptions', () => {
-    buildRules(typical, [], '/blocked')
+  test('2000 entries, no exceptions', async ({ bench }) => {
+    await bench('2000 entries, no exceptions', () => {
+      buildRules(typical, [], '/blocked')
+    }).run()
   })
 
-  bench('5000 entries at the rule limit', () => {
-    buildRules(atLimit, [], '/blocked')
+  test('5000 entries at the rule limit', async ({ bench }) => {
+    await bench('5000 entries at the rule limit', () => {
+      buildRules(atLimit, [], '/blocked')
+    }).run()
   })
 
-  bench('10000 entries, over the limit', () => {
-    buildRules(over, [], '/blocked')
+  test('10000 entries, over the limit', async ({ bench }) => {
+    await bench('10000 entries, over the limit', () => {
+      buildRules(over, [], '/blocked')
+    }).run()
   })
 
-  bench('5000 entries with 50 exceptions', () => {
-    buildRules(atLimit, exceptions, '/blocked')
+  test('5000 entries with 50 exceptions', async ({ bench }) => {
+    await bench('5000 entries with 50 exceptions', () => {
+      buildRules(atLimit, exceptions, '/blocked')
+    }).run()
   })
 })

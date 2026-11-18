@@ -4,7 +4,7 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { directoriesIn, filesUnder } from './tree.mjs'
+import { directoriesIn, filesUnder, toPosix } from './tree.mjs'
 
 /**
  * REQ-30 — the licence and the attributions this project owes.
@@ -281,7 +281,8 @@ describe('the licences of what this project consumes', () => {
     const weights = ['packages', 'apps']
       .flatMap((dir) => walk(path.join(root, dir)))
       .filter((file) => /\.(onnx|bin|safetensors|gguf)$/.test(file))
-      .filter((file) => !file.includes('node_modules') && !file.includes('/dist/'))
+      // Separator-agnostic: on Windows the walk returns backslashed paths.
+      .filter((file) => !file.includes('node_modules') && !toPosix(file).includes('/dist/'))
 
     for (const file of weights) {
       const rel = path.relative(root, file)

@@ -21,7 +21,7 @@ never updated, which is the same drift this file exists to catch.)
 
 | ID | Screen | Used by | Figma | Status | Coverage |
 |----|--------|---------|-------|--------|----------|
-| SCR-01 | First-run check | FLW-01, FLW-14 | - | built | packages/ui/src/first-run/screen.ts:renderFirstRun |
+| SCR-01 | First-run check | FLW-01, FLW-14, FLW-24 | - | built | packages/ui/src/first-run/screen.ts:renderFirstRun |
 | SCR-02 | Popup | FLW-17, FLW-11, FLW-13 | - | built | e2e/scn-020.spec.ts |
 | SCR-03 | In-page warning banner | FLW-02, FLW-05, FLW-06, FLW-07, FLW-08, FLW-09, FLW-10 | - | built | packages/ui/src/banner/banner.ts:mountBanner |
 | SCR-04 | Finding inspector | FLW-02, FLW-03 | - | built | packages/ui/src/inspector/inspector.ts:mountInspector |
@@ -30,9 +30,9 @@ never updated, which is the same drift this file exists to catch.)
 | SCR-07 | Findings queue | FLW-01, FLW-17 | - | built | e2e/scn-020.spec.ts, e2e/scn-002.spec.ts |
 | SCR-08 | Leaks and repair | FLW-10, FLW-11, FLW-16 | - | built | e2e/scn-015.spec.ts |
 | SCR-09 | Extensions watch | FLW-12 | - | built | e2e/scn-017.spec.ts |
-| SCR-10 | Self-audit | FLW-13, FLW-17 | - | built | packages/ui/src/self-audit/panel.ts:renderSelfAudit |
+| SCR-10 | Self-audit | FLW-13, FLW-17, FLW-24 | - | built | packages/ui/src/self-audit/panel.ts:renderSelfAudit |
 | SCR-11 | Journal and weekly diff | FLW-17 | - | built | e2e/scn-020.spec.ts |
-| SCR-12 | Settings | FLW-05, FLW-14 | - | built | packages/ui/src/settings/data-controls.ts:renderDataControls |
+| SCR-12 | Settings | FLW-05, FLW-14, FLW-24 | - | built | packages/ui/src/settings/data-controls.ts:renderDataControls |
 | SCR-13 | Recovery checklist | FLW-06, FLW-07, FLW-16 | - | built | e2e/scn-025.spec.ts |
 | SCR-14 | Public domain status | FLW-04, FLW-15 | - | built | apps/proxy/src/router.test.ts |
 | SCR-15 | Dashboard overview | FLW-17 | - | built | packages/ui/src/dashboard/overview.ts:renderOverview, e2e/scn-027.spec.ts |
@@ -143,8 +143,20 @@ includes a redirect from `*.workers.dev`, not just a CNAME.
   2.2 AA, foundation → Product mechanics).
 - Every verdict shows its source: which check fired, which feed or stage, and
   when the data was last updated.
-- Every verdict is disputable in one click ("this is wrong"), and the
-  disagreement is remembered.
+- Every verdict is disputable in one click ("this is wrong"). How long the
+  disagreement is remembered depends on the surface: on a lookalike or a
+  login form on a new domain (in the page or in a frame) it adds the site to
+  trusted domains and outlives the page; the in-page trap panels (ClickFix
+  SCN-008, tech-support SCN-009, a link that may open a program SCN-049)
+  remember it for the life of the page only and journal nothing: after it
+  the same ClickFix or tech-support warning does not come back on that page
+  and writes no second journal line, and that one link goes through. The
+  link warning also obeys Trusted sites: on a trusted site it is not raised.
+  On the download panel "This is wrong" closes that panel and remembers
+  nothing. On the injection and leaked-password panels it clears the page's
+  findings and takes every panel down (`resolveEverything` in
+  `apps/extension/src/content/index.ts`); nothing outlives the page, and a
+  new finding later on the same page raises a new panel.
 - No counters of "threats blocked", no protection score, no streaks.
 - In-page surfaces render inside a closed Shadow DOM so page CSS cannot
   restyle or hide them.
@@ -163,7 +175,7 @@ generator, and the sheet declares no colour of its own.
 ## Screens
 
 ### SCR-01: First-run check
-- **Used by:** FLW-01 (all steps), FLW-14 (post-wipe return)
+- **Used by:** FLW-01 (all steps), FLW-14 (post-wipe return), FLW-24 (the usage and error data notice)
 - **Purpose:** deliver a real, local result within 30 seconds of install — the product's proof of value before any configuration
 - **Elements:** one-line statement of what runs locally; per-check progress list (open tabs / installed extensions / password corpus readiness); findings summary; **primary action: "Показать, с чего начать"**; secondary "Пока пропустить"; link "Что отправляется" → SCR-10
 - **States:**
@@ -175,8 +187,10 @@ generator, and the sheet declares no colour of its own.
   | success | findings exist | - | count by category, primary action into SCR-07 |
 - **Wireframe:** wireframes/SCR-01.md
 - **Coverage:** packages/ui/src/first-run/screen.ts:renderFirstRun, apps/extension/src/first-run/index.ts
-- **Scenarios:** SCN-001, SCN-002
+- **Scenarios:** SCN-001, SCN-002, SCN-050
+- **Usage notice (B-199):** one notice sentence that data about use and errors is sent, only to fix the product, and what is not in it, with the link «Открыть «Ваши данные»» to SCR-12; shown only while collection is on. The intro above it says that the addresses and text of pages are not sent
 - **Resources:** local corpus loader, extension inventory adapter, tab scanner
+- **Agent door (B-218):** none today. Actions: «Показать, с чего начать», «Пока пропустить». Planned: read (the first-run result) through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-02: Popup
@@ -198,17 +212,19 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/popup/popup.ts:renderPopup, apps/extension/src/popup/index.ts, e2e/scn-020.spec.ts
 - **Scenarios:** SCN-020, SCN-021
 - **Resources:** verdict store, queue selector
+- **Agent door (B-218):** none today. Actions: the top queued item, the diff count, the footer links. Planned: read first (current verdict, queue) through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-03: In-page warning banner
 - **Status note:** built for the injection variant only
 - **Used by:** FLW-02, FLW-05, FLW-06, FLW-07, FLW-08, FLW-09, FLW-10
 - **Purpose:** speak at the moment of the decision, inside the page, without stealing the page
-- **Elements:** severity icon + label; one-sentence plain-language reason; **one primary action per variant**; secondary "Показать" → SCR-04 where applicable; "Это неверно"; dismiss. Variants: `injection`, `lookalike`, `clickfix` (blocking), `techsupport`, `download`, `credential`, `password`
+- **Elements:** severity icon + label; one-sentence plain-language reason; **one primary action per variant**; secondary "Показать" → SCR-04 where applicable; "Это неверно"; dismiss. Variants: `injection`, `lookalike`, `clickfix` (blocking), `techsupport`, `download`, `credential`, `password`. The `clickfix` variant also carries the link that may open a program outside the browser (SCN-049, 2026-10-27): the same trap by another road, with its own headline and sentence and no new element
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
-  | success | a finding is raised | - | banner appears in the corner; blocking variants (clickfix) overlay and require a deliberate dismiss |
+  | success | a finding is raised | - | banner appears in the corner; blocking variants (clickfix) overlay and require a deliberate dismiss. The link warning (SCN-049) moves focus to its first action, "Leave this page", when it opens, and back to the link when "This is wrong" closes it |
+  | closed by the person | "This is wrong" or dismiss | - | the panel goes and stays gone: the slot is released with it. Until 2026-10-27 the slot's watch read this close as the page deleting the warning and drew it again (B-165 round 1) |
   | error | detail view or action failed | - | inline failure text with retry; the warning itself never disappears on error |
   | removed by the page | the page deletes the host from the document | - | put back up to three times, a quarter-second apart; after that the extension's **icon** carries a badge and the journal records the count. The banner is not on the page any more, and the product says so rather than going quiet |
   | more than one kind of finding | a second detector finds something on the same page | - | **one panel, never two.** The worst finding holds it, a tie leaves it where it is, and the rest become a single line naming how many other kinds are here. Two panels at the same `inset` drew one warning on top of another until 2026-08-20 (B-69) |
@@ -218,8 +234,9 @@ generator, and the sheet declares no colour of its own.
 - **Behavior notes — severity in a word and a colour, in that order.** The word is the message; the strip on the panel's leading edge is the third signal, from the same three token levels the extension's own screens use. Until 2026-08-21 there was no strip and no colour at all here, so `Критично` and `Незначительно` were indistinguishable at a glance (B-116)
 - **Wireframe:** wireframes/SCR-03.md
 - **Coverage:** packages/ui/src/banner/banner.ts:mountBanner, e2e/scn-003.spec.ts, e2e/a11y-overlays.spec.ts, e2e/scn-034.spec.ts (the credential variant drawn from a frame's report, asserted through the open shadow root of the hooked build)
-- **Scenarios:** SCN-003, SCN-006, SCN-008, SCN-009, SCN-011, SCN-012, SCN-013, SCN-031, SCN-034, SCN-035, SCN-036
+- **Scenarios:** SCN-003, SCN-006, SCN-008, SCN-009, SCN-011, SCN-012, SCN-013, SCN-031, SCN-034, SCN-035, SCN-036, SCN-049
 - **Resources:** shared banner component, variant copy table, i18n strings
+- **Agent door (B-218):** none today. Actions: the variant's action, «Показать», «Это неверно», close. Planned through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25); «Это неверно» is a decision about a warning the agent may itself be the subject of, so it needs the operator's confirmation on a channel the agent cannot forge
 - **Status:** built
 
 ### SCR-04: Finding inspector
@@ -237,6 +254,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/inspector/inspector.ts:mountInspector, e2e/scn-004-click.spec.ts, e2e/a11y-overlays.spec.ts (restore lands with the sanitizer, M5)
 - **Scenarios:** SCN-004, SCN-005
 - **Resources:** evidence store, DOM locator renderer
+- **Agent door (B-218):** none today. Actions: neutralise or restore, «Это неверно», «Оставить обезвреженным». Planned through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25); restore puts hidden instructions back in front of the agent, so it takes the operator's confirmation
 - **Status:** built
 
 ### SCR-05: Block interstitial
@@ -254,6 +272,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/interstitial/interstitial.ts:renderInterstitial, apps/extension/src/interstitial/appeal-link.ts:appealLinkFor, apps/extension/src/interstitial/framed.ts:isFramed, e2e/scn-007.spec.ts, e2e/scn-037.spec.ts
 - **Scenarios:** SCN-007, SCN-037
 - **Resources:** feed metadata store, exception store
+- **Agent door (B-218):** none today, **and never to the agent it stops**. Actions: «Назад», «Всё равно продолжить». «Всё равно продолжить» lifts a block; opened to the agent it guards, the agent would lift its own gate, so a door to it takes the operator's confirmation on a channel the agent cannot forge (B-218)
 - **Status:** built
 
 ### SCR-06: Agent action gate
@@ -273,6 +292,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/gate/gate.ts:mountGate, e2e/scn-010.spec.ts, e2e/a11y-overlays.spec.ts
 - **Scenarios:** SCN-010
 - **Resources:** action interceptor, finding store
+- **Agent door (B-218):** none today, **and never to the agent it stops**. Actions: «Заблокировать», «Разрешить один раз», «Показать инструкцию». «Разрешить один раз» is the gate itself; it takes the operator's confirmation on a channel the agent cannot forge (B-218). «Заблокировать» and reading are safe to open
 - **Status:** built
 
 ### SCR-07: Findings queue
@@ -292,27 +312,35 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/core-queue/src/rank.ts:buildQueue, packages/ui/src/queue/queue.ts:renderQueue, e2e/scn-020.spec.ts
 - **Scenarios:** SCN-002, SCN-022
 - **Resources:** priority scorer, action registry
+- **Agent door (B-218):** none today. Actions: per-item action, «show all». Planned: read first (the queue), then the actions, through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-08: Leaks and repair
 - **Used by:** FLW-10 (reuse list), FLW-11, FLW-16
 - **Purpose:** what of mine is exposed, and the repair for each
-- **Elements:** monitored sources (email, phone) with add/remove; results split into "Недавние: устройство было заражено" and "Более старые утечки"; per-entry data classes, date, source; **primary action per entry: "Сменить пароль"**; "Отметить решённым"; archive; manual password check field; the list of sources actually checked and when
+- **Elements:** monitored sources (email, phone) with add/remove; results split into "Недавние: устройство было заражено" and "Более старые утечки"; per-entry data classes, date, source; **primary action per entry: "Сменить пароль"**; "Отметить решённым"; archive; manual password check field; the list of sources actually checked and when; **the key line** under the coverage line (`source-key`) when Have I Been Pwned was not checked for want of a key or refused the one saved, with "Добавить ключ" or "Заменить ключ" (`add-key`), a link to the key block on SCR-12
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
-  | loading | check running | - | per-source progress, partial results shown as they arrive |
+  | loading | check running | - | "Запрос к источникам…" until every source has answered or reached its 10-second limit; the result is drawn whole, never in part |
   | empty | no sources monitored | - | prompt to add an email or phone, naming what is sent — the address itself, not a hash |
+  | idle, by key state | before a check | - | the sentence names every recipient: no key saved, Hudson Rock Cavalier only and the address not sent to Have I Been Pwned (`leaksIdleNoKey`); a key saved, both, with the key in the request header (`leaksIdleWithKey`); unreadable, Cavalier and Have I Been Pwned only if a key is saved (`leaksIdle`) |
+  | key unreadable | a check ran and the saved key could not be read | - | the key line says Have I Been Pwned was not checked because the saved key could not be read, with no link |
   | refused | Check now pressed with no usable address | - | states why nothing was sent (`[data-role=needs]`) and keeps the control, so the press is never silent |
   | error | a source failed | - | that row states unavailable + retry; other results stand |
   | success | results present | - | freshest first, historical collapsed |
+  | no key | a check ran with no Have I Been Pwned key saved | - | the coverage line names Have I Been Pwned as not checked; the key line says no key is saved and offers "Добавить ключ" |
+  | key refused | Have I Been Pwned answered 401 to the saved key | - | the key line says the key was refused and offers "Заменить ключ"; the other sources' results stand |
+- **Behavior notes (the credit line):** "Данные об утечках — Have I Been Pwned, по лицензии CC BY 4.0" credits data on the screen, so it is drawn only in the result of a check Have I Been Pwned answered. It used to be drawn in every state, which before a check made Have I Been Pwned the only source named, and with no key saved that was the one source not asked (B-125 round 2).
+- **Behavior notes (the missing source):** it says how to have it checked. Until 2026-10-29 nothing in the product wrote the key, so every check ended with Have I Been Pwned unchecked and the screen said only that it "could not be reached" (B-125). The coverage line now says "not checked", and the line under it names the reason and links to the one place the reason can be fixed. Other failures (a timeout, a 429 or 5xx) stay in the coverage line: their remedy is waiting, not a setting
 - **Behavior notes:** the idle state names what is sent, and it is **the address itself** — Hudson Rock's Cavalier and HIBP's breached-account endpoint answer to nothing less, so a screen implying a hashed lookup would be a false privacy claim on the surface where the user decides. The password check is the k-anonymous one and is kept distinct in the copy. The network choke point permits the address only because the request declares `carries: 'address'`, and the self-audit journal records that it left.
 - **Behavior notes:** the reuse answer is **on the password warning, not behind a control**. Between 2026-08-08 and 2026-08-09 there was no answer at all: a "Check reuse" control opened `options.html#reuse=`, a hash nothing read, and the index it implied was never built. A panel answering "no reuse found" from a store that does not exist tells the safest possible lie, so the control was removed rather than left lying. The index exists now (`reuse` store, DB v4) and the warning says one of three things — the other sites, "not seen on any other site on this device", or "unknown: this device has not seen it before". The third is the one the old control could not say, and it is what a fresh install has to say
 - **Behavior notes (address field):** the field is moved between repaints, never rebuilt, and **its focus and caret are carried with it**. Moving a node keeps its value; removing it from the document blurs it, and native typing needs a focused element to land in — so an address typed while the page was still settling went nowhere. That was the four-day flake tracked as #29: `apps/extension/src/options/keep-focus.ts` carries the rule
 - **Wireframe:** wireframes/SCR-08.md
-- **Coverage:** packages/ui/src/leaks/leaks.ts:renderLeaks, packages/core-leaks/src/group.ts:groupLeaks, packages/core-leaks/src/merge.ts:mergeLeaks, e2e/scn-015.spec.ts
+- **Coverage:** packages/ui/src/leaks/leaks.ts:renderLeaks, packages/core-leaks/src/group.ts:groupLeaks, packages/core-leaks/src/merge.ts:mergeLeaks, apps/extension/src/background/leaks.ts:hibp, e2e/scn-015.spec.ts
 - **Scenarios:** SCN-014, SCN-015, SCN-016
 - **Resources:** source adapters (HIBP, XposedOrNot, Hudson Rock), local hash store, **reuse index** — `reuse` store keyed by [tag, host], tag = HMAC-SHA-256 over the leak-check digest under a device-local random key ([privacy](../privacy.md))
+- **Agent door (B-218):** none today. Actions: add and remove a monitored source, «Сменить пароль», «Отметить решённым», «Проверить». Planned through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25); the HIBP key is a typed secret and stays a human gate
 - **Status:** built
 
 ### SCR-09: Extensions watch
@@ -334,10 +362,11 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/extensions/extensions.ts:renderExtensions, packages/core-extensions/src/diff.ts:diffInventory, e2e/scn-017.spec.ts
 - **Scenarios:** SCN-017, SCN-018
 - **Resources:** management adapter, snapshot store, CRX static analyser
+- **Agent door (B-218):** none today. Actions: per-change actions, «Это изменение в порядке». Planned: read first (the inventory and its changes), then acceptance, through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-10: Self-audit
-- **Used by:** FLW-13, FLW-17
+- **Used by:** FLW-13, FLW-17, FLW-24
 - **Purpose:** make "we don't collect your browsing" verifiable rather than promised
 - **Elements:** outbound request log — each row labelled (`когда/куда/зачем/что ушло/источник`) and **openable**, with what that purpose sends and what it holds back plus the outcome in words; a two-position period control (the last seven days / everything kept); **primary action: "Выгрузить журнал"**; a one-line summary that names what left as well as what did not
 - **States:**
@@ -348,7 +377,7 @@ generator, and the sheet declares no colour of its own.
   | error | journal unreadable | - | states the problem and offers repair; never shows an empty list on error |
   | success | entries exist | - | newest first, grouped by purpose |
 - **Behavior notes:** this log is written by the single network choke point before each request; if a request could bypass it, the guarantee is void — enforced by lint and test, not by convention
-- **Behavior notes — what the summary may claim.** The one-line summary names no absence it cannot prove. Until 2026-08-21 it ended "no page address, **email** or page content" unconditionally, while [facts.md](../brand/facts.md) says in its own table that `leak-lookup` sends the email address and `domain-status` sends the domain: a list containing such a request, under a sentence denying it exists. The unconditional half is now only what the choke point keeps — no page address, no page content — and what did leave is named per purpose. A purpose this build cannot read drops the absence claim entirely and says why
+- **Behavior notes — what the summary may claim.** The one-line summary names no absence it cannot prove. Until 2026-08-21 it ended "no page address, **email** or page content" unconditionally, while [facts.md](../brand/facts.md) says in its own table that `leak-lookup` sends the email address and `domain-status` sends the domain: a list containing such a request, under a sentence denying it exists. The unconditional half is now only what the choke point keeps — no page address, no page content — and what did leave is named per purpose, **and the person's Have I Been Pwned key is counted on its own when it left** (rows whose shape names `header:hibp-api-key`, B-125), because the address count alone would hide that a credential went with some of those requests. A purpose this build cannot read drops the absence claim entirely and says why
 - **Behavior notes — the window is applied, not just worded.** The panel receives the boundary as an instant (`windowStartIso`) and filters on it; retention is ninety days, and it used to be handed all of them under the words "the last seven". A row whose time is unreadable is kept, because understating what left is this screen's dangerous direction
 - **Behavior notes — a row the store wrote incompletely.** Rows are read straight out of IndexedDB, where the type is a promise and an older build's row is not bound by it. Each missing field names itself ("куда — не записано"), the row is never hidden, and an outcome nobody recorded is counted in its own clause rather than dropped from the total
 - **Behavior notes — every line says which field it is, and the instant keeps its seconds.**
@@ -366,13 +395,16 @@ generator, and the sheet declares no colour of its own.
   plaintext addresses would be a secret store of its own — so the row's detail names what left
   for that purpose and what was held back, which is the question a reader has and a stronger
   answer than a byte dump. **A filter by feature** over six purposes at a handful of rows a
-  day is a control that costs a line and answers nothing. **Grouping by purpose** contradicts
+  day was a control that cost a line and answered nothing; since B-199 the log takes up to 100
+  `usage-data` rows a day over seven purposes, and grouping them is B-205. **Grouping by purpose** contradicts
   the newest-first order this screen's own scenario promises in step 1; with a seven-day
-  window the flat list is short enough that grouping only adds nesting
+  window the flat list of requests the person caused is short enough that grouping only adds nesting;
+  the usage-data rows are the exception, B-205
 - **Wireframe:** wireframes/SCR-10.md
-- **Coverage:** packages/ui/src/self-audit/panel.ts:renderSelfAudit, apps/extension/src/options/index.ts, packages/ui/src/self-audit/panel.test.ts (32 checks), e2e/scn-019.spec.ts (four, including opening a row and widening the period), e2e/rendered-instants.spec.ts (nine areas, seeded stores, one row written the way an older build leaves it)
+- **Coverage:** packages/ui/src/self-audit/panel.ts:renderSelfAudit, apps/extension/src/options/index.ts, packages/ui/src/self-audit/panel.test.ts (35 checks), e2e/scn-019.spec.ts (four, including opening a row and widening the period), e2e/rendered-instants.spec.ts (nine areas, seeded stores, one row written the way an older build leaves it)
 - **Scenarios:** SCN-019
 - **Resources:** net layer journal, exporter
+- **Agent door (B-218):** none today. Actions: the period, opening a request, export. Planned: read first (the outbound log) and the export, through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-11: Journal and weekly diff
@@ -394,21 +426,34 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/core-queue/src/diff.ts:diffSince, packages/ui/src/journal/journal.ts:renderJournal, e2e/scn-020.spec.ts
 - **Scenarios:** SCN-021
 - **Resources:** event journal, diff selector
+- **Agent door (B-218):** none today. Actions: full history. Planned: read first (the journal), through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-12: Settings
-- **Used by:** FLW-05 (watchlist edit), FLW-14
+- **Used by:** FLW-05 (watchlist edit), FLW-11 (the HIBP key), FLW-14, FLW-24 (the usage and error data switch)
 - **Purpose:** the few switches that change behaviour, plus data ownership
-- **Elements:** brand watchlist (add/edit/remove); quiet mode toggle; proxy on/off with a plain explanation of what each option reveals and to whom; retention period; **primary action: "Выгрузить все данные"**; "Удалить все данные" (разрушительное, подтверждается списком того, что удаляется — **по одному виду на каждое хранилище, девять**; список приходит из схемы, а не пишется рядом с ней, и рендерер отказывается рисовать подтверждение, которое не называет ничего). **The trusted domains list moved to SCR-16** on 2026-08-12: the dashboard lists one area per view, the overview names "Доверенные домены" and "Ваши данные" separately, and reviewing what you trusted is a different job from exporting and wiping
+- **Elements:** brand watchlist (add/edit/remove); quiet mode toggle; proxy on/off with a plain explanation of what each option reveals and to whom; retention period; **primary action: "Выгрузить все данные"**; "Удалить все данные" (разрушительное, подтверждается списком того, что удаляется — **по одному виду на каждое хранилище, девять**; список приходит из схемы, а не пишется рядом с ней, и рендерер отказывается рисовать подтверждение, которое не называет ничего). **The trusted domains list moved to SCR-16** on 2026-08-12: the dashboard lists one area per view, the overview names "Доверенные домены" and "Ваши данные" separately, and reviewing what you trusted is a different job from exporting and wiping. **The Have I Been Pwned key block** (`leak-key`), under the export and wipe actions: a heading, a sentence naming where the key goes (only haveibeenpwned.com, in the request header, when a check is pressed) and where it does not (the export, the log), a status line, a masked field (`leak-key-field`), "Сохранить ключ" or, once one is saved, "Заменить ключ" (`leak-key-save`), and "Удалить ключ" (`leak-key-remove`) only when there is something to remove
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
   | success | default | - | grouped settings |
   | error | export or wipe failed | - | inline failure with retry; state left unchanged |
+  | usage on | usage and error data is on (Chrome and Edge from the first run; Firefox while it grants it) | - | the usage block: the switch checked, the sentence on what is sent, no state line |
+  | usage off | the switch was turned off | - | the switch unchecked and `usageOff` (nothing is sent, the install number is deleted) |
+  | usage unsupported | Firefox 129 to 139, with no built-in data consent | - | the switch unchecked and disabled; `usageFirefoxOld` says nothing is sent and why |
+  | usage not renewed | «Удалить все данные» or «Очистить локальные данные» could not replace the install number, and the unsent events stay (SCN-023, SCN-032) | - | `usageRenewFailed` in the usage block says so, that the unsent events stay, and how to get a new number, on every paint until a renewal works or the switch is used (after a reset the page opens here) |
+  | usage not saved | the switch did not go through (the worker did not answer, or Firefox kept the permission after off) | - | `usageSaveFailed` once on the repaint, over the state actually stored |
+  | no key | no Have I Been Pwned key saved, the state every install starts in | - | the status line says no key is saved, so the address does not go to Have I Been Pwned (the password check, a separate one, needs no key); an empty field and "Сохранить ключ" |
+  | key saved | a key is stored | - | the status line says a key is saved and is not shown; the field is empty; "Заменить ключ" and "Удалить ключ" |
+  | refused | "Сохранить ключ" pressed after trimming (spaces around a key are dropped silently) with an empty field (only spaces counts), a space or a non-printing character inside the key, a character outside the Latin layout, or more than 256 characters | - | nothing is saved and the block says which of the four it was (`leak-key-needs`: `leakKeyEmpty`, `leakKeyShape`, `leakKeyLatin`, `leakKeyLong`); the field keeps what was typed so it can be corrected |
+  | key write failed | saving or removing the key failed | - | the page's failure slot says the action did not go through; the block shows what is actually stored |
+- **Behavior notes (the key field):** the key is never put back on screen. The field is `type=password`, is emptied the moment a key is accepted, and is never filled from storage: the renderer is told only whether a key exists. Showing even its last characters would put part of a paid credential into every screenshot of this page, and nothing a person does here needs it: replacing pastes a new key over the old, removing needs none
 - **Wireframe:** wireframes/SCR-12.md
-- **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, e2e/scn-024.spec.ts (data controls built; watchlist, quiet mode and the proxy toggle land with their modules)
-- **Scenarios:** SCN-023, SCN-024
+- **Coverage:** packages/ui/src/settings/data-controls.ts:renderDataControls, apps/extension/src/options/leak-key.ts, e2e/scn-024.spec.ts (data controls built; watchlist, quiet mode and the proxy toggle land with their modules), e2e/scn-015.spec.ts (the key block: saved, never shown back, removed)
+- **Scenarios:** SCN-015, SCN-023, SCN-024, SCN-051, SCN-052
+- **Usage block (B-199):** block "Данные об использовании и ошибках": a switch, one sentence on what is sent; in Firefox the switch asks the browser, and on Firefox 129 to 139 it says nothing is sent because the browser has no consent
 - **Resources:** settings store, exporter, wipe routine
+- **Agent door (B-218):** none today. Actions: brand list, quiet mode, proxy, retention, the HIBP key, usage and error data, «Выгрузить все данные», «Удалить все данные». Planned through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25); «Удалить все данные» goes through `fabric_effect_request` (deletion that cannot be undone), the HIBP key stays a typed secret
 - **Status:** built
 
 ### SCR-13: Recovery checklist
@@ -427,6 +472,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/recovery/picker.ts:renderIncidentPicker, packages/ui/src/recovery/recovery.ts:renderRecovery, packages/core-recovery/src/checklist.ts:buildChecklist, packages/core-recovery/src/portable.ts:toPortable, e2e/scn-025.spec.ts
 - **Scenarios:** SCN-025
 - **Resources:** playbook definitions, incident store
+- **Agent door (B-218):** none today. Actions: incident type, step done. Planned through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-14: Public domain status
@@ -451,6 +497,7 @@ generator, and the sheet declares no colour of its own.
   - **Indexable:** yes — `canonical` → `/status?domain=<domain>` per lookup, built in `apps/proxy/src/router.ts:statusPage`, so a shared link and the page agree
   - **Without JS:** wholly — the verdict and the appeal form are both in the markup, because the owner arrives from an interstitial on a site that is down
   - **Entity:** none. The page is a lookup result about someone else's domain, not a thing this product offers; a `SoftwareApplication` block here would describe the wrong subject
+- **Agent door (B-218):** **HTTP today**: `GET /status/domain?domain=<host>` answers the verdict (`domainStatus`), the page is `GET /status`, and the appeal is `POST /appeal` (`apps/proxy/src/router.ts`), all on the public worker and callable by any agent with an HTTP client; no MCP wrapper yet
 - **Status:** built
 
 ### SCR-15: Dashboard overview
@@ -470,6 +517,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/dashboard/overview.ts:renderOverview, packages/ui/src/when.ts:shortDate/shortTime, apps/extension/src/pages.css, apps/extension/src/options/views.ts:routeFor, apps/extension/src/options/views.ts:recoveryHref, apps/extension/src/options/keep-focus.ts:keepingFocus, e2e/scn-027.spec.ts, docs/store/screenshots/03-self-audit.png
 - **Scenarios:** SCN-027, SCN-028, SCN-029, SCN-030
 - **Resources:** `packages/core-queue/src/rank.ts` (ranking), the counts each area can answer cheaply
+- **Agent door (B-218):** none today. Actions: links into the areas. Planned: read (the attention band and area states) through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-16: Trusted domains
@@ -487,17 +535,18 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/trusted/trusted.ts:renderTrusted (states `ready` and `error`), e2e/scn-024.spec.ts
 - **Scenarios:** SCN-024
 - **Resources:** trusted-domain store
+- **Agent door (B-218):** none today. Action: «Убрать из доверенных». Planned through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-17: Product landing page
 - **Used by:** FLW-18 (deciding whether to install). **The gap recorded here on 2026-08-12 is closed 2026-08-20 (B-22)** — and the way it was recorded is why closing it was easy: the entry said a flow traced to no story would be a diagram rather than a design, and named the missing piece instead of inventing one. ST-021 is that story, FLW-18 the flow, SCN-033 the scenario
 - **Purpose:** let someone who has never heard of this decide whether to install it — including by reading what it refuses to do
-- **Elements:** what the product is in one sentence; what it does; **what it does not do** (half the page); how to install; links to `/privacy` and `/status`. **Primary action: install**
+- **Elements:** what the product is in one sentence; what it does; what it sends us (`[data-role=sends]`: usage and error data, the only data from the person's use that goes to us; the feed download from our worker carries nothing from them, and the rest of what leaves is in `/privacy`; B-199); **what it does not do** (half the page); how to install; links to `/privacy` and `/status`. **Primary action: install**
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
   | success | any request to `/` | - | the whole page, served as markup |
-- **Behavior notes:** a security tool that lists only its own powers describes a product nobody can check — so half the page is what it does not do. **No executable scripts at all**, and eleven rules in `apps/proxy/src/landing.test.ts` hold that, four of them verified by planted defects (a script appeared, the word "полностью" appeared, the does-not-do list was gutted, the structured block became invalid JSON)
+- **Behavior notes:** a security tool that lists only its own powers describes a product nobody can check — so half the page is what it does not do. **No executable scripts at all**, and the rules in `apps/proxy/src/landing.test.ts` hold that, four of them verified by planted defects (a script appeared, the word "полностью" appeared, the does-not-do list was gutted, the structured block became invalid JSON)
 - **Web surface:**
   - **Route:** `/`
   - **Answers:** what Okolos is, what it does, and what it will not do
@@ -505,14 +554,15 @@ generator, and the sheet declares no colour of its own.
   - **Without JS:** wholly — there is not one script on the page, by gate
   - **Entity:** `schema.org/SoftwareApplication` in `application/ld+json`, repeating the page's own claims in machine form, built in `apps/proxy/src/router.ts:landingPage`
 - **Coverage:** apps/proxy/src/router.ts:landingPage, apps/proxy/src/landing.test.ts
-- **Scenarios:** none — a scenario needs a flow node to cover, and this screen has no flow (see `Used by`). The eleven rules in `landing.test.ts` are what hold it meanwhile, and they are gates rather than scenarios
+- **Scenarios:** none — a scenario needs a flow node to cover, and this screen has no flow (see `Used by`). The rules in `landing.test.ts` are what hold it meanwhile, and they are gates rather than scenarios
 - **Resources:** worker root route
+- **Agent door (B-218):** not needed: a public page with links only (`/`), readable over HTTP
 - **Status:** built
 
 ### SCR-18: Privacy page
 - **Used by:** FLW-18 (deciding whether to install), as the second step. It is also linked from the store listing and from the extension, and it is the document SCR-10 (self-audit) must agree with. **The gap recorded here on 2026-08-12 closed 2026-08-20 (B-22):** the pre-install journey is in the chain now — JRN-01 stages 2 and 3 always carried it, and what was missing was ST-021 between the journey and these pages
 - **Purpose:** state what leaves the device, where to, why, and what is never stored — the document the store requires and the one the self-audit screen must agree with
-- **Elements:** the five outbound destinations with what each carries; what is stored on the device and for how long; the reuse-index paragraph; what does not exist (no analytics, no account, no ads); why the extension asks for every site
+- **Elements:** the six kinds of outbound request with what each carries, usage and error data among them; what is stored on the device and for how long; the reuse-index paragraph; what does not exist (no account, no ads, no browsing tracking); why the extension asks for every site
 - **States:**
   | State | Trigger | Figma frame | Behavior |
   |-------|---------|-------------|----------|
@@ -527,6 +577,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** apps/proxy/src/router.ts:privacyPage, tools/privacy-page.mjs, tools/docs.test.ts
 - **Scenarios:** none — same reason as SCR-17. `tools/docs.test.ts` holds the page against its sources meanwhile
 - **Resources:** `docs/privacy.md` (the source), the outbound-log contract
+- **Agent door (B-218):** not needed: a public page with links only (`/privacy`), readable over HTTP
 - **Status:** built
 
 ### SCR-19: Lookalike comparison
@@ -542,6 +593,7 @@ generator, and the sheet declares no colour of its own.
 - **Design system:** the shared overlay tokens, like the other three. It carries no palette of its own, and a test asserts there are no hex literals in its stylesheet — three surfaces once accumulated twenty-two hexes between them
 - **Coverage:** packages/ui/src/comparison/comparison.ts:mountComparison, packages/ui/src/comparison/comparison.test.ts, e2e/scn-006.spec.ts, e2e/a11y-overlays.spec.ts
 - **Scenarios:** SCN-006, SCN-024
+- **Agent door (B-218):** none today. Actions: as SCR-05 for the address shown; the same rule: lifting the warning takes the operator's confirmation
 - **Status:** built
 
 ### SCR-20: Local store unavailable
@@ -556,9 +608,11 @@ generator, and the sheet declares no colour of its own.
   | blocked | another copy of Okolos holds the store | - | says to close the other window; trying again then works |
   | unknown | anything else | - | says the reason is below, and shows it |
 - **Replaces six errors with one panel.** Every section of the options page reads the store and catches its own failure, so a profile written by a newer build rendered the browser's sentence about requested and existing versions once per panel, in a page that was otherwise empty. The check runs before any area is built
+- **After "Clear the local data" the cleared page is drawn first, then the install number for usage and error data is renewed when collection is on;** a renewal that fails opens «Ваши данные», where the usage block says so (`usageRenewFailed`, SCR-12)
 - **There is no confirmation behind "Clear the local data" — this panel is the confirmation.** The note carries what the wipe dialog's list carries, because a user agreeing to a word is not a user who agreed
 - **Coverage:** packages/ui/src/storage/storage-problem.ts:renderStorageProblem, packages/ui/src/storage/storage-problem.test.ts, apps/extension/src/options/index.ts:storageProblem
 - **Scenarios:** SCN-032
+- **Agent door (B-218):** none today. Actions: the repair and clearing steps the panel names. Planned through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25); clearing is deletion and goes through `fabric_effect_request`
 - **Status:** built
 
 ### SCR-21: Message verdict
@@ -577,6 +631,7 @@ generator, and the sheet declares no colour of its own.
 - **The "did not run" block is not a footnote.** The browser side learned this twice — a download verdict that omitted the hash check read as a full one (B-57), and a scan that exited silently read as a clean page (B-74). A mail verdict has more absent checks than the browser side ever has: an unauthenticated sender, an attachment the parser refused, a reviewer that was off. Listing them quietly would make this the most confidently wrong surface in the product.
 - **Scenarios:** SCN-038, SCN-039, SCN-040, SCN-041, SCN-043
 - **Resources:** core-mail parser, the signed phishing feed, the lookalike checker, the jailed attachment parser, the reviewer driver
+- **Agent door (B-218):** **CLI today**: `okolos-mail` (`apps/mail-cli`) checks one message on demand and prints the verdict; with SCR-14's HTTP, the only Okolos surface with an agent door (B-218)
 - **Status:** designed
 
 ### SCR-22: Message alert
@@ -594,6 +649,7 @@ generator, and the sheet declares no colour of its own.
 - **Silence has to be earned, and the error state is what earns it.** A watcher that dies quietly leaves the user safer-feeling and no safer. This is the same argument SCN-030 makes on the dashboard — an unread state must never render as "nothing here".
 - **Scenarios:** SCN-042
 - **Resources:** the watcher, the notification channel
+- **Agent door (B-218):** CLI through SCR-21: the alert's one action opens the verdict `apps/mail-cli` already gives
 - **Status:** designed
 
 ### SCR-23: Agent pairing

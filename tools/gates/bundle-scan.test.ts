@@ -6,6 +6,9 @@ import path from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import { KNOWN_HASHES, routeFor } from '../../apps/extension/src/options/views.js'
+import { binInvocation } from '../bin.mjs'
+import { posixRelative } from '../tree.mjs'
+import { buildTooOld } from '../build-age.mjs'
 
 /**
  * The gates that read what actually ships.
@@ -47,8 +50,11 @@ const run = promisify(execFile)
 async function build(): Promise<void> {
   // tsc -b emits every package's dist; the extension bundles come from vite.
   try {
-    await run('pnpm', ['typecheck'], { cwd: root, maxBuffer: 64 * 1024 * 1024 })
-    await run('pnpm', ['build'], { cwd: root, maxBuffer: 64 * 1024 * 1024 })
+    // pnpm is pnpm.cmd on Windows, which Node spawns only through a shell (B-163, B-164).
+    for (const script of ['typecheck', 'build']) {
+      const pnpm = binInvocation('pnpm', [script])
+      await run(pnpm.command, pnpm.args, { cwd: root, shell: pnpm.shell, maxBuffer: 64 * 1024 * 1024 })
+    }
   } catch (cause) {
     // Caught rather than thrown: a throw in beforeAll marks these tests
     // *skipped*, and a gate that reports "skipped" when the thing it guards is
@@ -103,7 +109,8 @@ function offenders(files: string[], tokens: string[]): Array<{ file: string; tok
   for (const file of files) {
     const source = executable(readFileSync(file, 'utf8'))
     for (const token of tokens) {
-      if (source.includes(token)) hits.push({ file: path.relative(root, file), token })
+      // Repository spelling, `/`, so the names compare with TRANSPORT_SOURCE on Windows too.
+      if (source.includes(token)) hits.push({ file: posixRelative(root, file), token })
     }
   }
   return hits
@@ -154,7 +161,7 @@ describe('REQ-08 — exactly one module may reach the network', () => {
     // And it must still be there: an exemption for a file that no longer exists
     // silently becomes an exemption for nothing. `sources` holds absolute
     // paths, `offenders` reports repo-relative ones — compared like with like.
-    expect(sources.map((f) => path.relative(root, f))).toContain(PAGE_WATCH)
+    expect(sources.map((f) => posixRelative(root, f))).toContain(PAGE_WATCH)
   })
 
   it('leaves no stray network call in the shipped extension bundles', () => {
@@ -242,6 +249,60 @@ describe('what the shipped extension is made of', () => {
       expect(content, `${browser} build must not carry the test hook`).not.toContain('"open"')
     }
   })
+
+  /**
+   * A mark per focus, per look at the page and per password answer is what lets an e2e
+   * spec assert "no warning" after the check rather than after a fixed wait (B-169). On a
+   * page a person works in for hours it would pile up in the timeline, so the shipped
+   * bundle must not write it.
+   */
+  const TEST_MARKS = ['okolos:focus-judged', 'okolos:trap-judged', 'okolos:password-handled', 'okolos:click-judged']
+
+  it('keeps the per-event test marks out of the shipped bundles', () => {
+    for (const browser of ['chrome', 'firefox']) {
+      const shipped = readFileSync(path.join(root, `apps/extension/dist/${browser}/content.js`), 'utf8')
+      for (const mark of TEST_MARKS) {
+        // A boolean, not `toContain`: a failure names the mark instead of dumping the bundle.
+        expect(shipped.includes(mark), `${browser} build carries the test mark ${mark}`).toBe(false)
+      }
+    }
+  })
+
+  /**
+   * The test build is checked too, or a typo in the flag would pass above and leave the
+   * specs waiting for marks nothing writes. It is made by `pnpm build:e2e`, which
+   * `pnpm test` and `pnpm gates` do not run, so when it is missing or older than the
+   * sources this is **skipped, with the reason in its name**, rather than failing a gate
+   * on a build the gate did not make. `pnpm build:e2e` (or `pnpm test:e2e`) makes it run.
+   */
+  const e2eStale = ['chrome-e2e', 'firefox-e2e']
+    .map((build) => buildTooOld(path.join(root, `apps/extension/dist/${build}`), 'pnpm build:e2e'))
+    .find((reason) => reason !== null)
+
+  /**
+   * Where the test build is made on purpose, a skip would hide the half this gate
+   * exists for. CI's gates job does not run `pnpm build:e2e`, so there the test above
+   * is skipped; the e2e job has just made the test build and runs this file with
+   * `OKOLOS_REQUIRE_E2E_BUILD=1`, which turns a missing or stale test build into a
+   * failure (B-192).
+   */
+  it.runIf(process.env.OKOLOS_REQUIRE_E2E_BUILD === '1')('has a fresh test build when one is required', () => {
+    expect(e2eStale, 'OKOLOS_REQUIRE_E2E_BUILD=1 and the test build is missing or stale').toBeUndefined()
+  })
+
+  it.skipIf(e2eStale !== undefined)(
+    `carries the per-event test marks in the test build${
+      e2eStale === undefined ? '' : ` (skipped: ${e2eStale})`
+    }`,
+    () => {
+      for (const build of ['chrome-e2e', 'firefox-e2e']) {
+        const text = readFileSync(path.join(root, `apps/extension/dist/${build}/content.js`), 'utf8')
+        for (const mark of TEST_MARKS) {
+          expect(text.includes(mark), `${build} lacks ${mark}: run pnpm build:e2e`).toBe(true)
+        }
+      }
+    },
+  )
 
   it('ships nothing the product does not produce', () => {
     /**

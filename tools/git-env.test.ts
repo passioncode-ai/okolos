@@ -39,7 +39,20 @@ describe('a test that runs git elsewhere does not inherit the hook’s GIT_DIR',
     expect(testFiles.length).toBeGreaterThan(50)
   })
 
-  it('finds no git -C call in a test file that does not pass gitEnv()', () => {
+  /**
+   * Since B-160 on main the whole suite runs with git's location variables removed
+   * (`tools/vitest-git-env.ts`, a vitest setup file), which covers every test file and every
+   * helper this per-file rule could not see. The per-file rule stands for a suite without it.
+   */
+  const globallyCleaned = readFileSync(path.join(root, 'vitest.config.ts'), 'utf8').includes(
+    "'tools/vitest-git-env.ts'",
+  )
+
+  it('finds no git -C call in a test file that does not pass gitEnv(), unless the suite strips git for all', () => {
+    if (globallyCleaned) {
+      expect(readFileSync(path.join(root, 'tools/vitest-git-env.ts'), 'utf8')).toContain("'GIT_DIR'")
+      return
+    }
     expect(offenders(testFiles)).toEqual([])
   })
 

@@ -38,7 +38,7 @@ describe('waiting for a surface', () => {
     const offenders: string[] = []
     for (const spec of specs()) {
       const text = readFileSync(path.join(root, spec), 'utf8')
-      for (const [index, line] of text.split('\n').entries()) {
+      for (const [index, line] of text.split(/\r?\n/).entries()) {
         // The hand-rolled shape: a count assertion naming one of this product's surfaces.
         // A `waitFor`, a `poll` or an assertion about *absence* is a different question and
         // is left alone — this rule is about the wait that hangs. Written as one positive

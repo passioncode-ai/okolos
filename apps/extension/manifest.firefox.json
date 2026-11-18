@@ -65,7 +65,10 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "okolos@ssheleg.dev",
-      "strict_min_version": "129.0"
+      "strict_min_version": "129.0",
+      "data_collection_permissions": {
+        "optional": ["technicalAndInteraction"]
+      }
     }
   },
   "host_permissions": [

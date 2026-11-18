@@ -1,25 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { InferenceRuntime } from '@okolos/model'
-
-import { createInferenceHost, type InferenceDeps } from './inference.js'
-
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
-import { fromCatalogue, useResolver, type Catalogue } from '@okolos/i18n'
-
-/** The shipped Russian catalogue: `default_locale` is `ru`, and a fake would let a missing key pass. */
-const CATALOGUE = JSON.parse(
-  readFileSync(path.resolve(import.meta.dirname, '../../_locales/ru/messages.json'), 'utf8'),
-) as Catalogue
-
-useResolver(fromCatalogue(CATALOGUE))
-
-/** The entry, or a failure that names the key rather than comparing to undefined. */
-function message(key: string): string {
-  const entry = CATALOGUE[key]
-  if (!entry) throw new Error(`the shipped catalogue has no key "${key}"`)
-  return entry.message
-}
+import { createInferenceHost, type InferenceDeps } from './host.js'
+import type { InferenceRuntime } from './session.js'
 
 const WEIGHTS = new Uint8Array([1, 2, 3]).buffer
 
@@ -80,7 +61,7 @@ describe('nothing scores until everything is in place', () => {
   })
 
   it('refuses to score when it was never prepared', async () => {
-    await expect(createInferenceHost(deps()).score('text')).rejects.toThrow(message('inferenceNotReady'))
+    await expect(createInferenceHost(deps()).score('text')).rejects.toThrow(/not prepared/)
   })
 })
 
@@ -116,7 +97,7 @@ describe('running the model where the browser allows it', () => {
       deps({ ensureHost: async () => 'offscreen', remoteScore: async () => null }),
     )
     await host.prepare()
-    await expect(host.score('text')).rejects.toThrow(message('inferenceNoModel'))
+    await expect(host.score('text')).rejects.toThrow(/no model/)
   })
 })
 

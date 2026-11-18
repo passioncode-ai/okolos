@@ -478,7 +478,7 @@ export function buildSnapshot(nodes: readonly AxNode[], options: SnapshotOptions
   let chosen = walk.entries.map((e, i) => ({ entry: e, name: names[i] ?? '' }))
   let base = 0
   let hiddenRemoved = 0
-  let fieldTextDropped = 0
+  let fieldTextDropped: number
   if (root === undefined) {
     for (const [, count] of walk.cut) hiddenRemoved += count
     fieldTextDropped = walk.dropped.length

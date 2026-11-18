@@ -1,4 +1,5 @@
 
+import { HIBP_KEY_HEADER_SHAPE } from '@okolos/core-leaks'
 import { t } from '@okolos/i18n'
 import type { AuditEntry } from '@okolos/contracts'
 
@@ -46,8 +47,8 @@ export interface PanelHandlers {
    * The reader asked for a different period.
    *
    * SCR-10 promised "filters by period and feature" from the start. The feature filter is
-   * deliberately not built — over six purposes at a handful of rows a day it is a control
-   * that costs a line and answers nothing — but the period is real: retention is ninety days
+   * deliberately not built — over seven purposes it is a control that costs a line and answers
+   * little; usage rows make the list longer, and grouping them is B-205 — but the period is real: retention is ninety days
    * and the default view is seven, so without this the other eighty-three are reachable only
    * by exporting the file.
    */
@@ -162,6 +163,11 @@ function summarise(entries: readonly AuditEntry[], since: string): string {
   if (unrecorded > 0) parts.push(t('auditSummaryUnknownOutcome', String(unrecorded)))
 
   for (const [key, count] of carried(entries)) parts.push(t(key, String(count)))
+  // The person's Have I Been Pwned key, counted on its own: the address count says a lookup
+  // happened and would hide that a credential went with some of them (B-125). Read from the
+  // shape the choke point recorded, which names the header and never its value.
+  const keys = entries.filter((e) => (said(e.payloadShape) ?? '').includes(HIBP_KEY_HEADER_SHAPE)).length
+  if (keys > 0) parts.push(t('auditSummaryCarriedKey', String(keys)))
 
   const unreadable = entries.filter((e) => purposeKey(said(e.purpose) ?? '') === undefined).length
   // A purpose this build cannot read is a request whose payload it cannot vouch for, so it
@@ -296,7 +302,7 @@ function row(doc: Document, entry: AuditEntry): HTMLLIElement {
 /**
  * What each purpose sends, and what it holds back — the facts table, in code.
  *
- * `docs/brand/facts.md` carries the same six rows under "Что уходит с устройства", and a
+ * `docs/brand/facts.md` carries the same rows under "Что уходит с устройства", and a
  * gate compares that document against the tree. Kept beside `PURPOSE_KEY` because they
  * answer different questions: that one names the request, this one is what a person opens
  * the row to read.
@@ -308,6 +314,7 @@ const KEPT_KEY: Record<string, string> = {
   'leak-lookup': 'auditKeptLeakLookup',
   'file-hash': 'auditKeptFileHash',
   'domain-status': 'auditKeptDomainStatus',
+  'usage-data': 'auditKeptUsageData',
 }
 
 /** The three outcomes the contract has, in words. A row with none says so instead. */
@@ -326,18 +333,21 @@ const PURPOSE_KEY: Record<string, string> = {
   'leak-lookup': 'auditPurposeLeakLookup',
   'file-hash': 'auditPurposeFileHash',
   'domain-status': 'auditPurposeDomainStatus',
+  'usage-data': 'auditPurposeUsageData',
 }
 
 /**
- * The two purposes that carry something of the user's, and the sentence each earns.
+ * The purposes that carry something of the user's, and the sentence each earns.
  *
  * Kept beside `PURPOSE_KEY` because they answer different questions — that one names the
- * request, this one names what was in it — and because the pair is what
+ * request, this one names what was in it — and because these are what
  * `docs/brand/facts.md` documents.
  */
 const CARRIED_KEY: Record<string, string> = {
   'leak-lookup': 'auditSummaryCarriedAddress',
   'domain-status': 'auditSummaryCarriedDomain',
+  // Usage and error data carries no address and no page, only the random install number (B-199).
+  'usage-data': 'auditSummaryCarriedInstall',
 }
 
 const purposeKey = (purpose: string): string | undefined => PURPOSE_KEY[purpose]

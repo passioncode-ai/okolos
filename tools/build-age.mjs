@@ -26,7 +26,7 @@
 import { existsSync, statSync } from 'node:fs'
 import path from 'node:path'
 
-import { filesUnder } from './tree.mjs'
+import { filesUnder, posixRelative } from './tree.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
 
@@ -118,7 +118,7 @@ function walk(dir, pattern, skipDir, skipFile = null) {
     })
     .flatMap((full) => {
       try {
-        return [{ file: path.relative(root, full), at: statSync(full).mtimeMs }]
+        return [{ file: posixRelative(root, full), at: statSync(full).mtimeMs }]
       } catch {
         // Removed between the listing and the stat. Not newer than anything.
         return []

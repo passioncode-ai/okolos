@@ -20,6 +20,7 @@ export type {
   HiddenTextCandidate,
   PageCandidates,
 } from './snapshot.js'
+export { candidateSpanId } from './snapshot.js'
 
 export type { ActionInput } from './policy.js'
 export { decideAction } from './policy.js'
@@ -34,6 +35,7 @@ export type {
   RpcError,
   RpcMap,
   RpcType,
+  UsageDataState,
 } from './rpc.js'
 export { isEnvelope } from './rpc.js'
 export type {

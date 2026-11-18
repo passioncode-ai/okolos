@@ -37,8 +37,15 @@ for (const event of ['pointerdown', 'keydown'] as const) {
   })
 }
 
+let countedShown = false
+
 function paint(context: BlockContext | null): void {
   if (!root) return
+  // Once per page: the block page is a warning on screen (B-206).
+  if (!countedShown) {
+    countedShown = true
+    void platform.runtime.send('warning/shown', { kind: 'blocked-page' }).catch(() => undefined)
+  }
 
   root.replaceChildren(
     renderInterstitial(

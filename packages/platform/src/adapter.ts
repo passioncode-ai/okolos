@@ -1,6 +1,8 @@
 import { isEnvelope, type Envelope, type RpcMap, type RpcType } from '@okolos/contracts'
 
 import type {
+  DataConsent,
+  CreatedDownload,
   Platform,
   RpcHandler,
   RpcSender,
@@ -27,7 +29,7 @@ export function toSafeUrl(raw: string | undefined): string | null {
 
 /**
  * Both browsers are built from the same adapter: the differences that matter
- * to this product (worker vs page, offscreen vs direct inference) live in the
+ * to this product (a worker or a background page) live in the
  * extension composition, not in these calls.
  */
 /**
@@ -84,7 +86,19 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
     selfExtensionId = self.id
   })
 
+  /**
+   * Firefox only: Chrome has no built-in data consent, and its `permissions` object has no
+   * `data_collection` half, so the consent module reads Chrome by its own rule.
+   */
+  const perms = kind === 'firefox' ? api.permissions : undefined
+  const dataConsent: DataConsent = {
+    ...(perms?.getAll ? { getAll: perms.getAll.bind(perms) } : {}),
+    ...(perms?.request ? { request: perms.request.bind(perms) } : {}),
+    ...(perms?.remove ? { remove: perms.remove.bind(perms) } : {}),
+  }
+
   return {
+    dataConsent,
     kind,
 
     storage: {
@@ -176,6 +190,12 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
         })
       },
 
+      onUpdated(handler: () => void): void {
+        api.runtime.onInstalled.addListener((details) => {
+          if (details.reason === 'update') handler()
+        })
+      },
+
       onBrowserStart(handler: () => void): void {
         // Browser start, install, update and browser update: the only moments the
         // installed rules can differ from what the stored feed says. A plain worker
@@ -186,6 +206,10 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
 
       getUrl(path: string): string {
         return api.runtime.getURL(path)
+      },
+
+      version(): string {
+        return api.runtime.getManifest?.().version ?? '0.0.0'
       },
 
       async openOptionsPage(): Promise<void> {
@@ -276,24 +300,93 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
       available: () => Boolean(api.downloads),
 
       onCreated(handler): void {
-        api.downloads?.onCreated.addListener((item) => {
-          handler({
-            id: item.id,
-            url: item.url,
-            // Both addresses travel: the link the page carried and where it landed.
-            // A short link to a malicious host is innocent at the first and not at
-            // the second, and the check used to see only the first (B-57).
-            ...(item.finalUrl !== undefined && item.finalUrl !== item.url
-              ? { finalUrl: item.finalUrl }
-              : {}),
-            filename: (item.filename ?? '').split(/[\\/]/).pop() ?? '',
-            mime: item.mime ?? null,
+        /**
+         * Chrome reports a download before it has decided the file name, so `onCreated` carries
+         * an empty one and the type checks judged every download as nameless (measured in
+         * Chromium 151, round 7 of the B-165 certification). A nameless download waits for the
+         * name `onChanged` brings, up to five seconds, and is reported once, with it or without.
+         */
+        const NAME_WAIT_MS = 5_000
+        const waiting = new Map<number, { item: CreatedDownload; done: (item: CreatedDownload) => void; timer: ReturnType<typeof setTimeout> }>()
+        const shape = (item: { id: number; url: string; finalUrl?: string; filename?: string; mime?: string }): CreatedDownload => ({
+          id: item.id,
+          url: item.url,
+          // Both addresses travel: the link the page carried and where it landed.
+          // A short link to a malicious host is innocent at the first and not at
+          // the second, and the check used to see only the first (B-57).
+          ...(item.finalUrl !== undefined && item.finalUrl !== item.url
+            ? { finalUrl: item.finalUrl }
+            : {}),
+          filename: (item.filename ?? '').split(/[\\/]/).pop() ?? '',
+          mime: item.mime ?? null,
+        })
+        api.downloads?.onChanged?.addListener((delta) => {
+          const pending = waiting.get(delta.id)
+          const name = delta.filename?.current
+          if (pending === undefined || !name) return
+          clearTimeout(pending.timer)
+          waiting.delete(delta.id)
+          pending.done({ ...pending.item, filename: name.split(/[\\/]/).pop() ?? '' })
+        })
+        api.downloads?.onCreated.addListener((raw) => {
+          const item = shape(raw)
+          if (item.filename || !api.downloads?.onChanged) {
+            handler(item, Promise.resolve(item))
+            return
+          }
+          // The item goes to the handler now, before Chrome names it, so a check by address
+          // runs while the download can still be stopped; the name follows (round 8).
+          const named = new Promise<CreatedDownload>((done) => {
+            const timer = setTimeout(() => {
+              waiting.delete(item.id)
+              done(item)
+            }, NAME_WAIT_MS)
+            waiting.set(item.id, { item, done, timer })
           })
+          handler(item, named)
         })
       },
 
       async cancel(id: number): Promise<void> {
         await api.downloads?.cancel(id)
+      },
+
+      async discard(id: number): Promise<boolean> {
+        const downloads = api.downloads
+        const look = async () => (await downloads?.search?.({ id }).catch(() => []))?.[0]
+        let item = await look()
+        if (!downloads || item === undefined) return false
+        // By the state the browser reports (round 6): Chrome's cancel resolves for a finished
+        // download too and leaves its file on disk, and removeFile refuses one still running.
+        if (item.state !== 'complete' && item.state !== 'interrupted') {
+          let refused = false
+          try {
+            await downloads.cancel(id)
+          } catch {
+            // Firefox rejects the cancel of a download that has just completed, where Chrome
+            // resolves (B-181): a refusal is a reason to look again, not an answer.
+            refused = true
+          }
+          // It may have finished between the look and the cancel (round 7): look again.
+          item = (await look()) ?? item
+          if (refused && item.state !== 'complete' && item.state !== 'interrupted') return false
+          // Still running after the cancel: a download already finishing may ignore it and
+          // complete. That is not a stop, and the entry stays so the file can still be
+          // removed from the warning (round 10 seam).
+          if (item.state === 'in_progress') return false
+        }
+        // A finished file already moved or deleted is gone; nothing is left to remove.
+        if (item.state === 'complete' && item.exists !== false) {
+          if (!downloads.removeFile) return false
+          try {
+            await downloads.removeFile(id)
+          } catch {
+            const after = await look()
+            if (after?.exists !== false) return false
+          }
+        }
+        await downloads.erase?.({ id }).catch(() => undefined)
+        return true
       },
     },
 
@@ -338,32 +431,6 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
           },
           { url: [{ schemes: ['http', 'https'] }] },
         )
-      },
-    },
-
-    inference: {
-      /**
-       * Where a classifier could run — and on Chrome the answer is nowhere, by decision.
-       *
-       * This used to create an offscreen document and return `'offscreen'`, which made
-       * `prepare()` report `ready`, which opened the third stage's gate, which sent every
-       * unresolved candidate on a round trip that came back `null` because there are no
-       * weights and there will not be. A document per worker wake-up, a permission in the
-       * store listing, and a status claiming a classifier that cannot answer (B-50).
-       *
-       * The third stage is **not shipped** — measured 2026-08-08 and recorded in REQ-37:
-       * nine false positives out of thirty-four at 0.97–1.00 confidence, on screen-reader
-       * labels in both languages, while the first stage's rules give 100% recall with none
-       * on the same corpus. So the offscreen document, the `offscreen` permission and the
-       * page that hosted it are gone with it, and this says `none` rather than building
-       * scaffolding for something that will not run.
-       *
-       * Firefox keeps `'background'`: its background context is a page with a DOM, so
-       * there is nothing to create and nothing to ask for. If the model ever ships, this
-       * is the one function that changes.
-       */
-      async ensureHost(): Promise<'offscreen' | 'background' | 'none'> {
-        return kind === 'firefox' ? 'background' : 'none'
       },
     },
 
@@ -432,7 +499,7 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
         }
       },
 
-      async sendToActive<T extends RpcType>(type: T, payload: RpcMap[T]['req']): Promise<boolean> {
+      async sendToActive<T extends RpcType>(type: T, payload: RpcMap[T]['req']): Promise<number | null> {
         /**
          * The active tab, because that is the page the person is looking at.
          *
@@ -449,19 +516,19 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
          * listening", and `sendMessage` to a tab without a content script rejects
          * promptly on its own.
          */
-        if (!api.tabs.sendMessage) return false
+        if (!api.tabs.sendMessage) return null
         const [tab] = await api.tabs.query({ active: true, currentWindow: true })
-        if (typeof tab?.id !== 'number') return false
+        if (typeof tab?.id !== 'number') return null
 
         const envelope: Envelope<T> = { v: 1, type, payload }
         try {
           await api.tabs.sendMessage(tab.id, envelope)
-          return true
+          return tab.id
         } catch {
           // A tab with no content script — an extension page, a PDF viewer, a
           // `chrome://` page — rejects. That is "no page to tell", not an error
           // worth propagating into a download handler.
-          return false
+          return null
         }
       },
     },

@@ -15,6 +15,14 @@ import type { Verdict } from './verdict.js'
  * way (B-75, B-77), and a frame is one more boundary — the words belong to whoever
  * draws them.
  */
+
+/**
+ * Whether usage and error data is sent, as the settings switch and the first-run notice show it.
+ * `unsupported` is a Firefox with no built-in data consent; `not-sent` is a build that carries no
+ * App-Key (every build but the store's), which sends nothing whatever the switch says (B-209).
+ */
+export type UsageDataState = 'on' | 'off' | 'unsupported' | 'not-sent'
+
 export interface FrameLine {
   readonly explainKey: string
   readonly explainArgs: readonly string[]
@@ -103,6 +111,8 @@ export type Purpose =
   | 'leak-lookup'
   | 'file-hash'
   | 'domain-status'
+  /** Usage and error events, on by default and switched off in settings (B-198, B-199). */
+  | 'usage-data'
 
 export interface AuditEntry {
   readonly id: string
@@ -179,9 +189,31 @@ export interface RpcMap {
       shape: ReadonlyArray<{ code: string; filename?: string; mimeType?: string }>
       reasons: string
       skipped: string
+      /** The browser's id of the download, so the panel's "Discard the file" can act on it. */
+      downloadId: number
+      /**
+       * On a block only: whether the stop is confirmed, nothing of the file left on disk.
+       * `false` makes the panel say the file may be on disk and offer to delete it
+       * (B-180, rounds 9 and 10 of the seam).
+       */
+      stopped?: boolean
     }
     res: { ok: true }
   }
+  /** Cancel a doubted download, delete its file and drop it from the list (B-165). */
+  'download/discard': { req: { downloadId: number }; res: { ok: boolean } }
+  /**
+   * Usage and error data (B-198, B-199): what the settings switch and the first-run notice
+   * show (`UsageDataState`).
+   */
+  'usage/state': { req: Record<string, never>; res: { state: UsageDataState } }
+  /**
+   * The settings switch. In Firefox the page asks the browser inside the click first, because
+   * `permissions.request` refuses outside a user gesture; the worker then reads the answer.
+   */
+  'usage/set': { req: { on: boolean }; res: { state: UsageDataState } }
+  /** After an erase: a new install number, only if collection is on at that moment (one worker step). */
+  'usage/renew': { req: Record<string, never>; res: { state: UsageDataState } }
   /** SHA-1 of a submitted password. The password itself never crosses this line. */
   'password/check': {
     /**
@@ -202,7 +234,19 @@ export interface RpcMap {
         classes: string[]
         domain?: string
       }>
-      sources: Array<{ name: string; answered: boolean; why?: string }>
+      /**
+       * `needsKey` is set when the reason is the person's own key: none saved (`missing`),
+       * the one saved was refused (`refused`), or the one saved could not be read from the
+       * device (`unreadable`). The first two point the screen at the key field; the third
+       * has no field to point at. Mirrors `KeyRemedy` in `@okolos/core-leaks`, which this
+       * package cannot import; `background/leaks.test.ts` holds the two equal.
+       */
+      sources: Array<{
+        name: string
+        answered: boolean
+        why?: string
+        needsKey?: 'missing' | 'refused' | 'unreadable'
+      }>
       complete: boolean
     }
   }
@@ -259,7 +303,17 @@ export interface RpcMap {
   /** Not today. It ranks last until the given time rather than disappearing. */
   'finding/defer': { req: { id: string; until: string }; res: { ok: true } }
   'site/facts': { req: { host: string }; res: { trusted: boolean; firstSeen: string | null } }
-  'trap/warned': { req: { kind: string; signals: string }; res: { ok: true } }
+  /**
+   * A trap warning, journalled. `shown` is false when another warning already held the panel, so
+   * the journal keeps the stopped click and `warning_shown` does not count it (B-210); absent from
+   * an older content script, which is read as shown.
+   */
+  /**
+   * A warning went up on screen: the surface's kind, or `blocked-page` from the block page. The
+   * worker counts it as `warning_shown` when the kind maps to the catalogue (B-206); no page.
+   */
+  'warning/shown': { req: { kind: string }; res: { ok: true } }
+  'trap/warned': { req: { kind: string; signals: string; shown?: boolean }; res: { ok: true } }
   /**
    * A state-changing request the page made while a finding on it was
    * unresolved. Observed, never held — see apps/extension/src/page-watch.
@@ -439,8 +493,6 @@ export interface RpcMap {
   }
   /** Remembers the user's exception and returns where to go, or null if refused. */
   'block/allow': { req: { url: string }; res: { url: string } | null }
-  /** `score: null` means there is no model here — never that the text is fine. */
-  'inference/score': { req: { text: string }; res: { score: number | null; backend: string | null } }
 }
 
 export type RpcType = keyof RpcMap

@@ -15,6 +15,9 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 - `skip`
 - `what-this-sends`
 - `retry`
+- `usage`
+- `usage-notice`
+- `usage-off`
 - `intro`
 - `check`
 - `check-label`

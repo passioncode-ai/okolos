@@ -153,7 +153,7 @@ const builtAtCommit = typeof graph.built_at_commit === 'string' ? graph.built_at
  * said about which sources are in there, and an unknown age is not a young age.
  */
 const manifestPath = path.join(path.dirname(path.resolve(graphPath)), 'manifest.json')
-let manifest = null
+let manifest
 try {
   manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
 } catch {

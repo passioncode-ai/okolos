@@ -299,7 +299,7 @@ describe('every citation names something that exists', () => {
    */
   const claims = (doc: string): string[] =>
     readFileSync(path.join(root, doc), 'utf8')
-      .split('\n')
+      .split(/\r?\n/)
       .filter((line) => /\*\*Coverage:\*\*|^\| `/.test(line))
       .filter((line) => !/\bplanned\b/.test(line))
 
@@ -501,6 +501,18 @@ describe('the brand pack states facts, and a fact is checkable', () => {
     }
     claim('Сценариев', scnDone, scnTotal, 'все реализованы', 'реализовано')
     claim('Экранов', scrDone, scrTotal, 'все построены', 'построено')
+
+    /**
+     * And the second copy, in the first file anyone opens (B-127). `docs/README.md` carries the
+     * scenario count in its status table, and that copy is where the numbers drifted before
+     * (B-126): the gate read `facts.md` only.
+     */
+    const readmeRow = /^\| Сценарии \| \*\*(\d+)\*\*, из них \*\*(\d+) реализованы\*\*/m.exec(readme)
+    expect(readmeRow, 'docs/README.md has no countable "Сценарии" row').not.toBeNull()
+    expect([readmeRow?.[1], readmeRow?.[2]], 'docs/README.md and the tree disagree about scenarios').toEqual([
+      String(scnTotal),
+      String(scnDone),
+    ])
   })
 
   it('counts requirements, and the one closed by decision, from the brief', () => {
@@ -583,6 +595,92 @@ describe('the brand pack states facts, and a fact is checkable', () => {
         `\`${permission}\``,
       )
     }
+  })
+
+  it('promises every OS only while the built extension asks no OS', () => {
+    /**
+     * "Windows, macOS and Linux" rests on an absence: nothing the browser runs
+     * asks which system it is on, so nothing can behave differently there
+     * (B-166). An absence is read from what ships, the built bundle, and not
+     * from the sources, because a bundled dependency is invisible to a sweep of
+     * `src/`. So this test needs `pnpm build` first, and it judges the last
+     * build: `pnpm gates` and CI build before they test, a lone `vitest run`
+     * after a source change does not.
+     *
+     * The probe is a word list, not a parser, so it is wide on purpose: the
+     * word `platform` in any case catches `navigator.platform`, a bracketed or
+     * destructured read, an aliased `navigator` and `getPlatformInfo`, and today
+     * it has no innocent hit. A future hit that is not a probe is reviewed and
+     * the word list narrowed with a reason, not silenced. Native messaging is
+     * refused as a call: the extension names `chrome.runtime.connectNative`
+     * inside a detection pattern for other extensions, never followed by `(`.
+     *
+     * The targets come from the manifests and the promise is read from the
+     * "Где работает" section only, so a third build cannot ship without that
+     * section naming it, and the row cannot name a browser or a version floor
+     * the manifests do not carry.
+     */
+    const extension = path.join(root, 'apps/extension')
+    const manifests = filesIn(extension, '.json').filter((name) => name.startsWith('manifest.'))
+    expect(manifests.length, 'no manifest found to read the targets from').toBeGreaterThanOrEqual(2)
+
+    const heading = '## Где работает\n'
+    expect(facts, 'facts.md has no "Где работает" section').toContain(heading)
+    const after = facts.slice(facts.indexOf(heading) + heading.length)
+    const section = after.slice(0, after.search(/^## /m) === -1 ? after.length : after.search(/^## /m))
+
+    const probe =
+      /platform|userAgent|appVersion|oscpu|connectNative\s*\(|sendNativeMessage\s*\(/i
+    const rebuild = 'run pnpm build first; this test reads the last build'
+    for (const manifest of manifests) {
+      expect(section, `${manifest} ships and "Где работает" does not name it`).toContain(
+        `apps/extension/${manifest}`,
+      )
+      const dist = path.join(extension, 'dist', manifest.split('.')[1] as string)
+      expect(existsSync(dist), `${path.relative(root, dist)} is missing: ${rebuild}`).toBe(true)
+      const bundles = filesUnder(dist, '.js', { skip: [] })
+      expect(bundles.length, `${path.relative(root, dist)} holds no script: ${rebuild}`).toBeGreaterThan(0)
+      for (const file of bundles) {
+        /**
+         * One hit is not a probe and is narrowed out with its reason: the growth platform's
+         * `platform` prop, a constant naming the kind of product (`browser_extension`) on every
+         * usage event (B-198, B-199). It reads nothing about the system; the OS of an event is
+         * filled by the analytics server from the request's own User-Agent. Only the exact
+         * key-value pair is removed, so a read of `navigator.platform` beside it still hits.
+         * The same for `systemProps.appVersion`, which the Aptabase contract names and which
+         * carries the extension's own version (`deps.extensionVersion`), not the browser's.
+         */
+        const shipped = readFileSync(file, 'utf8')
+          .replaceAll('platform:"browser_extension"', '')
+          .replace(/appVersion:[A-Za-z_$][\w$]*\.extensionVersion/g, '')
+        const hit = probe.exec(shipped)
+        expect(
+          hit?.[0],
+          `${path.relative(root, file)} asks which OS it runs on (${rebuild})`,
+        ).toBeUndefined()
+      }
+    }
+
+    // The browsers and their floors, as the two manifests set them.
+    const chrome = JSON.parse(
+      readFileSync(path.join(extension, 'manifest.chrome.json'), 'utf8'),
+    ) as { minimum_chrome_version?: string }
+    const firefox = JSON.parse(
+      readFileSync(path.join(extension, 'manifest.firefox.json'), 'utf8'),
+    ) as { browser_specific_settings?: { gecko?: { strict_min_version?: string } } }
+    const chromeFloor = chrome.minimum_chrome_version
+    const firefoxFloor = firefox.browser_specific_settings?.gecko?.strict_min_version?.split('.')[0]
+    expect(chromeFloor, 'manifest.chrome.json sets no minimum_chrome_version').toMatch(/^\d+$/)
+    expect(firefoxFloor, 'manifest.firefox.json sets no strict_min_version').toMatch(/^\d+$/)
+    expect(manifests.sort(), 'a build without a browser in the promise').toEqual([
+      'manifest.chrome.json',
+      'manifest.firefox.json',
+    ])
+
+    const row = /^\| Расширение работает в ([^|]+?) на ([^|]+?) \|/m.exec(section)
+    expect(row, '"Где работает" has no row promising the extension an OS list').not.toBeNull()
+    expect(row?.[1]).toBe(`Chrome ${chromeFloor}+, Edge ${chromeFloor}+ и Firefox ${firefoxFloor}+`)
+    expect(row?.[2]).toBe('Windows, macOS и Linux')
   })
 })
 
@@ -835,7 +933,7 @@ describe('the page a stranger reads is prose, not source', () => {
     // count instead of near its paragraph count.
     const paragraphs = (html.match(/<p>/g) ?? []).length
     const sourceLines = readFileSync(path.join(root, 'docs/privacy.md'), 'utf8')
-      .split('\n')
+      .split(/\r?\n/)
       .filter((l) => l.trim() !== '' && !l.startsWith('|') && !l.startsWith('- ') && !l.startsWith('#'))
       .length
     expect(paragraphs).toBeLessThan(sourceLines / 2)

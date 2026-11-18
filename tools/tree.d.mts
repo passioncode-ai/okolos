@@ -22,3 +22,9 @@ export declare function filesUnder(
   options?: { skip?: readonly string[] },
 ): string[]
 
+
+/** `file` with the platform's separator (or `sep`) turned into `/`; unchanged on POSIX. */
+export declare function toPosix(file: string, sep?: string): string
+
+/** `path.relative(from, to)` spelled with `/` on every platform, as the repository names files. */
+export declare function posixRelative(from: string, to: string): string

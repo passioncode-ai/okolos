@@ -116,7 +116,8 @@ describe('the reuse index, and what it puts on disk', () => {
    * The index answers a question the product refused to answer for two
    * releases, so what it stores is the part worth pinning: a tag that is an
    * HMAC over the digest — never a password, never the digest itself — a host,
-   * and the date it was first seen there.
+   * and the date it was last submitted there, which the sweep ages out after a
+   * year (B-134).
    */
   it('stores a tag, a host and a date, and nothing that resembles a password', async () => {
     const db = await openDb()
@@ -151,4 +152,19 @@ describe('the reuse index, and what it puts on disk', () => {
     expect(await db.getAll('reuse')).toEqual([])
     expect(await db.get('settings', 'reuse:key')).toBeUndefined()
   })
+})
+
+describe('a range service that answers with an error status', () => {
+  // Before 2026-10-29 the status was never read: a 503 or 429 body went to the range parser,
+  // and a body without the suffix read as "not in a breach" (found while certifying N-109).
+  for (const status of [503, 429, 500]) {
+    it(`reads ${status} as unanswered, never as a clean password`, async () => {
+      const transport = vi.fn(async () => new Response(`0018A45C4D1DEF81644B54AB7F969B88D65:1\n`, { status }))
+      const { deps: d } = deps({ transport })
+      const verdict = await checkSubmittedPassword(RARE, d)
+      expect(verdict.compromised).toBe(false)
+      expect(verdict.source).toBe('nothing')
+      expect(verdict.explain.code).toBe('unreachable')
+    })
+  }
 })

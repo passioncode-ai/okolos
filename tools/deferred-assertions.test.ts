@@ -65,7 +65,7 @@ describe('a deferred assertion names what it is waiting for', () => {
     for (const file of tests()) {
       // This file's own DEFERS table is the vocabulary, not a deferral.
       if (file === 'tools/deferred-assertions.test.ts') continue
-      const lines = readFileSync(path.join(root, file), 'utf8').split('\n')
+      const lines = readFileSync(path.join(root, file), 'utf8').split(/\r?\n/)
       lines.forEach((line, index) => {
         const nearby = lines.slice(index + 1, index + 3).join(' ')
         if (defersWithoutCiting(line, nearby)) offenders.push(`${file}:${index + 1}`)

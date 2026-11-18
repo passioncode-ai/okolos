@@ -160,8 +160,8 @@ flowchart TD
 ### FLW-06: ClickFix — page copies a command
 - **Traces:** ST-007 (JTBD-02, JRN-03/#3)
 - **Goal:** interrupt between the clipboard write and the user pasting into a system dialog — the last moment we can reach
-- **Entry points:** script-initiated clipboard write containing a shell-like payload, with no genuine user copy action
-- **Success exit:** user does not run the command; clipboard content is flagged
+- **Entry points:** script-initiated clipboard write containing a shell-like payload, with no genuine user copy action; a click on a link whose address may open a program on the computer (SCN-049, added 2026-10-27)
+- **Success exit:** user does not run the command; clipboard content is flagged; a link that would start a program is stopped before the browser passes it on. When both happen in one click (the FileFix page) on a page that reads as a ClickFix page (the verification pretext and a run box), the ClickFix warning takes the panel from the link warning and keeps what the link warning listed behind it; a page worded otherwise, or one whose ClickFix warning was disputed, keeps the link warning and the click stays stopped
 - **Task analysis:**
   1. Stop before switching windows
   2. Understand in one sentence why this is fake
@@ -173,9 +173,12 @@ flowchart TD
   A[Screen: Page - fake CAPTCHA] -->|script writes command to clipboard| B[Screen: In-page banner - clickfix variant, blocking]
   B -->|what is this| C[State: plain-language explanation + the copied text shown verbatim]
   C -->|leave page| D[Back to previous page]
-  C -->|I already ran it| E[Screen: Recovery checklist]
-  B -->|dismiss - deliberate action required| F[Warning collapses to a persistent marker]
+  B -->|This is wrong| F[Warning closes for this page]
   F --> A
+  P[Screen: Popup - recovery entry] -->|Something happened, then I already ran it| E[Screen: Recovery checklist]
+  G[Screen: Page with a link to a program] -->|click, the click is stopped| H[Screen: In-page banner, clickfix variant, blocking: what would open and where]
+  H -->|leave page| D
+  H -->|this is wrong| I[Warning closes; that link goes through on the next click]
 ```
 
 - **Screens traversed:**
@@ -188,7 +191,7 @@ flowchart TD
 - **Traces:** ST-008 (JTBD-02, JTBD-06)
 - **Goal:** break the trap and explain it, so the user does not call the number on screen
 - **Entry points:** forced fullscreen without user gesture; looping modal dialogs; fake OS/browser chrome
-- **Success exit:** the user is out of the trap and on a safe page
+- **Success exit:** the user is out of the trap and on a safe page; a link warning (SCN-049) standing on the page gives way to this warning: the link's click stays stopped and the link warning is closed, not listed on the new panel (B-182)
 - **Task analysis:**
   1. Regain control of the window
   2. Understand it was fake
@@ -200,8 +203,8 @@ flowchart TD
   A[Screen: Page - fake lock] -->|forced fullscreen or dialog loop| B[Trap broken: fullscreen exited, dialogs suppressed]
   B --> C[Screen: In-page banner - techsupport variant]
   C -->|close this page| D[Tab closed or previous page]
-  C -->|I already called them| E[Screen: Recovery checklist]
-  C -->|dismiss| A2[Page remains, suppression stays active]
+  C -->|This is wrong| A2[Warning closes for this page, suppression stays active]
+  P[Screen: Popup - recovery entry] -->|Something happened, then I already called them| E[Screen: Recovery checklist]
   B -->|suppression not possible in this context| B_err[Inline: cannot fully block dialogs here - close the tab]
   B_err --> D
 ```
@@ -216,7 +219,7 @@ flowchart TD
 - **Traces:** ST-009 (JTBD-02)
 - **Goal:** a dangerous file is stopped before it is saved, and the user is told exactly which checks applied
 - **Entry points:** download started
-- **Success exit:** file kept after a clean check, or discarded after a warning
+- **Success exit:** a file whose address is in a feed is cancelled before it lands; a doubted file is kept or deleted at the person's word
 - **Task analysis:**
   1. See the verdict before the file lands
   2. Keep or discard
@@ -224,20 +227,19 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  A[Download started] --> B{Source in feeds?}
-  B -->|yes| W[Screen: In-page banner - download variant, blocking]
-  B -->|no| C{Hash obtainable?}
-  C -->|yes| D{Known-bad hash?}
-  C -->|no| E[Verdict: partial - URL checks only, stated in UI]
-  D -->|yes| W
-  D -->|no| F[Verdict: clean by the checks that ran]
-  E --> G[Screen: In-page banner - download variant, informational]
-  F --> G
-  W -->|discard file| H[Download cancelled, journalled]
-  W -->|keep anyway| I[Download kept; exception journalled]
-  G -->|keep| I
-  B -->|feeds unavailable| B_err[Inline: feeds stale - checks limited]
-  B_err --> C
+  A[Download started] --> B{Address or redirect in feeds?}
+  B -->|yes| X[Download cancelled at once, before it lands, journalled]
+  X --> W[Screen: In-page banner - download variant, critical]
+  B -->|no| N[Name reported, or 5 s waited for it]
+  N --> T{Program, hidden type or check not run?}
+  T -->|yes| D[Screen: In-page banner - download variant, major]
+  T -->|no| G[No banner: clean by the checks that ran, no hash check; journalled]
+  W -->|show the record| J[Journal]
+  D -->|discard the file| H[Cancelled if running, file deleted, dropped from the list]
+  D -->|delete failed| E[Inline: delete it from the browser's downloads]
+  D -->|this is wrong or dismiss| I[File stays where the browser put it]
+  B -->|feeds unavailable| B_err[Feed check not run, stated in the verdict]
+  B_err --> N
 ```
 
 - **Screens traversed:**
@@ -293,7 +295,7 @@ rather than from anything the frame said about itself.
 flowchart TD
   A[Password submitted or entered manually] --> B[SHA-1 computed in page context]
   B --> C{In local top-N corpus?}
-  C -->|yes| D[Verdict: compromised - zero network requests]
+  C -->|yes| D[Verdict: compromised - no request about the password]
   C -->|no| E[k-anonymity query: 5-char prefix, padded]
   E --> F{Suffix match?}
   F -->|yes| D
@@ -351,16 +353,28 @@ flowchart TD
   C -->|none| E[State: clean, with the list of sources actually checked]
   C -->|a source failed| C_err[Row: source unavailable + retry]
   C_err -->|retry| A_load
+  C -->|no HIBP key saved| K[Line: Have I Been Pwned not checked, no key + Add key]
+  C -->|HIBP refused the key| K_ref[Line: key refused + Replace key]
+  K -->|add key| S[Screen: Settings - HIBP key block]
+  K_ref -->|replace key| S
+  S -->|paste and save| S_saved[State: key saved, field emptied, key not shown]
+  S -->|save with an empty field or a space| S_needs[State: refused - nothing saved, says why]
+  S_needs --> S
+  S_saved -->|remove key| S
+  S_saved -->|back to leaks| A_idle[State: idle, the sentence names the recipients for the key as it now is; the old no-key result is gone]
+  A_idle -->|check| A_load
   D -->|open entry| F[Entry: data classes, date, source, next steps]
   F -->|change password| G[Site change-password opened]
   F -->|check reuse| H[Local reuse list]
   F -->|mark resolved| I[Entry archived; leaves active queue]
 ```
 
+- **The key is the one setting this flow needs, and it is optional.** Hudson Rock Cavalier answers without one; Have I Been Pwned answers only with the person's own paid key. With none saved the list is built from one source and says so; the line that says so is also the way to the field (FLW-11 -> SCN-015)
 - **Screens traversed:**
   | Screen | States used here |
   |--------|------------------|
   | SCR-08 Leaks and repair | loading, empty, error, success |
+  | SCR-12 Settings | success, error |
 
 ### FLW-12: Extension change alert
 - **Traces:** ST-013, ST-014 (JTBD-03)
@@ -430,7 +444,7 @@ flowchart TD
 flowchart TD
   A[Screen: Settings] -->|export everything| B[JSON file produced]
   A -->|wipe everything| C{Confirm - names what will be deleted}
-  C -->|confirm| D[All local data deleted; extension returns to first-run state]
+  C -->|confirm| D[All local data deleted; extension returns to first-run state; usage and error data, if on, under a new install number with the queue dropped]
   C -->|cancel| A
   B -->|export failed| B_err[Inline: export failed + retry]
   B_err -->|retry| B
@@ -475,7 +489,7 @@ flowchart TD
 ### FLW-16: Recovery — "I already fell for it"
 - **Traces:** ST-015 (JTBD-06, JRN-03/#5)
 - **Goal:** turn panic into an ordered checklist matched to what actually happened
-- **Entry points:** "I already ran it / already entered it" from any banner; SCR-02 popup; SCR-07 queue
+- **Entry points:** the recovery entry in the SCR-02 popup; SCR-07 queue (the banners have no "I already ran it" button)
 - **Success exit:** the checklist for that incident type is completed or explicitly deferred
 - **Task analysis:**
   1. Say what happened
@@ -780,3 +794,30 @@ flowchart TD
 
 - **Screens traversed:** none designed yet — the census and deep-scan views are designed in Б3.
 - **`ppid = 1` is not an orphan on macOS.** Every service-manager job looks like that, including a browser the machine keeps on purpose with no client between sessions. The rule is a conjunction of facts, never one of them.
+
+### FLW-24: Usage and error data
+- **Traces:** ST-032 (JTBD-05, JRN-01/#4)
+- **Goal:** the person knows what is sent and why, and can switch it off; the product learns where it fails without learning anything about the person's pages
+- **Entry points:** the first-run screen (SCR-01); settings (SCR-12); Firefox's own install prompt
+- **Success exit:** the person's choice holds: on sends events from a closed catalogue through the one network module, off sends nothing
+- **Task analysis:**
+  1. Read the notice on the first run
+  2. Keep it on, or open settings and switch it off
+  3. Later, switch it on or off again
+- **Flow:**
+
+```mermaid
+flowchart TD
+  I[Install] --> B{Browser}
+  B -->|Chrome or Edge| N[First run: notice, collection on] --> S{Settings switch}
+  B -->|Firefox 140+| P[Install prompt: optional technical and interaction data] --> G{Granted?}
+  G -->|yes| ON[On: events sent]
+  G -->|no| OFF[Off: nothing sent]
+  B -->|Firefox 129..139| OLD[Off: the browser has no consent, nothing sent; settings say why]
+  S -->|off| OFF2[Off: id deleted, queue dropped]
+  S -->|on| ON
+  OFF2 -->|switched on again| NEW[On with a new id]
+```
+
+- **Screens traversed:** SCR-01, SCR-12, SCR-10 (the requests show in the self-audit log)
+

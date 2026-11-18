@@ -31,6 +31,8 @@ import {
   type AreaRow,
   type AttentionItem,
   type ExtensionsState,
+  type LeakKeyPanel,
+  type UsagePanel,
   type LeaksState,
   type OverviewHandlers,
   type PanelState,
@@ -51,6 +53,8 @@ import {
 import { mapJournal } from '../popup/state.js'
 import { answered } from './answered.js'
 import { keepingFocus, markFocus } from './keep-focus.js'
+import { hasLeakKey, removeLeakKey, saveLeakKey } from './leak-key.js'
+import { switchConsent } from '../background/usage/consent.js'
 import { showFailure } from './failure.js'
 import { whilePending } from './pending.js'
 import {
@@ -62,6 +66,7 @@ import {
   type Route,
 } from './views.js'
 import '../pages.css'
+import { runUsageSwitch } from './usage-switch.js'
 
 /**
  * The options page is, first of all, the self-audit panel: the product's
@@ -119,7 +124,13 @@ const addressField = (() => {
   return field
 })()
 
-function leaksSection(): HTMLElement {
+async function leaksSection(): Promise<HTMLElement> {
+  // Which recipients the idle sentence names depends on whether a key is saved; `null` when
+  // that cannot be read, so the sentence names Have I Been Pwned conditionally rather than
+  // guessing (B-125 round 2).
+  const keySaved = await openDb()
+    .then((db) => hasLeakKey(db))
+    .catch(() => null)
   const container = document.createElement('div')
   // Named so the stylesheet can treat the field and the panel as one block.
   // Without it the address input floats between two cards, which is what the
@@ -132,7 +143,7 @@ function leaksSection(): HTMLElement {
   // moving the live input into a tree that has not been swapped in yet takes it
   // out of the document for as long as the remaining sections take to load.
   container.append(
-    renderLeaks(document, leaks, {
+    renderLeaks(document, leaks.kind === 'idle' ? { ...leaks, keySaved } : leaks, {
       onCheck: () => {
         void (async () => {
           // Silence was the old answer here, and it is the worst one: the
@@ -152,10 +163,15 @@ function leaksSection(): HTMLElement {
             return
           }
           leaks = { kind: 'checking' }
+          // The key state this check runs under. If the key is saved, removed or erased
+          // while it runs, here or in another tab, its answer describes a state that is gone
+          // and is dropped rather than drawn over the reset (N-110 round 3).
+          const epoch = leakEpoch
           await paintCurrent()
+          let answer: LeaksState
           try {
             const result = await platform.runtime.send('leaks/check', { address })
-            leaks = result
+            answer = result
               ? {
                   kind: 'ready',
                   inventory: { ...result, leaks: result.leaks },
@@ -163,8 +179,14 @@ function leaksSection(): HTMLElement {
                 }
               : { kind: 'error', message: t('errCheckEmpty') }
           } catch (cause) {
-            leaks = { kind: 'error', message: String(cause) }
+            answer = { kind: 'error', message: String(cause) }
           }
+          // The answer to this check has arrived, drawn or dropped: an e2e spec waits on it
+          // instead of a fixed time (B-169). One per press of «Проверить», on an extension
+          // page no web page can read, so it ships.
+          performance.mark('okolos:leaks-answered')
+          if (epoch !== leakEpoch) return
+          leaks = answer
           await paintCurrent()
         })()
       },
@@ -175,6 +197,8 @@ function leaksSection(): HTMLElement {
         const url = leak.domain ? changePasswordUrl(leak.domain) : null
         if (url !== null) void platform.tabs.create(url)
       },
+      // The key line's link: a source unchecked for want of a key points at the field.
+      keyHref: optionsPageFor('data'),
       onResolve: (name) => {
         void (async () => {
           const db = await openDb()
@@ -432,7 +456,7 @@ async function extensionsSection(): Promise<HTMLElement> {
  * words that it can be.
  */
 async function trustedSection(): Promise<HTMLElement> {
-  let entries: TrustedDomain[] = []
+  let entries: TrustedDomain[]
   try {
     // Not `?? []`: silence is not an empty list, and the comment three lines
     // below has always said so.
@@ -788,7 +812,7 @@ async function openIncidents(): Promise<{
   for (const entry of settings) {
     if (!entry.key.startsWith('recovery:')) continue
     const kind = entry.key.slice('recovery:'.length)
-    let done: StepProgress[] = []
+    let done: StepProgress[]
     try {
       done = typeof entry.value === 'string' ? (JSON.parse(entry.value) as StepProgress[]) : []
     } catch {
@@ -1048,15 +1072,181 @@ async function dataSection(): Promise<HTMLElement> {
       onExport: download,
       onWipe: async () => {
         const db = await openDb()
-        return wipeAll(db)
+        const wiped = await wipeAll(db)
+        // The stores' outcome is said at once and stands on its own: the leak screen resets after a
+        // full wipe whatever the renewal does. The renewal follows (one worker step, usage/renew,
+        // which may wait behind a send), and one that failed repaints the usage block in its own words.
+        void renewUsage().then((renewed) => {
+          // Repaint whenever the notice changes, both ways, so a renewal that worked takes an
+          // earlier "not replaced" away. Not after a partial wipe: its note and its retry live only
+          // in the drawn section, and a repaint would erase them; the retry's full wipe repaints.
+          const was = usageRenewFailed
+          usageRenewFailed = !renewed
+          if (wiped.ok && was !== usageRenewFailed) void reload()
+        })
+        return wiped
       },
-      onWiped: () => void reload(),
+      // The erase took the key, so the leaks screen goes back to its start here and in every
+      // other tab: its last result spoke about a key that no longer exists (N-110 round 3).
+      onWiped: () => {
+        forgetLeakScreen()
+        announceKeyChange('erased')
+        void reload()
+      },
     },
     // Every store, from the schema that owns the list — not a subset written here.
     // `DATA_KIND_KEY` is `Record<StoreName, string>`, so a store added later fails
     // the build until the confirmation has words for it.
     Object.values(DATA_KIND_KEY),
+    await leakKeyPanel(),
+    await usagePanel(),
   )
+}
+
+/**
+ * "Delete all data" and "Clear the local data" take the install number and the unsent events as
+ * well (docs/privacy.md): collection that was on stays on, under a new number, so nothing sent
+ * later links to what was sent before. Off has no number to take. False when the renewal failed,
+ * which the usage block then says (`usageRenewFailed`), apart from the wipe's own outcome.
+ */
+async function renewUsage(): Promise<boolean> {
+  try {
+    // One worker step that renews only if collection is on at that moment: a state read followed
+    // by a set would undo a switch-off that landed between the two.
+    await platform.runtime.send('usage/renew', {})
+    return true
+  } catch (cause) {
+    console.warn('okolos: the wipe could not renew the usage install number', cause)
+    return false
+  }
+}
+
+/** Whether the last switch did not save, shown once on the repaint that follows it. */
+let usageFailed = false
+/** The latest switch: an earlier one whose Firefox answer arrives late does not overrule it. */
+let usageSwitches = 0
+/** The last erase could not replace the install number; said in the usage block until it is. */
+let usageRenewFailed = false
+
+/**
+ * The usage and error data switch (B-199). In Firefox the browser keeps the choice and
+ * `permissions.request` works only inside a user gesture, so this page asks Firefox from the
+ * change event and the worker then reads what Firefox granted.
+ */
+async function usagePanel(): Promise<UsagePanel | undefined> {
+  let state: UsagePanel['state']
+  try {
+    state = (await platform.runtime.send('usage/state', {})).state
+  } catch {
+    return undefined
+  }
+  const failed = usageFailed
+  usageFailed = false
+  // Kept, not consumed: a reset paints twice (its own reload, then the hash change), and the
+  // second paint must still say it. Cleared by a renewal that worked or by the switch.
+  const renewFailed = usageRenewFailed
+  return {
+    state,
+    firefox: platform.kind === 'firefox',
+    failed,
+    renewFailed,
+    onSwitch: (on: boolean) => {
+      void runUsageSwitch(on, {
+        ticket: () => ++usageSwitches,
+        latest: () => usageSwitches,
+        ask: (wanted) => (platform.kind === 'firefox' ? switchConsent('firefox', platform.dataConsent, wanted) : Promise.resolve(null)),
+        set: (wanted) => platform.runtime.send('usage/set', { on: wanted }),
+        // A Firefox that declined is an answer, not a failure: the repaint shows the switch off.
+        // Off deleted the number, on made a new one: either way the old one is gone.
+        saved: () => {
+          usageFailed = false
+          usageRenewFailed = false
+        },
+        failed: () => {
+          usageFailed = true
+        },
+        repaint: () => void reload(),
+      })
+    },
+  }
+}
+
+/**
+ * A leak result computed under the old key state is not shown under the new one.
+ *
+ * `leaks` lives in page memory, and the page is one document routed by hash: after "Add
+ * key", saving, and Back, the leaks screen repainted the earlier result and said "no key is
+ * saved" beside a key that was (N-110 round 2). Only after the write succeeded; a failed
+ * write changed nothing, so the result still describes the key state there is. The address
+ * field is kept, so checking again is one press.
+ */
+function forgetLeakResult(): void {
+  leaks = { kind: 'idle' }
+  leakEpoch += 1
+}
+
+/** Bumped whenever the key state changes; a check that started under another value is stale. */
+let leakEpoch = 0
+
+/**
+ * Everything the leaks screen holds, gone: the result and the typed address. For an erase
+ * and a store reset, which take the key and every other record with them (SCN-023).
+ */
+function forgetLeakScreen(): void {
+  forgetLeakResult()
+  address = ''
+  addressField.value = ''
+}
+
+/**
+ * Other open tabs of this page hold their own `leaks` in their own memory. The key lives in
+ * IndexedDB, which raises no change event, so the tab that changed it says so here and every
+ * other tab drops its result and repaints (N-110 round 3). Absent where the browser has no
+ * BroadcastChannel; the stale tab then keeps its result until its next check.
+ */
+const keyChannel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('okolos:leak-key')
+keyChannel?.addEventListener('message', (event: MessageEvent<unknown>) => {
+  if (event.data === 'erased') forgetLeakScreen()
+  else forgetLeakResult()
+  void reload()
+})
+
+/** Tells the other tabs; this tab has already reset itself. */
+function announceKeyChange(kind: 'changed' | 'erased'): void {
+  keyChannel?.postMessage(kind)
+}
+
+/**
+ * The Have I Been Pwned key block (B-125), or none when whether a key is saved cannot be
+ * read: a block saying "no key" over a key that is there would invite pasting a second
+ * one, and the storage problem itself is SCR-20's to explain.
+ *
+ * Saving and removing go through `act`, so a failed write says so in the page's failure
+ * slot and the repaint shows what is actually stored. The key goes from the field to the
+ * store and nowhere else: not into this page's state, not into a message, not into a log.
+ */
+async function leakKeyPanel(): Promise<LeakKeyPanel | undefined> {
+  let saved: boolean
+  try {
+    saved = await hasLeakKey(await openDb())
+  } catch {
+    return undefined
+  }
+  return {
+    saved,
+    onSave: (key) =>
+      void act(async () => {
+        await saveLeakKey(await openDb(), key)
+        forgetLeakResult()
+        announceKeyChange('changed')
+      }),
+    onRemove: () =>
+      void act(async () => {
+        await removeLeakKey(await openDb())
+        forgetLeakResult()
+        announceKeyChange('changed')
+      }),
+  }
 }
 
 /**
@@ -1157,7 +1347,17 @@ async function storageProblem(): Promise<HTMLElement | null> {
         onReset: () => {
           void (async () => {
             await resetStorage()
+            forgetLeakScreen()
+            announceKeyChange('erased')
+            // The cleared page first: the renewal is one worker step (usage/renew) that may wait behind a send.
             await reload()
+            // The install number lives in the worker's storage, which a broken database does not
+            // reach: clearing takes it too (storageResetNote says so). When it could not, the
+            // page opens «Ваши данные», where the usage block says so and how to get a new one.
+            const was = usageRenewFailed
+            usageRenewFailed = !(await renewUsage())
+            if (usageRenewFailed && location.hash !== hashFor('data')) location.hash = hashFor('data')
+            else if (was !== usageRenewFailed) await reload()
           })()
         },
       },

@@ -1,6 +1,6 @@
 import { t } from '@okolos/i18n'
 
-import { groupLeaks, type Leak, type LeakInventory } from '@okolos/core-leaks'
+import { groupLeaks, HIBP_SOURCE, type Leak, type LeakInventory } from '@okolos/core-leaks'
 
 /**
  * SCR-08 — what is known to have leaked, and what was not checked.
@@ -14,8 +14,11 @@ import { groupLeaks, type Leak, type LeakInventory } from '@okolos/core-leaks'
  * The attribution is not decoration either. Have I Been Pwned's breach data is
  * CC BY 4.0, which requires credit wherever the data appears — so it appears
  * here, on the screen that shows it, rather than only in a README a user will
- * never open. It is rendered in every state, including the empty one: a result
- * of "nothing found" is still a result computed from someone else's work.
+ * never open. It is rendered wherever its data is: in the result of a check Have I
+ * Been Pwned answered, including one that found nothing, since "nothing found" is still
+ * a result computed from someone else's work. It is not rendered before a check, or
+ * after one Have I Been Pwned took no part in (B-125): there it named, as the only
+ * source on the screen, the one that was not asked.
  */
 
 /**
@@ -30,8 +33,12 @@ import { groupLeaks, type Leak, type LeakInventory } from '@okolos/core-leaks'
 export const hibpAttribution = (): string => t('leaksAttribution')
 
 export type LeaksState =
-  /** `needs` carries a refusal to state, so pressing the button is never silent. */
-  | { readonly kind: 'idle'; readonly needs?: string }
+  /**
+   * `needs` carries a refusal to state, so pressing the button is never silent.
+   * `keySaved` decides which recipients the sentence names: the page reads it, and `null`
+   * (or absent) means it could not, so the sentence names Have I Been Pwned conditionally.
+   */
+  | { readonly kind: 'idle'; readonly needs?: string; readonly keySaved?: boolean | null }
   | { readonly kind: 'checking' }
   | { readonly kind: 'ready'; readonly inventory: LeakInventory; readonly now: string }
   | { readonly kind: 'error'; readonly message: string }
@@ -41,6 +48,11 @@ export interface LeaksHandlers {
   readonly onResolve: (leakName: string) => void
   /** Opens the service's own password-change page, where it publishes one. */
   readonly onChangePassword: (leak: Leak) => void
+  /**
+   * Where the key field lives (SCR-12). Given by the page, which owns the addresses; when
+   * absent the key line still says why, and offers no link.
+   */
+  readonly keyHref?: string
 }
 
 export function renderLeaks(doc: Document, state: LeaksState, handlers: LeaksHandlers): HTMLElement {
@@ -59,10 +71,19 @@ export function renderLeaks(doc: Document, state: LeaksState, handlers: LeaksHan
       // to a full address, and both receive one. The sentence a user reads
       // before choosing must be the one that is true — the hashed check is the
       // password one, and conflating the two was the whole error.
+      //
+      // Every recipient is named, for the key state the page read (B-125 round 2). It said
+      // "the sources named below" and the only one below was the credit line, so Hudson Rock
+      // Cavalier, which always receives the address, was never named, and with no key the
+      // one source named was the one not asked.
       text(
         doc,
         'idle',
-        t('leaksIdle'),
+        state.keySaved === true
+          ? t('leaksIdleWithKey')
+          : state.keySaved === false
+            ? t('leaksIdleNoKey')
+            : t('leaksIdle'),
       ),
       // A button that does nothing is worse than one that refuses. Pressing
       // "Check now" without a usable address used to return in silence, which
@@ -83,13 +104,12 @@ export function renderLeaks(doc: Document, state: LeaksState, handlers: LeaksHan
       // reads it.
       addressSlot(doc),
       button(doc, 'check', t('leaksCheck'), handlers.onCheck, true),
-      attribution(doc),
     )
     return root
   }
 
   if (state.kind === 'checking') {
-    root.append(text(doc, 'status', t('leaksChecking')), addressSlot(doc), attribution(doc))
+    root.append(text(doc, 'status', t('leaksChecking')), addressSlot(doc))
     return root
   }
 
@@ -99,7 +119,6 @@ export function renderLeaks(doc: Document, state: LeaksState, handlers: LeaksHan
       text(doc, 'error-note', t('leaksErrorNote')),
       addressSlot(doc),
       button(doc, 'check', t('leaksRetry'), handlers.onCheck),
-      attribution(doc),
     )
     return root
   }
@@ -115,6 +134,7 @@ export function renderLeaks(doc: Document, state: LeaksState, handlers: LeaksHan
     ),
     // Always, and next to the number rather than beneath the fold.
     text(doc, 'coverage', coverageLine(inventory)),
+    ...keyLines(doc, inventory, handlers.keyHref),
     addressSlot(doc),
   )
 
@@ -134,7 +154,12 @@ export function renderLeaks(doc: Document, state: LeaksState, handlers: LeaksHan
     root.append(section)
   }
 
-  root.append(button(doc, 'check', t('leaksCheckAgain'), handlers.onCheck), attribution(doc))
+  root.append(button(doc, 'check', t('leaksCheckAgain'), handlers.onCheck))
+  // The credit is for data on the screen, so it follows the data: drawn when Have I Been
+  // Pwned answered, including with nothing found, and not otherwise (B-125 round 2).
+  if (inventory.sources.some((source) => source.answered && source.name === HIBP_SOURCE)) {
+    root.append(attribution(doc))
+  }
   return root
 }
 
@@ -179,6 +204,31 @@ function leakRow(doc: Document, leak: Leak, handlers: LeaksHandlers): HTMLElemen
   actions.append(button(doc, 'resolve', t('leaksMarkResolved'), () => handlers.onResolve(leak.name)))
   row.append(actions)
   return row
+}
+
+/**
+ * A source left unchecked for want of the person's key, said once, with the way to fix it.
+ *
+ * Only for that reason (B-125). Until 2026-10-29 nothing in the product could write the
+ * key, so every check ended with Have I Been Pwned unchecked and the screen said only that
+ * it "could not be reached". Other reasons stay in the coverage line: a timeout's remedy is
+ * waiting, and a link to a setting that cannot help would be a wrong answer.
+ */
+function keyLines(doc: Document, inventory: LeakInventory, keyHref: string | undefined): HTMLElement[] {
+  return inventory.sources.flatMap((source) => {
+    if (source.answered || source.needsKey === undefined || !source.why) return []
+    const line = text(doc, 'source-key', source.why)
+    // A key that could not be read has no fix in the field: the field is not drawn when the
+    // store fails, and "add a key" would contradict a key that may be there.
+    if (keyHref !== undefined && source.needsKey !== 'unreadable') {
+      const link = doc.createElement('a')
+      link.setAttribute('data-role', 'add-key')
+      link.href = keyHref
+      link.textContent = source.needsKey === 'refused' ? t('leakKeyReplace') : t('leakKeyAdd')
+      line.append(' ', link)
+    }
+    return [line]
+  })
 }
 
 /**

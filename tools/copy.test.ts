@@ -170,7 +170,7 @@ describe('nothing asks the catalogue before a resolver exists', () => {
   it('calls the resolver from a function, never at the top level', () => {
     const offences = sources.flatMap((file) =>
       read(file)
-        .split('\n')
+        .split(/\r?\n/)
         // A top-level statement starts in column zero. Anything indented is
         // inside a function, an object, or a class — i.e. deferred.
         .filter((line) => /^(?:export )?const \w+(?::[^=]*)? = t\(/.test(line))

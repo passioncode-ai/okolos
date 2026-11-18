@@ -40,9 +40,10 @@ import path from 'node:path'
 import { renderConfig } from './deploy-config.mjs'
 import { runBounded } from './feed/bounded.mjs'
 import { acquireLock } from './feed/lock.mjs'
-import { feedPaths } from './feed/paths.mjs'
+import { feedPaths, windowsRefusal } from './feed/paths.mjs'
 import { DEFAULT_WORKER, readServed, refuseBackwards } from './feed/served.mjs'
 import { hostOf, listingSql } from './listings.mjs'
+import { isMain } from './is-main.mjs'
 
 const REPO = path.resolve(import.meta.dirname, '..')
 
@@ -71,7 +72,7 @@ export const WRANGLER_ARGS = [
 export function loadEnv(env, file = path.join(homedir(), '.okolos/cloudflare.env')) {
   const merged = { ...env }
   if (!existsSync(file)) return merged
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
+  for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
     const m = /^\s*(?:export\s+)?([A-Z0-9_]+)=(?:'([^']*)'|"([^"]*)"|(.*))\s*$/.exec(line)
     if (m) merged[m[1]] ??= m[2] ?? m[3] ?? m[4]
   }
@@ -248,7 +249,12 @@ async function main() {
   }
 }
 
-if (import.meta.filename === process.argv[1]) {
+if (isMain(import.meta.filename)) {
+  const refusal = windowsRefusal('publish-feed')
+  if (refusal !== null) {
+    console.error(refusal)
+    process.exit(1)
+  }
   main().catch((cause) => {
     console.error(`publish-feed: ${cause instanceof Error ? cause.message : String(cause)}`)
     process.exit(1)

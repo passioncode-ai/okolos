@@ -105,6 +105,10 @@ export async function checkSubmittedPassword(
         },
         deps,
       )
+      // An error status is an unanswered question, not a range: a 503 or 429 body read as a
+      // range said "not in a breach" for any password (found 2026-10-29, certifying N-109).
+      // i18n-exempt: carried in the verdict's detail for the journal, never shown as a sentence
+      if (!response.ok) throw new Error(`range service answered ${response.status}`)
       return { body: await response.text() }
     },
   })

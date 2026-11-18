@@ -10,6 +10,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { isMain } from './is-main.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
 const OUT = path.join(root, 'apps/extension/src/tokens.generated.css')
@@ -64,7 +65,8 @@ ${declare('colour', t.dark, '    ')}
 `
 }
 
-if (import.meta.filename === process.argv[1]) {
+// Real paths, so a run through a symlink or a junction still runs (tools/is-main.mjs).
+if (isMain(import.meta.filename)) {
   const css = toCss()
   writeFileSync(OUT, css)
   console.log(`wrote ${path.relative(root, OUT)} (${css.split('\n').length} lines)`)

@@ -45,7 +45,7 @@
 его подделать, — и верхний фрейм не отличит доклад расширения от заявления того,
 о чём доносят. Фон стоит вне страницы: `frame/report` → `relayFrameFinding` →
 `sendToFrame('frame/finding', …, {frameId: 0})`
-(`apps/extension/src/background/index.ts:242`).
+(`apps/extension/src/background/index.ts`, `relayFrameFinding` и `sendToFrame`).
 
 ### 3. `origin` штампует фон, из отправителя
 

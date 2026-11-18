@@ -16,11 +16,22 @@
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 
+import { findPython, noPythonMessage, pythonEnv } from './python.mjs'
+
 const root = path.resolve(import.meta.dirname, '..')
 const pack = process.argv[2] ?? 'docs/brand'
 
-const run = spawnSync('python3', [path.join(root, 'docs/brand/lint.py'), path.join(root, pack)], {
+// Found, not spelled: `python3` is not a name a stock Windows answers to (B-162).
+const python = findPython()
+if (python === null) {
+  console.error(`\n  could not run the brand linter: ${noPythonMessage()}\n`)
+  process.exit(1)
+}
+
+const run = spawnSync(python.command, [...python.args, path.join(root, 'docs/brand/lint.py'), path.join(root, pack)], {
   stdio: 'inherit',
+  env: pythonEnv(),
+  windowsHide: true,
 })
 
 if (run.error) {

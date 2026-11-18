@@ -1,5 +1,5 @@
 import { expect, test } from './hooks.js'
-import { expectBanner } from './surfaces.js'
+import { expectBanner, expectPageSettled } from './surfaces.js'
 
 /**
  * SCN-006 — an address that imitates a known one is shown next to the name it
@@ -52,7 +52,9 @@ test('the genuine article is left alone', async ({ context }) => {
 
   const page = await context.newPage()
   await page.goto('https://google.com/signin')
-  await page.waitForTimeout(1500)
+  // Until the address check and the scan say they are done, not for a time: a fixed wait
+  // ran out first under load and passed on a check that had not run (B-169).
+  await expectPageSettled(page)
 
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 })
@@ -64,7 +66,7 @@ test('and so is a subdomain of it', async ({ context }) => {
 
   const page = await context.newPage()
   await page.goto('https://accounts.google.com/signin')
-  await page.waitForTimeout(1500)
+  await expectPageSettled(page)
 
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 })

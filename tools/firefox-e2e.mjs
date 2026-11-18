@@ -27,76 +27,19 @@
  */
 
 import { createServer } from 'node:http'
-import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Builder, By, until } from 'selenium-webdriver'
 import { existsSync } from 'node:fs'
 
-import { directoriesIn } from './tree.mjs'
 import { Options } from 'selenium-webdriver/firefox.js'
 
+import { endTree, spawnTree } from './bin.mjs'
 import { buildTooOld } from './build-age.mjs'
+import { findFirefox } from './find-firefox.mjs'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const BUILD = path.join(root, 'apps/extension/dist/firefox')
-/**
- * Finds the Firefox Playwright installed, without naming its build number.
- *
- * The number changes with every Playwright upgrade, and a path that carries one
- * turns an unrelated dependency bump into a red Firefox job — which is exactly
- * the pressure that gets a browser dropped from CI. So the newest build in the
- * cache is used, and an explicit FIREFOX_BINARY still wins for anyone pointing
- * at a system install.
- */
-function findFirefox() {
-  if (process.env.FIREFOX_BINARY) return process.env.FIREFOX_BINARY
-
-  const home = process.env.HOME ?? ''
-  const roots = [
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
-    path.join(home, 'Library/Caches/ms-playwright'),
-    path.join(home, '.cache/ms-playwright'),
-    '/root/.cache/ms-playwright',
-  ].filter(Boolean)
-
-  // Both layouts: macOS ships an .app bundle, Linux a bare binary.
-  const suffixes = [
-    'firefox/Nightly.app/Contents/MacOS/firefox',
-    'firefox/firefox',
-  ]
-
-  const found = []
-  for (const dir of roots) {
-    let entries
-    try {
-      entries = directoriesIn(dir)
-    } catch {
-      continue
-    }
-    for (const entry of entries) {
-      const build = /^firefox-(\d+)$/.exec(entry)
-      if (!build) continue
-      for (const suffix of suffixes) {
-        const candidate = path.join(dir, entry, suffix)
-        if (existsSync(candidate)) found.push({ build: Number(build[1]), candidate })
-      }
-    }
-  }
-
-  if (found.length === 0) {
-    throw new Error(
-      'No Playwright Firefox found. Run `pnpm exec playwright install firefox`, ' +
-        'or set FIREFOX_BINARY to a Firefox you already have.',
-    )
-  }
-
-  // Newest build wins: an old one left behind by a previous version would
-  // otherwise be tested instead of the one the suite was written against.
-  found.sort((a, b) => b.build - a.build)
-  return found[0].candidate
-}
-
 let BINARY
 try {
   BINARY = findFirefox()
@@ -206,7 +149,9 @@ const server = createServer((req, res) => {
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
 const origin = `http://127.0.0.1:${server.address().port}`
 
-const gecko = spawn('npx', ['geckodriver', '--port', '4444'], { stdio: 'ignore' })
+// npx is npx.cmd on Windows, which Node will not spawn without a shell (B-163); on macOS and
+// Linux it leads its own process group, so endTree ends geckodriver under it too (B-177).
+const gecko = spawnTree('npx', ['geckodriver', '--port', '4444'])
 
 /**
  * Wait for readiness rather than sleeping a guessed interval: on a cold
@@ -230,7 +175,8 @@ async function waitForDriver(timeoutMs) {
 const driverUp = await waitForDriver(60_000)
 if (!driverUp) {
   console.error('geckodriver did not start within 60s')
-  gecko.kill()
+  // The tree, not just the cmd.exe in front of it on win32.
+  endTree(gecko)
   server.close()
   process.exit(1)
 }
@@ -334,7 +280,25 @@ try {
   )
 
   await driver.get(`${origin}/clean`)
-  await driver.sleep(2500)
+  /*
+   * Until the product says the scan and the address check have settled, not for 2.5 s: a
+   * fixed pause ran out before the check on a loaded machine and the absence below passed
+   * on a check that had not run (B-169). A scan that gave up stops the wait at once, since
+   * an absence after it proves nothing.
+   */
+  await driver.wait(
+    async () => {
+      const seen = await driver.executeScript(() => ({
+        scan: performance.getEntriesByName('okolos:scan').length,
+        lookalike: performance.getEntriesByName('okolos:lookalike').length,
+        failed: performance.getEntriesByName('okolos:scan-failed').length,
+      }))
+      if (seen.failed > 0) throw new Error('the scan of the clean page gave up (okolos:scan-failed)')
+      return seen.scan > 0 && seen.lookalike > 0
+    },
+    35_000,
+    'the clean page never settled: okolos:scan and okolos:lookalike were not both written',
+  )
   const onClean = await driver.findElements(By.css('okolos-banner'))
   check('stays silent on a page whose hidden text is ordinary', onClean.length === 0)
 
@@ -525,7 +489,7 @@ try {
   check('firefox run completed', false, String(cause).split('\n')[0])
 } finally {
   await driver?.quit().catch(() => undefined)
-  gecko.kill()
+  endTree(gecko)
   server.close()
 }
 

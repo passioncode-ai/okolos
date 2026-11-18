@@ -20,13 +20,22 @@ import { createHash } from 'node:crypto'
 import { readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 
-import { filesUnder } from './tree.mjs'
+import { filesUnder, posixRelative } from './tree.mjs'
 
-/** What the four images actually render: the UI package, the options page, the style sheet. */
+/**
+ * What the four images actually render: the UI package, the pages that mount it (options,
+ * first run, popup, interstitial), the style sheet, and the Russian catalogue every string on
+ * them comes from. The pages and the catalogue joined after B-199's certification (B-215): a
+ * first-run note changed in `_locales` and the retake was voluntary, because nothing here moved.
+ */
 export const SURFACES = [
   'packages/ui/src',
   'apps/extension/src/options',
+  'apps/extension/src/first-run',
+  'apps/extension/src/popup',
+  'apps/extension/src/interstitial',
   'apps/extension/src/pages.css',
+  'apps/extension/_locales/ru/messages.json',
 ]
 
 /**
@@ -53,7 +62,12 @@ function surfaceFiles(root) {
       files.push(absolute)
     }
   }
-  return files.sort()
+  // Sorted by the repository's spelling: a backslash sorts elsewhere than `/` (B-164).
+  return files.sort((a, b) => {
+    const left = posixRelative(root, a)
+    const right = posixRelative(root, b)
+    return left < right ? -1 : left > right ? 1 : 0
+  })
 }
 
 /**
@@ -66,7 +80,8 @@ function surfaceFiles(root) {
 export function surfacesDigest(root) {
   const hash = createHash('sha256')
   for (const file of surfaceFiles(root)) {
-    hash.update(path.relative(root, file))
+    // `/` on every platform, so a Windows checkout of the same tree has the same digest.
+    hash.update(posixRelative(root, file))
     hash.update('\0')
     hash.update(readFileSync(file))
     hash.update('\0')

@@ -62,6 +62,7 @@ describe('the list itself', () => {
       'leak-lookup',
       'model-update',
       'password-range',
+      'usage-data',
     ])
   })
 
@@ -246,6 +247,7 @@ describe('every purpose has a producer, or a recorded reason it has none', () =>
       'apps/extension/src/background/leaks.ts',
       'apps/extension/src/background/password.ts',
       'apps/extension/src/background/feed-sync.ts',
+      'apps/extension/src/background/usage/send.ts',
       'packages/model/src/manager.ts',
     ]
       .map((file) => readFileSync(path.join(root, file), 'utf8'))
@@ -267,5 +269,28 @@ describe('every purpose has a producer, or a recorded reason it has none', () =>
       'utf8',
     )
     expect(feedSync).toContain("purpose: 'feed-update'")
+  })
+})
+
+describe('usage and error data (B-198, B-199)', () => {
+  /**
+   * The one purpose the operator's decision of 2026-11-04 adds: usage and error events to
+   * the organisation's Aptabase. One host, its own: another Aptabase instance was the first
+   * choice and is not on the list, because PassionCode products send to the
+   * organisation's server (the analytics owner, 2026-11-04).
+   */
+  it('reaches the organisation analytics host and nothing else', () => {
+    expect(DESTINATIONS['usage-data']).toEqual(['analytics.passioncode.ai'])
+    expect(allowedDestination('usage-data', 'analytics.passioncode.ai')).toBe(true)
+    expect(allowedDestination('usage-data', 'analytics.example.org')).toBe(false)
+    expect(allowedDestination('feed-update', 'analytics.passioncode.ai')).toBe(false)
+  })
+
+  it('is audited before it leaves, and refused anywhere else', async () => {
+    const d = deps()
+    await request({ ...spec('usage-data', 'https://analytics.passioncode.ai/api/v0/events'), method: 'POST', body: '[]' }, d)
+    expect(d.written[0]).toMatchObject({ purpose: 'usage-data', destination: 'analytics.passioncode.ai' })
+
+    await expect(request(spec('usage-data', 'https://elsewhere.test/api/v0/events'), deps())).rejects.toBeInstanceOf(DestinationError)
   })
 })

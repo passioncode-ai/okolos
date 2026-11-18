@@ -1,24 +1,15 @@
 {
-  "goal": "Агент, привязанный человеком, через локальную дверь Okolos Agent читает страницу в своём фоновом окне очищенной и частями, и каждый ответ есть в журнале",
+  "goal": "Долги стабильности и Windows закрыты по аудиту 2026-10-27 (канва docs/superpowers/specs/2026-10-27-stability-windows-canvas.md)",
   "requirements": [
-    "REQ-53",
-    "REQ-54",
-    "REQ-55",
-    "REQ-56",
-    "REQ-57",
-    "REQ-58",
-    "REQ-59",
-    "REQ-60",
-    "REQ-61",
-    "REQ-62",
-    "REQ-63",
-    "REQ-64",
-    "REQ-65",
-    "REQ-66",
-    "REQ-67",
-    "REQ-68",
-    "REQ-69",
-    "REQ-70"
+    "B-161",
+    "B-162",
+    "B-159",
+    "B-164",
+    "B-158",
+    "B-165",
+    "B-166",
+    "B-78",
+    "B-125"
   ],
   "nodes": [
     {
@@ -1333,437 +1324,174 @@
         "unit: git -C /Users/sshlg/DATA/_worktrees/okolos-b1-n-025 log --oneline -1 -> 28f2434; git ls-files | wc -l -> 768; git status --porcelain -> empty",
         "proven at da814f658b78bac3874c960f6b9704da8e01d351 (tree 8496c2efcf93422b942f7b54feefef680c6f42c5)"
       ]
+    },
+    {
+      "id": "N-101",
+      "title": "mail-cli: запуск на Windows (закрывает B-161)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [],
+      "serves": "B-161",
+      "check": "pnpm -s exec vitest run apps/mail-cli && pnpm gates",
+      "risk": "R1",
+      "wave": 1,
+      "x-sw": "SW-01",
+      "touches": [
+        "apps/mail-cli/**"
+      ]
+    },
+    {
+      "id": "N-102",
+      "title": "инструменты и гейты на Windows (закрывает B-162, B-163)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [],
+      "serves": "B-162",
+      "check": "pnpm gates && pnpm package:check",
+      "risk": "R2",
+      "wave": 1,
+      "x-sw": "SW-02",
+      "touches": [
+        "tools/**",
+        "package.json",
+        ".gitattributes",
+        "docs/runbooks/development.md"
+      ]
+    },
+    {
+      "id": "N-103",
+      "title": "агент фида не падает молча (закрывает B-159)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [],
+      "serves": "B-159",
+      "check": "pnpm -s exec vitest run tools && pnpm gates",
+      "risk": "R2",
+      "wave": 1,
+      "x-sw": "SW-03",
+      "touches": [
+        "tools/launchd/**",
+        "tools/install-feed-agent.mjs",
+        "tools/feed-job.mjs",
+        "AGENTS.md"
+      ]
+    },
+    {
+      "id": "N-105",
+      "title": "CI на Windows (после SW-01, SW-02) (закрывает B-164)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [
+        "N-101",
+        "N-102"
+      ],
+      "serves": "B-164",
+      "check": "pnpm gates",
+      "risk": "R1",
+      "wave": 2,
+      "x-sw": "SW-05",
+      "touches": [
+        ".github/workflows/**"
+      ]
+    },
+    {
+      "id": "N-106",
+      "title": "снимок фида без ручного шага (закрывает B-158)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [],
+      "serves": "B-158",
+      "check": "pnpm gates",
+      "risk": "R2",
+      "wave": 2,
+      "x-sw": "SW-06",
+      "touches": [
+        "tools/feed-job.mjs",
+        "tools/feed/**"
+      ]
+    },
+    {
+      "id": "N-107",
+      "title": "Windows-типы и схемы ссылок (закрывает B-165)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [],
+      "serves": "B-165",
+      "check": "pnpm gates",
+      "risk": "R2",
+      "wave": 2,
+      "x-sw": "SW-07",
+      "touches": [
+        "packages/core-download/**",
+        "packages/core-traps/**",
+        "packages/platform/**",
+        "docs/ux/**",
+        "packages/i18n/**"
+      ]
+    },
+    {
+      "id": "N-108",
+      "title": "обещание ОС и браузеров; решение для Okolos Agent (закрывает B-166, B-167)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [],
+      "serves": "B-166",
+      "check": "pnpm gates",
+      "risk": "R1",
+      "wave": 2,
+      "x-sw": "SW-08",
+      "touches": [
+        "README.md",
+        "docs/brand/**",
+        "docs/runbooks/**",
+        "docs/store/**"
+      ]
+    },
+    {
+      "id": "N-109",
+      "title": "скан под нагрузкой и ожидания в e2e (закрывает B-78, B-168, B-169)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [],
+      "serves": "B-78",
+      "check": "pnpm gates",
+      "risk": "R2",
+      "wave": 2,
+      "x-sw": "SW-09",
+      "touches": [
+        "e2e/**",
+        "apps/extension/src/content/**"
+      ]
+    },
+    {
+      "id": "N-110",
+      "title": "ключ HIBP и inference/score (закрывает B-125, B-131)",
+      "owner": "implementer",
+      "status": "pending",
+      "blocked_by": [],
+      "serves": "B-125",
+      "check": "pnpm gates",
+      "risk": "R2",
+      "wave": 2,
+      "x-sw": "SW-10",
+      "touches": [
+        "apps/extension/src/background/**",
+        "packages/contracts/**",
+        "docs/ux/**"
+      ]
     }
   ],
   "edges": [
     {
-      "from": "N-002",
-      "to": "N-022",
-      "payload": "CdpPipe и его тесты"
+      "from": "N-101",
+      "to": "N-105",
+      "payload": "переносимые инструменты и CLI, которые CI на Windows запускает"
     },
     {
-      "from": "N-002",
-      "to": "N-005",
-      "payload": "resource: корневой tsconfig.json, ссылки на проекты; N-005 дописывает после N-002"
-    },
-    {
-      "from": "N-022",
-      "to": "N-005",
-      "payload": "resource: packages/cdp-pipe/src/pipe.ts; N-022 вливается первым, при слиянии N-005 файл берётся из N-022 (его пометки i18n-exempt покрывают весь файл)"
-    },
-    {
-      "from": "N-024",
-      "to": "N-025",
-      "payload": "buildIdentity и тест dotfiles"
-    },
-    {
-      "from": "N-024",
-      "to": "N-007",
-      "payload": "каталоги данных и токен хоста"
-    },
-    {
-      "from": "N-024",
-      "to": "N-013",
-      "payload": "resource: каталоги строк агента; N-013 дописывает строки SCR-23 после строк службы"
-    },
-    {
-      "from": "N-023",
-      "to": "N-009",
-      "payload": "validateScope, inScope, verbAllowed, refuse"
-    },
-    {
-      "from": "N-024",
-      "to": "N-009",
-      "payload": "apps/agent: package.json, tsconfig"
-    },
-    {
-      "from": "N-007",
-      "to": "N-009",
-      "payload": "checkFreeText для цели задачи"
-    },
-    {
-      "from": "N-023",
-      "to": "N-003",
-      "payload": "toSnapshotFinding, SnapshotFinding, TaskScope"
-    },
-    {
-      "from": "N-024",
-      "to": "N-003",
-      "payload": "resource: pnpm-lock.yaml; N-003 правит lockfile после N-005"
-    },
-    {
-      "from": "N-003",
-      "to": "N-004",
-      "payload": "Snapshot с вердиктом"
-    },
-    {
-      "from": "N-024",
-      "to": "N-006",
-      "payload": "каталоги данных службы, servicePaths, setup после замка"
-    },
-    {
-      "from": "N-023",
-      "to": "N-006",
-      "payload": "BridgeRefusal, AnyBridgeVerb, canonicalVerb для типа JournalEntry"
-    },
-    {
-      "from": "N-023",
-      "to": "N-008",
-      "payload": "BRIDGE_VERBS, toolName, BridgeResult, refuse"
-    },
-    {
-      "from": "N-006",
-      "to": "N-008",
-      "payload": "Journal.record до ответа"
-    },
-    {
-      "from": "N-007",
-      "to": "N-008",
-      "payload": "Pairing.verify и запрос привязки"
-    },
-    {
-      "from": "N-003",
-      "to": "N-008",
-      "payload": "resource: pnpm-lock.yaml; N-008 правит lockfile после N-003"
-    },
-    {
-      "from": "N-014",
-      "to": "N-008",
-      "payload": "ключи каталога для CLI привязки и шима"
-    },
-    {
-      "from": "N-022",
-      "to": "N-010",
-      "payload": "CdpTransport, onExit, CdpError, timeoutMs на вызов"
-    },
-    {
-      "from": "N-024",
-      "to": "N-010",
-      "payload": "apps/agent: package.json, tsconfig"
-    },
-    {
-      "from": "N-014",
-      "to": "N-010",
-      "payload": "ключ события onCloseIncomplete"
-    },
-    {
-      "from": "N-004",
-      "to": "N-011",
-      "payload": "pageOf с курсором"
-    },
-    {
-      "from": "N-006",
-      "to": "N-011",
-      "payload": "Journal, answerAfterRecord"
-    },
-    {
-      "from": "N-008",
-      "to": "N-011",
-      "payload": "регистрация инструментов на запрос"
-    },
-    {
-      "from": "N-009",
-      "to": "N-011",
-      "payload": "Task.charge и проверки области"
-    },
-    {
-      "from": "N-010",
-      "to": "N-011",
-      "payload": "AgentWindow.open/close"
-    },
-    {
-      "from": "N-012",
-      "to": "N-011",
-      "payload": "census, readCensus, CensusEntry[]"
-    },
-    {
-      "from": "N-022",
-      "to": "N-011",
-      "payload": "CdpError.kind и cdpCode для перевода в отказы контракта"
-    },
-    {
-      "from": "N-007",
-      "to": "N-011",
-      "payload": "Pairing: open, close, flush, list, onNotice, onReload"
-    },
-    {
-      "from": "N-023",
-      "to": "N-012",
-      "payload": "CensusEntry"
-    },
-    {
-      "from": "N-024",
-      "to": "N-012",
-      "payload": "apps/agent: package.json, tsconfig"
-    },
-    {
-      "from": "N-014",
-      "to": "N-012",
-      "payload": "ключи причин переписи"
-    },
-    {
-      "from": "N-013",
-      "to": "N-014",
-      "payload": "список строк экранов"
-    },
-    {
-      "from": "N-024",
-      "to": "N-014",
-      "payload": "resource: apps/agent/_locales/{ru,en}/messages.json; N-014 дописывает строки страницы после строк службы N-024"
-    },
-    {
-      "from": "N-007",
-      "to": "N-014",
-      "payload": "NameRefusal, StoreRefusal, ClaimRefusal, EndCause: коды, которым нужны слова"
-    },
-    {
-      "from": "N-006",
-      "to": "N-015",
-      "payload": "Journal.recent, JournalEntry, DoorRejection"
-    },
-    {
-      "from": "N-007",
-      "to": "N-015",
-      "payload": "список привязок и отзыв"
-    },
-    {
-      "from": "N-009",
-      "to": "N-015",
-      "payload": "список активных задач"
-    },
-    {
-      "from": "N-011",
-      "to": "N-015",
-      "payload": "createAgent и src/agent.ts, куда страница монтирует маршруты"
-    },
-    {
-      "from": "N-013",
-      "to": "N-015",
-      "payload": "состояния экранов SCR"
-    },
-    {
-      "from": "N-014",
-      "to": "N-015",
-      "payload": "ключи строк i18n"
-    },
-    {
-      "from": "N-011",
-      "to": "N-016",
-      "payload": "точка входа main"
-    },
-    {
-      "from": "N-012",
-      "to": "N-016",
-      "payload": "инструмент переписи"
-    },
-    {
-      "from": "N-015",
-      "to": "N-016",
-      "payload": "статика страницы"
-    },
-    {
-      "from": "N-007",
-      "to": "N-016",
-      "payload": "путь и формат списка доступов для doctor"
-    },
-    {
-      "from": "N-015",
-      "to": "N-017",
-      "payload": "страница для подтверждения"
-    },
-    {
-      "from": "N-016",
-      "to": "N-017",
-      "payload": "скрипт agent:build и релиз"
-    },
-    {
-      "from": "N-011",
-      "to": "N-018",
-      "payload": "механизмы для таблиц ADR"
-    },
-    {
-      "from": "N-011",
-      "to": "N-019",
-      "payload": "вызывающий код для core-snapshot и agent-probe"
-    },
-    {
-      "from": "N-016",
-      "to": "N-020",
-      "payload": "команды установки"
-    },
-    {
-      "from": "N-017",
-      "to": "N-020",
-      "payload": "команда e2e моста"
-    },
-    {
-      "from": "N-019",
-      "to": "N-021",
-      "payload": "чистый reachable"
-    },
-    {
-      "from": "N-020",
-      "to": "N-021",
-      "payload": "доки в синхроне"
+      "from": "N-102",
+      "to": "N-105",
+      "payload": "переносимые инструменты и CLI, которые CI на Windows запускает"
     }
   ],
-  "revisions": [
-    {
-      "verb": "add",
-      "node": "N-005",
-      "why": "plan_audit: N-002 и N-005 оба правят корневой tsconfig.json и не были упорядочены; добавлено ресурсное ребро N-002→N-005"
-    },
-    {
-      "verb": "invalidate",
-      "node": "N-001",
-      "why": "проверка узла: pnpm 11 не принимает `pnpm -s typecheck`, только `pnpm -s run typecheck` (отчёт исполнителя N-001); смысл проверки не изменился"
-    },
-    {
-      "verb": "add",
-      "node": "N-022",
-      "why": "N-002 закрыт с рисками проверок круга 1 (unit 3, seam 9, product 3); те, что меняют API для N-010/N-011, вынесены в отдельный узел, который блокирует N-010"
-    },
-    {
-      "verb": "close",
-      "node": "N-002",
-      "why": "certified at all 3 tiers in round 2",
-      "precondition": "09bfbaab9ac04ea54050f1d8213ad309bfff28fb"
-    },
-    {
-      "verb": "park",
-      "node": "N-001",
-      "why": "certification ceiling: 3 failing round(s), ceiling 3; failing tier(s) seam; stuck on seam; first break /Users/sshlg/DATA/_worktrees/okolos-bridge-b1/.task-pipeline/packets/N-005.json (outputs), N-009.json, N-012.json (edges: depend on N-001 only); apps/agent/package.json: Every apps/agent consumer of the contract imports @okolos/contracts, but apps/agent/package.json declares no dependency on it and no node in the plan adds one. pnpm links workspace packages only into a package that declares them (no root node_modules/@okolos), so from apps/agent the import does not resolve: tsc reports TS2307 and vitest fails to load the module. N-009 (validateScope, refuse, verbAllowed at runtime) and N-012 run in group B beside N-005 with edit targets limited to their own source files; N-006, N-010 (cdp-pipe), N-011 (core-snapshot) and N-015 have the same gap. N-005 owns apps/agent/package.json and tsconfig.json but its packet says nothing about workspace dependencies or project references; N-008 touches package.json only for the MCP SDK and zod. This is the round-2 core-snapshot finding, fixed for N-003 only.; check: after N-005: (cd /Users/sshlg/DATA/_worktrees/okolos-bridge-b1/apps/agent && node --input-type=module -e \"console.log(import.meta.resolve('@okolos/contracts'))\") prints packages/contracts/src/index.ts, and pnpm -s run typecheck exits 0 with apps/agent in the root references. Blocker row owed on the board"
-    },
-    {
-      "verb": "park",
-      "node": "N-001",
-      "why": "потолок проверки: 3 непроходящих круга, каждый раз seam; код узла в b1/n-001 цел и продолжается в N-023"
-    },
-    {
-      "verb": "add",
-      "node": "N-023",
-      "why": "альтернативный производитель для потребителей N-001 (N-003, N-008, N-009, N-012): явная смена рёбер; N-023 начинает с ветки b1/n-001 и закрывает находки seam круга 3"
-    },
-    {
-      "verb": "add",
-      "node": "N-009",
-      "why": "N-009, N-010, N-012 пишут в apps/agent, который настраивает N-005 (package.json, tsconfig): ребро N-005 добавлено по seam N-001 круг 3"
-    },
-    {
-      "verb": "add",
-      "node": "N-005",
-      "why": "ресурсное ребро по pipe.ts перевёрнуто: N-022 построен параллельно и сам расставил пометки i18n, поэтому он вливается первым, а N-005 при слиянии берёт pipe.ts из N-022"
-    },
-    {
-      "verb": "close",
-      "node": "N-022",
-      "why": "certified at all 3 tiers in round 2",
-      "precondition": "dfaf5b0b9cfcc3b481a6c642e3ab86b7ed33cfd1"
-    },
-    {
-      "verb": "park",
-      "node": "N-005",
-      "why": "certification ceiling: 3 failing round(s), ceiling 3; failing tier(s) unit, product; stuck on product; first break apps/agent/src/service/http.ts:287-289: The per-request log write in the response 'finish' listener is outside every catch. RotatingLog.write throws on any open/rename failure (EACCES, ENOSPC, a failed rotate), and a throw inside an EventEmitter listener emitted from the stream's afterWrite tick is an uncaughtException: the daemon dies with exit 1 on the first request after its log becomes unwritable, without an answer, without a drain and without its stopping event. This contradicts the shell's own contract at http.ts:333 ('No throw inside handle, the log's included, may ... end the daemon') and the care taken at http.ts:336-340, 371, 393, 401 to make every other log write non-fatal. Reproduced: a scratch script started the service on a temp home, chmod 0400 the service.jsonl, sent GET /.well-known/fabric-service; the process exited 1 with 'EACCES ... at RotatingLog.write ... at ServerResponse.<anonymous> (http.ts:288)' before the first answer was read.; check: pnpm -s exec vitest run apps/agent/src/service -t 'log cannot be written' passes with a test that chmods servicePaths(dirs).serviceLog to 0400 after start, calls /.well-known/fabric-service twice and gets 200 both times, then close() resolves; the existing suite stays 99+ green. Blocker row owed on the board"
-    },
-    {
-      "verb": "park",
-      "node": "N-005",
-      "why": "потолок проверки: 3 непроходящих круга (r1 unit+seam+product, r2 product, r3 unit+product); seam прошёл во 2 и 3 кругах; код в b1/n-005 продолжается в N-024"
-    },
-    {
-      "verb": "add",
-      "node": "N-024",
-      "why": "альтернативный производитель для потребителей N-005 (N-003, N-006, N-007, N-009, N-010, N-012): явная смена рёбер"
-    },
-    {
-      "verb": "close",
-      "node": "N-024",
-      "why": "certified at all 3 tiers in round 2",
-      "precondition": "87eea45fdddf5db508eef27599173e538c61512f"
-    },
-    {
-      "verb": "add",
-      "node": "N-025",
-      "why": "тест N-024 под хуком pre-push закоммитил «dotfiles» (1 файл вместо 767) в bridge/b1-run2 через унаследованный GIT_DIR; пуш не ушёл, ветка восстановлена на 33a0e75; исправление и гейт класса"
-    },
-    {
-      "verb": "close",
-      "node": "N-025",
-      "why": "certified at all 1 tiers in round 1",
-      "precondition": "da814f658b78bac3874c960f6b9704da8e01d351"
-    },
-    {
-      "verb": "add",
-      "node": "N-006",
-      "why": "N-006 типизирует JournalEntry кодами отказов и глаголами контракта; ребро N-023→N-006 делает это явным. Сборка N-006 начата на старом контракте с именами из b1/n-023; узел закрывается после N-023"
-    },
-    {
-      "verb": "add",
-      "node": "N-013",
-      "why": "surface_class снят: N-013 меняет документы UX-цепочки и строки, не пиксели; визуальный трек отклонён записью режиссёра (docs/design/agent-dashboard/director-record.md); страницу рисует N-015, класс product остаётся на нём"
-    },
-    {
-      "verb": "park",
-      "node": "N-013",
-      "why": "loop guard: 12 failing certification rounds recorded in .task-pipeline/build/cert-N-013-r1..r12-*.json, against a cap of 3; from about round 7 most breaks were caused by the previous round's own fixes (self-inflicted >= new), so the axis is exhausted. Graph recorded only round 1 because rounds 2-12 were not passed to certify (process violation, run.md 2026-10-27). Last state: r10 unit and seam pass, r12 one shared break fixed at 0795850; r13 stopped unread. Resume only on the operator's explicit request; open findings in B-157"
-    },
-    {
-      "verb": "park",
-      "node": "N-007",
-      "why": "loop guard: 6 failing certification rounds (cert-N-007-r1..r6-*.json) against a cap of 3, not recorded in the graph (process violation, run.md 2026-10-27); round 7 ADVERSARIAL passed all three tiers at 2f1d71e (cert-N-007-r7-*.json, 0 breaks); R3 still owes one more passing round. Resume only on the operator's explicit request; open risks in B-157"
-    },
-    {
-      "verb": "resume",
-      "node": "N-007",
-      "why": "operator 2026-10-27 in chat: «проверим все долги … И давай все доделаем» (taken as the explicit request loop-guard.md requires for further rounds after the cap; B-157). Certification history rewritten from the tier reports in .task-pipeline/build/cert-N-007-r*-*.json so the graph holds every round, including those not passed to certify before (process violation recorded in run.md). Further rounds run with an explicit --ceiling raised for this request only."
-    },
-    {
-      "verb": "resume",
-      "node": "N-013",
-      "why": "operator 2026-10-27 in chat: «проверим все долги … И давай все доделаем» (taken as the explicit request loop-guard.md requires for further rounds after the cap; B-157). Certification history rewritten from the tier reports in .task-pipeline/build/cert-N-013-r*-*.json so the graph holds every round, including those not passed to certify before (process violation recorded in run.md). Further rounds run with an explicit --ceiling raised for this request only."
-    },
-    {
-      "verb": "close",
-      "node": "N-023",
-      "why": "certified at all 3 tiers in round 6",
-      "precondition": "3623ca51150c87b485a2ab51f08c7b1ab3cef6f7"
-    },
-    {
-      "verb": "close",
-      "node": "N-007",
-      "why": "certified at all 3 tiers in round 10",
-      "precondition": "5ff2e73808dbaf8c6b2f04b795ba499424e3e8b9"
-    },
-    {
-      "verb": "park",
-      "node": "N-013",
-      "why": "certification ceiling: 20 failing round(s), ceiling 20; failing tier(s) product; stuck on product; first break apps/extension/_locales/ru/messages.json:1887 (storageResetNote, en twin), packages/ui/src/storage/storage-problem.ts:103, docs/ux/scenarios.md:747 SCN-032, docs/backlog.md B-156: A neighbouring extension string becomes false once Okolos Agent is installed, and nothing records it. The SCR-20 storage-problem screen says «Очистка удалит всё, что Okolos хранит на этом устройстве: находки, журнал, …» / 'Clearing removes everything Okolos kept on this device'. With Okolos Agent on the device, its access list, agents' journal, service events, logs, agent profile (with what sites keep from sign-ins) and clients/ keys all survive that clearing. N-013 handled the same collision for SCN-023 and SCN-024 (scope lines, B-156), and terminology.md cites SCR-20's «Очистить локальные данные», but SCN-032, storageResetNote, B-156 and every plan node leave this sentence out; check: grep -n 'storageResetNote\\|SCN-032' docs/backlog.md prints a row, and grep -n 'Okolos Agent' docs/ux/scenarios.md shows a hit inside SCN-032; then judgement: SCN-032 reads true for a device with Okolos Agent installed. Blocker row owed on the board"
-    },
-    {
-      "verb": "close",
-      "node": "N-009",
-      "why": "certified at all 3 tiers in round 4",
-      "precondition": "7913bc3b93c3be402e776e25f73e42ff639742f5"
-    },
-    {
-      "verb": "resume",
-      "node": "N-013",
-      "why": "B-157 second option, chosen 2026-10-27 under the operator's «давай все доделаем» by the run's rule for an open question (safest reversible: the stricter of the two options; accepting with risks would close it unread): the product tier is narrowed to the node's own files (docs/ux SCR-23, SCR-24, FLW-21, FLW-22, SCN-044, SCN-045, JRN-05 rows, apps/agent/_locales, the spec sections the node edited) read against the code that exists and the spec; neighbouring extension screens and other runs' docs go to B-156 as before. One round (21), ceiling 21: a failing round parks the node again for the operator."
-    },
-    {
-      "verb": "park",
-      "node": "N-013",
-      "why": "certification ceiling: 21 failing round(s), ceiling 21; failing tier(s) unit, seam, product; stuck on product; first break docs/superpowers/specs/2026-10-06-bridge-b1-design.md:219 and :265: The spec's strings section contradicts itself and the tree on the catalogue size. §9 opens with «98 строк (... 95 и 97 в следующих; число берётся командой node -e ...)» and the same paragraph ends «Всего строк 99»; §10 still says «98 строк × 2 языка на 2026-10-27, число берётся командой». The named command prints 99 (taskTimeOver, added by N-009 round 2, commit 1d68ab2, was counted at the end but not at the head or in §10). A record that names its own counting command and states a number the command does not print is the drift the brand pack rule «число берётся командой в момент правки» forbids.; check: node -e \"console.log(Object.keys(require('/Users/sshlg/DATA/_worktrees/okolos-bridge-b1/apps/agent/_locales/ru/messages.json')).length)\" prints N, and grep -nE '[0-9]+ строк' /Users/sshlg/DATA/_worktrees/okolos-bridge-b1/docs/superpowers/specs/2026-10-06-bridge-b1-design.md shows only N for the catalogue count. Blocker row owed on the board"
-    },
-    {
-      "verb": "park",
-      "node": "N-006",
-      "why": "certification ceiling: 8 failing round(s), ceiling 8; failing tier(s) seam, product; stuck on seam; first break .task-pipeline/packets/N-011.json acceptance 46 (= plans/2026-10-27-bridge-b1.md:533, test 47), against journal.ts write() exemption `closes = line.outcome === 'answered' && line.verb === 'close'` and spec §3 sentence 'удачных закрытий не больше открытых задач': The day cap's bound rests on 'a successful close happens at most once per open task', but the planned caller N-011 makes a close of a timer-swept task answer success from a per-agent memory with no once-only rule, and the journal writes every successful close past the cap without checking the task. One agent past 5000 entries can repeat close on one swept id and grow the day file without limit.; check: a journal test that seeds AGENT_LINES_PER_DAY agent lines, records 200 successful closes of one task id and expects exactly one more line on disk and 199 rejections with code day_full; pnpm -s exec vitest run apps/agent/src/journal. Blocker row owed on the board"
-    },
-    {
-      "verb": "park",
-      "node": "N-003",
-      "why": "certification ceiling: 8 failing round(s), ceiling 8; failing tier(s) seam, product; churn across levels; first break Dependent: N-004 paginate (.task-pipeline/packets/N-004.json acceptance 'вердикт целого снимка приложен к каждой странице' and 'каждая страница ≤ 32 КБ'), the ADR promise docs/superpowers/specs/2026-10-06-bridge-b1-design.md:183 'Снимок для агента частями, не больше 32 КБ на ответ' (REQ-56, REQ-67), and N-011's snapshot answers. Mechanism: apps/extension/src/agent-probe.ts:81 and packages/core-snapshot/src/verdict.ts:46-53: The snapshot verdict this node produces can on its own exceed the 32 KB per-answer ceiling, and it is attached to every page. MAX_PROBE_VERDICTS (200) with dedup by the full finding allows up to 200 distinct findings: the concealment field is a subset of 8 techniques, times 2 confidences, so 510 distinct findings exist. Measured in Chromium: 255 elements each hidden by a different combination of techniques give a snapshotVerdict of 36 968 bytes; the worst 200 (computed from the closed sets) give 42 366 bytes. Before this node the probe's budget capped verdicts at 50 (DEFAULT_BUDGET at 31a1745). Every page of such a snapshot is therefore over 32 KB whatever maxBytes the agent asks for (even maxBytes 1024).; check: A verdict.test.ts case feeding 510 verdicts (2 confidences x 255 concealment sets) asserts utf8Bytes(JSON.stringify(snapshotVerdict(...))) <= 4096: pnpm -s exec vitest run packages/core-snapshot/src/verdict.test.ts; and the Chromium fixture of 255 concealment combinations reports verdict bytes <= 4096. Blocker row owed on the board"
-    }
-  ]
+  "revisions": []
 }

@@ -1,7 +1,12 @@
 /** @vitest-environment happy-dom */
 import { describe, expect, it, vi } from 'vitest'
 
-import { renderDataControls, type DataControlsHandlers } from './data-controls.js'
+import {
+  renderDataControls,
+  type DataControlsHandlers,
+  type LeakKeyPanel,
+  type UsagePanel,
+} from './data-controls.js'
 
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -371,5 +376,219 @@ describe('one answer on the screen, whatever the clicking', () => {
       expect(el.querySelector('[data-role=wipe-failed]')?.textContent ?? '').toContain('models'),
     )
     expect(el.querySelectorAll('[data-role=wipe-failed]').length).toBe(1)
+  })
+})
+
+/**
+ * B-125: the Have I Been Pwned key, which the background read and nothing wrote.
+ *
+ * The renderer is told whether a key exists, never what it is, so there is no value it
+ * could put back on screen. The fake key below is obviously fake on purpose.
+ */
+describe('the Have I Been Pwned key', () => {
+  const FAKE_KEY = 'fake-hibp-key-for-tests-0000'
+
+  function keyPanel(saved: boolean, overrides: Partial<LeakKeyPanel> = {}): LeakKeyPanel {
+    return { saved, onSave: vi.fn(), onRemove: vi.fn(), ...overrides }
+  }
+
+  function mountKey(panel: LeakKeyPanel): HTMLElement {
+    const el = renderDataControls(document, handlers(), KINDS, panel)
+    document.body.replaceChildren(el)
+    return el
+  }
+
+  const role = (root: HTMLElement, name: string) => root.querySelector<HTMLElement>(`[data-role=${name}]`)
+  const field = (root: HTMLElement) => role(root, 'leak-key-field') as HTMLInputElement
+
+  it('draws no key block when the page passes none', () => {
+    const { el } = mount()
+    expect(role(el, 'leak-key')).toBeNull()
+  })
+
+  it('says no key is saved, and offers only to save one', () => {
+    const el = mountKey(keyPanel(false))
+    expect(role(el, 'leak-key-state')?.textContent).toBe(message('leakKeyNone'))
+    expect(role(el, 'leak-key-save')?.textContent).toBe(message('leakKeySave'))
+    expect(role(el, 'leak-key-remove')).toBeNull()
+    expect(role(el, 'leak-key-blurb')?.textContent).toBe(message('leakKeyBlurb'))
+  })
+
+  it('says a key is saved without showing it, and offers to replace or remove it', () => {
+    const el = mountKey(keyPanel(true))
+    expect(role(el, 'leak-key-state')?.textContent).toBe(message('leakKeySaved'))
+    expect(role(el, 'leak-key-save')?.textContent).toBe(message('leakKeyReplace'))
+    expect(role(el, 'leak-key-remove')?.textContent).toBe(message('leakKeyRemove'))
+    expect(field(el).value).toBe('')
+  })
+
+  it('keeps the field masked and out of the browser\'s memory of typed values', () => {
+    const input = field(mountKey(keyPanel(false)))
+    expect(input.type).toBe('password')
+    expect(input.getAttribute('autocomplete')).toBe('off')
+    expect(input.getAttribute('spellcheck')).toBe('false')
+    expect(input.getAttribute('aria-label')).toBe(message('leakKeyField'))
+  })
+
+  it('saves the pasted key, trimmed, and empties the field at once', () => {
+    const panel = keyPanel(false)
+    const el = mountKey(panel)
+    field(el).value = `  ${FAKE_KEY}\n`
+    role(el, 'leak-key-save')?.click()
+
+    expect(panel.onSave).toHaveBeenCalledWith(FAKE_KEY)
+    // Emptied by the renderer itself, so the key is off the screen even if the page
+    // never repaints after the save.
+    expect(field(el).value).toBe('')
+    expect(el.textContent).not.toContain(FAKE_KEY)
+  })
+
+  it('saves on Enter as well as on the button', () => {
+    const panel = keyPanel(false)
+    const el = mountKey(panel)
+    field(el).value = FAKE_KEY
+    field(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    expect(panel.onSave).toHaveBeenCalledWith(FAKE_KEY)
+  })
+
+  it('refuses an empty field out loud and saves nothing', () => {
+    const panel = keyPanel(false)
+    const el = mountKey(panel)
+    field(el).value = '   '
+    role(el, 'leak-key-save')?.click()
+
+    expect(panel.onSave).not.toHaveBeenCalled()
+    expect(role(el, 'leak-key-needs')?.textContent).toBe(message('leakKeyEmpty'))
+  })
+
+  it('refuses a key with a space inside, and leaves it in the field to correct', () => {
+    const panel = keyPanel(false)
+    const el = mountKey(panel)
+    field(el).value = 'abc def'
+    role(el, 'leak-key-save')?.click()
+    role(el, 'leak-key-save')?.click()
+
+    expect(panel.onSave).not.toHaveBeenCalled()
+    expect(role(el, 'leak-key-needs')?.textContent).toBe(message('leakKeyShape'))
+    // One refusal, however many presses: the slot is replaced, not appended.
+    expect(el.querySelectorAll('[data-role=leak-key-needs]')).toHaveLength(1)
+    expect(field(el).value).toBe('abc def')
+  })
+
+  it('names a letter outside the Latin layout as what it is, not as a space', () => {
+    // A key retyped in the Russian layout carries a Cyrillic letter; telling that person
+    // to look for a space sends them hunting for something that is not there.
+    const panel = keyPanel(false)
+    const el = mountKey(panel)
+    field(el).value = 'abcdеf0123' // the "е" is Cyrillic
+    role(el, 'leak-key-save')?.click()
+
+    expect(panel.onSave).not.toHaveBeenCalled()
+    expect(role(el, 'leak-key-needs')?.textContent).toBe(message('leakKeyLatin'))
+    field(el).value = 'abc\tdef'
+    role(el, 'leak-key-save')?.click()
+    expect(role(el, 'leak-key-needs')?.textContent).toBe(message('leakKeyShape'))
+  })
+
+  it('refuses a key longer than any real one, by its own sentence', () => {
+    const panel = keyPanel(false)
+    const el = mountKey(panel)
+    field(el).value = 'a'.repeat(257)
+    role(el, 'leak-key-save')?.click()
+    expect(panel.onSave).not.toHaveBeenCalled()
+    expect(role(el, 'leak-key-needs')?.textContent).toBe(message('leakKeyLong'))
+
+    field(el).value = 'a'.repeat(256)
+    role(el, 'leak-key-save')?.click()
+    expect(panel.onSave).toHaveBeenCalledWith('a'.repeat(256))
+  })
+
+  it('clears an earlier refusal once a key is accepted', () => {
+    const el = mountKey(keyPanel(false))
+    role(el, 'leak-key-save')?.click()
+    field(el).value = FAKE_KEY
+    role(el, 'leak-key-save')?.click()
+    expect(role(el, 'leak-key-needs')).toBeNull()
+  })
+
+  it('removes the key on one press', () => {
+    const panel = keyPanel(true)
+    const el = mountKey(panel)
+    role(el, 'leak-key-remove')?.click()
+    expect(panel.onRemove).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the wipe confirmation next to the wipe button, above the key block', () => {
+    const el = mountKey(keyPanel(false))
+    role(el, 'wipe')?.click()
+    const confirm = role(el, 'confirm') as HTMLElement
+    expect(confirm.compareDocumentPosition(role(el, 'leak-key') as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+  })
+})
+
+describe('usage and error data (B-199, SCN-051, SCN-052)', () => {
+  const role = (root: HTMLElement, name: string) => root.querySelector<HTMLElement>(`[data-role=${name}]`)
+  const kinds = ['dataKindFindings']
+  const panel = (overrides: Partial<UsagePanel> = {}): UsagePanel => ({ state: 'on', firefox: false, onSwitch: vi.fn(), ...overrides })
+
+  it('says what is sent and what is not, and shows the switch on while it is on', () => {
+    const el = renderDataControls(document, handlers(), kinds, undefined, panel())
+    expect(role(el, 'usage-title')?.textContent).toBe(message('usageTitle'))
+    expect(role(el, 'usage-what')?.textContent).toBe(message('usageWhat'))
+    const box = el.querySelector<HTMLInputElement>('[data-role=usage-switch]')
+    expect(box?.checked).toBe(true)
+    expect(box?.disabled).toBe(false)
+  })
+
+  it('passes the person’s choice on, and says off sends nothing and deleted the install number', () => {
+    const onSwitch = vi.fn()
+    const el = renderDataControls(document, handlers(), kinds, undefined, panel({ onSwitch }))
+    const box = el.querySelector<HTMLInputElement>('[data-role=usage-switch]')
+    if (box) box.checked = false
+    box?.dispatchEvent(new Event('change'))
+    expect(onSwitch).toHaveBeenCalledWith(false)
+    const off = renderDataControls(document, handlers(), kinds, undefined, panel({ state: 'off' }))
+    expect(role(off, 'usage-state')?.textContent).toBe(message('usageOff'))
+  })
+
+  it('in a Firefox with no built-in consent shows the switch off and unusable, and says why', () => {
+    const el = renderDataControls(document, handlers(), kinds, undefined, panel({ state: 'unsupported', firefox: true }))
+    const box = el.querySelector<HTMLInputElement>('[data-role=usage-switch]')
+    expect(box?.checked).toBe(false)
+    expect(box?.disabled).toBe(true)
+    expect(role(el, 'usage-state')?.textContent).toBe(message('usageFirefoxOld'))
+  })
+
+  it('in Firefox 140 says the browser keeps the choice', () => {
+    const el = renderDataControls(document, handlers(), kinds, undefined, panel({ firefox: true }))
+    expect(role(el, 'usage-firefox')?.textContent).toBe(message('usageFirefox'))
+  })
+
+  it('says when clearing the local data could not replace the install number, and how to get a new one', () => {
+    const el = renderDataControls(document, handlers(), kinds, undefined, panel({ renewFailed: true }))
+    // The switch's own label, substituted: a relabelled switch cannot leave the sentence naming the old one.
+    expect(role(el, 'usage-renew-failed')?.textContent).toBe(message('usageRenewFailed').replace('$SWITCH$', message('usageSwitch')))
+  })
+
+  it('says a build that sends nothing sends nothing, with the switch off and not to be changed (B-209)', () => {
+    const el = renderDataControls(document, handlers(), kinds, undefined, panel({ state: 'not-sent' }))
+    const box = el.querySelector<HTMLInputElement>('[data-role=usage-switch]')
+    expect(box?.checked).toBe(false)
+    expect(box?.disabled).toBe(true)
+    expect(el.querySelector('[data-role=usage-state]')?.textContent).toContain('не из магазина')
+  })
+
+  it('says the install number was not replaced only while collection is on: off and unsupported have none to replace (B-215)', () => {
+    for (const state of ['off', 'unsupported'] as const) {
+      const el = renderDataControls(document, handlers(), kinds, undefined, panel({ renewFailed: true, state }))
+      expect(role(el, 'usage-renew-failed'), state).toBeNull()
+    }
+  })
+
+  it('says a change that did not save did not save', () => {
+    const el = renderDataControls(document, handlers(), kinds, undefined, panel({ failed: true }))
+    expect(role(el, 'usage-failed')?.textContent).toBe(message('usageSaveFailed'))
   })
 })

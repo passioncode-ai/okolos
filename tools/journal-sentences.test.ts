@@ -72,7 +72,7 @@ describe('a reader’s sentence', () => {
     const found: Record<string, number> = {}
     for (const source of sources()) {
       const text = readFileSync(path.join(root, source), 'utf8')
-      for (const line of text.split('\n')) {
+      for (const line of text.split(/\r?\n/)) {
         const commented = /^\s*(?:\/\/|\*|\/\*)/.test(line)
         if (!commented && insideResolvingCall(line)) found[source] = (found[source] ?? 0) + 1
       }

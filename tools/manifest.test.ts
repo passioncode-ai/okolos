@@ -21,8 +21,9 @@ function manifest(browser: 'chrome' | 'firefox'): Record<string, unknown> {
 
 /**
  * Everything the product needs today, and nothing that anticipates a later
- * module. `offscreen` is Chrome-only and arrives with the classifier host: a
- * service worker has no DOM, so there is nowhere else a model could run.
+ * module. `offscreen` is not here and must not come back on its own: it would
+ * arrive only with a shipped classifier host, and the third stage is not shipped
+ * (ADR-0006; the host and its permission were removed in B-50 and B-131).
  */
 const ALLOWED_PERMISSIONS = [
   'storage',

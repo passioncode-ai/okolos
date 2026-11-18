@@ -123,6 +123,9 @@
   "auditPayloadNone": {
     "message": "none"
   },
+  "auditPurposeUsageData": {
+    "message": "sending usage and error data"
+  },
   "auditPurposeDomainStatus": {
     "message": "checking a domain status"
   },
@@ -433,7 +436,7 @@
     "message": "Keep my data"
   },
   "dataConfirmNote": {
-    "message": "It cannot be undone. Export first if you want a copy."
+    "message": "It cannot be undone. If usage and error data is on, the install number is replaced with a new one too, and unsent events are deleted. Export first if you want a copy."
   },
   "dataConfirmTitle": {
     "message": "This deletes, from this device:"
@@ -451,7 +454,7 @@
     "message": "Your data"
   },
   "dataIntro": {
-    "message": "Everything is stored on this device. Take a copy, or delete all of it — no account is involved either way."
+    "message": "Okolos keeps your data on this device. Take a copy, or delete all of it: no account is involved either way. Usage and error data already sent is not deleted by this."
   },
   "dataKindAudit": {
     "message": "the outbound log of what was sent"
@@ -475,7 +478,7 @@
     "message": "the password-reuse index"
   },
   "dataKindSettings": {
-    "message": "settings"
+    "message": "settings, including a saved Have I Been Pwned key"
   },
   "dataKindSnapshots": {
     "message": "snapshots of your installed extensions"
@@ -585,6 +588,9 @@
   "exportNothingWithheld": {
     "message": "Nothing was withheld from this file."
   },
+  "exportUsageOutside": {
+    "message": "The install number and unsent usage and error data are kept apart from the nine stores and are not in this file; switching collection off or “Delete all data” removes them."
+  },
   "exportWithheldBytes": {
     "message": "$COUNT$ bytes",
     "placeholders": {
@@ -594,12 +600,24 @@
     }
   },
   "exportWithheldNote": {
-    "message": "Withheld from this file: $WHAT$. A key that makes the rest of this file readable is not a fact about you — exported beside the data it protects it would let whoever holds this file recover what the data is for. Model weights are named by size rather than included: they are a download, not something the product learned about you.",
+    "message": "Withheld from this file: $WHAT$.",
     "placeholders": {
       "what": {
         "content": "$1"
       }
     }
+  },
+  "exportWithheldOwnKey": {
+    "message": "your own Have I Been Pwned key, which stays on this device"
+  },
+  "exportWhyReuseKey": {
+    "message": "A key that makes the rest of this file readable is not a fact about you: exported beside the data it protects, it would let whoever holds this file recover what the data is for."
+  },
+  "exportWhyOwnKey": {
+    "message": "Your Have I Been Pwned key is yours: a file you hand to someone does not carry it."
+  },
+  "exportWhyBytes": {
+    "message": "Model weights are named by size rather than included: they are a download, not something the product learned about you."
   },
   "exportWithheldSecret": {
     "message": "this value is what makes the rest reversible"
@@ -922,7 +940,7 @@
     "message": "Leaked-password check"
   },
   "firstRunCheckPasswordNote": {
-    "message": "runs on submit; the most common ones are answered without any request"
+    "message": "runs on submit; the most common ones are answered with no request about the password"
   },
   "firstRunCheckStorage": {
     "message": "Local storage"
@@ -945,7 +963,7 @@
     "message": "Okolos is on"
   },
   "firstRunIntro": {
-    "message": "Everything below runs on this device. Nothing about the pages you visit is sent anywhere — you can check that yourself at any time."
+    "message": "Every check below runs on this device. The addresses and text of the pages you visit are not sent anywhere, and you can check that yourself at any time."
   },
   "firstRunNothingFound": {
     "message": "Nothing found — $COUNT$ checks ran.",
@@ -975,6 +993,12 @@
   },
   "firstRunStateUnavailable": {
     "message": "not available yet"
+  },
+  "firstRunUsageNotice": {
+    "message": "Okolos sends us usage and error data so we can fix the product where it breaks. It contains no page addresses, page text, file names, email or passwords."
+  },
+  "firstRunUsageOff": {
+    "message": "Open Your data"
   },
   "firstRunWhatSends": {
     "message": "What this sends"
@@ -1137,12 +1161,6 @@
   "gateUnknownAction": {
     "message": "An action on this page that could not be described"
   },
-  "inferenceNoModel": {
-    "message": "The classifier host reported no model."
-  },
-  "inferenceNotReady": {
-    "message": "The classifier is not prepared."
-  },
   "inspectorEmpty": {
     "message": "The page changed since this was found, so the evidence is gone."
   },
@@ -1262,8 +1280,79 @@
   "journalTitle": {
     "message": "What changed since last time"
   },
+  "leakKeyTitle": {
+    "message": "Have I Been Pwned key"
+  },
+  "leakKeyBlurb": {
+    "message": "Have I Been Pwned looks an address up only with your own paid key. The key is kept on this device and goes only to haveibeenpwned.com, in the request header, when you press Check now. It never goes into the export or the logs."
+  },
+  "leakKeyNone": {
+    "message": "No key is saved, so your address is not sent to Have I Been Pwned."
+  },
+  "leakKeySaved": {
+    "message": "A key is saved on this device and is not shown here. To change it, paste a new one."
+  },
+  "leakKeyField": {
+    "message": "Paste the key"
+  },
+  "leakKeyLatin": {
+    "message": "The key has a character outside the Latin keyboard layout, such as a Cyrillic letter, so nothing was saved."
+  },
+  "leakKeyLong": {
+    "message": "The key is longer than 256 characters, so nothing was saved. A Have I Been Pwned key is much shorter."
+  },
+  "leakKeySave": {
+    "message": "Save key"
+  },
+  "leakKeyReplace": {
+    "message": "Replace key"
+  },
+  "leakKeyRemove": {
+    "message": "Remove key"
+  },
+  "leakKeyEmpty": {
+    "message": "The field is empty, so nothing was saved."
+  },
+  "leakKeyShape": {
+    "message": "The key has a space or a non-printing character in it, so nothing was saved."
+  },
+  "leakKeyAdd": {
+    "message": "Add key"
+  },
+  "leakSourceKeyRefused": {
+    "message": "$NAME$ refused the saved key.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "leakSourceKeyUnreadable": {
+    "message": "$NAME$ was not checked: whether a key is saved could not be read.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "leakSourceStatus": {
+    "message": "$NAME$ answered with error $STATUS$.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "status": {
+        "content": "$2"
+      }
+    }
+  },
   "leakSourceNoKey": {
-    "message": "No API key is configured for this source."
+    "message": "$NAME$ was not checked: no key is saved.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   },
   "leakSourceTimedOut": {
     "message": "$NAME$ did not answer within $SECONDS$ seconds.",
@@ -1300,7 +1389,7 @@
     }
   },
   "leaksCoverageIncomplete": {
-    "message": "Checked against $ANSWERED$. $SILENT$ could not be reached, so this list may be incomplete.",
+    "message": "Checked against $ANSWERED$. Not checked against $SILENT$, so this list may be incomplete.",
     "placeholders": {
       "answered": {
         "content": "$1"
@@ -1353,7 +1442,13 @@
     "message": "A service you used was breached. Change the password there, and anywhere you reused it."
   },
   "leaksIdle": {
-    "message": "Nothing has been looked up yet. Checking sends your address to the sources named below — they answer to nothing less. Your passwords are never sent: that check uses a partial hash and is separate."
+    "message": "Nothing has been looked up yet. Checking sends your address to Hudson Rock Cavalier and, if a key is saved, to Have I Been Pwned with the key in the request header. These sources answer to nothing less. Your passwords are never sent: that check uses a partial hash and is separate."
+  },
+  "leaksIdleNoKey": {
+    "message": "Nothing has been looked up yet. Checking sends your address to Hudson Rock Cavalier, which answers to nothing less. Your address does not go to Have I Been Pwned until you save a key. Your passwords are never sent: that check uses a partial hash and is separate."
+  },
+  "leaksIdleWithKey": {
+    "message": "Nothing has been looked up yet. Checking sends your address to Hudson Rock Cavalier and Have I Been Pwned, which answer to nothing less, and your key goes to Have I Been Pwned in the request header. Your passwords are never sent: that check uses a partial hash and is separate."
   },
   "leaksMarkResolved": {
     "message": "Mark resolved"
@@ -1452,6 +1547,9 @@
   },
   "logTrapGeneric": {
     "message": "A page trap was detected."
+  },
+  "logTrapOutsideLink": {
+    "message": "A link on a page could have opened a program outside the browser; the click was stopped."
   },
   "logTrapTechsupport": {
     "message": "A page claimed your computer was locked and gave a number to call."
@@ -1655,13 +1753,13 @@
     "message": "This is a storage problem. It is not a statement that this page is fine."
   },
   "pwdExplainAbsent": {
-    "message": "This password does not appear in the breach corpus. Only the first five characters of its fingerprint were sent."
+    "message": "This password does not appear in the breach corpus. The password itself was not sent, only the first five characters of its fingerprint."
   },
   "pwdExplainCommon": {
-    "message": "This password is one of the most common in the world. It was recognised on this device, so nothing was sent anywhere."
+    "message": "This password is one of the most common in the world. It was recognised on this device, so neither the password nor its fingerprint was sent anywhere."
   },
   "pwdExplainFound": {
-    "message": "This password appears $COUNT$ times in breached data. Only the first five characters of its fingerprint were sent.",
+    "message": "This password appears $COUNT$ times in breached data. The password itself was not sent, only the first five characters of its fingerprint.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -1885,7 +1983,7 @@
     "message": "Clear the local data"
   },
   "storageResetNote": {
-    "message": "Clearing removes everything Okolos kept on this device: findings, the journal, the network audit, exceptions, settings, extension snapshots, the model, the feeds and the password-reuse index. It cannot be undone."
+    "message": "Clearing removes everything Okolos kept on this device: findings, the journal, the network audit, exceptions, settings with a saved Have I Been Pwned key, extension snapshots, the model, the feeds and the password-reuse index. If usage and error data is on, the install number is replaced with a new one and unsent events are deleted. It cannot be undone."
   },
   "storageRetry": {
     "message": "Try again"
@@ -2020,7 +2118,16 @@
     "message": "A download was stopped before it was saved"
   },
   "warnDownloadCancelled": {
-    "message": "The file was cancelled, so nothing reached your disk."
+    "message": "The download was cancelled, and nothing of it is left on your disk."
+  },
+  "warnDownloadNotStoppedHeadline": {
+    "message": "A listed download was not stopped in time"
+  },
+  "warnDownloadNotStopped": {
+    "message": "The download could not be stopped in time, so the file may be on your disk. Delete it."
+  },
+  "warnDownloadDiscardFailed": {
+    "message": "The file could not be deleted. Delete it from the browser's downloads."
   },
   "warnDownloadShowRecord": {
     "message": "Show the record"
@@ -2130,6 +2237,31 @@
   "warnLookalikeSource": {
     "message": "comparing the address on this device"
   },
+  "warnOutsideLinkHeadline": {
+    "message": "This link may open a program on your computer, not a page"
+  },
+  "warnOutsideLinkProgram": {
+    "message": "The address starts with $SCHEME$:, and the browser hands an address like this to a program on your computer if one is installed.",
+    "placeholders": {
+      "scheme": {
+        "content": "$1"
+      }
+    }
+  },
+  "warnOutsideLinkSource": {
+    "message": "reading the link's address on this device"
+  },
+  "warnOutsideLinkStopped": {
+    "message": "The click on the link was stopped, and the link was not opened."
+  },
+  "warnOutsideLinkWhere": {
+    "message": "The link leads to $HOST$.",
+    "placeholders": {
+      "host": {
+        "content": "$1"
+      }
+    }
+  },
   "warnPasswordHeadline": {
     "message": "This password has appeared in a breach"
   },
@@ -2167,7 +2299,7 @@
     "message": "Where else this password is used is unknown: this device has not seen it before."
   },
   "warnPasswordSourceOffline": {
-    "message": "a list built into this extension — nothing was sent"
+    "message": "a list built into this extension; neither the password nor its fingerprint was sent"
   },
   "warnPasswordSourceOnline": {
     "message": "Have I Been Pwned (CC BY 4.0), via a range query that sent five characters of the fingerprint"
@@ -2211,8 +2343,24 @@
       }
     }
   },
+  "auditSummaryCarriedKey": {
+    "message": "your Have I Been Pwned key, in the request header: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "auditSummaryCarriedDomain": {
     "message": "the domain you checked: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "auditSummaryCarriedInstall": {
+    "message": "requests carrying the random install number: $COUNT$",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -2269,10 +2417,13 @@
     "message": "The first five characters of the password’s SHA-1 hash. The password itself and its full hash are never sent and are not kept here."
   },
   "auditKeptLeakLookup": {
-    "message": "The email address you asked us to check. This log shortens it to its first letter — the whole address is not kept here."
+    "message": "The email address you asked us to check and, in a request to Have I Been Pwned, your key in the request header. This log shortens the address to its first letter and does not keep the key at all."
   },
   "auditKeptFileHash": {
-    "message": "The file’s hash. Not its name, not its contents."
+    "message": "Nothing: no hash of the file is computed, and neither its name nor its contents leave."
+  },
+  "auditKeptUsageData": {
+    "message": "Names of actions and errors from a fixed list and their outcome (for example, whether a password was found in breaches), when they happened, a random install number, a session number for the hour, the extension version, the build kind, the browser language and two constant product labels. No page addresses, no page text, no file names, no email and no passwords."
   },
   "auditKeptDomainStatus": {
     "message": "The domain you checked. No page address, no page content."
@@ -2318,6 +2469,26 @@
         "content": "$1"
       }
     }
+  },
+  "journalDownload": {
+    "message": "$WHAT$ ($FILE$)",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      },
+      "file": {
+        "content": "$2"
+      }
+    }
+  },
+  "journalDownloadDiscarded": {
+    "message": "A doubted download was deleted at your request: the file is no longer on your disk"
+  },
+  "journalDownloadLeftOnDisk": {
+    "message": "A dangerous download could not be stopped in time, so the file may be on your disk"
+  },
+  "journalDownloadUnseen": {
+    "message": "The download warning was not shown, because no page was open"
   },
   "mailHeader": {
     "message": "From $WHO$ <$ADDRESS$> — “$SUBJECT$” — $DATE$",
@@ -2511,5 +2682,37 @@
   },
   "mailSkipNoSender": {
     "message": "the message carries no parsable sender address"
+  },
+  "usageTitle": {
+    "message": "Usage and error data"
+  },
+  "usageWhat": {
+    "message": "What is sent while collection is on: names of actions and errors from a fixed list and their outcome (for example, whether a password was found in breaches), when they happened, a random install number, a session number for the hour, the extension version, the build kind, the browser language and two constant product labels. The service learns the browser and the system from the request header. Page addresses, page text, file names, email and passwords are not sent."
+  },
+  "usageSwitch": {
+    "message": "Send usage and error data"
+  },
+  "usageOff": {
+    "message": "Off: no usage and error data is sent, and there is no install number."
+  },
+  "usageSaveFailed": {
+    "message": "The change was not saved. Try again."
+  },
+  "usageRenewFailed": {
+    "message": "The install number was not replaced, and the unsent events are still there. Turn \"$SWITCH$\" off and on again: that deletes them and gives a new number.",
+    "placeholders": {
+      "switch": {
+        "content": "$1"
+      }
+    }
+  },
+  "usageFirefoxOld": {
+    "message": "This version of Firefox has no built-in consent to data collection, so Okolos sends no usage and error data. Update Firefox to version 140 to choose."
+  },
+  "usageFirefox": {
+    "message": "In Firefox the browser keeps the choice. The switch asks Firefox to allow or stop sending."
+  },
+  "usageNotSent": {
+    "message": "This build of Okolos is not from a store and sends no usage and error data, whatever the switch shows."
   }
 }

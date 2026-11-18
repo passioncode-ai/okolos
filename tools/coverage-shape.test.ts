@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { filesUnder } from './tree.mjs'
+import { filesUnder, posixRelative } from './tree.mjs'
 
 /**
  * Every module that holds a rule is tested where the rule lives.
@@ -95,7 +95,7 @@ const VENDORED: Record<string, string> = {
 const modules = ['packages', 'apps', 'tools']
   .filter((dir) => existsSync(path.join(root, dir)))
   .flatMap((dir) => sources(path.join(root, dir)))
-  .map((file) => path.relative(root, file))
+  .map((file) => posixRelative(root, file))
   .filter((file) => !Object.keys(VENDORED).some((dir) => file.startsWith(dir) && file.endsWith('.mjs')))
   .filter(holdsRules)
 

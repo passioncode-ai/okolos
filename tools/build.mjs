@@ -19,6 +19,7 @@ import { readFile, writeFile, mkdir, rm, cp } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { build } from 'vite'
+import { pageMarks } from './build-flags.mjs'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const app = path.join(root, 'apps/extension')
@@ -31,16 +32,42 @@ const targets = ['chrome', 'firefox']
  * gate asserts that.
  */
 const withTestHooks = process.argv.includes('--with-test-hooks')
+/**
+ * The build the store screenshots are taken from (`pnpm screenshots`): closed shadow roots and no
+ * key, like `dist/<target>`, but the usage notice and switch as the store build shows them
+ * (B-209). Written to `dist/<target>-shots`, which the screenshot tool removes when it is done.
+ */
+const forStoreShots = process.argv.includes('--store-shots')
 
 const shared = {
   configFile: false,
   logLevel: 'warn',
   resolve: { conditions: ['import', 'module', 'browser', 'default'] },
-  define: { __OKOLOS_TEST_HOOKS__: JSON.stringify(withTestHooks) },
+  define: {
+    __OKOLOS_TEST_HOOKS__: JSON.stringify(withTestHooks),
+    // Marks in the page's performance timeline, which a page can read: none in the store build (B-190).
+    __OKOLOS_PAGE_MARKS__: JSON.stringify(pageMarks({ withTestHooks, env: process.env })),
+    /**
+     * Usage and error data (B-198, B-199). Only the store build made by `pnpm package` sets
+     * these, through the secret runner; every other build carries no App-Key and `sandbox`, and
+     * a build with no key sends nothing. A test-hook build never carries a key.
+     */
+    __OKOLOS_USAGE__: JSON.stringify({
+      // The vault slot passioncode-platform/prod/APTABASE_APP_KEY_OKOLOS, set only by the secret
+      // runner around `pnpm package` (docs/runbooks/development.md, «Выпуск»).
+      // Only together with the production flag `pnpm package` sets: a plain `pnpm build` from a
+      // shell that happens to hold the key builds without it.
+      appKey: withTestHooks || process.env.OKOLOS_USAGE_ENV !== 'production' ? null : (process.env.APTABASE_APP_KEY_OKOLOS || null),
+      environment: !withTestHooks && process.env.OKOLOS_USAGE_ENV === 'production' ? 'production' : 'sandbox',
+      // The test build shows the switch and the notice as the store build does, with no key to
+      // send with (B-209); every other keyless build says it sends nothing.
+      asIfSending: withTestHooks || forStoreShots,
+    }),
+  },
 }
 
 for (const target of targets) {
-  const outDir = path.join(app, 'dist', withTestHooks ? `${target}-e2e` : target)
+  const outDir = path.join(app, 'dist', withTestHooks ? `${target}-e2e` : forStoreShots ? `${target}-shots` : target)
   await rm(outDir, { recursive: true, force: true })
   await mkdir(outDir, { recursive: true })
 

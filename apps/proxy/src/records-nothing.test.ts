@@ -20,7 +20,9 @@ import { describe, expect, it } from 'vitest'
  * performs are **exactly** the writes it is known to perform.
  */
 
-const here = path.dirname(new URL(import.meta.url).pathname)
+// Not `new URL(import.meta.url).pathname`: on Windows that is `/D:/…`, a directory
+// that does not exist, and the scan below found no files at all (B-164).
+const here = import.meta.dirname
 
 /** Every source of the service, excluding its tests. */
 function sources(): string[] {

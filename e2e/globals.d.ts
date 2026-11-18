@@ -42,4 +42,13 @@ declare const chrome: {
     getBadgeText(details: { tabId: number }): Promise<string>
     getTitle(details: { tabId: number }): Promise<string>
   }
+  /**
+   * What the browser lists, read only when the extensions screen reports a change on a
+   * fresh profile, so the failure names the extension (B-168).
+   */
+  management: {
+    getAll(): Promise<Array<{ id: string; name: string; version: string; installType?: string }>>
+  }
+  /** Read only, to see that "Delete all data" renewed the usage install number (SCN-051). */
+  storage: { local: { get(key: string): Promise<Record<string, unknown>> } }
 }

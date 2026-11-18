@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { transport } from './transport.js'
+import { transport, TransportError } from './transport.js'
 
 /**
  * The one place in this codebase that calls `fetch`, tested where it lives.
@@ -42,6 +42,23 @@ describe('what leaves the device carries nothing it should not', () => {
       expect(init, 'transport was never called').toBeDefined()
       expect(init?.method).toBe('POST')
       expect(init?.body).toBe('{"domain":"x.test"}')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
+
+describe('a request that never reached the server (B-215)', () => {
+  it('rejects with TransportError, still a TypeError, carrying what fetch threw', async () => {
+    const cause = new TypeError('Failed to fetch')
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw cause
+    }))
+    try {
+      const failed = await transport({ url: 'https://api.test/x', method: 'GET' }).catch((error: unknown) => error)
+      expect(failed).toBeInstanceOf(TransportError)
+      expect(failed).toBeInstanceOf(TypeError)
+      expect((failed as TransportError).cause).toBe(cause)
     } finally {
       vi.unstubAllGlobals()
     }

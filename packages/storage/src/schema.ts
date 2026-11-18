@@ -26,6 +26,30 @@ export const RETENTION_DAYS = {
    * it is finite because "never" is what turned a lookup into a log.
    */
   seenHost: 365,
+  /**
+   * A row of the password-reuse index, counted from the **last** time that password was
+   * submitted on that host (B-134).
+   *
+   * It had no window, and that was argued as a choice: ageing a row would understate
+   * reuse. What it did instead was overstate it with rows nobody could clear: a password
+   * changed a year ago still answered "already used on old.test", and the store was a
+   * permanent list of every site where a password was ever submitted, the browsing
+   * history `seenHost` above was given a window to stop being. Each submission refreshes
+   * its row, so a password still in use is never aged out; only one not typed on that
+   * host for a year is, and a year is the window `seenHost` already uses for the same
+   * question of "is this site still part of my life".
+   */
+  reuse: 365,
+  /**
+   * The snapshot of an extension the daily review no longer finds, counted from the
+   * first review that missed it (B-134).
+   *
+   * Until the user accepts the removal it keeps being reported, which is the point; but
+   * an unaccepted removal used to be kept, and re-journalled every time the journal aged
+   * its row out, forever. Ninety days is the journal's own window: by then the removal
+   * has been on the journal screen for the whole time the journal keeps anything.
+   */
+  removedExtension: 90,
 } as const
 
 /**
@@ -239,6 +263,12 @@ export interface SnapshotRecord {
   hostPermissions?: readonly string[]
   /** Whether it was enabled when the snapshot was taken. */
   enabled?: boolean
+  /**
+   * When the daily review first did not find this extension installed (B-134). Absent
+   * while it is installed; the sweep deletes the row once this is older than
+   * `RETENTION_DAYS.removedExtension`, and takes it back if the extension returns.
+   */
+  goneSince?: string
 }
 
 export interface OkolosDB extends DBSchema {

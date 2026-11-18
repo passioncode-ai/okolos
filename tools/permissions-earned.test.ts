@@ -48,7 +48,16 @@ const UNLOCKS: Readonly<Record<string, string>> = {
  * needed" is a claim about the platform and it belongs written down where the check can
  * be read.
  */
-const FREE: readonly string[] = ['runtime', 'i18n', 'action']
+const FREE: readonly string[] = [
+  'runtime',
+  'i18n',
+  'action',
+  // `permissions` (getAll, request, remove) is callable by every extension; what the adapter
+  // reads through it is Firefox's built-in data consent, which the Firefox manifest declares
+  // in `browser_specific_settings.gecko.data_collection_permissions`, not in `permissions`
+  // (B-199). The Chrome adapter does not touch it.
+  'permissions',
+]
 
 function manifest(browser: 'chrome' | 'firefox'): { permissions: string[] } {
   return JSON.parse(

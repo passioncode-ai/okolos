@@ -128,7 +128,7 @@ export function runProbe(
     }
     // A flagged comment was counted as an element lost, which refused every such page (round 7).
     if (locator === COMMENT_LOCATOR) continue
-    let element: Element | null = null
+    let element: Element | null
     try {
       element = doc.querySelector(locator)
     } catch {

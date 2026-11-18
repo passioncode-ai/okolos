@@ -132,3 +132,23 @@ describe('the first thing a new user sees', () => {
     expect(el.querySelector('[data-role=result]')?.textContent).toContain(message('firstRunPartial'))
   })
 })
+
+describe('the usage and error data notice (B-199, SCN-050)', () => {
+  it('says what is sent and links to the switch, when collection is on', () => {
+    const onUsageSettings = vi.fn()
+    const el = renderFirstRun(document, { checks: rows(), findings: 0, usage: 'on' }, { ...handlers, onUsageSettings })
+    expect(el.querySelector('[data-role=usage-notice]')?.textContent).toBe(message('firstRunUsageNotice'))
+    const off = el.querySelector<HTMLButtonElement>('[data-role=usage-off]')
+    expect(off?.textContent).toBe(message('firstRunUsageOff'))
+    off?.click()
+    expect(onUsageSettings).toHaveBeenCalledTimes(1)
+  })
+
+  it('says nothing about sending when nothing is sent: off, a Firefox that was not granted, or one with no consent', () => {
+    for (const usage of ['off', 'unsupported'] as const) {
+      const el = renderFirstRun(document, { checks: rows(), findings: 0, usage }, handlers)
+      expect(el.querySelector('[data-role=usage-notice]')).toBeNull()
+    }
+    expect(renderFirstRun(document, { checks: rows(), findings: 0 }, handlers).querySelector('[data-role=usage-notice]')).toBeNull()
+  })
+})

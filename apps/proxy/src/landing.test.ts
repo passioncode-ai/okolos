@@ -115,4 +115,14 @@ describe('the landing page a stranger and a crawler both read', () => {
     const { html } = await landing()
     expect(html).toContain('<html lang="ru">')
   })
+
+  it('says what it sends us in the store card\'s own words, so the two cannot drift apart', async () => {
+    const { readFileSync } = await import('node:fs')
+    const listing = readFileSync(new URL('../../../docs/store/listing.md', import.meta.url), 'utf8')
+    const card = listing.split('\n').find((line) => line.startsWith('• Данные об использовании и ошибках'))
+    expect(card, 'the listing has the usage line under «Что он отправляет нам»').toBeDefined()
+    const { html } = await landing()
+    const block = /<ul data-role="sends">([\s\S]*?)<\/ul>/.exec(html)?.[1] ?? ''
+    expect(block).toContain(card?.slice(2).trim())
+  })
 })

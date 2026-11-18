@@ -48,6 +48,7 @@
 import { deflateSync } from 'node:zlib'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { isMain } from './is-main.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
 const OUT = path.join(root, 'apps/extension/icons')
@@ -384,7 +385,8 @@ export function outputs() {
   return files
 }
 
-if (import.meta.filename === process.argv[1]) {
+// Real paths, so a run through a symlink or a junction still runs (tools/is-main.mjs).
+if (isMain(import.meta.filename)) {
   mkdirSync(OUT, { recursive: true })
   mkdirSync(MARKS, { recursive: true })
   for (const [file, make] of outputs()) {

@@ -190,9 +190,10 @@ function wearsBrandAsLabel(decoded: string, target: string): boolean {
 /**
  * Watched names whose own first label names a service, not a brand.
  *
- * Kept as a list of two rather than a rule, because it is a list of two: of the
- * fifty watched names, `mail.ru` and `office.com` are the ones whose brand label
- * is a word the whole web uses for a subdomain. A length threshold was the
+ * Kept as a list rather than a rule, because it is a short one: of the watched
+ * names, `mail.ru` and `office.com` are the ones whose brand label is a word the
+ * whole web uses for a subdomain, and `x.com` the one whose label is a single
+ * letter, which the whole web uses as one too (`x.example.com`). A length threshold was the
  * alternative and it is worse — it would have silently dropped `vtb`, `mkb`,
  * `mos`, `ozon` and `cdek`, five names this product exists to protect, to catch
  * two it can name.
@@ -201,7 +202,7 @@ function wearsBrandAsLabel(decoded: string, target: string): boolean {
  * is caught; what is given up is `mail.evil.test`, and that is the trade a mail
  * provider's subdomain buys.
  */
-const GENERIC_LABELS: ReadonlySet<string> = new Set(['mail', 'office'])
+const GENERIC_LABELS: ReadonlySet<string> = new Set(['mail', 'office', 'x'])
 
 /**
  * The same name under an ending one edit away from the brand's.

@@ -126,11 +126,12 @@ describe('the wipe names everything the wipe clears', () => {
  * hand, one block per case, so a key added to the table and forgotten in the sweep would be
  * a number a person reads and a product that keeps the data anyway.
  *
- * Measured 2026-08-20: all four keys are enforced, and five of the nine stores are swept by
- * nothing — each of those five for a reason the privacy page states (a blocklist and a model
- * cache replaced wholesale, one snapshot per extension overwritten on each review, the
- * user's own exceptions which a window would silently revoke, and the password-reuse index,
- * where ageing a row would understate reuse — the direction this product refuses). So the
+ * Measured 2026-08-20: all four keys were enforced, and five of the nine stores were swept by
+ * nothing. Since 2026-11-18 (B-134) the password-reuse index ages out a row a year after its
+ * last submission, and the snapshot of an extension gone for ninety days is deleted; three
+ * stores stay unswept, each for a reason the privacy page states (a blocklist and a model
+ * cache replaced wholesale, and the user's own exceptions which a window would silently
+ * revoke). So the
  * check is on the table, not on the store list: a store with no window is a decision that
  * the privacy-page gate already reads, while a window with no sweep is nobody's decision.
  */

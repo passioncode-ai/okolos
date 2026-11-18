@@ -1,19 +1,20 @@
 import { standingFindings } from '@okolos/core-extensions'
-import { classifyUndecided, detectHidden } from '@okolos/core-injection'
+import { detectHidden } from '@okolos/core-injection'
 import { detectPlatform, type RpcSender } from '@okolos/platform'
+
 import { buildRules, matchUrl, type FeedSnapshot,
 } from '@okolos/core-feeds'
-import { createOnnxRuntime, MODEL } from '@okolos/model'
 import {
+  FEED_INTERVAL_MS,
   INVENTORY_INTERVAL_MS,
   LAST_FEED_KEY,
   LAST_INVENTORY_KEY,
   LAST_SWEEP_KEY,
-  createModelCache,
   dueForFeed,
   dueForSweep,
   openDb,
   pruneExpired,
+  pruneRemovedSnapshots,
 } from '@okolos/storage'
 import type {
   Envelope,
@@ -26,17 +27,19 @@ import type {
   Verdict,
 } from '@okolos/contracts'
 
-import { handleDownload } from './downloads.js'
+import { discardDownload, handleDownload, rememberWarnedTab, warnedTabOf, type WarnedTabs } from './downloads.js'
+
+/** `storage.local` key: download id to the tab its warning went to (B-181). */
+const WARNED_TABS_KEY = 'downloads:warnedTabs'
 import {
   acceptInventoryChange,
   compareInventory,
   journalChanges,
   type InventoryDeps,
 } from './extensions.js'
-import { CAVALIER, hibp, lookupLeaks } from './leaks.js'
+import { CAVALIER, hibpFromStore, lookupLeaks } from './leaks.js'
 import { checkSubmittedPassword } from './password.js'
-import { createInferenceHost } from './inference.js'
-import { ensureRules, runIfDue, WAKE_ALARMS, type DueStore } from './wake.js'
+import { ensureRules, runIfDue, USAGE_FLUSH_KEY, WAKE_ALARMS, type DueStore } from './wake.js'
 
 /**
  * The background context holds no state between wake-ups.
@@ -47,6 +50,11 @@ import { ensureRules, runIfDue, WAKE_ALARMS, type DueStore } from './wake.js'
  */
 
 const platform = detectPlatform()
+/**
+ * Usage and error events (B-198, B-199): on by default by the browser's rules, off in
+ * settings, sent through the audited network path. Read lazily, so a plain wake costs nothing.
+ */
+const usage = startUsage(platform, auditDeps)
 
 /**
  * The worker shows copy too — a download verdict reaches a banner within the
@@ -65,6 +73,9 @@ import { explained, t, useResolver } from '@okolos/i18n'
 import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 
 import { recordPageRequest } from './page-requests.js'
+import { recordTrap } from './trap-journal.js'
+import { downloadWarningShown, leakCheckResult, passwordCheckResult, surfaceWarning, trapWarning } from './usage/catalogue.js'
+import { startUsage } from './usage/start.js'
 import { optionsPageFor } from '../options/views.js'
 
 /**
@@ -90,12 +101,29 @@ export const MARK_VERDICT_IN = 'okolos:verdict:start'
 export const MARK_VERDICT_OUT = 'okolos:verdict:end'
 export const MEASURE_VERDICT = 'okolos:verdict'
 
+/**
+ * A submitted password has been judged, and what the judgement set in motion has settled:
+ * a compromised verdict is journalled, held for the tab and offered to the document there
+ * (drawn, or refused because nobody was listening). Measured from the question's arrival.
+ *
+ * In the worker because only the worker knows: the asking document may be gone, taken by
+ * the navigation its own form caused (B-82). A test asserting "a clean password leaves the
+ * landing page alone" waits for this instead of a fixed time, which under load ran out
+ * before the check did and passed on a check that had not run (B-169).
+ */
+export const MEASURE_PASSWORD = 'okolos:password'
+
 // One list of alarms, shared with the wake budget test (wake.ts, wake.test.ts).
 const [FEED, RETENTION, INVENTORY] = WAKE_ALARMS
 const FEED_ALARM = FEED.name
 const RETENTION_ALARM = RETENTION.name
 const INVENTORY_ALARM = INVENTORY.name
 
+/**
+ * A discard is taken only from a top frame's content script, by the download's id, and the
+ * download is not judged again (`discardDownload`, round 7 of the B-165 certification): the
+ * warning the person answered is the judgement. A page cannot message the extension at all.
+ */
 platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSender) => {
   switch (message.type) {
     case 'page/candidates':
@@ -121,6 +149,31 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
       ) as Promise<RpcMap[T]['res']>
     case 'password/shown':
       return forgetHeldVerdict(from) as Promise<RpcMap[T]['res']>
+    case 'download/discard':
+      return discardDownload(
+        message.payload,
+        from,
+        (id) => platform.downloads.discard(id),
+        async (id) => warnedTabOf(await platform.storage.get<WarnedTabs>(WARNED_TABS_KEY), id),
+        async () => {
+          const db = await openDb()
+          const now = new Date().toISOString()
+          await db.put('journal', {
+            id: `download-discarded:${now}`,
+            createdAt: now,
+            kind: 'action',
+            detail: { ...explained('journalDownloadDiscarded'), outcome: 'discarded' },
+          })
+        },
+      ) as Promise<RpcMap[T]['res']>
+    case 'usage/state':
+      return usage.state().then((state) => ({ state })) as Promise<RpcMap[T]['res']>
+    case 'usage/set':
+      return usage
+        .set(Boolean((message.payload as { on?: unknown }).on))
+        .then((state) => ({ state })) as Promise<RpcMap[T]['res']>
+    case 'usage/renew':
+      return usage.renew().then((state) => ({ state })) as Promise<RpcMap[T]['res']>
     case 'password/pending':
       return answerPendingVerdict(from) as Promise<RpcMap[T]['res']>
     case 'leaks/check':
@@ -143,7 +196,9 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
         from,
       ) as Promise<RpcMap[T]['res']>
     case 'trap/warned':
-      return journalTrap(message.payload as { kind: string; signals: string }) as Promise<RpcMap[T]['res']>
+      return journalTrap(message.payload as { kind: string; signals: string; shown?: boolean }) as Promise<RpcMap[T]['res']>
+    case 'warning/shown':
+      return countShownWarning(message.payload as { kind: string }) as Promise<RpcMap[T]['res']>
     case 'recovery/open':
       return openRecovery(message.payload as { kind: string }) as Promise<RpcMap[T]['res']>
     case 'password/change':
@@ -184,41 +239,15 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
 })
 
 /**
- * The classifier host.
+ * Stage 3, the classifier, is not wired here: it is not shipped (ADR-0006).
  *
- * It prepares itself once per wake-up and reports honestly why it is
- * unavailable when it is: no place to run a model, no weights the user agreed
- * to fetch, or no runtime bundled. Today the last of those is the real answer —
- * the weights carry a licence question that is the operator's to settle — so
- * stage 3 never fires and nothing above it claims otherwise.
+ * Until 2026-10-29 a classifier host was prepared on every wake-up and asked about every
+ * candidate the rules left undecided. It could never answer (Chrome has nowhere to run a
+ * model since B-50, Firefox has no weights and no runtime), but it put `@okolos/model`
+ * into both background bundles and sent `inference/score` to a receiver that no longer
+ * existed (B-131). The host and the stage's gate stay as library code with their tests:
+ * `createInferenceHost` in `@okolos/model`, `classifyUndecided` in `@okolos/core-injection`.
  */
-const inference = createInferenceHost({
-  ensureHost: () => platform.inference.ensureHost(),
-  weights: async () => {
-    try {
-      const db = await openDb()
-      const cache = createModelCache({ db, now: () => new Date().toISOString() })
-      return await cache.read(MODEL.id, MODEL.version)
-    } catch {
-      return null
-    }
-  },
-  runtime: createOnnxRuntime,
-  remoteScore: async (text) => {
-    const response = await platform.runtime.send('inference/score', { text })
-    return response?.score ?? null
-  },
-  log: (message) => console.warn(message),
-})
-
-/**
- * Prepared per wake-up, not per page. Chrome tears the worker down after about
- * thirty seconds of quiet, so this runs again on the next message — which is
- * also what makes a model installed mid-session take effect without a restart.
- */
-const prepared = inference.prepare().catch(() => 'no-host' as const)
-
-
 async function handleCandidates(page: PageCandidates): Promise<{ verdicts: Verdict[] }> {
   // Before anything that can throw or await: the fact being recorded is "this worker
   // heard the question", and a mark placed after the first await would be missing in
@@ -227,11 +256,6 @@ async function handleCandidates(page: PageCandidates): Promise<{ verdicts: Verdi
   const now = new Date().toISOString()
   const ctx = { now, newId: () => crypto.randomUUID() }
   const verdicts = detectHidden(page, ctx)
-  await prepared
-
-  // Stage 3 sees only what the rules left undecided.
-  const decidedLocators = verdicts.flatMap((v) => v.evidence.map((e) => e.locator ?? ''))
-  verdicts.push(...(await classifyUndecided(page, decidedLocators, inference, ctx)))
 
   if (verdicts.length > 0) {
     try {
@@ -317,6 +341,11 @@ async function handleGateDecision(decision: GateDecision): Promise<{ ok: true }>
 // and it is easiest to make in exactly this kind of one-line wiring.
 platform.runtime.onInstalled(() => {
   void platform.tabs.create(platform.runtime.getUrl('first-run.html'))
+  void usage.track('extension_installed', { reason: 'install' })
+})
+// The catalogue's other value, sent by nobody until B-206: a store update of this extension.
+platform.runtime.onUpdated(() => {
+  void usage.track('extension_installed', { reason: 'update' })
 })
 
 /**
@@ -620,6 +649,7 @@ async function handlePasswordCheck(
   payload: { sha1: string; host: string },
   from: RpcSender,
 ): Promise<PasswordAnswer> {
+  const asked = performance.now()
   const verdict = await checkSubmittedPassword(payload.sha1, await auditDeps())
 
   let reusedOn: string[] = []
@@ -633,16 +663,21 @@ async function handlePasswordCheck(
       reusedOn = answer.elsewhere.map((row) => row.host)
       reuseUnknown = answer.unknown
       // Recorded after the answer, so a first submission reads as unknown
-      // rather than as "seen here already".
-      if (answer.unknown || !rows.some((row) => row.host === payload.host)) {
-        await db.put('reuse', { tag, host: payload.host, seenAt: new Date().toISOString().slice(0, 10) })
-      }
+      // rather than as "seen here already". Written on every submission, not only
+      // the first: `seenAt` is the last time this password was typed here, and the
+      // retention sweep ages a row out only when that is a year ago (B-134).
+      await db.put('reuse', { tag, host: payload.host, seenAt: new Date().toISOString().slice(0, 10) })
     } catch {
       // An unreadable index answers "unknown", never "nowhere else".
       reusedOn = []
       reuseUnknown = true
     }
   }
+
+  void usage.track('check_done', {
+    check: 'password',
+    result: passwordCheckResult(verdict.explain.code),
+  })
 
   const answer: PasswordAnswer = {
     compromised: verdict.compromised,
@@ -652,6 +687,9 @@ async function handlePasswordCheck(
     reusedOn,
     reuseUnknown,
   }
+
+  /** What was set in motion, so the measure below waits for it rather than for the return. */
+  let offered: Promise<unknown> = Promise.resolve()
 
   if (answer.compromised) {
     /**
@@ -683,16 +721,22 @@ async function handlePasswordCheck(
        * is torn down when the browser decides — measured as a warning that arrived most of
        * the time. Whoever this misses asks for it themselves as they start.
        */
-      void platform.tabs
+      offered = platform.tabs
         .sendToFrame(
           'password/verdict',
           { host: payload.host, verdict: answer },
           { tabId: from.tabId, frameId: 0 },
         )
         .catch(() => false)
-
     }
   }
+
+  // Not awaited, for the reason the offer is not: the asking document must not wait on a
+  // delivery to its own replacement. The measure waits instead.
+  void offered.then(() => {
+    const settled = performance.now()
+    performance.measure(MEASURE_PASSWORD, { start: asked, end: settled })
+  })
 
   return answer
 }
@@ -744,13 +788,16 @@ async function answerPendingVerdict(
   return held === null ? null : { host: held.host, verdict: held.verdict }
 }
 
-async function handleLeakCheck(payload: { address: string }) {
-  const key = await readSetting('hibp:apiKey')
-  const inventory = await lookupLeaks(
-    payload.address,
-    [hibp(typeof key === 'string' && key ? key : null), CAVALIER],
-    await auditDeps(),
-  )
+async function handleLeakCheck(payload: { address: string }): Promise<RpcMap['leaks/check']['res']> {
+  // The read is handed over rather than awaited here, so a failed read stays a failed read
+  // and does not become "no key saved" (B-125 round 2).
+  const breaches = await hibpFromStore(() => readSetting('hibp:apiKey'))
+  const inventory = await lookupLeaks(payload.address, [breaches, CAVALIER], await auditDeps())
+  // Found or not, never what: no address, no breach name, no count.
+  void usage.track('check_done', {
+    check: 'leak-inventory',
+    result: leakCheckResult(inventory.leaks.length, inventory.complete),
+  })
   return {
     leaks: inventory.leaks.map((leak) => ({ ...leak, classes: [...leak.classes] })),
     sources: inventory.sources.map((source) => ({ ...source })),
@@ -758,13 +805,13 @@ async function handleLeakCheck(payload: { address: string }) {
   }
 }
 
+/**
+ * A stored setting, or null when there is none. A store that cannot be read throws: it
+ * used to answer null, which made "could not read" and "not set" one answer.
+ */
 async function readSetting(key: string): Promise<unknown> {
-  try {
-    const db = await openDb()
-    return (await db.get('settings', key))?.value ?? null
-  } catch {
-    return null
-  }
+  const db = await openDb()
+  return (await db.get('settings', key))?.value ?? null
 }
 
 async function extensionsState() {
@@ -952,13 +999,6 @@ const STORAGE_KEY: Record<string, string> = {
   full: 'logStorageFull',
 }
 
-/** What each page trap is recorded as. `generic` covers one we cannot name. */
-const TRAP_KEY: Record<string, string> = {
-  clickfix: 'logTrapClickfix',
-  techsupport: 'logTrapTechsupport',
-  generic: 'logTrapGeneric',
-}
-
 /**
  * A state-changing request the page made while a finding was unresolved.
  *
@@ -982,23 +1022,25 @@ async function journalPageRequest(
   return { ok: true }
 }
 
-async function journalTrap(payload: { kind: string; signals: string }): Promise<{ ok: true }> {
-  // Table, not a ternary, because `tools/locales.test.ts` finds the keys a
-  // build asks for by reading `t('…')`, `*_KEY` tables and `…Key:` fields — and
-  // deliberately nothing looser, since a looser reader keeps dead messages
-  // alive. Written any other way these five keys read as translated-and-unused.
+async function journalTrap(payload: { kind: string; signals: string; shown?: boolean }): Promise<{ ok: true }> {
   try {
-    const db = await openDb()
-    const now = new Date().toISOString()
-    await db.put('journal', {
-      id: `trap:${payload.kind}:${now}`,
-      createdAt: now,
-      kind: 'verdict',
-      detail: { explainKey: TRAP_KEY[payload.kind] ?? 'logTrapGeneric', signals: payload.signals },
-    })
+    await recordTrap({ db: await openDb(), now: () => new Date().toISOString() }, payload)
   } catch (cause) {
     console.warn('okolos: could not journal a page trap', cause)
   }
+  // The kind only, mapped to the catalogue's value; an unmapped kind is not counted. No signal,
+  // no page.
+  const kind = trapWarning(payload.kind)
+  // Counted when it was shown, not when it was journalled: a link clicked under a ClickFix
+  // warning is stopped and recorded, and its own warning never appears (B-210).
+  if (kind !== null && payload.shown !== false) void usage.track('warning_shown', { kind })
+  return { ok: true }
+}
+
+async function countShownWarning(payload: { kind: string }): Promise<{ ok: true }> {
+  // The kind only, mapped to the catalogue's value; an unmapped kind is not counted (B-206).
+  const kind = surfaceWarning(String(payload?.kind ?? ''))
+  if (kind !== null) void usage.track('warning_shown', { kind })
   return { ok: true }
 }
 
@@ -1126,21 +1168,24 @@ platform.runtime.onBrowserStart(() => {
  * Downloads are judged as they are created — the only moment the bytes have not
  * landed yet. Nothing here waits on the page: a direct link has no page.
  */
-platform.downloads.onCreated((item) => {
+platform.downloads.onCreated((item, named) => {
   void handleDownload(item, {
     feed: currentFeed,
-    cancel: (id) => platform.downloads.cancel(id),
+    stop: (id) => platform.downloads.discard(id),
     journal: async (entry) => {
       const db = await openDb()
       const now = new Date().toISOString()
       await db.put('journal', {
         id: `download:${item.id}:${now}`,
         createdAt: now,
-        kind: entry.outcome === 'block' ? 'verdict' : 'action',
-        detail: { explain: entry.explain, outcome: entry.outcome },
+        kind: entry.outcome.startsWith('block') ? 'verdict' : 'action',
+        detail: {
+          ...explained('journalDownload', [{ messageKey: entry.whatKey }, entry.file]),
+          outcome: entry.outcome,
+        },
       })
     },
-    announce: async (verdict) => {
+    announce: async (verdict, _item, outcome) => {
       /**
        * `tabs.sendToActive`, not `runtime.send`, and the difference is the whole
        * defect this replaces.
@@ -1158,7 +1203,7 @@ platform.downloads.onCreated((item) => {
        * cases. `false` says so; it does not throw, because a handler deciding
        * whether to cancel a download has no use for an exception about a banner.
        */
-      const told = await platform.tabs
+      const toldTab = await platform.tabs
         .sendToActive('download/verdict', {
           action: verdict.action,
           // Codes, not sentences: the words are the content script's, which has the
@@ -1167,8 +1212,21 @@ platform.downloads.onCreated((item) => {
           shape: verdict.shape,
           reasons: verdict.reasons.join(' '),
           skipped: verdict.skipped.map((entry) => `${entry.check}: ${entry.why}`).join('; '),
+          downloadId: item.id,
+          ...(outcome ? { stopped: outcome.stopped } : {}),
         })
-        .catch(() => false)
+        .catch(() => null)
+      const told = toldTab !== null
+      if (told) {
+        // Which tab may ask to delete this file (B-181).
+        await platform.storage
+          .get<WarnedTabs>(WARNED_TABS_KEY)
+          .then((record) => platform.storage.set(WARNED_TABS_KEY, rememberWarnedTab(record, item.id, toldTab)))
+          .catch(() => undefined)
+      }
+
+      // Counted once a page has the warning, not when it was decided (`downloadWarningShown`).
+      if (downloadWarningShown(verdict.action, told)) void usage.track('warning_shown', { kind: 'download' })
 
       if (!told) {
         // Recorded, because "the banner did not show" and "the check did not run"
@@ -1181,14 +1239,20 @@ platform.downloads.onCreated((item) => {
             id: `download-unseen:${item.id}:${now}`,
             createdAt: now,
             kind: 'action',
-            detail: { explain: verdict.headline, outcome: 'unseen' },
+            detail: {
+              ...explained('journalDownload', [
+                { messageKey: 'journalDownloadUnseen' },
+                item.filename || item.url,
+              ]),
+              outcome: 'unseen',
+            },
           })
         } catch (cause) {
           console.warn('okolos: could not journal an unseen download verdict', cause)
         }
       }
     },
-  })
+  }, named)
 })
 
 /**
@@ -1204,6 +1268,10 @@ async function reviewExtensions(): Promise<void> {
     // defect on a twenty-four-hour clock.
     const deps = inventoryDeps(await openDb())
     await journalChanges(deps, await compareInventory(deps))
+    // The snapshots of extensions that stayed gone for the whole window go too, or an
+    // unaccepted removal would be kept and re-journalled forever (B-134).
+    const installed = new Set((await deps.list()).map((entry) => entry.id))
+    await pruneRemovedSnapshots(deps.db, installed, Date.now())
   } catch (cause) {
     console.warn('okolos: the extension review failed', cause)
   }
@@ -1228,6 +1296,14 @@ async function settingsDueStore(): Promise<DueStore> {
  * was reset by every wake-up before it could fire, and the review itself ran at the
  * top of this file on every wake (LC-08).
  */
+async function flushIfDue(): Promise<void> {
+  try {
+    await runIfDue(await settingsDueStore(), USAGE_FLUSH_KEY, FEED_INTERVAL_MS, Date.now(), () => usage.flush())
+  } catch (cause) {
+    console.warn('okolos: could not decide whether usage events are owed', cause)
+  }
+}
+
 async function reviewIfDue(): Promise<void> {
   try {
     await runIfDue(await settingsDueStore(), LAST_INVENTORY_KEY, INVENTORY_INTERVAL_MS, Date.now(), reviewExtensions)
@@ -1359,6 +1435,7 @@ async function pullFeed(): Promise<void> {
     })
   } catch (cause) {
     console.warn('okolos: feed sync failed', cause)
+    void usage.track('error_occurred', { area: 'feed', kind: 'unexpected' })
   }
 }
 
@@ -1372,6 +1449,7 @@ async function pullFeed(): Promise<void> {
  * page, so an unconditional pull at start *is* a pull per page.
  */
 void pullFeed()
+void flushIfDue()
 void platform.alarms.create(FEED_ALARM, FEED.periodInMinutes)
 
 void sweepIfDue()
@@ -1379,6 +1457,9 @@ void platform.alarms.create(RETENTION_ALARM, RETENTION.periodInMinutes)
 platform.alarms.onFired((name) => {
   if (name === FEED_ALARM) {
     void pullFeed()
+    // Usage events ride the feed's alarm rather than a fourth one, owed by their own timestamp
+    // as at worker start: at most four sends a day (B-205, B-211). Events live 24 hours.
+    void flushIfDue()
     return
   }
   if (name === INVENTORY_ALARM) {
