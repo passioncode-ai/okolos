@@ -161,16 +161,24 @@ describe('a run that hangs ends inside its watchdog (LC-03, F4)', () => {
     const record = await promise
 
     expect(record.exit).toBe(124)
-    expect(Date.now() - started).toBeLessThan(ENDS_WITHIN_MS)
-    expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'failed', stage: 'ingest', exit: 124 })
-    expect(readStatus(w.paths.status)?.reason).toMatch(/watchdog/)
+    // The run's own span, from its record: how long node takes to start on a loaded machine is
+    // not the watchdog's (B-208; it failed under load and passed alone). The test's own clock
+    // stays only as the outer bound a hang would cross.
+    const status = readStatus(w.paths.status)
+    expect(Date.parse(String(status?.at)) - Date.parse(String(status?.startedAt))).toBeLessThan(ENDS_WITHIN_MS)
+    expect(Date.now() - started).toBeLessThan(28_000)
+    expect(status).toMatchObject({ outcome: 'failed', stage: 'ingest', exit: 124 })
+    expect(status?.reason).toMatch(/watchdog/)
     const pid = Number(readFileSync(path.join(w.fake, 'ingest.pid'), 'utf8'))
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    expect(alive(pid), `the hung ingest (${pid}) survived the watchdog`).toBe(false)
+    // Polled, not a fixed 300 ms: reaping a killed group is the machine's schedule, not the
+    // watchdog's (B-208).
+    await expect
+      .poll(() => alive(pid), { timeout: 10_000, message: `the hung ingest (${pid}) survived the watchdog` })
+      .toBe(false)
     await new Promise((resolve) => setTimeout(resolve, 500))
     expect(calls(w.fake, 'ingest'), 'no retry starts after the watchdog fired').toHaveLength(1)
     expect(calls(w.fake, 'publish'), 'nothing starts after the watchdog fired').toEqual([])
-  }, 30_000)
+  }, 45_000)
 })
 
 describe('one run at a time (LC-03)', () => {
