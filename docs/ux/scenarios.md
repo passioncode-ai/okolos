@@ -80,13 +80,13 @@ See [foundation.md](foundation.md) → Personas.
   1. User finishes installing -> system opens the first-run screen and starts local checks, listing each check by name with live progress
   2. User watches the checks complete -> system reports nothing found and names every check that ran and when its data was last updated
   3. User closes the screen -> system leaves the toolbar icon in a neutral state and records the run time
-- **Expected result:** the user knows, within 30 seconds and without an account, that their open tabs and installed extensions were checked locally and nothing was found
+- **Expected result:** the user knows, within 30 seconds and without an account, which checks ran locally (the hidden-instruction detector, the local store, the installed extensions, the password check and download judging) and that nothing was found; open tabs are not inventoried, and the screen does not say they were
 - **Alt paths:** user clicks "Skip for now" mid-run -> system finishes the checks in the background and surfaces results in the popup badge only if something is found
 - **UI elements:** first-run screen, per-check progress rows, "what this sends" link, "See what to do first" (disabled when nothing found), "Skip for now"
 - **States covered:** loading, empty, success
 - **Errors & recovery:** a check cannot run (e.g. corpus still downloading) -> that row states the reason and offers retry; the other checks continue and the result explicitly says the run was partial
 - **Status:** implemented
-- **Coverage:** packages/ui/src/first-run/screen.ts:renderFirstRun, apps/extension/src/first-run/index.ts — PARTIAL: the tab and extension inventories this scenario describes need permissions this version deliberately does not request, so those rows render as `unavailable` with the reason. They become `ok` with REQ-23 (extensions) and the tabs permission that justifies it
+- **Coverage:** packages/ui/src/first-run/screen.ts:renderFirstRun, apps/extension/src/first-run/index.ts (`checks`): five rows, `detector`, `storage`, `extensions`, `passwords`, `downloads`. The extensions row is `ok` where the `management` permission is (both manifests carry it) and `unavailable` with the reason where the API is missing. There is no tab inventory row: this scenario promised one until 2026-11-18, and the Coverage line said the extensions row could not run, both left over from before B-56 (B-130)
 
 ### SCN-002: First run — findings found
 - **Persona:** P-01
