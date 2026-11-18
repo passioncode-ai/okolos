@@ -184,9 +184,11 @@ and opened PR #59. Decision: [ADR-0017](docs/adr/0017-the-feed-agent-publishes-f
 `apps/extension/dist/{chrome,firefox}` and the `*-e2e` builds beside them, `apps/extension/.tsc`,
 `packages/*/dist`, `test-results/`, `playwright-report/`, `node_modules/.vite` — is capped at
 **500 MB** in total (`du -sch` over those paths); an agent that built and passed the cap runs
-`rm -rf apps/extension/dist/chrome* apps/extension/dist/firefox* apps/extension/.tsc packages/*/dist test-results playwright-report node_modules/.vite`
+`rm -rf apps/extension/dist/chrome* apps/extension/dist/firefox* apps/extension/.tsc packages/*/dist packages/*/tsconfig.tsbuildinfo apps/*/tsconfig.tsbuildinfo test-results playwright-report node_modules/.vite`
 before ending its run. It leaves `dist/release/` and every `node_modules` alone, and
-`pnpm build` restores what a gate needs. (Not `git clean -X` with pathspecs: measured
+`pnpm typecheck` then `pnpm build` (both in `pnpm gates`) restore what a gate needs: `tsc -b` rebuilds
+`packages/*/dist` only when its `tsconfig.tsbuildinfo` is gone too, which is why the command removes
+both (B-196). (Not `git clean -X` with pathspecs: measured
 2026-10-03, its dry run would remove the whole `node_modules` tree.) Both commands are POSIX
 shell: on Windows run them in Git Bash, not PowerShell or `cmd.exe`.
 
