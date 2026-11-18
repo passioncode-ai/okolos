@@ -14,6 +14,7 @@ import {
   dueForSweep,
   openDb,
   pruneExpired,
+  pruneRemovedSnapshots,
 } from '@okolos/storage'
 import type {
   Envelope,
@@ -662,10 +663,10 @@ async function handlePasswordCheck(
       reusedOn = answer.elsewhere.map((row) => row.host)
       reuseUnknown = answer.unknown
       // Recorded after the answer, so a first submission reads as unknown
-      // rather than as "seen here already".
-      if (answer.unknown || !rows.some((row) => row.host === payload.host)) {
-        await db.put('reuse', { tag, host: payload.host, seenAt: new Date().toISOString().slice(0, 10) })
-      }
+      // rather than as "seen here already". Written on every submission, not only
+      // the first: `seenAt` is the last time this password was typed here, and the
+      // retention sweep ages a row out only when that is a year ago (B-134).
+      await db.put('reuse', { tag, host: payload.host, seenAt: new Date().toISOString().slice(0, 10) })
     } catch {
       // An unreadable index answers "unknown", never "nowhere else".
       reusedOn = []
@@ -1267,6 +1268,10 @@ async function reviewExtensions(): Promise<void> {
     // defect on a twenty-four-hour clock.
     const deps = inventoryDeps(await openDb())
     await journalChanges(deps, await compareInventory(deps))
+    // The snapshots of extensions that stayed gone for the whole window go too, or an
+    // unaccepted removal would be kept and re-journalled forever (B-134).
+    const installed = new Set((await deps.list()).map((entry) => entry.id))
+    await pruneRemovedSnapshots(deps.db, installed, Date.now())
   } catch (cause) {
     console.warn('okolos: the extension review failed', cause)
   }

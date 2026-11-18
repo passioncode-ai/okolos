@@ -10,6 +10,7 @@ import {
   dueForInventory,
   dueForSweep,
   pruneExpired,
+  pruneRemovedSnapshots,
 } from './retention.js'
 import { RETENTION_DAYS } from './schema.js'
 
@@ -35,24 +36,55 @@ interface Setting {
   readonly value?: unknown
 }
 
-function fakeDb(seed: Record<string, Array<Row | Setting>>) {
-  const stores: Record<string, Array<Row | Setting>> = {
+/** A reuse row is keyed by `[tag, host]`, and a snapshot by its extension's id. */
+interface Reuse {
+  readonly tag: string
+  readonly host: string
+  readonly seenAt: string
+}
+
+interface Snapshot {
+  readonly extensionId: string
+  readonly takenAt: string
+  readonly goneSince?: string
+}
+
+type Any = Row | Setting | Reuse | Snapshot
+
+function fakeDb(seed: Record<string, Any[]>) {
+  const stores: Record<string, Any[]> = {
     journal: [],
     outbound_log: [],
     findings: [],
     settings: [],
+    reuse: [],
+    snapshots: [],
     ...seed,
   }
-  const idOf = (row: Row | Setting): string => ('key' in row ? row.key : row.id)
+  const keyOf = (row: Any): unknown => {
+    if ('key' in row) return row.key
+    if ('extensionId' in row) return row.extensionId
+    if ('tag' in row) return [row.tag, row.host]
+    return row.id
+  }
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
   const db = {
     getAll: async (name: string) => [...(stores[name] ?? [])],
-    delete: async (name: string, id: string) => {
-      stores[name] = (stores[name] ?? []).filter((row) => idOf(row) !== id)
+    delete: async (name: string, id: unknown) => {
+      stores[name] = (stores[name] ?? []).filter((row) => !same(keyOf(row), id))
+    },
+    put: async (name: string, value: Any) => {
+      stores[name] = [...(stores[name] ?? []).filter((row) => !same(keyOf(row), keyOf(value))), value]
     },
   }
   /** Reading the result is what the assertions do, so it is typed rather than cast. */
-  const ids = (name: string): string[] => (stores[name] ?? []).map(idOf)
-  return { db: db as never, ids }
+  const ids = (name: string): string[] =>
+    (stores[name] ?? []).map((row) => {
+      const key = keyOf(row)
+      return Array.isArray(key) ? key.join('@') : String(key)
+    })
+  const rows = (name: string) => [...(stores[name] ?? [])]
+  return { db: db as never, ids, rows }
 }
 
 describe('what the sweep drops and what it keeps', () => {
@@ -92,6 +124,83 @@ describe('what the sweep drops and what it keeps', () => {
   })
 })
 
+
+describe('the reuse index, which used to keep every row forever (B-134)', () => {
+  const NOW = Date.parse('2026-08-08T00:00:00.000Z')
+  const dayAgo = (days: number) => new Date(NOW - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+
+  it('drops a row whose last sighting is past the window and keeps a recent one', async () => {
+    // A password changed a year ago still answered "already used on old.test", and the
+    // store was a permanent list of every site where a password was ever submitted.
+    const { db, ids } = fakeDb({
+      reuse: [
+        { tag: 't1', host: 'old.test', seenAt: dayAgo(RETENTION_DAYS.reuse + 2) },
+        { tag: 't1', host: 'recent.test', seenAt: dayAgo(RETENTION_DAYS.reuse - 2) },
+      ],
+    })
+    await pruneExpired(db, NOW)
+    expect(ids('reuse')).toEqual(['t1@recent.test'])
+  })
+
+  it('drops a row whose date cannot be read, like every other store', async () => {
+    const { db, ids } = fakeDb({ reuse: [{ tag: 't1', host: 'broken.test', seenAt: 'not a date' }] })
+    await pruneExpired(db, NOW)
+    expect(ids('reuse')).toEqual([])
+  })
+
+  it('keeps the key the tags are made with, whatever the rows do', async () => {
+    const { db, ids } = fakeDb({
+      settings: [{ key: 'reuse:key', value: 'k' }],
+      reuse: [{ tag: 't1', host: 'old.test', seenAt: dayAgo(RETENTION_DAYS.reuse + 2) }],
+    })
+    await pruneExpired(db, NOW)
+    expect(ids('settings')).toEqual(['reuse:key'])
+  })
+})
+
+describe('snapshots of extensions that are gone (B-134)', () => {
+  const NOW = Date.parse('2026-08-08T00:00:00.000Z')
+  const at = (days: number) => new Date(NOW - days * 24 * 60 * 60 * 1000).toISOString()
+
+  it('marks a snapshot whose extension the review did not find, and deletes nothing yet', async () => {
+    // The removal is still a change the user has not seen; it is reported until accepted
+    // or until the window passes.
+    const { db, rows } = fakeDb({ snapshots: [{ extensionId: 'gone', takenAt: at(400) }] })
+    await pruneRemovedSnapshots(db, new Set(), NOW)
+    expect(rows('snapshots')).toEqual([{ extensionId: 'gone', takenAt: at(400), goneSince: at(0) }])
+  })
+
+  it('deletes it once the extension has been gone for the whole window', async () => {
+    const { db, ids } = fakeDb({
+      snapshots: [
+        { extensionId: 'long-gone', takenAt: at(400), goneSince: at(RETENTION_DAYS.removedExtension + 1) },
+        { extensionId: 'just-gone', takenAt: at(400), goneSince: at(RETENTION_DAYS.removedExtension - 1) },
+      ],
+    })
+    await pruneRemovedSnapshots(db, new Set(), NOW)
+    expect(ids('snapshots')).toEqual(['just-gone'])
+  })
+
+  it('never touches the snapshot of an installed extension, however old', async () => {
+    const { db, rows } = fakeDb({ snapshots: [{ extensionId: 'here', takenAt: at(3650) }] })
+    await pruneRemovedSnapshots(db, new Set(['here']), NOW)
+    expect(rows('snapshots')).toEqual([{ extensionId: 'here', takenAt: at(3650) }])
+  })
+
+  it('takes the mark back when the extension comes back', async () => {
+    const { db, rows } = fakeDb({
+      snapshots: [{ extensionId: 'back', takenAt: at(10), goneSince: at(RETENTION_DAYS.removedExtension + 5) }],
+    })
+    await pruneRemovedSnapshots(db, new Set(['back']), NOW)
+    expect(rows('snapshots')).toEqual([{ extensionId: 'back', takenAt: at(10) }])
+  })
+
+  it('deletes a mark it cannot read, rather than keeping the row forever', async () => {
+    const { db, ids } = fakeDb({ snapshots: [{ extensionId: 'gone', takenAt: at(1), goneSince: 'nonsense' }] })
+    await pruneRemovedSnapshots(db, new Set(), NOW)
+    expect(ids('snapshots')).toEqual([])
+  })
+})
 
 describe('deciding whether a sweep is owed', () => {
   const NOW = Date.parse('2026-08-08T12:00:00.000Z')
