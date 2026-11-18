@@ -73,6 +73,22 @@ const TRAP_WARNING: Readonly<Record<TrapKind, EventProps<'warning_shown'>['kind'
   'outside-link': 'outside-link',
 }
 
+/**
+ * The surfaces the content script and the block page draw, mapped to `warning_shown` (B-206). Traps
+ * and downloads are counted where they are decided (`trapWarning`, `downloadWarningShown`), and the
+ * password surface draws every verdict, not only a leak, so `leaked-password` is not counted here.
+ */
+const SURFACE_WARNING: Readonly<Record<string, EventProps<'warning_shown'>['kind']>> = {
+  injection: 'hidden-instruction',
+  lookalike: 'lookalike',
+  credential: 'credential-guard',
+  'blocked-page': 'blocked-page',
+}
+
+export function surfaceWarning(kind: string): EventProps<'warning_shown'>['kind'] | null {
+  return Object.hasOwn(SURFACE_WARNING, kind) ? (SURFACE_WARNING[kind] ?? null) : null
+}
+
 export function trapWarning(kind: string): EventProps<'warning_shown'>['kind'] | null {
   return Object.hasOwn(TRAP_WARNING, kind) ? TRAP_WARNING[kind as TrapKind] : null
 }

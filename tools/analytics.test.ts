@@ -76,20 +76,33 @@ describe('the event catalogue, for people and for the code', () => {
     }
   })
 
-  it('points each active event at a line that sends it', () => {
+  it('points each active event at the function that sends it', () => {
+    /**
+     * By a function or a top-level handler, not a line number (B-220). Line numbers moved with every
+     * edit above them in `index.ts` and went red three times in one day for no change to any event;
+     * the place that sends is named instead, and its body must carry the event's own name.
+     */
     for (const cells of rows) {
       const name = cells[1]?.replaceAll('`', '') ?? ''
       if (cells[2] !== 'active') continue
-      const sites = [...(cells[4] ?? '').matchAll(/`([^`]+\.ts):(\d+)`/g)]
+      const sites = [...(cells[4] ?? '').matchAll(/`([^`#]+\.ts)#([\w.]+)`/g)]
       expect(sites.length, `${name} names no site`).toBeGreaterThan(0)
-      for (const [, file, line] of sites) {
-        const source = readFileSync(path.join(root, file as string), 'utf8').split('\n')
-        const around = source.slice(Number(line) - 3, Number(line) + 1).join('\n')
-        // The event's own name, not any `check: '` nearby: a row pointing at another event's line
-        // must fail (B-215).
-        expect(around, `${file}:${line} does not send ${name}`).toMatch(new RegExp(`'${name}'`))
+      for (const [, file, anchor] of sites) {
+        const body = topLevelBody(readFileSync(path.join(root, file as string), 'utf8'), anchor as string)
+        expect(body, `${file}#${anchor} is not a top-level function or handler`).not.toBeNull()
+        // The event's own name, not any `check: '` nearby: a row pointing at another event's
+        // place must fail (B-215).
+        expect(body ?? '', `${file}#${anchor} does not send ${name}`).toMatch(new RegExp(`'${name}'`))
       }
     }
+  })
+
+  it('reads a top-level body and nothing past it', () => {
+    const source = ['function a() {', "  send('x')", '}', '', 'platform.on(() => {', "  send('y')", '})', ''].join('\n')
+    expect(topLevelBody(source, 'a')).toContain("'x'")
+    expect(topLevelBody(source, 'a')).not.toContain("'y'")
+    expect(topLevelBody(source, 'platform.on')).toContain("'y'")
+    expect(topLevelBody(source, 'missing')).toBeNull()
   })
 })
 
@@ -195,3 +208,17 @@ describe('the send limits the documents state', () => {
     expect(analyticsDoc).toContain(`больше чем на ${skew / 60_000} минут`)
   })
 })
+
+/**
+ * The body of a top-level `function NAME(` / `async function NAME(` or a top-level call such as
+ * `platform.downloads.onCreated(`, up to the closing line at column 0; null when there is none.
+ */
+function topLevelBody(source: string, anchor: string): string | null {
+  const lines = source.split('\n')
+  const escaped = anchor.replace(/[.]/g, '\\.')
+  const start = new RegExp(`^(?:export )?(?:async )?(?:function ${escaped}\\b|${escaped}\\()`)
+  const from = lines.findIndex((line) => start.test(line))
+  if (from === -1) return null
+  const to = lines.findIndex((line, at) => at > from && /^\}/.test(line))
+  return lines.slice(from, to === -1 ? undefined : to + 1).join('\n')
+}

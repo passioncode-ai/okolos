@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest'
 
 import type { TrapKind } from '../../content/traps.js'
 
-import { admissible, CATALOGUE, downloadWarningShown, leakCheckResult, passwordCheckResult, trapWarning } from './catalogue.js'
+import {
+  admissible,
+  CATALOGUE,
+  downloadWarningShown,
+  leakCheckResult,
+  passwordCheckResult,
+  surfaceWarning,
+  trapWarning,
+} from './catalogue.js'
 
 describe('the catalogue', () => {
   it('admits an event with every declared prop at one of its values', () => {
@@ -83,5 +91,24 @@ describe('the leak check, by what it found out (B-215)', () => {
 
   it('is unavailable when a source stayed silent and nothing was found: a question not answered', () => {
     expect(leakCheckResult(0, false)).toBe('unavailable')
+  })
+})
+
+describe('surfaceWarning (B-206)', () => {
+  it('maps the surfaces drawn on a page and the block page to catalogue values', () => {
+    expect(surfaceWarning('injection')).toBe('hidden-instruction')
+    expect(surfaceWarning('lookalike')).toBe('lookalike')
+    expect(surfaceWarning('credential')).toBe('credential-guard')
+    expect(surfaceWarning('blocked-page')).toBe('blocked-page')
+  })
+
+  it('counts nothing it cannot name: traps and downloads are counted where decided, and a password verdict is not always a leak', () => {
+    for (const kind of ['trap', 'download', 'password', 'constructor', '']) expect(surfaceWarning(kind), kind).toBeNull()
+  })
+
+  it('maps only to values the catalogue holds', () => {
+    for (const kind of ['injection', 'lookalike', 'credential', 'blocked-page']) {
+      expect(CATALOGUE.warning_shown.kind).toContain(surfaceWarning(kind))
+    }
   })
 })

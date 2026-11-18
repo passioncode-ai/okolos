@@ -31,7 +31,7 @@ export interface TrapDeps {
    * and tech-support, and once per link per page for a link that leaves the browser,
    * however often it is clicked, so a page cannot fill the journal by clicking.
    */
-  warned?: (kind: TrapKind, signals: readonly string[]) => void
+  warned?: (kind: TrapKind, signals: readonly string[], shown?: boolean) => void
   /**
    * How a warning reaches the screen.
    *
@@ -272,7 +272,8 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
     }
     if (!journalledLinks.has(href) && journalledLinks.size < JOURNAL_LINKS_MAX) {
       journalledLinks.add(href)
-      deps.warned?.('outside-link', verdict.signals)
+      // Journalled either way; shown only when no other warning holds the panel (B-210).
+      deps.warned?.('outside-link', verdict.signals, banner === null)
     }
     // One panel: a ClickFix or tech-support warning already up is the more urgent
     // sentence, and the click is stopped either way.

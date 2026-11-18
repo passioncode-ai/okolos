@@ -163,6 +163,10 @@ const slot = createSurfaceSlot({
     })
   },
   alsoLine: (kinds) => t('warnAlsoHere', String(kinds.length)),
+  // The kind only: the worker maps it to `warning_shown` and counts nothing else (B-206).
+  shown: (kind) => {
+    void platform.runtime.send('warning/shown', { kind }).catch(() => undefined)
+  },
   mounted: () => {
     // From the navigation's time origin, which is what a person waited from. Wrapped
     // because a page can have taken the API away, and a missing measurement must not
@@ -1118,9 +1122,9 @@ if (isTopFrame) {
     recover: (kind) => {
       void platform.runtime.send('recovery/open', { kind }).catch(() => undefined)
     },
-    warned: (kind, signals) => {
+    warned: (kind, signals, shown = true) => {
       void platform.runtime
-        .send('trap/warned', { kind, signals: signals.join(',') })
+        .send('trap/warned', { kind, signals: signals.join(','), shown })
         .catch(() => undefined)
     },
     judged: () => {

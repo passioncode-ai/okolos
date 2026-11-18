@@ -74,6 +74,12 @@ export interface SlotEnvironment {
    * measurement of that one.
    */
   readonly mounted?: () => void
+  /**
+   * Called each time a kind's panel goes up on screen: a first claim, or one worse than the panel
+   * it replaces. Not for a claim refused the panel, which is a line on someone else's. This is
+   * what `warning_shown` counts (B-206).
+   */
+  readonly shown?: (kind: string) => void
 }
 
 export interface SlotClaim {
@@ -209,6 +215,7 @@ export function createSurfaceSlot(env: SlotEnvironment) {
     if (held === null) {
       const given = hold(request)
       env.mounted?.()
+      env.shown?.(request.kind)
       paintAlso()
       return given
     }
@@ -230,6 +237,7 @@ export function createSurfaceSlot(env: SlotEnvironment) {
     if (!alsoHere.includes(displaced)) alsoHere.push(displaced)
 
     const given = hold(request)
+    env.shown?.(request.kind)
     paintAlso()
     return given
   }

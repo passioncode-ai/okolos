@@ -51,7 +51,9 @@ afterEach(() => {
 
 function slotWith() {
   const refused: Array<{ kind: string; severity: string }> = []
+  const shown: string[] = []
   const slot = createSurfaceSlot({
+    shown: (kind) => shown.push(kind),
     doc: document,
     noteRefused: (kind, severity) => refused.push({ kind, severity }),
     escalate: vi.fn(async () => undefined),
@@ -59,13 +61,24 @@ function slotWith() {
     wait: async () => undefined,
   })
   made.push(slot)
-  return { slot, refused }
+  return { slot, refused, shown }
 }
 
 /** Every host this document holds, whatever name the fallback gave it. */
 function panels(): number {
   return document.querySelectorAll('[data-okolos=banner]').length
 }
+
+describe('what the slot says was shown (B-206)', () => {
+  it('names each kind whose panel went up, and not one refused the panel', () => {
+    const { slot, shown } = slotWith()
+    slot.claim(claim('lookalike', 'major'))
+    slot.claim(claim('injection', 'minor'))
+    expect(shown).toEqual(['lookalike'])
+    slot.claim(claim('injection', 'critical'))
+    expect(shown).toEqual(['lookalike', 'injection'])
+  })
+})
 
 describe('the in-page warning slot', () => {
   it('draws the first finding', () => {
