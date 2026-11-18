@@ -18,6 +18,7 @@ import {
   RUN_DEADLINE_MS,
   runAgent,
   signalRecord,
+  satisfiesEngines,
 } from './bootstrap.mjs'
 import { acquireLock } from './lock.mjs'
 import { CHECKOUT_LOCK_REASON, feedPaths } from './paths.mjs'
@@ -746,4 +747,44 @@ describe('with real git (B-150: the folder deleted, git still listing it)', () =
     expect(git('-C', r.paths.agentCheckout, 'status', '--porcelain')).toBe('')
     expect(await checkoutHealth({ checkout: r.paths.agentCheckout, tool, env })).toEqual({ state: 'ok' })
   }, 30_000)
+})
+
+describe('the node the agent runs under (B-178)', () => {
+  const RANGE = '^22.18.0 || >=23.6.0'
+
+  it('reads the repository range as written', () => {
+    expect(satisfiesEngines('22.18.0', RANGE)).toBe(true)
+    expect(satisfiesEngines('22.20.1', RANGE)).toBe(true)
+    expect(satisfiesEngines('v26.10.0', RANGE)).toBe(true)
+    expect(satisfiesEngines('22.17.9', RANGE)).toBe(false)
+    expect(satisfiesEngines('23.5.0', RANGE)).toBe(false)
+    expect(satisfiesEngines('20.11.0', RANGE)).toBe(false)
+  })
+
+  it('does not judge a term of another form, or a version it cannot read', () => {
+    expect(satisfiesEngines('18.0.0', '~18.1')).toBe(true)
+    expect(satisfiesEngines('not-a-version', RANGE)).toBe(true)
+  })
+
+  it('records a node outside the range as a failed run, before the job starts', async () => {
+    const w = world()
+    plantCheckout(w.paths.agentCheckout)
+    writeFileSync(path.join(w.paths.agentCheckout, 'package.json'), JSON.stringify({ engines: { node: RANGE } }))
+    const job = fakeJob(w)
+    const result = await agent(w, { run: job.run, nodeVersion: '20.11.0' }).promise
+    expect(result.exit).not.toBe(0)
+    expect(job.starts).toHaveLength(0)
+    expect(readStatus(w.paths.status)).toMatchObject({ outcome: 'failed', stage: 'node' })
+    expect(readStatus(w.paths.status)?.reason).toContain('node 20.11.0 is outside')
+  })
+
+  it('runs the job when the node is in range', async () => {
+    const w = world()
+    plantCheckout(w.paths.agentCheckout)
+    writeFileSync(path.join(w.paths.agentCheckout, 'package.json'), JSON.stringify({ engines: { node: RANGE } }))
+    const job = fakeJob(w)
+    const result = await agent(w, { run: job.run, nodeVersion: '22.18.0' }).promise
+    expect(result.exit).toBe(0)
+    expect(job.starts).toHaveLength(1)
+  })
 })

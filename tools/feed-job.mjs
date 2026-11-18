@@ -53,7 +53,7 @@ import path from 'node:path'
 import { killAllGroups, runBounded, withoutSecrets } from './feed/bounded.mjs'
 import { acquireLock, LockHeldError } from './feed/lock.mjs'
 import { capFile, cleanLine, openLog } from './feed/log.mjs'
-import { feedPaths } from './feed/paths.mjs'
+import { feedPaths, windowsRefusal } from './feed/paths.mjs'
 import { DEFAULT_WORKER, readServed } from './feed/served.mjs'
 import {
   proposeSnapshot,
@@ -566,6 +566,11 @@ async function main() {
 }
 
 if (isMain(import.meta.url)) {
+  const refusal = windowsRefusal('feed-job')
+  if (refusal !== null) {
+    console.error(refusal)
+    process.exit(EXIT.failed)
+  }
   main().catch((cause) => {
     console.error(`feed-job: ${cause instanceof Error ? cause.stack : String(cause)}`)
     process.exit(EXIT.failed)

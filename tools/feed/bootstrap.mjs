@@ -36,14 +36,14 @@
  * rule.
  */
 import { randomUUID } from 'node:crypto'
-import { closeSync, existsSync, mkdirSync, openSync, readSync, realpathSync, renameSync, rmSync, statSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 import { killAllGroups, runBounded, withoutSecrets } from './bounded.mjs'
 import { isMain } from './is-main.mjs'
 import { acquireLock, LockHeldError } from './lock.mjs'
 import { capFile, cleanLine, openLog } from './log.mjs'
-import { CHECKOUT_LOCK_REASON, feedPaths } from './paths.mjs'
+import { CHECKOUT_LOCK_REASON, feedPaths, windowsRefusal } from './paths.mjs'
 import { offMainFacts, readStatus, stampRunId, writeStatus } from './status.mjs'
 
 /** What the installer copies beside launchd: this file and every module it imports. */
@@ -204,6 +204,50 @@ export async function recoverCheckout({ checkout, sourceRepo, origin, tool = run
   return { how, commit }
 }
 
+/** The `engines.node` range of the checkout's package.json, or null when it cannot be read. */
+export function enginesOf(checkout) {
+  try {
+    const range = JSON.parse(readFileSync(path.join(checkout, 'package.json'), 'utf8'))?.engines?.node
+    return typeof range === 'string' && range.trim() !== '' ? range : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Whether `version` is in an engines range of the forms this repository writes: `^X.Y.Z` and
+ * `>=X.Y.Z`, joined by `||` (B-178). A term of another form is not judged: it counts as met, so an
+ * unfamiliar range never stops a run that would have worked.
+ */
+export function satisfiesEngines(version, range) {
+  const v = parseVersion(version)
+  if (v === null) return true
+  return range.split('||').some((raw) => {
+    const term = raw.trim()
+    const caret = /^\^(\d+\.\d+\.\d+)$/.exec(term)
+    if (caret) {
+      const min = parseVersion(caret[1])
+      return min !== null && v[0] === min[0] && compareVersions(v, min) >= 0
+    }
+    const atLeast = /^>=\s*(\d+\.\d+\.\d+)$/.exec(term)
+    if (atLeast) {
+      const min = parseVersion(atLeast[1])
+      return min !== null && compareVersions(v, min) >= 0
+    }
+    return true
+  })
+}
+
+function parseVersion(text) {
+  const match = /^v?(\d+)\.(\d+)\.(\d+)/.exec(String(text).trim())
+  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null
+}
+
+function compareVersions(a, b) {
+  for (let i = 0; i < 3; i += 1) if (a[i] !== b[i]) return a[i] - b[i]
+  return 0
+}
+
 /**
  * One agent run: repair the checkout if it needs it, run the job, and make sure a
  * record exists for how it ended. Returns `{ exit, record }`; `record` is null
@@ -215,6 +259,8 @@ export async function runAgent({
   tool = runBounded,
   run = runBounded,
   node = process.execPath,
+  // The version of `node` above: the job and its `pnpm install` run under it (B-178).
+  nodeVersion = process.versions.node,
   now = Date.now,
   log,
   // The launch line in the plist passes its own id, so it can tell whether this
@@ -338,6 +384,14 @@ export async function runAgent({
   } finally {
     clearTimeout(timer)
     lock.release()
+  }
+
+  // The engines range of the checkout the job runs from (B-178): the agent ran under whatever node
+  // the login shell found, and a node outside the range failed later, inside pnpm or the job, with
+  // a message about something else. No package.json to read (or no range) is not a refusal.
+  const engines = enginesOf(checkout)
+  if (engines !== null && !satisfiesEngines(nodeVersion, engines)) {
+    return fail('node', EXIT.failed, `node ${nodeVersion} is outside the repository's engines range "${engines}"; install a node in that range for the login shell and reinstall the agent (pnpm feed:agent)`)
   }
 
   write('── job')
@@ -517,6 +571,11 @@ async function main() {
 }
 
 if (isMain(import.meta.url)) {
+  const refusal = windowsRefusal('feed-agent')
+  if (refusal !== null) {
+    console.error(refusal)
+    process.exit(EXIT.failed)
+  }
   main().catch((cause) => {
     console.error(`feed-agent: ${cause instanceof Error ? cause.stack : String(cause)}`)
     // Best effort: a crash here (an unwritable log folder, say) still counts.

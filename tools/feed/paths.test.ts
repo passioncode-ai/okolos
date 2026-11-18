@@ -1,8 +1,9 @@
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { toPosix } from '../tree.mjs'
-import { feedPaths } from './paths.mjs'
+import { feedPaths, windowsRefusal } from './paths.mjs'
 
 /**
  * The paths in the platform's spelling turned into `/`, so the same literals hold on
@@ -51,5 +52,27 @@ describe('where the feed agent writes', () => {
     expect(paths.feed).toBe('/s/feeds/phishing.json')
     expect(paths.log).toBe('/l/feed.log')
     expect(paths.agentCheckout).toBe('/c')
+  })
+})
+
+describe('the feed tools on Windows (B-175)', () => {
+  it('refuse there with a sentence naming where to publish instead', () => {
+    const refusal = windowsRefusal('feed-job', 'win32')
+    expect(refusal).toContain('feed-job: the feed tools do not run on Windows')
+    expect(refusal).toContain('ADR-0002')
+  })
+
+  it('say nothing on macOS and Linux', () => {
+    expect(windowsRefusal('feed-job', 'darwin')).toBeNull()
+    expect(windowsRefusal('feed-job', 'linux')).toBeNull()
+  })
+
+  it('are refused before main runs, in every entry point that spawns pnpm or git', () => {
+    for (const file of ['tools/feed-job.mjs', 'tools/feed/bootstrap.mjs', 'tools/publish-feed.mjs']) {
+      const source = readFileSync(path.resolve(import.meta.dirname, '../..', file), 'utf8')
+      const entry = source.slice(source.lastIndexOf('if (isMain('))
+      expect(entry.indexOf('windowsRefusal('), file).toBeGreaterThan(-1)
+      expect(entry.indexOf('windowsRefusal('), file).toBeLessThan(entry.indexOf('main()'))
+    }
   })
 })

@@ -95,6 +95,27 @@ export function endTree(child, { platform = process.platform, signal = 'SIGTERM'
   if (plan.kind === 'taskkill') run(plan.command, plan.args)
 }
 
+/**
+ * Starts a background tool so that `endTree` can end it with everything it started (B-177).
+ *
+ * geckodriver runs under `npx`, and `child.kill()` ended only npx on macOS and Linux: the driver
+ * itself was left an orphan after every Firefox e2e run, and CI ended it only because the runner
+ * ends the job. On POSIX the child leads its own process group, as `runToCompletion`'s do; on
+ * win32 `endTree` already ends the tree with taskkill.
+ *
+ * @param {string} name
+ * @param {readonly string[]} args
+ * @param {{ stdio?: import('node:child_process').StdioOptions, platform?: string }} [options]
+ * @returns {import('node:child_process').ChildProcess}
+ */
+export function spawnTree(name, args, { stdio = 'ignore', platform = process.platform } = {}) {
+  const invocation = binInvocation(name, args, platform)
+  const group = platform !== 'win32'
+  const child = spawn(invocation.command, invocation.args, { stdio, shell: invocation.shell, detached: group })
+  if (group) GROUP_LEADERS.add(child)
+  return child
+}
+
 /** taskkill.exe, no shell (the pid is a number), bounded; "not found" is the outcome asked for. */
 function runTaskkill(command, args) {
   spawnSync(command, args, { stdio: 'ignore', windowsHide: true, timeout: 30_000 })
