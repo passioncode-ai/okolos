@@ -31,9 +31,9 @@ function readJsonc(file: string): unknown {
 function cleanupTargets(): string[] {
   const agents = readFileSync(path.join(root, 'AGENTS.md'), 'utf8')
   const section = agents.slice(agents.indexOf('**Build retention (LC-15).**'))
-  const match = section.match(/`rm -rf ([^`]+)`/)
-  if (!match) throw new Error('AGENTS.md: no `rm -rf` line in the LC-15 paragraph')
-  return match[1].trim().split(/\s+/)
+  const line = section.match(/`rm -rf ([^`]+)`/)?.[1]
+  if (!line) throw new Error('AGENTS.md: no `rm -rf` line in the LC-15 paragraph')
+  return line.trim().split(/\s+/)
 }
 
 /** A shell glob as the command uses it: `*` within one path segment. */
