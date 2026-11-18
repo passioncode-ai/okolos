@@ -6,18 +6,32 @@ import { existsSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 
 import { endTree } from './bin.mjs'
-import { filesUnder } from './tree.mjs'
+import { directoriesIn, filesUnder } from './tree.mjs'
 
 /**
  * @param {readonly string[]} dirs the target builds that may carry the key
  * @param {{ log?: (line: string) => void }} [options]
  */
+/**
+ * A target and what a build of it may have left beside it: `tools/build.mjs` writes into
+ * `<target>.building-<pid>` and swaps it in at the end (B-226), so a store build killed half way
+ * leaves the key there rather than in the target.
+ */
+export function withLeftovers(dir) {
+  const parent = path.dirname(dir)
+  const base = path.basename(dir)
+  const siblings = existsSync(parent)
+    ? directoriesIn(parent).filter((name) => name.startsWith(`${base}.`) && /\.(building|old)-\d+$/.test(name))
+    : []
+  return [dir, ...siblings.map((name) => path.join(parent, name))]
+}
+
 export function guardKeyedBuilds(dirs, { log = (line) => console.error(line) } = {}) {
   let armed = false
   const drop = () => {
     if (!armed) return
     armed = false
-    for (const dir of dirs) rmSync(dir, { recursive: true, force: true })
+    for (const dir of dirs.flatMap(withLeftovers)) rmSync(dir, { recursive: true, force: true })
     log('package: removed the store builds in dist/, which carried the App-Key; `pnpm build` restores them')
   }
   // `exit` runs for process.exit and for an uncaught exception alike; rmSync is synchronous, so
@@ -104,8 +118,9 @@ export function carriesKey(dir, key) {
  * @returns {string[]}
  */
 export function keyedTargets(dist, targets) {
-  return targets.filter((target) => {
-    const dir = path.join(dist, target)
-    return existsSync(dir) && shippedFiles(dir).some((file) => ANY_KEY.test(readFileSync(path.join(dir, file), 'utf8')))
-  })
+  return targets.filter((target) =>
+    withLeftovers(path.join(dist, target)).some(
+      (dir) => existsSync(dir) && shippedFiles(dir).some((file) => ANY_KEY.test(readFileSync(path.join(dir, file), 'utf8'))),
+    ),
+  )
 }
