@@ -76,8 +76,15 @@ describe('the LC-15 cleanup command (AGENTS.md)', () => {
     expect(targets.some((t) => t === 'node_modules' || t.endsWith('/node_modules'))).toBe(false)
   })
 
-  it.each(builtProjects())('a removed outDir takes its tsconfig.tsbuildinfo with it: $dir', ({ dir, outDir }) => {
-    if (!removedBy(targets, outDir)) return
+  // A project whose output the command keeps (`apps/mail-cli/dist`) keeps its
+  // build info too, and `tsc -b` has nothing to restore there.
+  const cleaned = builtProjects().filter(({ outDir }) => removedBy(targets, outDir))
+
+  it('reaches the packages the bundle gate reads', () => {
+    expect(cleaned.map(({ dir }) => dir)).toContain('packages/core-injection')
+  })
+
+  it.each(cleaned)('a removed outDir takes its tsconfig.tsbuildinfo with it: $dir', ({ dir }) => {
     expect(removedBy(targets, `${dir}/tsconfig.tsbuildinfo`)).toBe(true)
   })
 })
