@@ -32,6 +32,9 @@
       "path": "packages/core-download"
     },
     {
+      "path": "packages/core-collect"
+    },
+    {
       "path": "packages/core-gate"
     },
     {

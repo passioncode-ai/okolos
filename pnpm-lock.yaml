@@ -65,6 +65,9 @@ importers:
       '@okolos/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@okolos/core-collect':
+        specifier: workspace:*
+        version: link:../../packages/core-collect
       '@okolos/core-credential':
         specifier: workspace:*
         version: link:../../packages/core-credential
@@ -140,6 +143,12 @@ importers:
         version: 4.146.0(@types/node@22.20.1)
 
   packages/contracts: {}
+
+  packages/core-collect:
+    dependencies:
+      '@okolos/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/core-credential: {}
 

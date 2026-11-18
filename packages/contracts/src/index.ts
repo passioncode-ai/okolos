@@ -20,6 +20,7 @@ export type {
   HiddenTextCandidate,
   PageCandidates,
 } from './snapshot.js'
+export { candidateSpanId } from './snapshot.js'
 
 export type { ActionInput } from './policy.js'
 export { decideAction } from './policy.js'
