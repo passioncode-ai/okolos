@@ -502,5 +502,43 @@
   },
   "refusal_local_answer": {
     "message": "сайт из задачи ответил с адреса этого устройства или локальной сети"
+  },
+  "cliPairCode": {
+    "message": "Агент «$NAME$» просит доступ. Код: $CODE$. Сравните его с кодом на странице Okolos Agent и подтвердите там.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "code": {
+        "content": "$2"
+      }
+    }
+  },
+  "cliPairWaiting": {
+    "message": "Ждём подтверждения на странице Okolos Agent…"
+  },
+  "cliPairSaved": {
+    "message": "Доступ дан. Ключ сохранён: $FILE$",
+    "placeholders": {
+      "file": {
+        "content": "$1"
+      }
+    }
+  },
+  "cliPairRefused": {
+    "message": "Доступ не дан: $WHY$",
+    "placeholders": {
+      "why": {
+        "content": "$1"
+      }
+    }
+  },
+  "cliNotPaired": {
+    "message": "У агента «$NAME$» нет доступа. Сначала выполните okolos-agent pair --name «$NAME$».",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   }
 }

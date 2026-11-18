@@ -232,6 +232,7 @@ export function door(deps: DoorDeps): Route {
     server.registerTool(
       'execute',
       {
+        // i18n-exempt: read by the agent over MCP, not by the person
         description:
           'Runs one operation that `search` returned, by its name, with its arguments. ' +
           'Every call is written to the person\'s journal before you get the answer.',
@@ -244,6 +245,7 @@ export function door(deps: DoorDeps): Route {
         if (verb === null || op === undefined) {
           return answered({ at: journalTime(now()), ...who, outcome: 'refused', verb: 'unknown', code: 'bad_call' }, {
             success: false,
+            // i18n-exempt: read by the agent over MCP, not by the person
             error: { code: 'bad_call', message: `No operation is named ${JSON.stringify(operation)}; call search for the list.` },
           })
         }
@@ -251,6 +253,7 @@ export function door(deps: DoorDeps): Route {
         if (!input.success) {
           return answered({ at: journalTime(now()), ...who, outcome: 'refused', verb, code: 'bad_call' }, {
             success: false,
+            // i18n-exempt: read by the agent over MCP, not by the person
             error: { code: 'bad_call', message: `The arguments do not match ${verb}'s input schema; call search for it.` },
           })
         }
@@ -258,6 +261,7 @@ export function door(deps: DoorDeps): Route {
         try {
           outcome = await op.run(input.data, { agent })
         } catch {
+          // i18n-exempt: read by the agent over MCP, not by the person
           outcome = { success: false, error: { code: 'internal', message: 'The operation failed inside Okolos Agent.', retryable: true } as BridgeError }
         }
         const where = { ...(outcome.task === undefined ? {} : { task: outcome.task }), ...(outcome.origin === undefined ? {} : { origin: outcome.origin }) }

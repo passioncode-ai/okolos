@@ -502,5 +502,43 @@
   },
   "refusal_local_answer": {
     "message": "a site in the task answered from an address on this device or the local network"
+  },
+  "cliPairCode": {
+    "message": "Agent \"$NAME$\" asks for access. Code: $CODE$. Compare it with the code on the Okolos Agent page and confirm there.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "code": {
+        "content": "$2"
+      }
+    }
+  },
+  "cliPairWaiting": {
+    "message": "Waiting for the confirmation on the Okolos Agent page…"
+  },
+  "cliPairSaved": {
+    "message": "Access given. The key is saved in $FILE$",
+    "placeholders": {
+      "file": {
+        "content": "$1"
+      }
+    }
+  },
+  "cliPairRefused": {
+    "message": "Access not given: $WHY$",
+    "placeholders": {
+      "why": {
+        "content": "$1"
+      }
+    }
+  },
+  "cliNotPaired": {
+    "message": "Agent \"$NAME$\" has no access. Run okolos-agent pair --name \"$NAME$\" first.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   }
 }
