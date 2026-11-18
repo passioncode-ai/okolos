@@ -9,10 +9,13 @@
     "build": "tsc -b"
   },
   "dependencies": {
+    "@modelcontextprotocol/node": "^2.1.2",
+    "@modelcontextprotocol/server": "^2.4.0",
     "@okolos/cdp-pipe": "workspace:*",
     "@okolos/contracts": "workspace:*",
     "@okolos/core-snapshot": "workspace:*",
     "@okolos/i18n": "workspace:*",
-    "@okolos/storage": "workspace:*"
+    "@okolos/storage": "workspace:*",
+    "zod": "^4.6.7"
   }
 }
