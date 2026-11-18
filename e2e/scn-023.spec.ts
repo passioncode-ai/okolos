@@ -137,9 +137,9 @@ test('cancelling the confirmation leaves every store exactly as it was', async (
   await page.locator('[data-role=confirm-no]').click()
   await expect(page.locator('[data-role=confirm]')).toHaveCount(0)
 
-  // Half a second is longer than the wipe takes when it does run, so this is not
-  // a race that happens to pass.
-  await page.waitForTimeout(500)
+  // No wait before the count, and none is owed: the dialog's "No" only removes the dialog
+  // (`confirm.remove()` in packages/ui/src/settings/data-controls.ts), synchronously, and the
+  // wipe is reachable only from "Yes". The dialog gone is the handler done (B-189).
   expect(await counts(page)).toEqual(before)
 })
 
@@ -152,6 +152,8 @@ test('the first click asks rather than deletes', async ({ context, extensionId }
   const before = await counts(page)
 
   await page.locator('[data-role=wipe]').click()
-  await page.waitForTimeout(500)
+  // The confirmation on screen is the click handled: `askFirst` builds it synchronously and
+  // starts nothing else, so the stores are read after the only work the click does (B-189).
+  await expect(page.locator('[data-role=confirm]')).toHaveCount(1)
   expect(await counts(page)).toEqual(before)
 })
