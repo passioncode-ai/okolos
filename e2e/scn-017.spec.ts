@@ -59,6 +59,7 @@ test('the screen reports the state of this browser rather than an empty list', a
         '  - a fresh profile is baselined by the first comparison (the daily review at the' +
         ' worker\'s start, or this screen); a change here means that baseline held an' +
         ' extension the browser no longer lists, or the reverse',
+      { cause },
     )
   }
 })

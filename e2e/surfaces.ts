@@ -47,7 +47,7 @@ export async function expectSurface(
   try {
     await expect(page.locator(selector)).toHaveCount(1, { timeout: SURFACE_MOUNT_MS })
   } catch (cause) {
-    throw new Error(`${(cause as Error).message}\n\n${await diagnose(page, context)}`)
+    throw new Error(`${(cause as Error).message}\n\n${await diagnose(page, context)}`, { cause })
   }
 }
 

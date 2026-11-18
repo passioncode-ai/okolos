@@ -137,6 +137,7 @@ test('a large page is cut short, and says so on the warning', async ({ context }
     throw new Error(
       `${(cause as Error).message}\n\nthe walk was never cut short: ${seen.scans} scan(s) ` +
         `over ${seen.nodes} nodes, and the node ceiling is 5000`,
+      { cause },
     )
   }
 

@@ -456,7 +456,7 @@ async function extensionsSection(): Promise<HTMLElement> {
  * words that it can be.
  */
 async function trustedSection(): Promise<HTMLElement> {
-  let entries: TrustedDomain[] = []
+  let entries: TrustedDomain[]
   try {
     // Not `?? []`: silence is not an empty list, and the comment three lines
     // below has always said so.
@@ -812,7 +812,7 @@ async function openIncidents(): Promise<{
   for (const entry of settings) {
     if (!entry.key.startsWith('recovery:')) continue
     const kind = entry.key.slice('recovery:'.length)
-    let done: StepProgress[] = []
+    let done: StepProgress[]
     try {
       done = typeof entry.value === 'string' ? (JSON.parse(entry.value) as StepProgress[]) : []
     } catch {
