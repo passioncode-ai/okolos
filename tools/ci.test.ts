@@ -241,6 +241,32 @@ describe('each gates job runs the whole chain on its own system', () => {
   })
 })
 
+describe('the test build\'s half of the bundle gates runs somewhere (B-192)', () => {
+  /** The step that runs the gate over the test build, with its env, or undefined. */
+  function testBuildGateStep(job: string): string | undefined {
+    return job
+      .split(/\n(?=\s+- )/)
+      .find((step) => /run: pnpm exec vitest run tools\/gates\/bundle-scan\.test\.ts\s*$/m.test(step))
+  }
+  const e2e = jobs(workflow).get('e2e') ?? ''
+
+  it('the e2e job runs bundle-scan with the test build required, after making it', () => {
+    const step = testBuildGateStep(e2e)
+    expect(step, 'the e2e job has no step running tools/gates/bundle-scan.test.ts').toBeDefined()
+    expect(step).toMatch(/OKOLOS_REQUIRE_E2E_BUILD: '1'/)
+    expect(e2e.indexOf('pnpm test:e2e')).toBeGreaterThan(-1)
+    expect(e2e.indexOf('pnpm test:e2e')).toBeLessThan(e2e.indexOf('tools/gates/bundle-scan.test.ts'))
+    expect(softenersIn(step ?? ''), 'the step can pass with the gate failing').toEqual([])
+  })
+
+  it('would notice the step removed or the requirement dropped', () => {
+    const step = testBuildGateStep(e2e) ?? ''
+    expect(step).not.toBe('')
+    expect(testBuildGateStep(e2e.replace(step, ''))).toBeUndefined()
+    expect(testBuildGateStep(e2e.replace("OKOLOS_REQUIRE_E2E_BUILD: '1'", ''))).not.toMatch(/OKOLOS_REQUIRE_E2E_BUILD/)
+  })
+})
+
 describe('the local shortcut matches CI', () => {
   it('builds before running the gates that read the build', () => {
     // Without this `pnpm gates` runs the bundle scanners over whatever dist
