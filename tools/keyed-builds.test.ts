@@ -106,4 +106,13 @@ describe('finding the App-Key where it must not be (B-215)', async () => {
     const root = tree({ 'chrome/background.js': 'appKey:"A-SH-0000000000"', 'firefox/background.js': 'appKey:null' })
     expect(keyedTargets(root, ['chrome', 'firefox'])).toEqual(['chrome'])
   })
+
+  it('finds the key in a half-written build beside a clean target (B-226)', () => {
+    const root = tree({
+      'chrome/background.js': 'appKey:null',
+      'chrome.building-4242/background.js': 'appKey:"A-SH-0000000000"',
+      'firefox/background.js': 'appKey:null',
+    })
+    expect(keyedTargets(root, ['chrome', 'firefox'])).toEqual(['chrome'])
+  })
 })

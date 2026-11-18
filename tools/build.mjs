@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { build } from 'vite'
 import { pageMarks } from './build-flags.mjs'
+import { buildingDir, swapInto, sweepLeftovers } from './dist-swap.mjs'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const app = path.join(root, 'apps/extension')
@@ -66,8 +67,13 @@ const shared = {
   },
 }
 
+// A killed earlier run may have left a half-written directory beside a target (B-226).
+await sweepLeftovers(path.join(app, 'dist'))
+
 for (const target of targets) {
-  const outDir = path.join(app, 'dist', withTestHooks ? `${target}-e2e` : forStoreShots ? `${target}-shots` : target)
+  // Written beside the target and swapped in at the end, so a reader never finds it empty (B-226).
+  const finalDir = path.join(app, 'dist', withTestHooks ? `${target}-e2e` : forStoreShots ? `${target}-shots` : target)
+  const outDir = buildingDir(finalDir)
   await rm(outDir, { recursive: true, force: true })
   await mkdir(outDir, { recursive: true })
 
@@ -174,5 +180,6 @@ for (const target of targets) {
     filter: product,
   })
 
-  console.log(`built ${target}${withTestHooks ? ' (test hooks)' : ''} → ${path.relative(root, outDir)}`)
+  await swapInto(finalDir, outDir)
+  console.log(`built ${target}${withTestHooks ? ' (test hooks)' : ''} → ${path.relative(root, finalDir)}`)
 }
