@@ -20,4 +20,4 @@ export function feedPaths(env?: Record<string, string | undefined>, home?: strin
 export const CHECKOUT_LOCK_REASON: string
 
 /** The sentence a feed tool refuses with on Windows, or null elsewhere (B-175). */
-export function windowsRefusal(tool: string, platform?: string): string | null
+export function windowsRefusal(tool: string, platform?: string, env?: Record<string, string | undefined>): string | null

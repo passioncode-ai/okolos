@@ -62,6 +62,11 @@ describe('the feed tools on Windows (B-175)', () => {
     expect(refusal).toContain('ADR-0002')
   })
 
+  it('let a test that fakes every child run the bootstrap as a process on Windows', () => {
+    expect(windowsRefusal('feed-agent', 'win32', { OKOLOS_FEED_TEST_PROCESS: '1' })).toBeNull()
+    expect(windowsRefusal('feed-agent', 'win32', {})).not.toBeNull()
+  })
+
   it('say nothing on macOS and Linux', () => {
     expect(windowsRefusal('feed-job', 'darwin')).toBeNull()
     expect(windowsRefusal('feed-job', 'linux')).toBeNull()

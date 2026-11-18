@@ -512,6 +512,8 @@ describe('an install made off origin/main is in every record the bootstrap write
       OKOLOS_AGENT_BIN: w.paths.agentBin,
       OKOLOS_LAUNCH_ID: 'launch-9-9',
       OKOLOS_INSTALLED_OFF_MAIN: OFF,
+      // Every child is faked here, so the Windows runner proves the record keeping too (B-175).
+      OKOLOS_FEED_TEST_PROCESS: '1',
     }
     return { w, env }
   }
