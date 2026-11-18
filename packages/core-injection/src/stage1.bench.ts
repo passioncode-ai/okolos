@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest'
+import { describe, test } from 'vitest'
 import type { HiddenTextCandidate, PageCandidates } from '@okolos/contracts'
 
 import { detectHidden } from './stage1.js'
@@ -54,15 +54,21 @@ describe('the first stage over a page', () => {
   const large = page(1000)
   const dirty = page(1000, 25)
 
-  bench('50 candidates, none hidden', () => {
-    detectHidden(small, ctx)
+  test('50 candidates, none hidden', async ({ bench }) => {
+    await bench('50 candidates, none hidden', () => {
+      detectHidden(small, ctx)
+    }).run()
   })
 
-  bench('1000 candidates, none hidden', () => {
-    detectHidden(large, ctx)
+  test('1000 candidates, none hidden', async ({ bench }) => {
+    await bench('1000 candidates, none hidden', () => {
+      detectHidden(large, ctx)
+    }).run()
   })
 
-  bench('1000 candidates, one in 25 hidden', () => {
-    detectHidden(dirty, ctx)
+  test('1000 candidates, one in 25 hidden', async ({ bench }) => {
+    await bench('1000 candidates, one in 25 hidden', () => {
+      detectHidden(dirty, ctx)
+    }).run()
   })
 })

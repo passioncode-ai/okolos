@@ -104,7 +104,7 @@ async function expectWithDiagnosis(
     await assertion
   } catch (cause) {
     const why = await diagnose(page)
-    throw new Error(`${String(cause).split('\n')[0]}\n\nDiagnosis: ${why}`)
+    throw new Error(`${String(cause).split('\n')[0]}\n\nDiagnosis: ${why}`, { cause })
   }
 }
 

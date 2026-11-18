@@ -59,7 +59,7 @@ export function discover({ run = execFileSync, read = readFileSync, log = consol
     log('feed agent: could not resolve the Observatory interpreter — falling back to the environment')
     return null
   }
-  let names = ''
+  let names
   try {
     names = run(python, [`${root}/tools/use_secret.py`, 'names', SLOT.project], { encoding: 'utf8' })
   } catch {

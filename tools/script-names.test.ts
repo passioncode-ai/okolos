@@ -74,7 +74,7 @@ describe('every script can actually be run by name', () => {
      * "no such script" — which is what proves interception happens before scripts
      * are consulted, and therefore that the rule above has something to prevent.
      */
-    let output = ''
+    let output: string
     try {
       // pnpm is pnpm.cmd on Windows: without a shell the spawn fails and prints nothing,
       // which read as pnpm saying nothing about `access` (B-164).

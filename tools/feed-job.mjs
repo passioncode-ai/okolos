@@ -111,7 +111,7 @@ export function sweepLeftovers(tmp = tmpdir(), now = Date.now()) {
     rmSync(path.join(tmp, name), { force: true })
     removed.push(name)
   }
-  let directories = []
+  let directories
   try {
     directories = directoriesIn(tmp)
   } catch {

@@ -316,7 +316,6 @@ if (keyed) {
       die(`${target} still carries the App-Key after the keyless rebuild`)
     }
   }
-  keyed = false
   keyedBuilds.disarm()
   ok('dist/chrome and dist/firefox carry no App-Key')
 }
