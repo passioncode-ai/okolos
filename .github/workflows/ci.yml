@@ -163,6 +163,14 @@ jobs:
       - name: every scenario, against the built extension
         run: xvfb-run --auto-servernum pnpm test:e2e
 
+      # B-192: the bundle gates' half for the test build. The gates job makes no
+      # test-hook build, so there that half is skipped; this job has just made it,
+      # and OKOLOS_REQUIRE_E2E_BUILD turns a missing or stale one into a failure.
+      - name: bundle gates over the test build
+        run: pnpm exec vitest run tools/gates/bundle-scan.test.ts
+        env:
+          OKOLOS_REQUIRE_E2E_BUILD: '1'
+
       # The answer to the last two CI-only e2e failures was sitting on the runner
       # and being thrown away. `playwright.config.ts` keeps a trace on failure —
       # network, console, DOM snapshots per step — and without this the log's

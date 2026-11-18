@@ -279,6 +279,17 @@ describe('what the shipped extension is made of', () => {
     .map((build) => buildTooOld(path.join(root, `apps/extension/dist/${build}`), 'pnpm build:e2e'))
     .find((reason) => reason !== null)
 
+  /**
+   * Where the test build is made on purpose, a skip would hide the half this gate
+   * exists for. CI's gates job does not run `pnpm build:e2e`, so there the test above
+   * is skipped; the e2e job has just made the test build and runs this file with
+   * `OKOLOS_REQUIRE_E2E_BUILD=1`, which turns a missing or stale test build into a
+   * failure (B-192).
+   */
+  it.runIf(process.env.OKOLOS_REQUIRE_E2E_BUILD === '1')('has a fresh test build when one is required', () => {
+    expect(e2eStale, 'OKOLOS_REQUIRE_E2E_BUILD=1 and the test build is missing or stale').toBeUndefined()
+  })
+
   it.skipIf(e2eStale !== undefined)(
     `carries the per-event test marks in the test build${
       e2eStale === undefined ? '' : ` (skipped: ${e2eStale})`
