@@ -14,10 +14,11 @@
  * same command.
  */
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { directoriesIn } from './tree.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -110,7 +111,7 @@ describe('the tsc -b graph builds every core package (B-223)', () => {
   // `tsc -b` writes. A core package outside the graph has no dist, and the
   // "no browser API / no network call inside any core-* bundle" gates pass
   // without reading it: four packages were outside until 2026-11-18.
-  const core = readdirSync(path.join(root, 'packages'))
+  const core = directoriesIn(path.join(root, 'packages'))
     .filter((name) => name.startsWith('core-') && existsSync(path.join(root, 'packages', name, 'tsconfig.json')))
     .map((name) => `packages/${name}`)
   const built = graph()
