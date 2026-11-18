@@ -212,7 +212,15 @@ importers:
         specifier: workspace:*
         version: link:../contracts
 
-  packages/core-snapshot: {}
+  packages/core-snapshot:
+    dependencies:
+      '@okolos/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      '@okolos/core-injection':
+        specifier: workspace:*
+        version: link:../core-injection
 
   packages/core-traps: {}
 

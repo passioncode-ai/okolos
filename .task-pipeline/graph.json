@@ -152,7 +152,7 @@
       "id": "N-003",
       "title": "K2 снимок: вердикт движка, корпус инъекций, fuzz секретов",
       "owner": "implementer",
-      "status": "parked",
+      "status": "pending",
       "blocked_by": [
         "N-023",
         "N-024"
@@ -172,13 +172,13 @@
       ],
       "risk": "R3",
       "certification": {
-        "round": 8,
+        "round": 3,
         "tiers": {
-          "unit": "pass",
-          "seam": "fail",
+          "unit": "fail",
+          "seam": "pass",
           "product": "fail"
         },
-        "at": "5a34311cb948786949460cea4a7d169fbb7032b6",
+        "at": "f0b7daa2533dcca2618686aafd26f2fa8ad5d279",
         "history": [
           {
             "unit": "fail",
@@ -194,46 +194,15 @@
             "unit": "fail",
             "seam": "pass",
             "product": "fail"
-          },
-          {
-            "unit": "fail",
-            "seam": "fail",
-            "product": "pass"
-          },
-          {
-            "unit": "pass",
-            "seam": "pass",
-            "product": "fail"
-          },
-          {
-            "unit": "pass",
-            "seam": "pass",
-            "product": "fail"
-          },
-          {
-            "unit": "pass",
-            "seam": "fail",
-            "product": "fail"
-          },
-          {
-            "unit": "pass",
-            "seam": "fail",
-            "product": "fail"
           }
         ],
         "kinds": [
           "blind",
           "blind",
-          "blind",
-          "blind",
-          "blind",
-          "blind",
-          "blind",
           "blind"
         ],
-        "tree": "9d2f981c11579c8d2170db84d5d7d67eba6c760b"
-      },
-      "parked_reason": "certification ceiling: 8 failing round(s), ceiling 8; failing tier(s) seam, product; churn across levels; first break Dependent: N-004 paginate (.task-pipeline/packets/N-004.json acceptance 'вердикт целого снимка приложен к каждой странице' and 'каждая страница ≤ 32 КБ'), the ADR promise docs/superpowers/specs/2026-10-06-bridge-b1-design.md:183 'Снимок для агента частями, не больше 32 КБ на ответ' (REQ-56, REQ-67), and N-011's snapshot answers. Mechanism: apps/extension/src/agent-probe.ts:81 and packages/core-snapshot/src/verdict.ts:46-53: The snapshot verdict this node produces can on its own exceed the 32 KB per-answer ceiling, and it is attached to every page. MAX_PROBE_VERDICTS (200) with dedup by the full finding allows up to 200 distinct findings: the concealment field is a subset of 8 techniques, times 2 confidences, so 510 distinct findings exist. Measured in Chromium: 255 elements each hidden by a different combination of techniques give a snapshotVerdict of 36 968 bytes; the worst 200 (computed from the closed sets) give 42 366 bytes. Before this node the probe's budget capped verdicts at 50 (DEFAULT_BUDGET at 31a1745). Every page of such a snapshot is therefore over 32 KB whatever maxBytes the agent asks for (even maxBytes 1024).; check: A verdict.test.ts case feeding 510 verdicts (2 confidences x 255 concealment sets) asserts utf8Bytes(JSON.stringify(snapshotVerdict(...))) <= 4096: pnpm -s exec vitest run packages/core-snapshot/src/verdict.test.ts; and the Chromium fixture of 255 concealment combinations reports verdict bytes <= 4096. Blocker row owed on the board"
+        "tree": "54f2f7c35fe9b8bf8364e69e00236a738d8afba2"
+      }
     },
     {
       "id": "N-004",
