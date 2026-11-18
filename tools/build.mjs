@@ -80,7 +80,7 @@ for (const target of targets) {
       target: 'chrome116',
       rollupOptions: {
         input: path.join(app, 'src/content/index.ts'),
-        output: { entryFileNames: 'content.js', format: 'iife', inlineDynamicImports: true },
+        output: { entryFileNames: 'content.js', format: 'iife', codeSplitting: false },
       },
     },
   })
@@ -95,7 +95,7 @@ for (const target of targets) {
       target: 'chrome116',
       rollupOptions: {
         input: path.join(app, 'src/page-watch/index.ts'),
-        output: { entryFileNames: 'page-watch.js', format: 'iife', inlineDynamicImports: true },
+        output: { entryFileNames: 'page-watch.js', format: 'iife', codeSplitting: false },
       },
     },
   })
@@ -109,7 +109,7 @@ for (const target of targets) {
       target: 'chrome116',
       rollupOptions: {
         input: path.join(app, 'src/background/index.ts'),
-        output: { entryFileNames: 'background.js', format: 'es', inlineDynamicImports: true },
+        output: { entryFileNames: 'background.js', format: 'es', codeSplitting: false },
       },
     },
   })
