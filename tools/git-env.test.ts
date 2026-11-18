@@ -49,11 +49,11 @@ describe('a test that runs git elsewhere does not inherit the hook’s GIT_DIR',
   )
 
   it('finds no git -C call in a test file that does not pass gitEnv(), unless the suite strips git for all', () => {
-    if (globallyCleaned) {
-      expect(readFileSync(path.join(root, 'tools/vitest-git-env.ts'), 'utf8')).toContain("'GIT_DIR'")
-      return
-    }
-    expect(offenders(testFiles)).toEqual([])
+    expect(globallyCleaned ? [] : offenders(testFiles)).toEqual([])
+  })
+
+  it('strips git’s location in the suite-wide setup it defers to', () => {
+    expect(readFileSync(path.join(root, 'tools/vitest-git-env.ts'), 'utf8')).toContain("'GIT_DIR'")
   })
 
   it('would notice the call that committed into this repository', () => {
