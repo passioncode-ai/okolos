@@ -203,6 +203,21 @@ describe('a link that opens a program outside the browser (B-165)', () => {
     return event
   }
 
+  it('says the click was judged, whatever the link check decided (B-224)', () => {
+    const { mountWarning } = mounted()
+    const clickJudged = vi.fn()
+    watch({ mountWarning, clickJudged })
+
+    click(link('search-ms:query=x'))
+    expect(clickJudged, 'a held click').toHaveBeenCalledTimes(1)
+    click(link('https://example.test/'))
+    expect(clickJudged, 'an ordinary link let through').toHaveBeenCalledTimes(2)
+    const right = new MouseEvent('auxclick', { bubbles: true, cancelable: true, button: 2 })
+    link('search-ms:query=y').dispatchEvent(right)
+    expect(right.defaultPrevented, 'a right click is not stopped').toBe(false)
+    expect(clickJudged, 'a right click, which is not a link opening').toHaveBeenCalledTimes(3)
+  })
+
   it('stops the click and says a program would open', () => {
     const { mounts, mountWarning } = mounted()
     const deps = watch({ mountWarning })

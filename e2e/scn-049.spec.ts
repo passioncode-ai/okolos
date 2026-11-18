@@ -1,6 +1,6 @@
 import { SURFACE_MOUNT_MS } from './budgets.js'
 import { expect, serve, test } from './hooks.js'
-import { expectBanner, expectJournalLine } from './surfaces.js'
+import { expectBanner, expectJournalLine, expectSettled, SETTLED, settledCount } from './surfaces.js'
 
 /**
  * SCN-049: a link that may open a program outside the browser, in a real browser.
@@ -131,12 +131,18 @@ test('SCN-049: "This is wrong" closes the warning for good, and that link goes t
   await expect(page.locator('okolos-banner [data-role=primary]')).toBeFocused()
 
   await page.locator('okolos-banner [data-role=dispute]').click()
-  // Past the slot watch's three re-mounts, a quarter-second apart.
-  await page.waitForTimeout(1200)
+  /**
+   * Gone, and nothing can put it back: the slot stops its re-mount watch before it takes
+   * the panel down (`releaseHeld` in apps/extension/src/content/surface-slot.ts), and the
+   * trap watcher looks again only on a copy, a full screen or its start, none of which
+   * happens here. So the panel leaving is the signal, not 1200 ms (B-224).
+   */
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 
+  const clicks = await settledCount(page, SETTLED.click)
   await page.locator('#in-open').click()
-  await page.waitForTimeout(300)
+  // The link check has had the second click and let it through (B-224).
+  await expectSettled(page, SETTLED.click, clicks + 1)
   await expect(page.locator('okolos-banner')).toHaveCount(0)
   // Second click: the extension let it through and only the page's safety stopped it.
   expect(await page.evaluate(() => (window as unknown as { __held: boolean[] }).__held)).toEqual([true, false])
@@ -166,9 +172,11 @@ test('SCN-049: a right click on the link raises nothing', async ({ context }) =>
   const page = await context.newPage()
   await page.goto('https://fixture.test/shadow')
 
+  const clicks = await settledCount(page, SETTLED.click)
   await page.locator('#in-open').click({ button: 'right' })
   await page.keyboard.press('Escape')
-  await page.waitForTimeout(600)
+  // Chromium fires auxclick for the right button; the link check has had it (B-224).
+  await expectSettled(page, SETTLED.click, clicks + 1)
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 })
 
@@ -179,7 +187,8 @@ test('SCN-049 with SCN-008: a fake check that opens search-ms: and copies a comm
   await serve(context, FILEFIX_ON_CLICK)
   const page = await context.newPage()
   await page.goto('https://fixture.test/verify')
-  await page.waitForTimeout(600)
+  // The trap watcher's first look at the page, which raises nothing before the click (B-224).
+  await expectSettled(page, SETTLED.trap)
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 
   await page.locator('#open').click()
@@ -203,12 +212,18 @@ test('SCN-049 with SCN-008: after "This is wrong" on the ClickFix warning, the F
   // come back on this page; the link's click is still stopped and named.
   await expectBanner(page, context)
   await page.locator('okolos-banner [data-role=dispute]').click()
-  await page.waitForTimeout(1200)
+  // As in the dispute test above: the panel leaving is the signal (B-224).
   await expect(page.locator('okolos-banner')).toHaveCount(0)
 
+  const looks = await settledCount(page, SETTLED.trap)
   await page.locator('#open').click()
   await expect(headline(page)).toContainText('may open a program on your computer', { timeout: SURFACE_MOUNT_MS })
-  await page.waitForTimeout(800)
+  /**
+   * The page's click copies a command, and the copy is the only thing that makes the trap
+   * watcher look again; its look comes after the link warning, which the click drew at once.
+   * One more look is the check that could have taken the panel, done (B-224).
+   */
+  await expectSettled(page, SETTLED.trap, looks + 1)
   await expect(headline(page)).toContainText('may open a program on your computer')
   expect(await page.evaluate(() => (window as unknown as { __held: boolean[] }).__held)).toEqual([true])
 })

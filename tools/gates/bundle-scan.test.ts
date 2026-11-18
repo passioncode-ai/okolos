@@ -256,7 +256,7 @@ describe('what the shipped extension is made of', () => {
    * page a person works in for hours it would pile up in the timeline, so the shipped
    * bundle must not write it.
    */
-  const TEST_MARKS = ['okolos:focus-judged', 'okolos:trap-judged', 'okolos:password-handled']
+  const TEST_MARKS = ['okolos:focus-judged', 'okolos:trap-judged', 'okolos:password-handled', 'okolos:click-judged']
 
   it('keeps the per-event test marks out of the shipped bundles', () => {
     for (const browser of ['chrome', 'firefox']) {
