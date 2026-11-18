@@ -2115,7 +2115,7 @@
     }
   },
   "warnDownloadBlockedHeadline": {
-    "message": "Загрузка остановлена до сохранения"
+    "message": "Загрузка остановлена и удалена"
   },
   "warnDownloadCancelled": {
     "message": "Загрузка отменена, на диске ничего не осталось."

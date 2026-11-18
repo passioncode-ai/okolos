@@ -51,4 +51,6 @@ declare const chrome: {
   }
   /** Read only, to see that "Delete all data" renewed the usage install number (SCN-051). */
   storage: { local: { get(key: string): Promise<Record<string, unknown>> } }
+  // What the browser still lists of downloads, read by the real-download spec (B-201).
+  downloads: { search(query: object): Promise<Array<{ state: string; exists: boolean }>> }
 }

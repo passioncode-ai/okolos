@@ -651,7 +651,8 @@ describe('the brand pack states facts, and a fact is checkable', () => {
          * carries the extension's own version (`deps.extensionVersion`), not the browser's.
          */
         const shipped = readFileSync(file, 'utf8')
-          .replaceAll('platform:"browser_extension"', '')
+          // In any quote: Vite 8 writes this pair with backticks (B-225).
+          .replace(/platform:(["'`])browser_extension\1/g, '')
           .replace(/appVersion:[A-Za-z_$][\w$]*\.extensionVersion/g, '')
         const hit = probe.exec(shipped)
         expect(
