@@ -491,6 +491,18 @@ describe('the brand pack states facts, and a fact is checkable', () => {
     }
     claim('Сценариев', scnDone, scnTotal, 'все реализованы', 'реализовано')
     claim('Экранов', scrDone, scrTotal, 'все построены', 'построено')
+
+    /**
+     * And the second copy, in the first file anyone opens (B-127). `docs/README.md` carries the
+     * scenario count in its status table, and that copy is where the numbers drifted before
+     * (B-126): the gate read `facts.md` only.
+     */
+    const readmeRow = /^\| Сценарии \| \*\*(\d+)\*\*, из них \*\*(\d+) реализованы\*\*/m.exec(readme)
+    expect(readmeRow, 'docs/README.md has no countable "Сценарии" row').not.toBeNull()
+    expect([readmeRow?.[1], readmeRow?.[2]], 'docs/README.md and the tree disagree about scenarios').toEqual([
+      String(scnTotal),
+      String(scnDone),
+    ])
   })
 
   it('counts requirements, and the one closed by decision, from the brief', () => {
