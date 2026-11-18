@@ -200,6 +200,15 @@ for (const target of TARGETS) {
   }
   ok('shadow roots are closed — no test hooks in this build')
 
+  // A store archive tells no page that Okolos is installed (B-190): the marks the e2e suite
+  // waits on are in every build but this one. `--check` builds without the production flag,
+  // so it carries them and says so.
+  const marks = (content.match(/performance\.(mark|measure)\(/g) ?? []).length
+  if (!checkOnly && marks > 0) {
+    die(`${target}'s content script writes ${marks} mark(s) a page can read; the store build writes none`)
+  }
+  ok(checkOnly ? `--check build: ${marks} page mark(s), as every non-store build has` : 'the content script writes no mark a page can read')
+
   const leaked = carriesKey(dir, usageKey)
   if (leaked.length > 0) die(`${target} carries the App-Key outside its background: ${leaked.join(', ')}`)
   if (!checkOnly && !readFileSync(path.join(dir, 'background.js'), 'utf8').includes(usageKey)) {

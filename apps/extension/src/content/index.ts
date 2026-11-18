@@ -27,6 +27,7 @@ import { AgentGate } from './agent-gate.js'
 import { createPacer } from './pace.js'
 import { reportToEmbeddingPage } from './report-frame.js'
 import { collect, DEFAULT_BUDGET } from './collect.js'
+import { capped } from './marks.js'
 import { injectionDetail } from './warn-words.js'
 import { warnIfLookalike } from './lookalike.js'
 import { credentialDetail } from './credential-words.js'
@@ -172,7 +173,7 @@ const slot = createSurfaceSlot({
     // because a page can have taken the API away, and a missing measurement must not
     // be the reason a warning does not appear.
     try {
-      performance.measure(MEASURE_TO_BANNER)
+      if (__OKOLOS_PAGE_MARKS__) performance.measure(MEASURE_TO_BANNER)
     } catch {
       // Nothing to report is better than a throw on the path to the surface.
     }
@@ -308,6 +309,18 @@ function passwordHandled(): void {
 declare const __OKOLOS_TEST_HOOKS__: boolean | undefined
 
 /**
+ * Whether this build writes its marks into the page's performance timeline (B-190).
+ *
+ * The marks are read by the e2e suite and by anyone with devtools open, and also by the
+ * page's own scripts and its analytics: `performance.getEntriesByName('okolos:collect')`
+ * answers "is Okolos installed" on every page, without the page doing anything a person
+ * would notice. So the store build made by `pnpm package` writes none; every other build,
+ * the e2e ones included, writes them as before (`pageMarks` in `tools/build-flags.mjs`).
+ */
+declare const __OKOLOS_PAGE_MARKS__: boolean
+
+
+/**
  * The scan has settled, and whether it asked the worker anything.
  *
  * **One entry per document, the latest.** A page that keeps changing is rescanned up to
@@ -324,6 +337,7 @@ declare const __OKOLOS_TEST_HOOKS__: boolean | undefined
  */
 function scanSettled(started: number, asked: boolean): void {
   try {
+    if (!__OKOLOS_PAGE_MARKS__) return
     const end = performance.now()
     performance.clearMeasures(MEASURE_SCAN)
     performance.measure(MEASURE_SCAN, { start: started, end, detail: { asked } })
@@ -382,7 +396,7 @@ window.addEventListener('message', (event) => {
  * the walk stopped before asking.
  */
 function noteBlinded(): void {
-  performance.mark(MARK_BLINDED)
+  if (__OKOLOS_PAGE_MARKS__) capped(performance, MARK_BLINDED, () => performance.mark(MARK_BLINDED))
   void journal.record('scan-blinded', async () => {
     await platform.runtime.send('page/note', {
       kind: 'scan-blinded',
@@ -393,18 +407,22 @@ function noteBlinded(): void {
 
 async function scan(): Promise<void> {
   const started = performance.now()
-  performance.mark(MARK_START)
+  if (__OKOLOS_PAGE_MARKS__) performance.mark(MARK_START)
   const page = collect(document, {
     url: location.href,
     frameId: isTopFrame ? 0 : 1,
     budget: DEFAULT_BUDGET,
     elapsed: () => performance.now() - started,
   })
-  performance.mark(MARK_END)
-  performance.measure(MEASURE_COLLECT, MARK_START, MARK_END)
-
-  // Before the branch, so it is true of every scan rather than only of the empty ones.
-  if (page.truncated) performance.mark(MARK_PARTIAL)
+  if (__OKOLOS_PAGE_MARKS__) {
+    performance.mark(MARK_END)
+    capped(performance, MEASURE_COLLECT, () => performance.measure(MEASURE_COLLECT, MARK_START, MARK_END))
+    // The two marks exist only to make the measure; kept, they were two more entries a scan.
+    performance.clearMarks(MARK_START)
+    performance.clearMarks(MARK_END)
+    // Before the branch, so it is true of every scan rather than only of the empty ones.
+    if (page.truncated) capped(performance, MARK_PARTIAL, () => performance.mark(MARK_PARTIAL))
+  }
 
   if (page.candidates.length === 0) {
     /**
@@ -949,7 +967,7 @@ async function safely(work: () => Promise<void>): Promise<void> {
     warn: (cause) => {
       // A fact in the page, next to `okolos:collect`, so "no banner" can be told from
       // "the check never finished" by anyone reading from outside (B-78).
-      performance.mark(MARK_SCAN_FAILED)
+      if (__OKOLOS_PAGE_MARKS__) capped(performance, MARK_SCAN_FAILED, () => performance.mark(MARK_SCAN_FAILED))
       console.warn('okolos: scan failed', cause)
     },
     note: async (cause) => {
@@ -1090,7 +1108,7 @@ if (isTopFrame) {
       // From the navigation, which is what a person waited from. A page can have taken the
       // API away; the measure is a fact for observers, never a reason to throw.
       try {
-        performance.measure(MEASURE_LOOKALIKE)
+        if (__OKOLOS_PAGE_MARKS__) performance.measure(MEASURE_LOOKALIKE)
       } catch {
         // Nothing to report.
       }
@@ -1424,7 +1442,7 @@ if (isTopFrame) {
     .then((held) => {
       if (held) showPasswordVerdict(held.host, held.verdict, held.verdict.offline)
       try {
-        performance.measure(MEASURE_PENDING)
+        if (__OKOLOS_PAGE_MARKS__) performance.measure(MEASURE_PENDING)
       } catch {
         // Nothing to report: the verdict, if any, is drawn either way.
       }

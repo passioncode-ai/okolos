@@ -19,6 +19,7 @@ import { readFile, writeFile, mkdir, rm, cp } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { build } from 'vite'
+import { pageMarks } from './build-flags.mjs'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const app = path.join(root, 'apps/extension')
@@ -44,6 +45,8 @@ const shared = {
   resolve: { conditions: ['import', 'module', 'browser', 'default'] },
   define: {
     __OKOLOS_TEST_HOOKS__: JSON.stringify(withTestHooks),
+    // Marks in the page's performance timeline, which a page can read: none in the store build (B-190).
+    __OKOLOS_PAGE_MARKS__: JSON.stringify(pageMarks({ withTestHooks, env: process.env })),
     /**
      * Usage and error data (B-198, B-199). Only the store build made by `pnpm package` sets
      * these, through the secret runner; every other build carries no App-Key and `sandbox`, and
