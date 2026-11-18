@@ -9,3 +9,5 @@ export declare function guardKeyedBuilds(
 }
 export declare function carriesKey(dir: string, key: string): string[]
 export declare function keyedTargets(dist: string, targets: readonly string[]): string[]
+/** A target and the half-written build directories beside it (B-226). */
+export declare function withLeftovers(dir: string): string[]
