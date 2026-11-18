@@ -2420,7 +2420,7 @@
     "message": "The email address you asked us to check and, in a request to Have I Been Pwned, your key in the request header. This log shortens the address to its first letter and does not keep the key at all."
   },
   "auditKeptFileHash": {
-    "message": "The file’s hash. Not its name, not its contents."
+    "message": "Nothing: no hash of the file is computed, and neither its name nor its contents leave."
   },
   "auditKeptUsageData": {
     "message": "Names of actions and errors from a fixed list and their outcome (for example, whether a password was found in breaches), when they happened, a random install number, a session number for the hour, the extension version, the build kind, the browser language and two constant product labels. No page addresses, no page text, no file names, no email and no passwords."
@@ -2480,6 +2480,9 @@
         "content": "$2"
       }
     }
+  },
+  "journalDownloadDiscarded": {
+    "message": "A doubted download was deleted at your request: the file is no longer on your disk"
   },
   "journalDownloadLeftOnDisk": {
     "message": "A dangerous download could not be stopped in time, so the file may be on your disk"

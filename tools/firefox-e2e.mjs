@@ -27,7 +27,6 @@
  */
 
 import { createServer } from 'node:http'
-import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Builder, By, until } from 'selenium-webdriver'
@@ -35,7 +34,7 @@ import { existsSync } from 'node:fs'
 
 import { Options } from 'selenium-webdriver/firefox.js'
 
-import { binInvocation, endTree } from './bin.mjs'
+import { endTree, spawnTree } from './bin.mjs'
 import { buildTooOld } from './build-age.mjs'
 import { findFirefox } from './find-firefox.mjs'
 
@@ -150,9 +149,9 @@ const server = createServer((req, res) => {
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
 const origin = `http://127.0.0.1:${server.address().port}`
 
-// npx is npx.cmd on Windows, which Node will not spawn without a shell (B-163).
-const npx = binInvocation('npx', ['geckodriver', '--port', '4444'])
-const gecko = spawn(npx.command, npx.args, { stdio: 'ignore', shell: npx.shell })
+// npx is npx.cmd on Windows, which Node will not spawn without a shell (B-163); on macOS and
+// Linux it leads its own process group, so endTree ends geckodriver under it too (B-177).
+const gecko = spawnTree('npx', ['geckodriver', '--port', '4444'])
 
 /**
  * Wait for readiness rather than sleeping a guessed interval: on a cold

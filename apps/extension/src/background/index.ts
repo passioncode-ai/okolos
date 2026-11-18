@@ -154,6 +154,16 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
         from,
         (id) => platform.downloads.discard(id),
         async (id) => warnedTabOf(await platform.storage.get<WarnedTabs>(WARNED_TABS_KEY), id),
+        async () => {
+          const db = await openDb()
+          const now = new Date().toISOString()
+          await db.put('journal', {
+            id: `download-discarded:${now}`,
+            createdAt: now,
+            kind: 'action',
+            detail: { ...explained('journalDownloadDiscarded'), outcome: 'discarded' },
+          })
+        },
       ) as Promise<RpcMap[T]['res']>
     case 'usage/state':
       return usage.state().then((state) => ({ state })) as Promise<RpcMap[T]['res']>

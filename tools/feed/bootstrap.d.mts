@@ -56,12 +56,19 @@ export function signalRecord(
 /** The record of the bootstrap's own crash (stage bootstrap). */
 export function crashRecord(cause: unknown, at?: string, env?: Record<string, string | undefined>): RunRecord
 
+/** The checkout's `engines.node` range, or null when it cannot be read (B-178). */
+export function enginesOf(checkout: string): string | null
+/** Whether a node version is in an engines range of the forms `^X.Y.Z` and `>=X.Y.Z`, joined by `||`. */
+export function satisfiesEngines(version: string, range: string): boolean
+
 export function runAgent(options?: {
   paths?: FeedPaths
   env?: Record<string, string | undefined>
   tool?: Tool
   run?: Tool
   node?: string
+  /** The version of `node`, checked against the checkout's engines range (B-178). */
+  nodeVersion?: string
   now?: () => number
   log?: (line: string) => void
   runId?: string

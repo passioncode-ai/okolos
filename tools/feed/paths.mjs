@@ -42,3 +42,21 @@ export function feedPaths(env = process.env, home = os.homedir()) {
  * owner to every tool that reads `git worktree list`.
  */
 export const CHECKOUT_LOCK_REASON = 'okolos feed agent checkout; removed only by install-feed-agent --purge (B-150)'
+
+/**
+ * The sentence a feed tool refuses with on Windows, or null elsewhere (B-175).
+ *
+ * The feed tools start `pnpm` and `git` without a shell and keep their state under launchd's rules;
+ * on Windows the first spawn failed with ENOENT, a launch error that read like a broken install.
+ * The runbook already says they do not run there; the tool now says so itself, before anything.
+ * The tests that start the bootstrap as a process with every child faked set
+ * `OKOLOS_FEED_TEST_PROCESS=1`, so its record keeping is still proved on the Windows CI runner.
+ */
+export function windowsRefusal(tool, platform = process.platform, env = process.env) {
+  if (platform !== 'win32' || env.OKOLOS_FEED_TEST_PROCESS === '1') return null
+  return (
+    `${tool}: the feed tools do not run on Windows. Publish from a clean clone at origin/main on ` +
+    'macOS or Linux, on the machine that holds the signing key (ADR-0002); the feed agent is ' +
+    'macOS only (ADR-0017). docs/runbooks/development.md, «Windows».'
+  )
+}

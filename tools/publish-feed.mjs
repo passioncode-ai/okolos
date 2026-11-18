@@ -40,7 +40,7 @@ import path from 'node:path'
 import { renderConfig } from './deploy-config.mjs'
 import { runBounded } from './feed/bounded.mjs'
 import { acquireLock } from './feed/lock.mjs'
-import { feedPaths } from './feed/paths.mjs'
+import { feedPaths, windowsRefusal } from './feed/paths.mjs'
 import { DEFAULT_WORKER, readServed, refuseBackwards } from './feed/served.mjs'
 import { hostOf, listingSql } from './listings.mjs'
 import { isMain } from './is-main.mjs'
@@ -250,6 +250,11 @@ async function main() {
 }
 
 if (isMain(import.meta.filename)) {
+  const refusal = windowsRefusal('publish-feed')
+  if (refusal !== null) {
+    console.error(refusal)
+    process.exit(1)
+  }
   main().catch((cause) => {
     console.error(`publish-feed: ${cause instanceof Error ? cause.message : String(cause)}`)
     process.exit(1)
