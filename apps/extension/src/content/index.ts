@@ -1148,6 +1148,11 @@ if (isTopFrame) {
     judged: () => {
       if (__OKOLOS_TEST_HOOKS__) performance.mark(MARK_TRAP_JUDGED)
     },
+    clickJudged: () => {
+      // The name inside the guard, like `okolos:password-handled`: a module constant would be
+      // kept in the shipped build, and the bundle gate refuses the name there.
+      if (__OKOLOS_TEST_HOOKS__) performance.mark('okolos:click-judged')
+    },
     exitFullscreen: () => {
       void document.exitFullscreen?.().catch(() => {
         // The browser refused. The warning still stands and still says the way
