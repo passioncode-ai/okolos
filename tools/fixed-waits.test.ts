@@ -31,10 +31,6 @@ const KNOWN: Record<string, { sites: number; why: string }> = {
     sites: 1,
     why: 'the gap between reads of the installed rules inside a polling loop with its own deadline; not a wait before an assertion',
   },
-  'e2e/scn-049.spec.ts': {
-    sites: 6,
-    why: 'a link warning that must not come back after a dispute, a right click that must not be stopped and a page that must not raise anything before the click have no completion signal to wait for; same class as B-169, left open under B-224',
-  },
 }
 
 function specs(): string[] {

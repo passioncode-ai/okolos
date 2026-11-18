@@ -334,6 +334,7 @@ export async function expectJournalLine(
  * - `okolos:pending`: the question "does this tab hold a leak verdict nobody was shown?";
  * - `okolos:password` (in the **worker**): a submitted password judged, and a compromised
  *   verdict held and offered to the tab;
+ * - `okolos:click-judged`: a click or auxclick through the link check, whatever it decided;
  * - `okolos:focus-judged`, `okolos:trap-judged`, `okolos:password-handled`: a focus judged
  *   by the password pause (after the first decision, and in a frame after the report has
  *   arrived), a look at the page by the trap watcher, and the asking document having
@@ -354,6 +355,7 @@ export const SETTLED = {
   password: 'okolos:password',
   focus: 'okolos:focus-judged',
   trap: 'okolos:trap-judged',
+  click: 'okolos:click-judged',
   passwordHandled: 'okolos:password-handled',
   leaksAnswered: 'okolos:leaks-answered',
 } as const

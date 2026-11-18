@@ -83,6 +83,12 @@ export interface TrapDeps {
    * wires it to a mark only in the build with test hooks.
    */
   judged?: () => void
+  /**
+   * Told when a click or auxclick has been through the link check, whatever it decided:
+   * let through, held, or not a link at all (B-224). For the same tests, which asserted
+   * "nothing was raised" after a fixed wait; wired to a mark only in the test-hook build.
+   */
+  clickJudged?: () => void
 }
 
 export interface TrapWatcher {
@@ -247,6 +253,14 @@ export function watchForTraps(deps: TrapDeps): TrapWatcher {
    * once and never see it again, which is why this does not rely on it.
    */
   const onLinkClick = (event: Event) => {
+    try {
+      judgeLinkClick(event)
+    } finally {
+      deps.clickJudged?.()
+    }
+  }
+
+  function judgeLinkClick(event: Event): void {
     if (event.defaultPrevented) return
     // The left button and the middle one open a link. A right click opens a menu, and
     // Chromium fires auxclick with button 2 for it: holding that put a blocking

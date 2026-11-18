@@ -188,6 +188,7 @@ generator, and the sheet declares no colour of its own.
 - **Scenarios:** SCN-001, SCN-002, SCN-050
 - **Usage notice (B-199):** one notice sentence that data about use and errors is sent, only to fix the product, and what is not in it, with the link «Открыть «Ваши данные»» to SCR-12; shown only while collection is on. The intro above it says that the addresses and text of pages are not sent
 - **Resources:** local corpus loader, extension inventory adapter, tab scanner
+- **Agent door (B-218):** none today. Actions: «Показать, с чего начать», «Пока пропустить». Planned: read (the first-run result) through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-02: Popup
@@ -209,6 +210,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/popup/popup.ts:renderPopup, apps/extension/src/popup/index.ts, e2e/scn-020.spec.ts
 - **Scenarios:** SCN-020, SCN-021
 - **Resources:** verdict store, queue selector
+- **Agent door (B-218):** none today. Actions: the top queued item, the diff count, the footer links. Planned: read first (current verdict, queue) through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-03: In-page warning banner
@@ -232,6 +234,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/banner/banner.ts:mountBanner, e2e/scn-003.spec.ts, e2e/a11y-overlays.spec.ts, e2e/scn-034.spec.ts (the credential variant drawn from a frame's report, asserted through the open shadow root of the hooked build)
 - **Scenarios:** SCN-003, SCN-006, SCN-008, SCN-009, SCN-011, SCN-012, SCN-013, SCN-031, SCN-034, SCN-035, SCN-036, SCN-049
 - **Resources:** shared banner component, variant copy table, i18n strings
+- **Agent door (B-218):** none today. Actions: the variant's action, «Показать», «Это неверно», close. Planned through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25); «Это неверно» is a decision about a warning the agent may itself be the subject of, so it needs the operator's confirmation on a channel the agent cannot forge
 - **Status:** built
 
 ### SCR-04: Finding inspector
@@ -249,6 +252,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/inspector/inspector.ts:mountInspector, e2e/scn-004-click.spec.ts, e2e/a11y-overlays.spec.ts (restore lands with the sanitizer, M5)
 - **Scenarios:** SCN-004, SCN-005
 - **Resources:** evidence store, DOM locator renderer
+- **Agent door (B-218):** none today. Actions: neutralise or restore, «Это неверно», «Оставить обезвреженным». Planned through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25); restore puts hidden instructions back in front of the agent, so it takes the operator's confirmation
 - **Status:** built
 
 ### SCR-05: Block interstitial
@@ -266,6 +270,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/interstitial/interstitial.ts:renderInterstitial, apps/extension/src/interstitial/appeal-link.ts:appealLinkFor, apps/extension/src/interstitial/framed.ts:isFramed, e2e/scn-007.spec.ts, e2e/scn-037.spec.ts
 - **Scenarios:** SCN-007, SCN-037
 - **Resources:** feed metadata store, exception store
+- **Agent door (B-218):** none today, **and never to the agent it stops**. Actions: «Назад», «Всё равно продолжить». «Всё равно продолжить» lifts a block; opened to the agent it guards, the agent would lift its own gate, so a door to it takes the operator's confirmation on a channel the agent cannot forge (B-218)
 - **Status:** built
 
 ### SCR-06: Agent action gate
@@ -285,6 +290,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/gate/gate.ts:mountGate, e2e/scn-010.spec.ts, e2e/a11y-overlays.spec.ts
 - **Scenarios:** SCN-010
 - **Resources:** action interceptor, finding store
+- **Agent door (B-218):** none today, **and never to the agent it stops**. Actions: «Заблокировать», «Разрешить один раз», «Показать инструкцию». «Разрешить один раз» is the gate itself; it takes the operator's confirmation on a channel the agent cannot forge (B-218). «Заблокировать» and reading are safe to open
 - **Status:** built
 
 ### SCR-07: Findings queue
@@ -304,6 +310,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/core-queue/src/rank.ts:buildQueue, packages/ui/src/queue/queue.ts:renderQueue, e2e/scn-020.spec.ts
 - **Scenarios:** SCN-002, SCN-022
 - **Resources:** priority scorer, action registry
+- **Agent door (B-218):** none today. Actions: per-item action, «show all». Planned: read first (the queue), then the actions, through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-08: Leaks and repair
@@ -331,6 +338,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/leaks/leaks.ts:renderLeaks, packages/core-leaks/src/group.ts:groupLeaks, packages/core-leaks/src/merge.ts:mergeLeaks, apps/extension/src/background/leaks.ts:hibp, e2e/scn-015.spec.ts
 - **Scenarios:** SCN-014, SCN-015, SCN-016
 - **Resources:** source adapters (HIBP, XposedOrNot, Hudson Rock), local hash store, **reuse index** — `reuse` store keyed by [tag, host], tag = HMAC-SHA-256 over the leak-check digest under a device-local random key ([privacy](../privacy.md))
+- **Agent door (B-218):** none today. Actions: add and remove a monitored source, «Сменить пароль», «Отметить решённым», «Проверить». Planned through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25); the HIBP key is a typed secret and stays a human gate
 - **Status:** built
 
 ### SCR-09: Extensions watch
@@ -352,6 +360,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/extensions/extensions.ts:renderExtensions, packages/core-extensions/src/diff.ts:diffInventory, e2e/scn-017.spec.ts
 - **Scenarios:** SCN-017, SCN-018
 - **Resources:** management adapter, snapshot store, CRX static analyser
+- **Agent door (B-218):** none today. Actions: per-change actions, «Это изменение в порядке». Planned: read first (the inventory and its changes), then acceptance, through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-10: Self-audit
@@ -393,6 +402,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/self-audit/panel.ts:renderSelfAudit, apps/extension/src/options/index.ts, packages/ui/src/self-audit/panel.test.ts (35 checks), e2e/scn-019.spec.ts (four, including opening a row and widening the period), e2e/rendered-instants.spec.ts (nine areas, seeded stores, one row written the way an older build leaves it)
 - **Scenarios:** SCN-019
 - **Resources:** net layer journal, exporter
+- **Agent door (B-218):** none today. Actions: the period, opening a request, export. Planned: read first (the outbound log) and the export, through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-11: Journal and weekly diff
@@ -414,6 +424,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/core-queue/src/diff.ts:diffSince, packages/ui/src/journal/journal.ts:renderJournal, e2e/scn-020.spec.ts
 - **Scenarios:** SCN-021
 - **Resources:** event journal, diff selector
+- **Agent door (B-218):** none today. Actions: full history. Planned: read first (the journal), through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-12: Settings
@@ -440,6 +451,7 @@ generator, and the sheet declares no colour of its own.
 - **Scenarios:** SCN-015, SCN-023, SCN-024, SCN-051, SCN-052
 - **Usage block (B-199):** block "Данные об использовании и ошибках": a switch, one sentence on what is sent; in Firefox the switch asks the browser, and on Firefox 129 to 139 it says nothing is sent because the browser has no consent
 - **Resources:** settings store, exporter, wipe routine
+- **Agent door (B-218):** none today. Actions: brand list, quiet mode, proxy, retention, the HIBP key, usage and error data, «Выгрузить все данные», «Удалить все данные». Planned through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25); «Удалить все данные» goes through `fabric_effect_request` (deletion that cannot be undone), the HIBP key stays a typed secret
 - **Status:** built
 
 ### SCR-13: Recovery checklist
@@ -458,6 +470,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/recovery/picker.ts:renderIncidentPicker, packages/ui/src/recovery/recovery.ts:renderRecovery, packages/core-recovery/src/checklist.ts:buildChecklist, packages/core-recovery/src/portable.ts:toPortable, e2e/scn-025.spec.ts
 - **Scenarios:** SCN-025
 - **Resources:** playbook definitions, incident store
+- **Agent door (B-218):** none today. Actions: incident type, step done. Planned through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-14: Public domain status
@@ -482,6 +495,7 @@ generator, and the sheet declares no colour of its own.
   - **Indexable:** yes — `canonical` → `/status?domain=<domain>` per lookup, built in `apps/proxy/src/router.ts:statusPage`, so a shared link and the page agree
   - **Without JS:** wholly — the verdict and the appeal form are both in the markup, because the owner arrives from an interstitial on a site that is down
   - **Entity:** none. The page is a lookup result about someone else's domain, not a thing this product offers; a `SoftwareApplication` block here would describe the wrong subject
+- **Agent door (B-218):** **HTTP today**: `GET /status/domain?domain=<host>` answers the verdict (`domainStatus`), the page is `GET /status`, and the appeal is `POST /appeal` (`apps/proxy/src/router.ts`), all on the public worker and callable by any agent with an HTTP client; no MCP wrapper yet
 - **Status:** built
 
 ### SCR-15: Dashboard overview
@@ -501,6 +515,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/dashboard/overview.ts:renderOverview, packages/ui/src/when.ts:shortDate/shortTime, apps/extension/src/pages.css, apps/extension/src/options/views.ts:routeFor, apps/extension/src/options/views.ts:recoveryHref, apps/extension/src/options/keep-focus.ts:keepingFocus, e2e/scn-027.spec.ts, docs/store/screenshots/03-self-audit.png
 - **Scenarios:** SCN-027, SCN-028, SCN-029, SCN-030
 - **Resources:** `packages/core-queue/src/rank.ts` (ranking), the counts each area can answer cheaply
+- **Agent door (B-218):** none today. Actions: links into the areas. Planned: read (the attention band and area states) through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-16: Trusted domains
@@ -518,6 +533,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/trusted/trusted.ts:renderTrusted (states `ready` and `error`), e2e/scn-024.spec.ts
 - **Scenarios:** SCN-024
 - **Resources:** trusted-domain store
+- **Agent door (B-218):** none today. Action: «Убрать из доверенных». Planned through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
 - **Status:** built
 
 ### SCR-17: Product landing page
@@ -538,6 +554,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** apps/proxy/src/router.ts:landingPage, apps/proxy/src/landing.test.ts
 - **Scenarios:** none — a scenario needs a flow node to cover, and this screen has no flow (see `Used by`). The rules in `landing.test.ts` are what hold it meanwhile, and they are gates rather than scenarios
 - **Resources:** worker root route
+- **Agent door (B-218):** not needed: a public page with links only (`/`), readable over HTTP
 - **Status:** built
 
 ### SCR-18: Privacy page
@@ -558,6 +575,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** apps/proxy/src/router.ts:privacyPage, tools/privacy-page.mjs, tools/docs.test.ts
 - **Scenarios:** none — same reason as SCR-17. `tools/docs.test.ts` holds the page against its sources meanwhile
 - **Resources:** `docs/privacy.md` (the source), the outbound-log contract
+- **Agent door (B-218):** not needed: a public page with links only (`/privacy`), readable over HTTP
 - **Status:** built
 
 ### SCR-19: Lookalike comparison
@@ -573,6 +591,7 @@ generator, and the sheet declares no colour of its own.
 - **Design system:** the shared overlay tokens, like the other three. It carries no palette of its own, and a test asserts there are no hex literals in its stylesheet — three surfaces once accumulated twenty-two hexes between them
 - **Coverage:** packages/ui/src/comparison/comparison.ts:mountComparison, packages/ui/src/comparison/comparison.test.ts, e2e/scn-006.spec.ts, e2e/a11y-overlays.spec.ts
 - **Scenarios:** SCN-006, SCN-024
+- **Agent door (B-218):** none today. Actions: as SCR-05 for the address shown; the same rule: lifting the warning takes the operator's confirmation
 - **Status:** built
 
 ### SCR-20: Local store unavailable
@@ -591,6 +610,7 @@ generator, and the sheet declares no colour of its own.
 - **There is no confirmation behind "Clear the local data" — this panel is the confirmation.** The note carries what the wipe dialog's list carries, because a user agreeing to a word is not a user who agreed
 - **Coverage:** packages/ui/src/storage/storage-problem.ts:renderStorageProblem, packages/ui/src/storage/storage-problem.test.ts, apps/extension/src/options/index.ts:storageProblem
 - **Scenarios:** SCN-032
+- **Agent door (B-218):** none today. Actions: the repair and clearing steps the panel names. Planned through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25); clearing is deletion and goes through `fabric_effect_request`
 - **Status:** built
 
 ### SCR-21: Message verdict
@@ -609,6 +629,7 @@ generator, and the sheet declares no colour of its own.
 - **The "did not run" block is not a footnote.** The browser side learned this twice — a download verdict that omitted the hash check read as a full one (B-57), and a scan that exited silently read as a clean page (B-74). A mail verdict has more absent checks than the browser side ever has: an unauthenticated sender, an attachment the parser refused, a reviewer that was off. Listing them quietly would make this the most confidently wrong surface in the product.
 - **Scenarios:** SCN-038, SCN-039, SCN-040, SCN-041, SCN-043
 - **Resources:** core-mail parser, the signed phishing feed, the lookalike checker, the jailed attachment parser, the reviewer driver
+- **Agent door (B-218):** **CLI today**: `okolos-mail` (`apps/mail-cli`) checks one message on demand and prints the verdict; with SCR-14's HTTP, the only Okolos surface with an agent door (B-218)
 - **Status:** designed
 
 ### SCR-22: Message alert
@@ -626,5 +647,6 @@ generator, and the sheet declares no colour of its own.
 - **Silence has to be earned, and the error state is what earns it.** A watcher that dies quietly leaves the user safer-feeling and no safer. This is the same argument SCN-030 makes on the dashboard — an unread state must never render as "nothing here".
 - **Scenarios:** SCN-042
 - **Resources:** the watcher, the notification channel
+- **Agent door (B-218):** CLI through SCR-21: the alert's one action opens the verdict `apps/mail-cli` already gives
 - **Status:** designed
 
