@@ -229,6 +229,24 @@ describe('discardDownload (B-165, round 7; B-181)', () => {
     expect(asked).toEqual([])
   })
 
+  it('writes a journal line once the file is gone, and none when it is not (B-182)', async () => {
+    const written: string[] = []
+    const journal = async () => void written.push('line')
+    await discardDownload({ downloadId: 7 }, { frameId: 0, tabId: 3 }, async () => true, shown, journal)
+    expect(written).toEqual(['line'])
+    await discardDownload({ downloadId: 7 }, { frameId: 0, tabId: 3 }, async () => false, shown, journal)
+    await discardDownload({ downloadId: 7 }, { frameId: 0, tabId: 4 }, async () => true, shown, journal)
+    expect(written).toEqual(['line'])
+    expect(message('journalDownloadDiscarded')).toContain('удалена')
+  })
+
+  it('still answers ok when the journal cannot be written: the file is gone either way', async () => {
+    const result = await discardDownload({ downloadId: 7 }, { frameId: 0, tabId: 3 }, async () => true, shown, async () => {
+      throw new Error('store closed')
+    })
+    expect(result).toEqual({ ok: true })
+  })
+
   it('reports a failed deletion as not done', async () => {
     expect(await discardDownload({ downloadId: 7 }, { frameId: 0, tabId: 3 }, async () => false, shown)).toEqual({
       ok: false,

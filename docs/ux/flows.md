@@ -175,7 +175,7 @@ flowchart TD
   C -->|leave page| D[Back to previous page]
   B -->|This is wrong| F[Warning closes for this page]
   F --> A
-  P[Screen: Popup - recovery entry] -->|I already ran it| E[Screen: Recovery checklist]
+  P[Screen: Popup - recovery entry] -->|Something happened, then I already ran it| E[Screen: Recovery checklist]
   G[Screen: Page with a link to a program] -->|click, the click is stopped| H[Screen: In-page banner, clickfix variant, blocking: what would open and where]
   H -->|leave page| D
   H -->|this is wrong| I[Warning closes; that link goes through on the next click]
@@ -191,7 +191,7 @@ flowchart TD
 - **Traces:** ST-008 (JTBD-02, JTBD-06)
 - **Goal:** break the trap and explain it, so the user does not call the number on screen
 - **Entry points:** forced fullscreen without user gesture; looping modal dialogs; fake OS/browser chrome
-- **Success exit:** the user is out of the trap and on a safe page
+- **Success exit:** the user is out of the trap and on a safe page; a link warning (SCN-049) standing on the page gives way to this warning: the link's click stays stopped and the link warning is closed, not listed on the new panel (B-182)
 - **Task analysis:**
   1. Regain control of the window
   2. Understand it was fake
@@ -204,7 +204,7 @@ flowchart TD
   B --> C[Screen: In-page banner - techsupport variant]
   C -->|close this page| D[Tab closed or previous page]
   C -->|This is wrong| A2[Warning closes for this page, suppression stays active]
-  P[Screen: Popup - recovery entry] -->|I already called them| E[Screen: Recovery checklist]
+  P[Screen: Popup - recovery entry] -->|Something happened, then I already called them| E[Screen: Recovery checklist]
   B -->|suppression not possible in this context| B_err[Inline: cannot fully block dialogs here - close the tab]
   B_err --> D
 ```

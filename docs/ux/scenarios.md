@@ -418,7 +418,7 @@ See [foundation.md](foundation.md) → Personas.
   2. An ordinary file (not a program or an archive, name and type agree) gets no banner: an `inform` verdict shows nothing on the page (`showDownloadVerdict` in `apps/extension/src/content/download.ts`), so a banner on every download does not become wallpaper -> the journal records the verdict. A program or an archive gets the doubted warning of SCN-012, which names the checks that did not run and why (`warnDownloadSkipped`; until round 7 of the B-165 certification this step promised an informational banner on every partial verdict)
   3. User keeps the file -> nothing more happens; the journal line stands
 - **Expected result:** the user is never given a clean verdict that the product did not actually earn
-- **Alt paths:** file type is executable with a mismatched MIME or a double extension -> the banner escalates to a warning naming that specific reason
+- **Alt paths:** file type is executable with a mismatched MIME or a double extension -> it is no ordinary file, so it gets the doubted warning of SCN-012, which names that specific reason (B-182: this line said the banner escalates, while step 2 says an ordinary file has none)
 - **UI elements:** none for an ordinary file; for a program or an archive the doubted warning of SCN-012 with its "checks that did not run" line
 - **States covered:** success, error
 - **Errors & recovery:** all checks fail -> the verdict says the file was not checked at all

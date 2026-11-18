@@ -169,6 +169,8 @@ export async function discardDownload(
   from: { frameId?: number; tabId?: number },
   discard: (id: number) => Promise<boolean>,
   warnedTab: (id: number) => Promise<number | undefined>,
+  /** A line for «Что изменилось» once the file is gone (B-182); its failure does not undo the delete. */
+  journal: () => Promise<void> = async () => undefined,
 ): Promise<{ ok: boolean }> {
   const downloadId = (payload as { downloadId?: unknown } | null)?.downloadId
   if (from.frameId !== 0 || typeof downloadId !== 'number' || !Number.isInteger(downloadId)) {
@@ -181,7 +183,9 @@ export async function discardDownload(
    */
   const shownIn = await warnedTab(downloadId).catch(() => undefined)
   if (shownIn === undefined || from.tabId !== shownIn) return { ok: false }
-  return { ok: await discard(downloadId).catch(() => false) }
+  const ok = await discard(downloadId).catch(() => false)
+  if (ok) await journal().catch(() => undefined)
+  return { ok }
 }
 
 /** How many warned downloads are remembered: enough for any session, bounded for storage. */

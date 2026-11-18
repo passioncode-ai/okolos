@@ -8,11 +8,11 @@
     "apps/extension/src/pages.css",
     "apps/extension/_locales/ru/messages.json"
   ],
-  "surfacesDigest": "c6746511dfbf1690327677900f738e8d",
+  "surfacesDigest": "d5b8ec5497b3939e42ce47b85afa9b65",
   "images": {
     "01-interstitial.png": "8ff0de8221729c00",
     "02-first-run.png": "52a901bcba52b159",
-    "03-self-audit.png": "1d97c5a585d8c1d2",
+    "03-self-audit.png": "001cc35f3b8ebbb4",
     "04-popup.png": "8c28b9eb6f189e98"
   },
   "shown": {
