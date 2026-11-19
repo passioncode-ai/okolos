@@ -558,6 +558,8 @@ describe('the verbs', () => {
       'okolos.finding.resolve',
       'okolos.finding.defer',
       'okolos.extension.accept',
+      'okolos.request.lift',
+      'okolos.request.state',
     ])
   })
 
@@ -655,6 +657,7 @@ describe('the answers', () => {
     expectTypeOf<BridgeSessionVerb>().toEqualTypeOf<
       'session.open' | 'hygiene.census' | 'okolos.ping' | 'okolos.queue' | 'okolos.verdict' | 'okolos.journal' | 'okolos.audit' | 'okolos.extensions'
       | 'okolos.trust.revoke' | 'okolos.finding.resolve' | 'okolos.finding.defer' | 'okolos.extension.accept'
+      | 'okolos.request.lift' | 'okolos.request.state'
     >()
   })
 

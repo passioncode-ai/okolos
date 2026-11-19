@@ -45,6 +45,8 @@ export const BRIDGE_SESSION_VERBS = [
   'okolos.finding.resolve',
   'okolos.finding.defer',
   'okolos.extension.accept',
+  'okolos.request.lift',
+  'okolos.request.state',
 ] as const
 export type BridgeSessionVerb = (typeof BRIDGE_SESSION_VERBS)[number]
 
@@ -571,6 +573,34 @@ export interface OkolosActionResult {
   readonly done: true
 }
 
+/**
+ * An agent asks to lift a gate Okolos holds it at, and only the person lifts it, on Okolos's own
+ * surface (B-218 wave (d), spec `docs/superpowers/specs/2026-11-19-agent-door-wave-d.md`). The
+ * request carries no words of the agent's: what a page wrote for it would reach the person too.
+ */
+export const OKOLOS_GATES = ['block', 'lookalike', 'agent-action'] as const
+export type OkolosGate = (typeof OKOLOS_GATES)[number]
+
+export interface OkolosRequestLiftInput {
+  readonly gate: OkolosGate
+  readonly host: string
+}
+
+export type OkolosRequestState = 'waiting' | 'allowed' | 'declined' | 'expired'
+
+export interface OkolosRequestLiftResult {
+  readonly requestId: string
+  readonly state: OkolosRequestState
+}
+
+export interface OkolosRequestStateInput {
+  readonly requestId: string
+}
+
+export interface OkolosRequestStateResult {
+  readonly state: OkolosRequestState
+}
+
 /** The census reads the machine, not a task, and takes nothing. */
 export type CensusInput = Record<string, never>
 
@@ -595,6 +625,8 @@ interface VerbIOEntries {
   readonly 'okolos.finding.resolve': { readonly input: OkolosFindingInput; readonly output: OkolosActionResult }
   readonly 'okolos.finding.defer': { readonly input: OkolosFindingDeferInput; readonly output: OkolosActionResult }
   readonly 'okolos.extension.accept': { readonly input: OkolosExtensionAcceptInput; readonly output: OkolosActionResult }
+  readonly 'okolos.request.lift': { readonly input: OkolosRequestLiftInput; readonly output: OkolosRequestLiftResult }
+  readonly 'okolos.request.state': { readonly input: OkolosRequestStateInput; readonly output: OkolosRequestStateResult }
 }
 
 /**

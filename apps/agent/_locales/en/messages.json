@@ -731,5 +731,11 @@
   },
   "verb_okolos_extension_accept": {
     "message": "accept an extension's change"
+  },
+  "verb_okolos_request_lift": {
+    "message": "ask to lift an Okolos gate"
+  },
+  "verb_okolos_request_state": {
+    "message": "ask what was decided about a request"
   }
 }

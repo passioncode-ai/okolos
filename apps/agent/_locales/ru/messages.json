@@ -731,5 +731,11 @@
   },
   "verb_okolos_extension_accept": {
     "message": "принять изменение расширения"
+  },
+  "verb_okolos_request_lift": {
+    "message": "попросить снять ворота Okolos"
+  },
+  "verb_okolos_request_state": {
+    "message": "узнать, что решили о просьбе"
   }
 }
