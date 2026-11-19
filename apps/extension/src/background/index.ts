@@ -75,6 +75,7 @@ import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 import { recordPageRequest } from './page-requests.js'
 import { recordTrap } from './trap-journal.js'
 import { downloadWarningShown, extensionsCheckResult, leakCheckResult, passwordCheckResult, passwordError, surfaceWarning, trapWarning } from './usage/catalogue.js'
+import { storageFailureKind } from './usage/errors.js'
 import { startUsage } from './usage/start.js'
 import { optionsPageFor } from '../options/views.js'
 
@@ -562,6 +563,9 @@ async function auditDeps() {
       }
     },
     report: (what) => {
+      // Counted once a day (B-206); it leaves only once a later sweep or a deletion makes room,
+      // because every send writes its audit line first, or it is dropped after a day.
+      if (what === 'still-full') void usage.error('storage', 'storage-full')
       // Written straight to the journal rather than through the audit log,
       // which is the thing that just failed.
       void db
@@ -1274,8 +1278,13 @@ platform.downloads.onCreated((item, named) => {
           })
         } catch (cause) {
           console.warn('okolos: could not journal an unseen download verdict', cause)
+          void usage.error('storage', storageFailureKind(cause))
         }
       }
+    },
+    // Counted, not shown: the download goes on as the step left it (B-206).
+    failed: (step, cause) => {
+      void (step === 'journal' ? usage.error('storage', storageFailureKind(cause)) : usage.error('download', 'unexpected'))
     },
   }, named)
 })

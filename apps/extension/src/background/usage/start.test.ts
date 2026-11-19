@@ -180,7 +180,9 @@ describe('an audit that cannot be opened', () => {
     await usage.track('warning_shown', { kind: 'lookalike' })
     await usage.track('warning_shown', { kind: 'clickfix' })
     await usage.flush()
-    expect((p.values.get('usage:state') as UsageState).queue).toHaveLength(2)
+    await usage.state()
+    // Both kept, and the failure counted once behind them (B-206).
+    expect((p.values.get('usage:state') as UsageState).queue.map((event) => event.props.kind)).toEqual(['lookalike', 'clickfix', 'unexpected'])
   })
 })
 
@@ -194,7 +196,9 @@ describe('a send whose outbound log does not open (B-214)', () => {
       const flushed = usage.flush()
       await vi.advanceTimersByTimeAsync(5_000)
       await flushed
-      expect((p.values.get('usage:state') as UsageState).queue).toHaveLength(1)
+      await usage.state()
+      // Kept, and the failed audit write counted as the storage's (B-206).
+      expect((p.values.get('usage:state') as UsageState).queue.map((event) => event.eventName)).toEqual(['extension_installed', 'error_occurred'])
     } finally {
       vi.useRealTimers()
     }
@@ -262,5 +266,61 @@ describe('a build with no App-Key says it sends nothing (B-209)', () => {
     const p = platform('chrome')
     const usage = startUsage(p.platform, audit, {}, { ...keyless, asIfSending: true })
     expect(await usage.state()).toBe('on')
+  })
+})
+
+describe('error_occurred, once a UTC day for each area and kind (B-206)', () => {
+  const keyed = { appKey: 'A-SH-0000000000', environment: 'sandbox' as const }
+  const errors = (p: ReturnType<typeof platform>) =>
+    ((p.values.get('usage:state') as UsageState | undefined)?.queue ?? [])
+      .filter((event) => event.eventName === 'error_occurred')
+      .map((event) => `${event.props.area}:${event.props.kind}`)
+
+  it('records a pair once however often it happens, and another pair beside it', async () => {
+    const p = platform('chrome')
+    const usage = startUsage(p.platform, audit, {}, keyed)
+    await Promise.all([usage.error('download', 'unexpected'), usage.error('download', 'unexpected'), usage.error('download', 'unexpected')])
+    await usage.error('storage', 'storage-full')
+    expect(errors(p)).toEqual(['download:unexpected', 'storage:storage-full'])
+  })
+
+  it('counts the pair again on the next UTC day', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(Date.parse('2026-11-19T23:58:00.000Z'))
+      const p = platform('chrome')
+      const usage = startUsage(p.platform, audit, {}, keyed)
+      await usage.error('usage', 'network')
+      await usage.error('usage', 'network')
+      vi.setSystemTime(Date.parse('2026-11-20T00:01:00.000Z'))
+      await usage.error('usage', 'network')
+      expect(errors(p)).toEqual(['usage:network', 'usage:network'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('marks nothing while collection is off, so the pair is counted once it is on', async () => {
+    const p = platform('chrome', { consent: 'off', iid: null, queue: [] })
+    const usage = startUsage(p.platform, audit, {}, keyed)
+    await usage.error('download', 'unexpected')
+    expect(p.values.get('usage:errorsReported')).toBeUndefined()
+    await usage.set(true)
+    await usage.error('download', 'unexpected')
+    expect(errors(p)).toEqual(['download:unexpected'])
+  })
+
+  it('counts a send whose audit could not be written as the storage\'s failure, queued behind the flush', async () => {
+    const p = platform('chrome')
+    const usage = startUsage(p.platform, audit, {}, keyed)
+    await usage.track('warning_shown', { kind: 'lookalike' })
+    await usage.flush()
+    // The count is the next step in line; any later step waits for it.
+    await usage.state()
+    expect(errors(p)).toEqual(['storage:unexpected'])
+    // The failed event is kept for the next flush, which counts nothing new today.
+    await usage.flush()
+    await usage.state()
+    expect(errors(p)).toEqual(['storage:unexpected'])
   })
 })

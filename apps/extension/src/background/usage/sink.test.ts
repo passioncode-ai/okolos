@@ -189,6 +189,37 @@ describe('the queue', () => {
     }
   })
 
+  it('tells of each failed send: kept on 503 and a transport error, dropped as refused on 400; a sent one tells nothing (B-206)', async () => {
+    for (const [fail, told] of [
+      [async () => new Response('', { status: 503 }), { area: 'usage', kind: 'unexpected' }],
+      [async () => new Response('', { status: 400 }), { area: 'usage', kind: 'refused' }],
+      [
+        async () => {
+          throw new TransportError(new TypeError('network down'))
+        },
+        { area: 'usage', kind: 'network' },
+      ],
+      [
+        async () => {
+          throw new AuditWriteError(new Error('quota'))
+        },
+        { area: 'storage', kind: 'storage-full' },
+      ],
+    ] as const) {
+      const failed = vi.fn()
+      const h = harness({ send: vi.fn(fail), failed })
+      await h.sink.track('warning_shown', { kind: 'lookalike' })
+      await h.sink.flush()
+      expect(failed.mock.calls).toEqual([[told]])
+    }
+    const failed = vi.fn()
+    const h = harness({ failed })
+    await h.sink.track('warning_shown', { kind: 'lookalike' })
+    await h.sink.flush()
+    expect(h.sent).toHaveLength(1)
+    expect(failed).not.toHaveBeenCalled()
+  })
+
   it('never sends an event that turned a day old during a slow send loop: the age is checked before each request', async () => {
     let clock = Date.parse('2026-11-04T20:00:00.000Z')
     const sentAt: number[] = []

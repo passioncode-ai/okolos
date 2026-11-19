@@ -4,6 +4,7 @@ import { withDeadline, type Platform } from '@okolos/platform'
 
 import type { EventName, EventProps } from './catalogue.js'
 import { browserConsent, ConsentUnreadable, type ConsentApi, type ConsentState } from './consent.js'
+import { countedToday, ERRORS_KEY, withCounted, type ErrorArea, type ErrorKind, type ErrorsReported } from './errors.js'
 import { usageSender } from './send.js'
 import { createUsageSink, type UsageState } from './sink.js'
 import { sessionFor } from './system.js'
@@ -30,6 +31,11 @@ const STATE_KEY = 'usage:state'
 export interface Usage {
   track<E extends EventName>(name: E, props: EventProps<E>): Promise<void>
   flush(): Promise<void>
+  /**
+   * `error_occurred` for `area` and `kind`, at most once a UTC day for the pair (B-206). A pair is
+   * marked counted only when the event was recorded, so a day with collection off counts nothing.
+   */
+  error(area: ErrorArea, kind: ErrorKind): Promise<void>
   /** What the settings switch shows, by the browser's rules and the person's choice. */
   state(): Promise<UsageDataState>
   /** From the settings switch, inside the click: Firefox asks only from a user gesture. */
@@ -94,6 +100,10 @@ export function startUsage(
       initialConsent: allowed === 'on' ? 'on' : 'off',
       extensionVersion: platform.runtime.version(),
       locale: globalThis.navigator?.language ?? '',
+      // Queued behind the flush that failed, never awaited inside it: the step would wait on itself.
+      failed: (failure) => {
+        void usage.error(failure.area, failure.kind)
+      },
     })
 
   // Firefox: the browser keeps the choice. A grant taken back drops the stored "on" with its
@@ -125,7 +135,7 @@ export function startUsage(
     return run
   }
 
-  return {
+  const usage: Usage = {
     // An event that cannot be recorded goes missing; it never becomes a rejection in the worker.
     track: (name, props) =>
       serial(async () => {
@@ -139,6 +149,19 @@ export function startUsage(
       serial(async () => {
         const { s } = await current()
         await s.flush()
+      }).then(
+        () => undefined,
+        () => undefined,
+      ),
+    error: (area, kind) =>
+      serial(async () => {
+        const now = Date.now()
+        const record = await platform.storage.get<ErrorsReported>(ERRORS_KEY)
+        if (countedToday(record, area, kind, now)) return
+        const { s } = await current()
+        if (await s.track('error_occurred', { area, kind })) {
+          await platform.storage.set(ERRORS_KEY, withCounted(record, area, kind, now))
+        }
       }).then(
         () => undefined,
         () => undefined,
@@ -176,4 +199,5 @@ export function startUsage(
         return 'on'
       }),
   }
+  return usage
 }

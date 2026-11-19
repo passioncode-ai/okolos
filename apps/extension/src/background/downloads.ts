@@ -44,6 +44,11 @@ export interface DownloadDeps {
   journal(entry: { whatKey: string; file: string; outcome: string }): Promise<void>
   /** `stopped` is present on a block only: whether the stop is confirmed (B-180, round 9). */
   announce(verdict: DownloadVerdict, item: DownloadItem, outcome?: { stopped: boolean }): Promise<void>
+  /**
+   * A step that threw: the feed read, the stop, the journal line (B-206). The download goes on as
+   * before (no feed, not stopped, no line); this only says it happened. Never awaited.
+   */
+  failed?(step: 'feed' | 'stop' | 'journal', cause: unknown): void
 }
 
 /**
@@ -122,7 +127,10 @@ export async function handleDownload(
   deps: DownloadDeps,
   named: Promise<DownloadItem> = Promise.resolve(created),
 ): Promise<DownloadVerdict> {
-  const feed = await deps.feed().catch(() => null)
+  const feed = await deps.feed().catch((cause: unknown) => {
+    deps.failed?.('feed', cause)
+    return null
+  })
   const byAddress = judgeItem(created, feed)
 
   let item = created
@@ -135,7 +143,12 @@ export async function handleDownload(
     // that already finished and leaves the file, and a file of a few hundred bytes
     // finishes inside the feed read. So the stop looks again and removes what was
     // written, and the panel says "nothing reached the disk" only when it is confirmed.
-    outcome = { stopped: await deps.stop(created.id).catch(() => false) }
+    outcome = {
+      stopped: await deps.stop(created.id).catch((cause: unknown) => {
+        deps.failed?.('stop', cause)
+        return false
+      }),
+    }
   } else {
     item = await named.catch(() => created)
     verdict = item === created ? byAddress : judgeItem(item, feed)
@@ -150,7 +163,7 @@ export async function handleDownload(
       file: item.filename || item.url,
       outcome: leftOnDisk ? 'block-left-on-disk' : verdict.action,
     })
-    .catch(() => undefined)
+    .catch((cause: unknown) => deps.failed?.('journal', cause))
 
   await (outcome ? deps.announce(verdict, item, outcome) : deps.announce(verdict, item)).catch(() => undefined)
   return verdict
