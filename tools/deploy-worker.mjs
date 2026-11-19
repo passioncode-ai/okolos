@@ -48,7 +48,7 @@ function loadEnv() {
   }
 }
 
-function wrangler(args, { capture = false } = {}) {
+function wrangler(args, { capture = false, token } = {}) {
   // npx is npx.cmd on Windows, which Node will not spawn without a shell (B-163).
   const npx = binInvocation('npx', ['wrangler', ...args])
   const out = execFileSync(npx.command, npx.args, {
@@ -56,7 +56,7 @@ function wrangler(args, { capture = false } = {}) {
     shell: npx.shell,
     encoding: 'utf8',
     stdio: capture ? ['inherit', 'pipe', 'inherit'] : 'inherit',
-    env: process.env,
+    env: token === undefined ? process.env : { ...process.env, CLOUDFLARE_API_TOKEN: token },
   })
   // Captured output still belongs on screen: a deploy the operator cannot see
   // is a deploy they cannot judge.
@@ -100,7 +100,19 @@ else {
 step('deploy')
 let deployOut = ''
 if (dryRun || smokeOnly) console.log(`   skipped: ${dryRun ? '--dry-run' : '--smoke-only'}`)
-else deployOut = wrangler(['deploy', '--config', 'wrangler.generated.toml'], { capture: true })
+else {
+  /**
+   * The deploy may take its own token. Observatory issues Cloudflare tokens by preset, and the
+   * D1 preset (`CLOUDFLARE_API_TOKEN`, the schema above) cannot write a Worker script while the
+   * Workers preset cannot write D1; measured 2026-11-19, when the D1 token applied the schema and
+   * the deploy failed on `workers/services/okolos-proxy`. With `CLOUDFLARE_WORKERS_TOKEN` set,
+   * the deploy uses it; without it, one token that holds both, as before.
+   */
+  deployOut = wrangler(['deploy', '--config', 'wrangler.generated.toml'], {
+    capture: true,
+    token: process.env.CLOUDFLARE_WORKERS_TOKEN,
+  })
+}
 
 step('smoke: the deployed worker answers as itself')
 if (dryRun) {
@@ -175,8 +187,8 @@ await check('an unknown path is this worker\'s own 404', async () => {
  * else's site. So each page is identified by a string only it serves.
  */
 const PAGES = [
-  ['/', 'Okolos — защита от скрытых инструкций'],
-  ['/privacy', 'Приватность — Okolos'],
+  ['/', 'Okolos: защита от скрытых инструкций'],
+  ['/privacy', 'Приватность · Okolos'],
   ['/status', 'Статус домена'],
 ]
 

@@ -27,6 +27,23 @@ node tools/deploy-worker.mjs --smoke-only # проверить выкаченн�
 | `CLOUDFLARE_ACCOUNT_ID` | id аккаунта, 32 hex-символа |
 | `OKOLOS_D1_ID` | uuid базы D1 `okolos` |
 | `OKOLOS_WORKER_URL` | необязательно; если не задана, URL берётся из `wrangler deployments list` |
+| `CLOUDFLARE_WORKERS_TOKEN` | необязательно: токен для шага деплоя, если `CLOUDFLARE_API_TOKEN` пишет только D1 |
+
+**Токены из Observatory (2026-11-19).** Observatory выпускает токены Cloudflare по пресетам, и
+один пресет не пишет и D1, и Worker: `okolos/prod/CLOUDFLARE_API_TOKEN` (пресет `d1-edit`) накатывает
+схему, `okolos-extension/prod/CLOUDFLARE_WORKERS_TOKEN` (пресет `workers-edit`, выпущен
+`tools/cloudflare.py issue --preset workers-edit`) выкатывает воркер. Переменная окружения сильнее
+файла, поэтому деплой целиком идёт так, без значений в выводе:
+
+```bash
+T="$(project-observatory full-path)/tools"
+python3 "$T/use_secret.py" run --vault-only --env prod okolos CLOUDFLARE_API_TOKEN -- \
+  python3 "$T/use_secret.py" run --vault-only --env prod okolos-extension CLOUDFLARE_WORKERS_TOKEN -- \
+  node tools/deploy-worker.mjs
+```
+
+Токен в `~/.okolos/cloudflare.env` 2026-11-19 отвечал `Invalid access token [code: 9109]`; файл
+нужен теперь только ради `CLOUDFLARE_ACCOUNT_ID` и `OKOLOS_D1_ID`.
 
 Env-файл **читается парсером, а не `source`** — команда, случайно попавшая в
 файл с кредами, не выполнится.
