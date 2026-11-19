@@ -114,8 +114,10 @@ describe('launching a browser on a pipe', () => {
     const started = Date.now()
     await expect(pipe.send('Fake.silence')).rejects.toThrow(/Fake\.silence/)
     expect(Date.now() - started).toBeGreaterThanOrEqual(250)
-    // The pipe is still usable after a request timed out.
-    expect(await pipe.send('Fake.echo', { after: 'timeout' })).toEqual({ after: 'timeout' })
+    // The pipe is still usable after a request timed out. This answer is expected, so it gets
+    // its own deadline: under load (B-229, load average 64) the fake took over 300 ms to answer
+    // and the pipe's default, which is under test above, rejected it.
+    expect(await pipe.send('Fake.echo', { after: 'timeout' }, undefined, { timeoutMs: 60_000 })).toEqual({ after: 'timeout' })
   })
 
   it('turns an answer carrying an error into a rejection with the CDP text and the method', async () => {
@@ -296,8 +298,9 @@ describe('a deadline for one request', () => {
 
   it('lengthens the pipe default for that call only, and the next call has the default again', async () => {
     const pipe = await fake([], { requestTimeoutMs: 200 })
-    // The answer comes after 600 ms: past the default, well inside the call's 5 s.
-    expect(await pipe.send('Fake.delay', { ms: 600 }, undefined, { timeoutMs: 5000 })).toEqual({ after: 600 })
+    // The answer comes after 600 ms: past the default, well inside the call's 60 s, which leaves
+    // room for a loaded machine (B-229).
+    expect(await pipe.send('Fake.delay', { ms: 600 }, undefined, { timeoutMs: 60_000 })).toEqual({ after: 600 })
 
     const error = await rejectionOf(pipe.send('Fake.silence'))
     expect(error.kind).toBe('timeout')
