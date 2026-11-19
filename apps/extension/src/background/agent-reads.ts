@@ -116,7 +116,7 @@ export async function answerRead(verb: string, input: unknown, sources: ReadSour
         host = parsed.hostname
       } catch {
         // i18n-exempt: read by the agent through Okolos Agent, not by the person
-        return refuse('internal', 'okolos.verdict takes an http or https address.')
+        return refuse('internal', 'This verb takes an http or https address.')
       }
       const findings: Record<string, number> = {}
       for (const finding of await sources.findings()) {
@@ -125,7 +125,7 @@ export async function answerRead(verb: string, input: unknown, sources: ReadSour
         findings[category] = (findings[category] ?? 0) + 1
       }
       const trusted = (await sources.trusted()).some((domain) => host === domain || host.endsWith(`.${domain}`))
-      const data: OkolosVerdictResult = { host, blocked: await sources.blockedBy(`https://${host}/`), findings, trusted }
+      const data: OkolosVerdictResult = { host, blocked: await sources.blockedBy(String(url)), findings, trusted }
       return { success: true, data }
     }
     case 'okolos.journal': {

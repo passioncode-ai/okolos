@@ -28,7 +28,7 @@ function sources(over: Partial<ReadSources> = {}): ReadSources {
         { id: 'o1', createdAt: '2026-11-19T10:05:00.000Z', destination: 'api.pwnedpasswords.com', purpose: 'leak-lookup', payloadShape: 's***@example.test', triggeredBy: 'user:leaks', outcome: 'sent' },
         { id: 'o2', createdAt: '2026-11-19T10:06:00.000Z', destination: 'api.example.com', purpose: 'domain-status', payloadShape: `domain:${PLANTED}`, triggeredBy: 'user:page', outcome: 'sent' },
       ] as AuditEntry[],
-    blockedBy: async (url) => (url === 'https://phish.example/' ? { list: 'Okolos: фишинг', entryDate: '2026-11-19' } : null),
+    blockedBy: async (url) => (new URL(url).hostname === 'phish.example' ? { list: 'Okolos: фишинг', entryDate: '2026-11-19' } : null),
     trusted: async () => ['bank.example'],
     extensionChanges: async () => [{ id: 'abcdefghijklmnopabcdefghijklmnop', kind: 'permission-added', severity: 'critical', name: PLANTED } as never],
     ...over,

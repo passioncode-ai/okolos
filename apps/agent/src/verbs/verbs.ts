@@ -472,14 +472,12 @@ export function createVerbs(deps: VerbsDeps): Verbs {
   const reads: ReadonlyArray<{ verb: AnyBridgeVerb; purpose: string; input: z.ZodType; example: unknown }> = [
     {
       verb: 'okolos.queue',
-      // i18n-exempt: read by the agent over MCP, not by the person
       purpose: "Lists Okolos's open findings: category, severity, host and when, never what was found on the page; waits for the extension like okolos.ping.",
       input: list,
       example: { limit: 20 },
     },
     {
       verb: 'okolos.verdict',
-      // i18n-exempt: read by the agent over MCP, not by the person
       purpose: "Says what Okolos holds about an http or https address's host: on a block list (which, since when), open findings by category, trusted by the person.",
       input: z.object({ url: z.string().url().max(2048).refine((url) => /^https?:\/\//i.test(url)) }).strict(),
       example: { url: 'https://example.com/login' },
