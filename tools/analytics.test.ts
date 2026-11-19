@@ -227,3 +227,33 @@ function topLevelBody(source: string, anchor: string): string | null {
   const to = lines.findIndex((line, at) => at > from && /^\}/.test(line))
   return lines.slice(from, to === -1 ? undefined : to + 1).join('\n')
 }
+
+/**
+ * What the service works out itself from each request (country, region, the daily device hash) is
+ * stated in the `usage-data` fact; the switch text and the self-audit row name it in both languages,
+ * so a person reading the extension learns what the privacy policy says (B-215, round 13).
+ */
+describe('the usage texts name what the service works out itself', () => {
+  const facts = readFileSync(path.join(root, 'docs/brand/facts.md'), 'utf8')
+  const row = facts.split('\n').find((line) => line.startsWith('| `usage-data` |')) ?? ''
+  const catalogue = (locale: string) =>
+    JSON.parse(readFileSync(path.join(root, `apps/extension/_locales/${locale}/messages.json`), 'utf8')) as Record<string, { message: string }>
+  const named = {
+    ru: [['страну', 'страну'], ['регион', 'регион'], ['суточный хеш', 'суточный хеш устройства']],
+    en: [['страну', 'country'], ['регион', 'region'], ['суточный хеш', 'daily device hash']],
+  } as const
+
+  it('as long as the fact names it', () => {
+    expect(row, 'docs/brand/facts.md has no `usage-data` row').not.toBe('')
+    for (const [locale, words] of Object.entries(named)) {
+      const messages = catalogue(locale)
+      for (const [inFact, inText] of words) {
+        if (!row.includes(inFact)) continue
+        for (const key of ['usageWhat', 'auditKeptUsageData']) {
+          expect(messages[key]?.message, `${locale} ${key} does not name «${inText}»`).toContain(inText)
+        }
+      }
+    }
+    expect(row).toContain('суточный хеш')
+  })
+})
