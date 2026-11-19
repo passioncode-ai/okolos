@@ -241,6 +241,25 @@ describe('the queue', () => {
     expect(h.state()?.queue).toHaveLength(0)
   })
 
+  it('drops an event that would turn a day old while the outbound log opens: a request never leaves it late (B-214, round 9)', async () => {
+    let clock = Date.parse('2026-11-04T20:00:00.000Z')
+    const leftAt: number[] = []
+    const h = harness({
+      now: () => clock,
+      send: vi.fn(async (spec) => {
+        // The log takes 5 s to open before the request leaves.
+        clock += 5_000
+        leftAt.push(clock - Date.parse((JSON.parse(spec.body) as { timestamp: string }).timestamp))
+        return new Response('{}', { status: 200 })
+      }),
+    })
+    await h.sink.track('warning_shown', { kind: 'lookalike' })
+    clock += 24 * 60 * 60 * 1000 - 10_000
+    await h.sink.flush()
+    expect(leftAt).toEqual([])
+    expect(h.state()?.queue).toHaveLength(0)
+  })
+
   it('does not send an event stamped in the future, from a clock that was ahead and was corrected', async () => {
     let clock = Date.parse('2026-11-04T22:00:00.000Z')
     const h = harness({ now: () => clock })

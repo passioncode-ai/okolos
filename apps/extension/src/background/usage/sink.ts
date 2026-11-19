@@ -34,6 +34,12 @@ const FUTURE_SKEW_MS = 5 * 60 * 1000
  * waiting behind it is not reported as failed (B-214). The rest waits for the next flush.
  */
 const FLUSH_START_BUDGET_MS = 8_000
+/**
+ * How long one request can take after its age was checked: up to 5 s to open the outbound log
+ * (`AUDIT_OPEN_MS` in `start.ts`) and the 15 s send deadline (`send.ts`). An event that would turn a
+ * day old inside it is dropped rather than sent late (B-214, round 9).
+ */
+const IN_FLIGHT_MS = 20_000
 /** A device that never reaches the network must not grow this without end. */
 const QUEUE_MAX = 500
 
@@ -140,7 +146,7 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
         let drop: boolean
         // Checked again before each request, not only before the loop: up to 25 sends of up to
         // 15 s each, and an event that turns a day old on the way is dropped, never sent.
-        if (!sendable(event.at, deps.now())) {
+        if (!sendable(event.at, deps.now() + IN_FLIGHT_MS)) {
           const latest = await read()
           state = { ...latest, queue: without(latest.queue, event) }
           await deps.save(state)

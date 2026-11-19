@@ -126,7 +126,7 @@ Three screens are public URLs served by the proxy worker: SCR-17 (`/`), SCR-18
 
 The answer was recorded 2026-08-12, after the code had already given it: the
 landing page was designed for a human and a crawler at once in B-15 and is held
-by eleven rules in `apps/proxy/src/landing.test.ts`, four of them verified by
+by the rules in `apps/proxy/src/landing.test.ts`, four of the first eleven verified by
 planted defects. Recording it late is the drift this section exists to prevent —
 SCR-17 and SCR-18 shipped with no screen entry at all, which the project's own
 hard rule forbids.
