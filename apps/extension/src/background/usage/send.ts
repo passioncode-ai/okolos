@@ -2,6 +2,7 @@ import { request, TransportError, type RequestDeps } from '@okolos/net'
 import { withDeadline } from '@okolos/platform'
 
 import { CATALOGUE } from './catalogue.js'
+import { SendTimedOut } from './errors.js'
 import type { UsageDeps } from './sink.js'
 
 /**
@@ -48,7 +49,7 @@ async function sentWithin(sent: Promise<Response>, ms: number): Promise<Response
   try {
     return await withDeadline(sent, ms, late)
   } catch (cause) {
-    throw cause instanceof Error && cause.message === late ? new TransportError(new Error(late)) : cause
+    throw cause instanceof Error && cause.message === late ? new TransportError(new SendTimedOut(late)) : cause
   }
 }
 

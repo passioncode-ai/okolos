@@ -372,3 +372,38 @@ describe('a listed file the browser finished before it could be stopped (B-180, 
     expect(announce).toHaveBeenCalledWith(verdict, expect.anything(), { stopped: false })
   })
 })
+
+describe('a step that threw is told, and the download goes on (B-206)', () => {
+  it('tells of a feed that could not be read, and judges without it', async () => {
+    const failed = vi.fn()
+    const cause = new Error('database gone')
+    const verdict = await handleDownload(item(), deps({ feed: async () => Promise.reject(cause), failed }))
+    expect(failed.mock.calls).toEqual([['feed', cause]])
+    expect(verdict.skipped.map((entry) => entry.check)).toContain('feed')
+  })
+
+  it('tells of a stop that threw, and the line says the file may be on the disk', async () => {
+    const failed = vi.fn()
+    const cause = new Error('no such download')
+    const d = deps({ stop: vi.fn(async () => Promise.reject(cause)), failed })
+    await handleDownload(item({ url: 'https://malware.test/x.exe' }), d)
+    expect(failed.mock.calls).toEqual([['stop', cause]])
+    expect(d.journal).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'block-left-on-disk' }))
+  })
+
+  it('tells of a journal line that could not be written, and still announces the verdict', async () => {
+    const failed = vi.fn()
+    const cause = Object.assign(new Error('quota'), { name: 'QuotaExceededError' })
+    const announce = vi.fn(async () => undefined)
+    await handleDownload(item(), deps({ journal: vi.fn(async () => Promise.reject(cause)), announce, failed }))
+    expect(failed.mock.calls).toEqual([['journal', cause]])
+    expect(announce).toHaveBeenCalledOnce()
+  })
+
+  it('tells nothing when every step worked', async () => {
+    const failed = vi.fn()
+    await handleDownload(item({ url: 'https://malware.test/x.exe' }), deps({ failed }))
+    await handleDownload(item(), deps({ failed }))
+    expect(failed).not.toHaveBeenCalled()
+  })
+})

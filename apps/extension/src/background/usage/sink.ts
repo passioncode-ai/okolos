@@ -1,6 +1,7 @@
 import { AuditWriteError, TransportError } from '@okolos/net'
 
 import { admissible, type EventName, type EventProps } from './catalogue.js'
+import { sendFailure, type ErrorArea, type ErrorKind } from './errors.js'
 
 /**
  * The one place usage and error events pass through (B-198, B-199).
@@ -80,6 +81,11 @@ export interface UsageDeps {
   readonly extensionVersion: string
   /** The browser's language, for `systemProps.locale`. Nothing about the device. */
   readonly locale: string
+  /**
+   * Told of a send that failed: kept for the next flush, or dropped as refused (B-206). Called
+   * once per failed request, never awaited, so counting it never holds the flush.
+   */
+  readonly failed?: (failure: { area: ErrorArea; kind: ErrorKind }) => void
 }
 
 export interface UsageSink {
@@ -147,12 +153,14 @@ export function createUsageSink(deps: UsageDeps): UsageSink {
             headers: { 'App-Key': deps.appKey, 'Content-Type': 'application/json' },
           })
           drop = response.ok || !retried(response.status)
+          if (!response.ok) deps.failed?.(sendFailure({ status: response.status }))
         } catch (cause) {
           // Kept only for what may pass next time: a transport failure (the network module's
           // TransportError, and the sender's deadline) or a failed audit write. Anything else, a
           // plain TypeError from a fault in the code and the module's own refusals included, would
           // fail the same way and hold the queue (B-215).
           drop = !(cause instanceof TransportError || cause instanceof AuditWriteError)
+          deps.failed?.(sendFailure({ thrown: cause }))
         }
         if (!drop) return
         // Re-read: an event tracked while the request was in flight was appended at the end, and
