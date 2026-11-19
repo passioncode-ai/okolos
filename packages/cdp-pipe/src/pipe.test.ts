@@ -396,8 +396,12 @@ describe('a browser its owner closed', () => {
     const pipe = await fake()
     const exits: unknown[] = []
     pipe.onExit((info) => exits.push(info))
+    // The fake answers once it is up; under load (B-227, load 317) a close sent before then
+    // found no Browser.close handler and the grace ran out into SIGTERM.
+    await pipe.send('Fake.echo')
 
-    await pipe.close(300)
+    // close() resolves as soon as the browser is gone; the grace only bounds a stuck one.
+    await pipe.close(5000)
 
     expect(exits).toEqual([{ code: 0, signal: null, requested: true }])
   })
@@ -406,6 +410,8 @@ describe('a browser its owner closed', () => {
     const pipe = await fake(['--ignore-close', '--ignore-term'])
     const exits: unknown[] = []
     pipe.onExit((info) => exits.push(info))
+    // Up and ignoring SIGTERM before it is sent (B-227): a slow start died of SIGTERM.
+    await pipe.send('Fake.echo')
 
     await pipe.close(200)
 
