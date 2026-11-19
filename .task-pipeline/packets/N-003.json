@@ -1,0 +1,55 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-003",
+ "intent": "K2: вердикт к снимку, корпус, fuzz секретов",
+ "inputs": [
+  "`buildSnapshot`, `AxNode` (packages/core-snapshot/src/snapshot.ts); `Verdict` (@okolos/contracts)",
+  "N-023: toSnapshotFinding, SnapshotFinding, TaskScope",
+  "N-024: resource: pnpm-lock.yaml; N-003 правит lockfile после N-005"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "packages/core-snapshot/src/verdict.ts",
+   "packages/core-snapshot/src/snapshot.ts",
+   "packages/core-snapshot/src/index.ts",
+   "packages/core-snapshot/package.json",
+   "packages/core-snapshot/tsconfig.json",
+   "pnpm-lock.yaml",
+   "packages/core-snapshot/src/verdict.test.ts",
+   "packages/core-snapshot/src/corpus.test.ts",
+   "packages/core-snapshot/src/secrets.test.ts"
+  ]
+ },
+ "outputs": [
+  "`snapshotVerdict(probe: {verdicts, truncated, unresolved}, snapshot: Pick<Snapshot,'incomplete'>): SnapshotVerdict | {refused: 'cleaning_incomplete'}` (incomplete или неполный пробник означает отказ без текста); находки только через `toSnapshotFinding` из N-023; `buildSnapshot(nodes, {hidden, taskKey /* обязателен, 16+ байт */, secretFields /* обязателен, пустое множество = нет секретных */, rootRef?, refMap?}): Snapshot {lines, refMap, hiddenUnmatched, incomplete}`; внутри поля ничего не даёт имени и текста; значения полей вычищаются из имён (4 знака, 3 у секретных; NFKD, свёртка регистра, цифры любых письменностей; значение, разбитое по узлам); бюджеты очистки дают incomplete; `refOf(backendId, taskKey)` HMAC-SHA-256; `resolveRef(refs, ref, taskKey, nodes, {hidden, secretFields}): {found:true, backendDOMNodeId, inField} | {found:false, reason:'unknown'|'hidden'}`; `secretFieldIds(DOM.getDocument roots)`; `isSecretInput`; `sha256(bytes)`; `clampMaxBytes(n)`, `MIN_PAGE_BYTES`, `MAX_PAGE_BYTES`"
+ ],
+ "acceptance": [
+  "buildSnapshot с rootRef под скрытым предком возвращает пусто; с rootRef под полем ввода текст поля не выдаётся (ревью F2)",
+  "refs непрозрачны: refOf(backendId, taskKey) — HMAC; ref другой задачи не находит узла",
+  "корпус corpora/injections/positives.json: каждый позитив, помещённый в AX-дерево скрытым узлом, отсутствует в renderLine-выдаче (уровень функции; настоящая проверка REQ-55 в Chrome — N-011)",
+  "negatives.json: ни один негатив не вырезан",
+  "fuzz: 200 случайных значений, введённых в textbox/searchbox/combobox и потомки, не встречаются в выдаче (фиксированное зерно)",
+  "truncated или unresolved > 0 дают отказ cleaning_incomplete без текста, а не level clean (ревью R1; правило retro №3)",
+  "значение поля (AX value) вычищается из имени любого узла: <label> вокруг поля, aria-labelledby на поле кода; contenteditable без роли считается полем (ревью R4)",
+  "значение ищется после удаления пробелов и разделителей и только если оно не короче 4 знаков: «4111 1111 1111 1111» в имени как «4111-1111-1111-1111» вычищается; значение «ab» имён не трогает (ревью S4)",
+  "toSnapshotFinding на настоящем выводе detectHidden (stage1) и stage3 по позитивам корпуса: concealment и carrier заполнены; тест падает, если детектор сменит формат detail (проверка seam N-001 круг 2)",
+  "снимок хранит refMap: ref (HMAC) → backendDOMNodeId; buildSnapshot принимает rootRef как ref и разрешает его через refMap снимка той же задачи (аудит #29)",
+  "новые символы импортируются из '@okolos/core-snapshot' (аудит #4)",
+  "pnpm install --frozen-lockfile → 0 (аудит #22)",
+  "проверка узла: pnpm -s exec vitest run packages/core-snapshot && pnpm -s run typecheck"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- packages/core-snapshot/src/verdict.ts packages/core-snapshot/src/snapshot.ts packages/core-snapshot/src/index.ts; затем первый непройденный тест в списке acceptance"
+}

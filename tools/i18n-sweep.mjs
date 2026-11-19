@@ -85,7 +85,12 @@ const root = path.resolve(import.meta.dirname, '..')
  * would find it. Adding the app and its gate in one change is the only version
  * of this that stays true.
  */
-const ROOTS = ['apps/extension/src', 'apps/mail-cli/src', 'packages']
+/*
+ * `apps/agent/src` joined on 2026-10-27 with the daemon's service shell (Okolos Bridge Б1,
+ * node N-005), for the same reason. The vendored Fabric kit under `apps/agent/src/fabric/` is
+ * `.mjs` and is not read: this sweep reads `.ts`, and the kit's words are the kit's.
+ */
+const ROOTS = ['apps/extension/src', 'apps/mail-cli/src', 'apps/agent/src', 'packages']
 
 /**
  * Three or more words with at least two lowercase ones after the first. Prose,

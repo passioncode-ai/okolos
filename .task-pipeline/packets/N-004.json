@@ -1,0 +1,43 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-004",
+ "intent": "K2: выдача частями",
+ "inputs": [
+  "`pageOf`, `utf8Bytes`, `SnapshotLine` (snapshot.ts)",
+  "N-003: Snapshot с вердиктом"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "packages/core-snapshot/src/pages.ts",
+   "packages/core-snapshot/src/index.ts",
+   "packages/core-snapshot/src/pages.test.ts"
+  ]
+ },
+ "outputs": [
+  "`encodeCursor({from, digest}) / decodeCursor(c): {from, digest} | null`; `paginate(lines, {cursor?, maxBytes?}): {text, cursor?, partial}` зажимает maxBytes через clampMaxBytes из @okolos/core-snapshot (MIN_PAGE_BYTES..MAX_PAGE_BYTES, своего DEFAULT_MAX_BYTES нет); дайджест курсора строится экспортированным sha256; курсор от другого снимка отвергается"
+ ],
+ "acceptance": [
+  "дерево формы Википедии (29 714 узлов, детерминированное): каждая страница ≤ 32 КБ UTF-8, страниц ≥ 8, конкатенация страниц равна полному тексту",
+  "курсор чужого снимка → null, демон отвечает stale_cursor (ревью R10)",
+  "maxBytes больше потолка обрезается до потолка; меньше 1 КБ поднимается до 1 КБ; NaN, дробь, строка, отрицательное приводятся к границам внутри paginate (ревью F10)",
+  "вердикт целого снимка приложен к каждой странице",
+  "страница всегда двигается вперёд, даже если одна строка длиннее maxBytes",
+  "paginate возвращает refs строк своей страницы и кладёт вердикт целого снимка в каждую страницу (аудит #29)",
+  "maxBytes зажимается clampMaxBytes из @okolos/core-snapshot внутри paginate (pageOf не зажимает); дайджест курсора строится экспортированным sha256; snapshot.ts N-004 не правит (N-003 круг 1)",
+  "проверка узла: pnpm -s exec vitest run packages/core-snapshot && pnpm -s run typecheck"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- packages/core-snapshot/src/pages.ts packages/core-snapshot/src/index.ts packages/core-snapshot/src/pages.test.ts; затем первый непройденный тест в списке acceptance"
+}

@@ -1,0 +1,152 @@
+{
+  "node": "N-022",
+  "done": [
+    "CdpTransport is exported with pid, send(method, params?, sessionId?, opts?: {timeoutMs?}), on, onExit, close(graceMs?) and CdpPipe implements it (pipe.ts:102-109, 143); a plain object satisfies it, and typecheck refuses one that lacks onExit (scratch tsc probe: TS2741), so test 3 has teeth",
+    "every rejection of send is a CdpError with the right kind: timeout (pipe.ts:260), cdp with cdpCode (392), exited from the process exit (195), closed from close() (314) or a lost stream (367), and the sync refusal on a closed pipe reuses the stored kind (254); launch failure is kind launch (238)",
+    "a read error on fd 4 or stderr and an EPIPE on fd 3 have 'error' listeners (pipe.ts:180-188) and do not take the owner down; requests waiting are rejected as closed, and new ones are refused at once",
+    "a browser that exits on its own fires onExit with code, signal and requested:false; waiting requests reject as exited; the pipe-before-exit ordering is resolved by lost() deferring 500 ms so the true kind wins (pipe.ts:365-369)",
+    "opts.timeoutMs overrides the default for one call in both directions, and the next call has the default again (pipe.test.ts:288-306); deadlines outside whole 1..2^31-1 ms are refused with TypeError before an id is consumed or a process spawned (pipe.ts:125-130, 230, 249)",
+    "closedBecause and the kind passed to fail() cannot disagree: every add to waiting checks closedBecause first and fail() drains waiting, so no request waits under a stale kind",
+    "close() after a broken fd 3 writes Browser.close into a destroyed stream without an 'error' event, escalates to SIGTERM and leaves no process (probe A); close() now reports a group whose browser left but a member survived (pipe.ts:331-334, test at pipe.test.ts:563-581)",
+    "wall-clock upper bounds in the tests go through atMost (5x expected); lower bounds keep 50 ms slack or none needed",
+    "docs rows exist as the brief asks: README cdp-pipe row says close can end with a live group and reports it; design spec K1 depends on nothing (package.json has no dependencies); engines node >=22.18; no U+2014 in any added line",
+    "edits outside the packet's edit_targets (fixtures/fake-browser.mjs, packages/cdp-pipe/package.json description, tools/reachable.test.ts exemption for errors.ts) are what the tests and the reachability gate need, and that gate passes",
+    "merged tree (N-022 + N-005, pipe.ts from N-022, reachable rows of both: N-022's errors.ts row plus N-005's five apps/agent/src/service rows) passes i18n:sweep (exit 0, 0 sentences outside the catalogue, 45 exempt, no stale marker) with N-005's ROOTS += apps/agent/src, and tools/reachable.test.ts (4 passed)",
+    "N-022's pipe.ts alone carries a reasoned i18n-exempt for every sentence N-005 had marked, plus the new ones (CdpError reasons, stderr reporter lines); N-005's four markers become redundant, so taking the file whole from N-022 leaves no unmarked string and no stale marker",
+    "merged tree typecheck (tsc -b and tsc -p tsconfig.tests.json) exit 0; eslint over packages/cdp-pipe, apps/agent, tools/reachable.test.ts, tools/i18n-sweep.mjs exit 0; apps/agent/src/service/deps.test.ts imports @okolos/cdp-pipe and finds CdpPipe (5 passed)",
+    "N-010's planned constructor default `launch: (o) => Promise<CdpTransport> = CdpPipe.launch` type-checks today (pipe.test.ts:236), and onCloseIncomplete is reachable to N-010 Test 9 through LaunchOptions, which index.ts exports; the hook fires before close() resolves (pipe.ts shutdown order)",
+    "N-010 Test 7 ('send rejected as closed leads to close() of the group') is safe against this pipe: close() is idempotent (same promise), and requests failed by close() itself are kind closed, so a consumer that answers closed with close() only re-enters the promise it already holds",
+    "N-010 Test 7 'requested' field exists on ExitInfo (pipe.ts:250) and is set from this.closing at exit; exit listeners run synchronously in the exit handler right after pending requests are rejected, so a consumer sees onExit before the rejections' handlers run",
+    "N-011 Test 23 inputs exist: CdpError.kind and cdpCode (errors.ts:85-100), exported from index.ts:1-2; cdpCode is set only for kind cdp",
+    "K1 depends on nothing, as the design spec now says: packages/cdp-pipe/package.json has no dependencies, pnpm-lock lists packages/cdp-pipe: {}, src imports only node: modules and its own files",
+    "engines >=22.18 matches the only two tools that import .ts from .mjs (tools/agent-window-spike.mjs:39, tools/sign-feed.mjs:26); CI setup-node node-version: 22 resolves to the newest cached 22.x",
+    "the spike's tests and the docs/runbook/licensing/reachable gates read the changed docs and pass: whole tools suite 62 files, 1028 passed, 1 skipped",
+    "every clause of the docs/README.md cdp-pipe row holds against the code: per-call deadline (pipe.ts:248-249), TypeError for a deadline outside whole 1..2^31-1 ms thrown at the call of send() and of launch() (pipe.ts:125-130, 230, 249), CdpError kinds launch at launch (pipe.ts:237-239) and timeout, cdp with code, exited, closed for requests (pipe.ts:260, 392, 195, 314, 367), onExit with code, signal and requested set from close() having started (pipe.ts:191-197), CdpPipe implements CdpTransport (pipe.ts:143), close asks with Browser.close then SIGTERM then SIGKILL to the group and resolves at about 3 x graceMs reporting through onCloseIncomplete a group with the browser or a child left (pipe.ts:303-336), no network",
+    "the package description in packages/cdp-pipe/package.json says the same as the README row and the close() doc comment",
+    "design spec §1 K1 row is true: packages/cdp-pipe/package.json has no dependencies key and src imports only node: builtins and its own files; K3 still lists K1 and maps CdpError to a K0 refusal",
+    "Node floor: root package.json is the only engines field; runbook row matches it; CI node-version 22 resolves to the newest 22.x, which satisfies >=22.18; the two tools the runbook names are the only tools/*.mjs that import .ts, and both imports load on Node 22.23.1",
+    "the code-map package count (22) still matches ls -d packages/*/",
+    "SCN-045 still holds as written: a browser that is gone is distinguishable to K3 as CdpError exited or closed, and onExit.requested separates a crash from a requested close",
+    "the feed agent is unaffected by the floor: it runs node from the login shell (tools/launchd/app.okolos.feed.plist:28-39) and already needed type stripping for tools/sign-feed.mjs"
+  ],
+  "not_done": [],
+  "not_verified": [
+    "unit: whether each test was observed red before its implementation (TDD guard): only visible in implementer history, which I was told not to read",
+    "unit: behaviour against a real Chrome (REQ-54 names an integration test on Chrome); the node check drives only the fake browser",
+    "unit: the 500 ms exited/closed window and the 5x bounds under real machine load; all three runs were on an idle machine",
+    "unit: the runbook's claim that importing .ts from tools/*.mjs works on Node 22.23.1; only 26.10.0 is present here",
+    "unit: consumers of CdpTransport (apps/agent, K3/N-010/N-011): not written yet, and they belong to the seam tier",
+    "unit: registering the same onExit listener twice after the exit queues two calls (the Set dedupes registration, not delivery); trivial, not probed",
+    "unit: tools/agent-window-spike.mjs internals beyond its single import of frames.ts",
+    "seam: real Chrome behaviour of the exit-after-pipe ordering (N-010 Test 8 owns it); only the fake browser was exercised",
+    "seam: a hosted CI run with node-version 22 resolving to >= 22.18; inferred from setup-node's resolution, not observed",
+    "seam: the merged tree's full pnpm gates (build, e2e, package:check); only sweep, reachable, typecheck, lint and the neighbouring unit suites were run",
+    "seam: N-005's own correctness beyond what touches cdp-pipe",
+    "product: Node 22.18.0 itself: no 22.18 binary on this machine; the floor rests on Node's release notes (type stripping on by default from 22.18) and CI runs the newest 22.x, not the floor",
+    "product: whether Chrome helpers on macOS (crashpad handler) leave the browser's process group, which would put them outside what close() sweeps; that is K4's e2e (design §3, 'no orphans after kill -9')",
+    "product: org-index repositories.json and fabric-workspace knowledge pages for a Node version or cdp-pipe statement (outside this repository)",
+    "product: the plan docs/superpowers/plans/2026-10-27-bridge-b1.md, read as intent rather than a claim of current behaviour"
+  ],
+  "blockers": [
+    {
+      "what": "send() and launch() return a Promise but refuse a bad deadline by throwing synchronously. A consumer that writes transport.send(...).catch(...) does not catch it (probe B: 'TypeError thrown synchronously past .catch'). SendOptions documents this, but CdpTransport.send, the contract consumers code against, says only that every rejection is a CdpError (packages/cdp-pipe/src/pipe.ts:249 (send), :230 (launch), :100-104 (CdpTransport doc), found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The diff validates two of the unit's three deadlines but not close(graceMs). With close(NaN), until() never times out: deadline - now is NaN, `left <= 0` is never true, and setTimeout(NaN) is 1 ms. A browser that ignores Browser.close then hangs close() forever, which breaks its 'never hangs' promise. Infinity behaves the same, and negative values or 0 shrink every grace to one poll. This predates the diff (f025a57 had the same until()), but the diff added checkTimeout right beside it (packages/cdp-pipe/src/pipe.ts:303-336 (close/shutdown), :428-436 (until), found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "A read error on the browser's stderr alone makes the whole CDP channel unusable: 500 ms later every send is refused as closed, while fd 3 and fd 4 and the browser are healthy and no onExit fires (probe C: 'after stderr EIO send -> closed'). The brief asks for exactly this (test 1), so it is not a defect. The cost is that a consumer has to treat 'closed' as 'call close() and relaunch', because the pipe will never recover on its own (packages/cdp-pipe/src/pipe.ts:188, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Whether a crash reports as exited or closed is decided by wall clock: lost() gives the process exit 500 ms to follow the pipe end (EXIT_AFTER_PIPE_MS, measured as 'the same millisecond' on the fake). If the event loop stalls more than 500 ms between the pipe 'end' and SIGCHLD, a crash reports as closed, and three tests assert exited on that path (packages/cdp-pipe/src/pipe.ts:141, :365-369, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "send() and CdpPipe.launch() are typed Promise-returning but throw TypeError synchronously for a timeoutMs/requestTimeoutMs outside whole 1..2^31-1 ms. A consumer that writes transport.send(...).catch(toRefusal) gets an uncaught throw, and one that awaits gets a TypeError with no kind, which the planned kind mapping cannot place. The CdpTransport doc says every rejection of send() is a CdpError, so fakes in N-010/N-011 tests will never produce it. A per-call deadline computed from a remaining budget (deadline - Date.now(), which can be 0, negative or fractional) hits this path (N-011 refusal mapping, docs/superpowers/plans/2026-10-27-bridge-b1.md:423 (Test 23), and N-010 AgentWindows callers of send/launch (plan :367); source pipe.ts:417-418, pipe.ts:396, asserted sync at pipe.test.ts:315,319-321, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "CdpErrorKind has a fifth kind, launch, from CdpPipe.launch (errors.ts:85, pipe.ts:404-406), and ExitInfo carries requested. The plan's N-022 Produces line still lists four kinds and onExit {code, signal}, and N-011 Test 23 maps only exited/closed/cdp/timeout. A Chrome that cannot start reaches the daemon as kind launch with no planned refusal; an if/else mapper would send it to internal rather than browser_offline (docs/superpowers/plans/2026-10-27-bridge-b1.md:423 (N-011 Test 23) and :137 (N-022 Produces read by N-010/N-011 packets); packets/N-011.json acceptance, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "N-010 Test 8 is written against EXIT_AFTER_PIPE_MS, but the constant is module-private (pipe.ts:309, not exported from index.ts), so the test must copy 500 ms and drifts silently if it changes. Related timing contract: on a broken pipe with the browser alive, waiting requests are rejected closed only after 500 ms; a request whose own timeoutMs is under 500 ms gets kind timeout (-> internal) instead of closed (-> browser_offline) (docs/superpowers/plans/2026-10-27-bridge-b1.md:378 (N-010 Test 8) and :423 (N-011 Test 23); source pipe.ts:309,515-519, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "the graph's resource edge N-022 -> N-005 names only packages/cdp-pipe/src/pipe.ts, and N-022's touches list omits tools/reachable.test.ts, packages/cdp-pipe/package.json and src/fixtures/fake-browser.mjs. git merge-tree shows tools/reachable.test.ts also conflicts with N-005; the 'keep both sets of rows' resolution is not recorded on the edge or in the plan (plan :30 names pipe.ts only). Taking that file from either side alone fails reachable: from N-022 it orphans five apps/agent/src/service files, from N-005 it orphans errors.ts (.task-pipeline/graph.json edge {from N-022, to N-005} and node N-022 touches; docs/superpowers/plans/2026-10-27-bridge-b1.md:30, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "the spike keeps its own CDP client that did not get this node's rules: no 'error' listener on fd 3, fd 4 or stderr (an EPIPE after a browser crash is an unhandled error that ends the spike before its cleanup), no rejection on exit (a request to a dead browser waits its 30 s timeout), plain Error messages. It is a hand-run measurement tool, not shipped (tools/agent-window-spike.mjs:130-224, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "docs/README.md says every refusal is a CdpError, with TypeError named only for a bad deadline, and the CdpTransport doc comment says every rejection of send() is a CdpError. params that JSON.stringify cannot serialise (a cycle, a BigInt) make send() reject with a plain TypeError (the throw happens inside the promise executor at the write), and the waiting entry stays until its timer. No caller can reach this from an agent's JSON request today, so the claim is false only for a programming error (docs/README.md:106; packages/cdp-pipe/src/pipe.ts:100, 251, 273, 278, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "the README row says consumers depend on CdpTransport and that close reports a group it could not end (onCloseIncomplete), but that report reaches only whoever passed LaunchOptions: CdpTransport has no such member and close() resolves void either way. The product promises that rest on it (design §2.2 close verb: 'окно и процессы задачи закрыты'; §3 row: on close the agent-window processes end, SIGTERM then SIGKILL to the group; SCN-048: a removal that fails is 'recorded as failed, never as freed') hold only if K3 wires onCloseIncomplete at launch into the task record. A K3 or K4 written against the interface alone would answer close as success with a process alive. The §3 row also now states unconditionally what cdp-pipe documents as conditional (docs/README.md:106; packages/cdp-pipe/src/pipe.ts:44, 102-109, 303; docs/superpowers/specs/2026-10-06-bridge-b1-design.md:68, 108; docs/ux/scenarios.md:1052, 1057, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    }
+  ],
+  "replan": {
+    "possible": true,
+    "add": [],
+    "park": [],
+    "why": "certified at all 3 tiers in round 2"
+  },
+  "evidence": [
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-022 -s exec vitest run packages/cdp-pipe tools/agent-window-spike.test.ts, run 1 -> Test Files 4 passed, Tests 65 passed, Duration 9.66s (wall 12 s)",
+    "unit: same, run 2 -> 4 files / 65 tests passed, Duration 9.61s (wall 13 s)",
+    "unit: same, run 3 -> 4 files / 65 tests passed, Duration 9.69s (wall 12 s)",
+    "unit: pnpm --dir … -s run typecheck -> exit 0 (tsc -b && tsc -p tsconfig.tests.json; tests are included)",
+    "unit: pgrep -fl fake -> no output, exit 1, after the checks and again after the probes",
+    "unit: scratch probe (vitest from scratchpad, importing pipe.ts): A) EPIPE on fd 3 -> waiting kind closed; close(200) took 227 ms, browser and group gone, exits [{code:null, signal:SIGTERM, requested:true}]; B) send(..., {timeoutMs:0}).catch(...) -> TypeError thrown synchronously past .catch; C) stderr EIO -> after 700 ms send rejects closed; close(300) 28 ms, group gone, requested:true",
+    "unit: scratch tsc probe: an object without onExit assigned to CdpTransport -> error TS2741 Property 'onExit' is missing",
+    "unit: pnpm -s exec vitest run tools/reachable.test.ts -> 1 file, 4 tests passed",
+    "unit: node tools/i18n-sweep.mjs -> exit 0, 0 sentences outside the catalogue, 41 exempt with reasons",
+    "unit: git diff f025a57..HEAD added lines | grep U+2014 -> nothing (exit 1)",
+    "unit: node --version -> v26.10.0, matching the runbook's 'гейты проверены на 26.10.0'",
+    "unit: commit 0daa8b5 carries the Co-Authored-By trailer",
+    "seam: N-022 worktree: node tools/i18n-sweep.mjs -> exit 0, 0 sentences outside the catalogue, 41 exempt",
+    "seam: N-022 worktree: pnpm -s exec vitest run packages/cdp-pipe tools/agent-window-spike.test.ts tools/reachable.test.ts tools/runbook.test.ts tools/docs.test.ts tools/licensing.test.ts -> 8 files, 163 passed",
+    "seam: N-022 worktree: pnpm -s run typecheck -> exit 0; git status clean afterwards",
+    "seam: N-022 worktree: pnpm -s exec vitest run tools --exclude 'tools/gates/**' -> 62 files, 1028 passed, 1 skipped",
+    "seam: git merge-tree --write-tree --name-only b1/n-022 b1/n-005 -> CONFLICT in packages/cdp-pipe/src/pipe.ts and tools/reachable.test.ts only",
+    "seam: merged tree built in scratch (git archive b1/n-022 + N-005's 46 A/M files, each byte-checked against the merge-tree result; pipe.ts identical to N-022's; reachable rows unioned to 12): node tools/i18n-sweep.mjs -> exit 0, 45 exempt; vitest tools/reachable.test.ts -> 4 passed",
+    "seam: merged tree: tsc -b and tsc -p tsconfig.tests.json -> exit 0; eslint packages/cdp-pipe apps/agent tools/reachable.test.ts tools/i18n-sweep.mjs -> exit 0",
+    "seam: merged tree: vitest packages/cdp-pipe apps/agent tools/reachable.test.ts tools/coverage-shape.test.ts -> 198 passed, 3 failed; the 3 failures are build.commit undefined (wellknown.test.ts:28, http.test.ts:614,671) because the scratch copy is not a git checkout, unrelated to the merge",
+    "seam: git merge-tree bridge/b1-run2 b1/n-022 -> clean; git merge-tree bridge/b1-run2 b1/n-005 -> clean",
+    "seam: grep over the tree for CdpPipe|CdpError|CdpTransport|cdp-pipe (excluding node_modules, dist, .git) -> no source consumer outside packages/cdp-pipe; spike imports frames.ts only",
+    "seam: grep for Node version statements -> package.json:14, docs/runbooks/development.md:16, .github/workflows/ci.yml:36,114,160",
+    "product: git diff f025a57..e32e057 -- docs package.json packages/cdp-pipe/package.json packages/cdp-pipe/src/index.ts packages/cdp-pipe/src/errors.ts tools/reachable.test.ts: read in full",
+    "product: read packages/cdp-pipe/src/pipe.ts in full against each README clause",
+    "product: grep -rln cdp-pipe|CdpPipe|CdpError|CdpTransport|onCloseIncomplete|remote-debugging-pipe over README.md AGENTS.md docs .github: docs/README.md, the design spec, modules spec, brief, plan, evidence doc; none outside the README row states close or error behaviour",
+    "product: grep node-version .github/workflows/ci.yml: 22 at lines 36, 114, 160; grep '\"node\"' over all package.json: only the root, >=22.18",
+    "product: grep import of .ts in tools/*.mjs: tools/agent-window-spike.mjs:39 (frames.ts), tools/sign-feed.mjs:26 (core-feeds apply.ts)",
+    "product: ~/.nvm/versions/node/v22.23.1/bin/node import of packages/cdp-pipe/src/frames.ts → splitFrames; of packages/core-feeds/src/apply.ts → applyUpdate,serialiseUpdate (runbook claim for 22.23.1 holds)",
+    "product: ls -d packages/*/ | wc -l → 22, matching docs/README.md:16 and docs/brand/facts.md:61",
+    "product: grep imports in packages/cdp-pipe/src/*.ts: node: builtins and local files only; packages/cdp-pipe/package.json has no dependencies",
+    "product: read docs/ux/scenarios.md SCN-045 (984-1000) and SCN-048 (1043-1062); design spec lines 1-140",
+    "product: pipe.test.ts test names cover each documented clause, including 'never hangs: when the group cannot be signalled it resolves within 3 x graceMs and reports the pid' (pipe.test.ts:517) and 'refuses a binary that does not exist with a CdpError of kind launch' (pipe.test.ts:160); tests were not run at this tier"
+  ],
+  "tested": {
+    "head": "dfaf5b0b9cfcc3b481a6c642e3ab86b7ed33cfd1",
+    "tree": "ebc4093ae4222c134df958c02eed02115400226b"
+  }
+}

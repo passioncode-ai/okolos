@@ -160,13 +160,13 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 ### JRN-05: P-01 — an agent does a job in my browser (JTBD-10)
 | # | Stage | User action | Touchpoint | Emotion (1-5) | Pain | Opportunity |
 |---|-------|------------|------------|---------------|------|-------------|
-| 1 | Connect | Lets an agent use the browser for the first time | agent's terminal, the bridge's prompt | 2 | Every bridge today asks for "read and change all your data" once and never again, for any agent that asks | One pairing per agent, confirmed by the person with a matching code, revocable, scoped |
+| 1 | Connect | Lets an agent use the browser for the first time | `okolos-agent pair` in the terminal, the Okolos Agent page in Fabric Dashboards | 2 | Every bridge today asks for "read and change all your data" once and never again, for any agent that asks | One pairing per agent, confirmed by the person with a matching code, revocable; each task the agent opens is scoped |
 | 2 | Hand over | Gives the agent a job | the agent | 3 | The agent gets the whole browser: every tab, every login | The job carries its own reach: which sites to read, which to write, for how long |
 | 3 | Working | Keeps working in their own apps | own apps | 3 | Agent windows jump in front and type into whatever has focus | The agent works in its own window, in the background, and never takes the focus |
 | 4 | Reading | — (the agent reads pages) | the agent's window | 3 | Pages carry instructions written for the agent; the agent reads them as orders | What the agent reads is cleaned first, and the page's verdict travels with it |
 | 5 | Decision | Is asked about something that matters | the bridge's panel | 2 | Either asked about everything, or about nothing | Asked only for money, sending, deleting, signing in, sharing — in a panel a page cannot draw |
 | 6 | Hand-off | Logs in, solves a CAPTCHA, takes over | the agent's window | 3 | The agent fights the CAPTCHA, or asks for the password in chat | The task pauses, the person does that one step, the task resumes; the agent never sees the secret |
-| 7 | After | Wants to know what happened, and wants the machine back | journal, machine | 4 | No record of what the agent did as me; leftover browser processes eat the memory | Every step recorded before it happened; the task's windows and processes gone when it ends |
+| 7 | After | Wants to know what happened, and wants the machine back | journal, machine | 4 | No record of what the agent did as me; leftover browser processes eat the memory | Every answer to a tool call and every refusal recorded in the agents' journal before it is sent (protocol handshake messages excepted, spec §3), and past the day's 5000 agent entries no answer to a tool call (except the first successful `close` of each task) until 00:00 UTC rather than an answer with no record; the task's windows and processes gone when it ends |
 
 ## User stories
 
@@ -407,22 +407,23 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 - **Status:** proposed
 
 ### ST-027: Connect an agent once, and be able to take it back
-- **Story:** As P-01, I want each agent to be paired with my browser once, by me, with a code I can compare, so that no process on my machine can drive my browser just by asking.
+- **Story:** As P-01, I want each agent to be paired with my browser once, by me, with a code I can compare, so that no agent and no web page can drive my browser just by asking.
 - **Traces:** JTBD-10, JRN-05/#1
 - **Acceptance criteria:**
-  - Given an agent that has never connected, when it asks to use the browser, then nothing is reachable until the person confirms a pairing in the bridge's own panel, comparing a code shown in both places.
-  - Given a request without the pairing's key, or from an origin that is not the bridge, when it reaches the local door, then it is refused and the refusal is recorded.
+  - Given an agent that has never connected, when it asks for access through `okolos-agent pair`, then nothing is reachable until the person confirms on the Okolos Agent page, comparing the six-digit code shown in both places.
+  - Given a call to `/mcp` without the agent's key, or any call to the door carrying an `Origin` or `Sec-Fetch-*` header (a web page), then it is refused before any request is made, and the refusal is recorded. Asking for access (`POST /pair`) needs no key: that is how a request starts.
+  - Code already running as the person is outside what Б1 defends against (spec §11 F4); the story promises protection from agents and pages, not from the person's own processes.
   - Given a paired agent, when the person revokes it, then its next call is refused and any task it holds stops.
 - **Priority:** must
 - **Status:** proposed
 
 ### ST-028: An agent reads my logged-in pages, cleaned, without disturbing me
-- **Story:** As P-01, I want an agent to read pages behind my logins in its own background window, with hidden instructions removed and the page's verdict attached, so that I can delegate reading without the page steering the agent or the agent stealing my focus.
+- **Story:** As P-01, I want an agent to read pages behind my logins in its own background window, with hidden instructions removed and the page's verdict attached, so that I can delegate reading without the page steering the agent or the agent stealing my focus. In Б1 the agent profile starts with no sign-ins and Б1 has no sign-in step, so the read is meant for pages that need none, though a sign-in I make by hand in an agent window stays as long as the site itself keeps it between browser runs; pages behind my logins come with the sign-in step of SCN-047 in Б2.
 - **Traces:** JTBD-10, JTBD-01, JRN-05/#2, JRN-05/#3, JRN-05/#4
 - **Acceptance criteria:**
   - Given a task with its sites named, when the agent asks for a site outside them, then it is refused with a reason it can act on.
   - Given a page with hidden instructions from the corpus, when the agent takes a snapshot, then none of them is in what it receives and the finding is attached.
-  - Given a page with a password, card or one-time-code field, when the agent reads it, then it sees the field and never its value.
+  - Given a page with a password, card or one-time-code field, when the agent reads it, then it sees the field and never its value; the value of any text, search, email, number, password, card or code field people can see is also removed from other elements' names (a field hidden from people masks nothing; a select's chosen value and an editable area's text are searched for too; date, time, colour and range inputs are not, B-185), from 4 characters and from 3 in password, card and one-time-code fields (spec §3 R4, §11 S4), so a shorter value (1 or 2 characters, or 3 in an ordinary field) can still show in a label that repeats it; an editable area arrives with its content listed by kind only (roles, no names or text), a select without its chosen option marked, and an autocomplete box keeps its combobox role but is cleaned as a text box (its typed query is searched for).
   - Given the person working in another app, when the agent opens, navigates and reads, then the person's app stays in front.
   - Given a very large page, when the agent asks for a snapshot, then it receives it in parts it can page through, never a single answer too large to use.
 - **Priority:** must

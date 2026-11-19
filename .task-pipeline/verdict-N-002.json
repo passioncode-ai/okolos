@@ -1,0 +1,176 @@
+{
+  "node": "N-002",
+  "done": [
+    "Acceptance 1: a message cut between reads is carried in pending and assembled; empty pieces between NULs are skipped (frames.test.ts:10-26); the spike's frame tests moved with the code and the spike now imports splitFrames from packages/cdp-pipe/src/frames.ts",
+    "Acceptance 2: send with no answer within requestTimeoutMs rejects with '<method>: no answer within N ms' (pipe.ts:138-141), the late answer is dropped because the id left `waiting`, and the pipe stays usable (pipe.test.ts:78-85)",
+    "Acceptance 3: an answer carrying error rejects with the CDP message, code and method name (pipe.ts:243; pipe.test.ts:87-93)",
+    "Acceptance 4: the child is spawned detached with stdio [ignore, ignore, pipe, pipe(fd 3 to browser), pipe(fd 4 from browser)]; close sends Browser.close, then SIGTERM, then SIGKILL to -pid, and the group (including a lingering grandchild) is gone afterwards (pipe.test.ts:182-206)",
+    "Acceptance 5: an event carrying sessionId reaches its subscriber with that sessionId as the second argument; unsubscribe stops delivery; send(method, params, sessionId) puts sessionId on the wire (pipe.test.ts:95-118)",
+    "close() has a hard deadline: the ask, SIGTERM and SIGKILL phases each wait at most graceMs and the final wait is bounded by the remaining deadline (overrun at most one POLL_MS), and an unsignallable group is reported via onCloseIncomplete instead of hanging (pipe.test.ts:216-237); repeated close returns the same promise",
+    "A frame that is not JSON and a listener that throws are both contained inside read(); delivery to the other listeners and the pipe continue, and the default report names the event and the error class, never the params",
+    "Interface matches the brief: splitFrames(pending, chunk): {messages, pending}; CdpPipe.launch({binary, args, userDataDir, requestTimeoutMs?}); send<T>(method, params?, sessionId?); on(event, (params, sessionId?) => void): () => void; readonly pid; close(graceMs = 2000)",
+    "pipe.ts imports only node:child_process and node:stream types: nothing reaches the network; the new package.json carries AGPL-3.0-only OR LicenseRef-PassionCode-Commercial; no added line in the diff carries U+2014",
+    "The spike still loads as a module under Node 26.10.0 and Node 22.23.1 (exports NATIVE_MESSAGE_LIMIT, chunksNeeded, compactAxTree)",
+    "cdp-pipe is correctly not a core-* package: it spawns processes and reads the clock (Date.now in close, setTimeout in send), and no core-* package imports it (core-* import only @okolos/contracts and @okolos/core-lookalike, grep)",
+    "the REQ-08 ESLint block (eslint.config.js:56) covers packages/cdp-pipe and the bundle-scan fetch scan reads its src; both are green and pipe.ts imports no node network module",
+    "the spike still loads after the move: importing tools/agent-window-spike.mjs under node v26.10.0 exports NATIVE_MESSAGE_LIMIT, chunksNeeded, compactAxTree; the .d.mts dropped splitFrames in step, and the .mjs-imports-.ts pattern has a precedent (tools/sign-feed.mjs:26)",
+    "the extension build cannot pull cdp-pipe in by accident today: tools/build.mjs entries do not reach it, and bundle-scan (which runs typecheck and build) is green",
+    "CdpPipe.launch works unbound, as N-010 will hold it (launch = CdpPipe.launch): it builds with the class name, not this; a scratch tsc probe assigning it to (o: LaunchOptions) => Promise<CdpPipe> compiles",
+    "on(event, (params, sessionId?)) delivers flat-session events with sessionId, which N-011 needs for per-window Network.responseReceived and load events",
+    "package.json, tsconfig.json and exports shape match the siblings (core-snapshot, contracts); licence expression accepted by tools/licensing.test.ts",
+    "pnpm-lock.yaml importers now match the workspace exactly (the base lock had no apps/agent importer; this diff adds it and packages/cdp-pipe)",
+    "docs counts (22 packages) agree with ls -d packages/*/ and pass tools/docs.test.ts; new doc lines carry no U+2014",
+    "the three reachable exemption rows carry the string 'Okolos Bridge Б1', so N-019 Test 1 (no such rows) will force their removal",
+    "the package count is true everywhere it is stated: `ls -d packages/*/ | wc -l` prints 22 and `ls -d apps/*/ | wc -l` prints 4 in the worktree, matching README.md:16, facts.md:61-62 and development.md:17; the Russian form '22 пакета' is the one tools/docs.test.ts demands",
+    "no other tracked file states 21 packages after the change (git grep for 21/22 near пакет/package finds only the three updated rows and a comment in tools/docs.test.ts)",
+    "the code-map row for cdp-pipe sits where its sibling bridge package core-snapshot is documented (README map, spec, plan, module map of the run); no other surface lists bridge packages",
+    "the README row's 'В сеть не ходит' holds: the package imports only node:child_process and node:stream",
+    "the README row's 'запросы со сроком' holds for the default too: requestTimeoutMs defaults to 10 000 ms",
+    "the evidence note's dated paragraph is true: splitFrames now lives in packages/cdp-pipe/src/frames.ts, the spike imports it from there, and the three spike test cases appear verbatim in packages/cdp-pipe/src/frames.test.ts (plus two new ones)",
+    "the documented spike command still works: the module imports under Node 26.10.0 and Node 22.23.1 and exposes NATIVE_MESSAGE_LIMIT, chunksNeeded, compactAxTree; importing .ts from a tool .mjs has a precedent in tools/sign-feed.mjs:26, so this is not a new runtime requirement",
+    "nothing else consumed splitFrames from the spike or its .d.mts (git grep finds no importer outside the spike and its test)",
+    "AGENTS.md Lifecycle stays true: the package is a library with no shipped caller (tools/reachable.test.ts exempts its three files until K3), it adds no port, login item, launchd job or per-session server; only the unit tests start fake browsers, and their afterEach kills each group",
+    "spec §3 'SIGTERM, потом SIGKILL группе' matches the documented close order (Browser.close, then SIGTERM to the group, then SIGKILL)",
+    "no user-facing behaviour changed: no UI string, locale file, screen or scenario is touched, so docs/ux/scenarios.md and CHANGELOG.md (user-visible changes only, by its own header) owe nothing; ux lint and brand lint exit 0",
+    "the lockfile's added 'apps/agent: {}' importer only records an app already on the base; on main it makes the feed agent run its documented 'install when the lockfile moved' step once, which AGENTS.md already describes",
+    "no cross-repository fact moved: fabric-workspace knowledge/ states no Okolos package count, and org-index repositories.json's okolos role is unchanged by an internal package",
+    "added documentation lines carry no em dash and no spaced-hyphen substitute"
+  ],
+  "not_done": [],
+  "not_verified": [
+    "unit: Behaviour against real Chrome: whether Chrome exits when fd 3 closes (the fixture does; if Chrome does not, a send after an incomplete close waits requestTimeoutMs instead of failing fast because shutdown() destroys the streams without setting closedBecause), and the ordering of a last answer vs the 'exit' event. REQ-54 names an integration test on Chrome; that is not part of this node's check",
+    "unit: The full pnpm gates / pnpm test run (docs.test.ts package count of 22, reachable.test.ts, licensing.test.ts, bundle and network scans over the fixture's node:net Socket import); only the node's named check and typecheck were run",
+    "unit: Callers: apps/agent (K3, N-011) does not exist yet as a consumer; how it uses on(), close() and requestTimeoutMs is the seam tier's",
+    "unit: Whether the TDD order (each test observed red first) was followed; commit history shows test and code landing per behaviour but red runs were not observed",
+    "unit: requestTimeoutMs and graceMs input validation (0, negative, NaN): read, judged harmless (immediate timeout or near-immediate SIGKILL), not tested",
+    "seam: real Chrome: no consumer exists yet, and the node's checks use the fake browser only; Chrome's behaviour on pipe EOF when the daemon dies (N-010 Test 5) was not tested",
+    "seam: hosted CI on Linux: process-group semantics of the pipe tests were not run there, only on this macOS host",
+    "seam: Node 22.0-22.17: the spike's .mjs import of a .ts file needs type stripping, which is on by default only from 22.18 (engines says >=22); only node v26.10.0 was run",
+    "seam: the N-005 Fabric kit and its logging: whether cdp-pipe's default stderr reporters fit the daemon's RotatingLog was not judged, because N-010's constructor passes no reporters",
+    "seam: the unit-level correctness of close() timing and listener isolation inside pipe.ts (the unit tier's subject)",
+    "product: the full pnpm gates (lint, typecheck, build, bundle scan, package:check): code tiers own them, and two gates need dist/",
+    "product: whether the K3 daemon and the K6 installer will add the Lifecycle rows AGENTS.md needs for the daemon and the agent window: that obligation arrives with those nodes, not this one",
+    "product: Node 22.0 to 22.17, where .ts imports from a tool .mjs are not stripped by default: the engines field allows them, but the precedent (tools/sign-feed.mjs) already carries that gap, and no such Node was available to run",
+    "product: the implementer's report, by instruction"
+  ],
+  "blockers": [
+    {
+      "what": "The readable side of the pipe (stdio[4], fromBrowser) and stderr (stdio[2]) have no 'error' listener, while the writable side does (pipe.ts:107) for the stated reason that an unhandled stream error takes the owner's process down. A read error on fd 4 would be thrown as an unhandled 'error' event and end the daemon with every session on it, the outcome the unit otherwise guards against (packages/cdp-pipe/src/pipe.ts:101-109, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Two added defensive branches are exercised by no test: the EPIPE route on the write side (toBrowser 'error' -> fail, pipe.ts:107) and the default onCloseIncomplete stderr line (pipe.ts:43-45). Both are reachable only on the failure paths they exist for (packages/cdp-pipe/src/pipe.ts:43-45, 107, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "tools/agent-window-spike.mjs now imports a .ts file directly (../packages/cdp-pipe/src/frames.ts), which runs only where Node strips types by default (22.18+). The root package.json declares engines node >=22, so 22.0-22.17 would fail to load the spike. Verified loading on 22.23.1 and 26.10.0 only (tools/agent-window-spike.mjs:39, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The core-* purity gate does not stop a core package from importing the new impure package or Node process/network modules. A file at packages/core-snapshot/src/ importing @okolos/cdp-pipe, node:child_process and node:https lints clean, and bundle-scan only looks for browser and fetch tokens in core-*/dist. core-snapshot is the nearest neighbour of cdp-pipe (same CDP AX-tree domain), so this is the likely place for the import to land (/Users/sshlg/DATA/_worktrees/okolos-b1-n-002/eslint.config.js:122-127 (core-* no-restricted-imports patterns: '*platform*', 'webextension-polyfill', '*/net*' only), found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "docs/README.md:106 states that cdp-pipe 'В сеть не ходит' and the guard says nothing leaves for the network except @okolos/net, but no gate proves it for a Node package: the REQ-08 rule restricts globals (fetch, XMLHttpRequest, WebSocket, EventSource) and bundle-scan greps 'fetch(', so a node:https or node:net import in packages/cdp-pipe/src lints and scans clean. cdp-pipe is the first package under packages/ that runs in Node with process powers, and apps/agent follows it (/Users/sshlg/DATA/_worktrees/okolos-b1-n-002/eslint.config.js:55-68 (REQ-08 block, globals only) and tools/gates/bundle-scan.test.ts REQ-08 test; claim at docs/README.md:106, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "N-010 has no seam to fake the pipe. CdpPipe has private members, so TypeScript treats it nominally: a fake launch returning {pid, send, on, close} does not type-check (TS2322, 'missing child, toBrowser, requestTimeoutMs, ... and 14 more'), and tsconfig.tests.json type-checks apps/*/src/**/*.test.ts in pnpm typecheck. N-010 Tests 1-2 (fake launch, Target.createTarget) need a cast or a Pick. Test 3 (shutdown on the fake browser) needs packages/cdp-pipe/src/fixtures/fake-browser.mjs, which the package does not export (exports only '.'), so N-010 must reach into another package's src by relative path or write a second fake (/Users/sshlg/DATA/_worktrees/okolos-bridge-b1/docs/superpowers/plans/2026-10-27-bridge-b1.md:297-298 (N-010 constructor launch = CdpPipe.launch; Tests 1-3) against /Users/sshlg/DATA/_worktrees/okolos-b1-n-002/packages/cdp-pipe/src/pipe.ts:93 (private constructor) and packages/cdp-pipe/package.json:8, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "A browser that exits on its own is silent to dependents. CdpPipe has no exit or closed signal, keeps no exit code or signal (pipe.ts:110-113 records only 'the browser exited'), and does not sweep the group at that moment; the sweep runs only inside close(). The repository's other LC-02 implementation, tools/feed/bounded.mjs:104, SIGKILLs the group as soon as the direct child exits. N-010/N-011 learn of a dead agent window only from the next send rejecting, cannot give the reason the design asks for (design 2026-10-06 §3 line 129: 'browser_offline с причиной'), and helpers left behind wait until someone calls close() (/Users/sshlg/DATA/_worktrees/okolos-bridge-b1/docs/superpowers/plans/2026-10-27-bridge-b1.md:297-298 (N-010 AgentWindows) and N-011 browser_offline mapping; cause at /Users/sshlg/DATA/_worktrees/okolos-b1-n-002/packages/cdp-pipe/src/pipe.ts:110-113, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Every rejection is a plain Error whose only payload is text ('<method>: no answer within N ms', '<method>: <cdp message> (CDP <code>)', '<method>: the browser exited', '<method>: the pipe ... closed'). N-011 must map these to BridgeRefusal (tab_gone, browser_offline with retryable:true, internal; design §2 and F20) and can only do it by parsing English message strings, which drifts the first time a message is reworded (/Users/sshlg/DATA/_worktrees/okolos-bridge-b1/docs/superpowers/plans/2026-10-27-bridge-b1.md:310-345 (N-011 verbs) and :297 (N-010), against /Users/sshlg/DATA/_worktrees/okolos-b1-n-002/packages/cdp-pipe/src/pipe.ts send/fail/read rejections, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The request deadline is fixed per pipe (default 10 s, pipe.ts:96) with no per-call override. The spike it replaces took a per-call timeoutMs with a 30 s default (agent-window-spike.mjs:175). The B0 evidence measured Accessibility.getFullAXTree at up to 2.65 s on an idle machine, and this repository records 3-5x slowdowns under load (vitest.config.ts testTimeout comment). N-011's navigate, snapshot and probe evaluation share one deadline with cheap calls (/Users/sshlg/DATA/_worktrees/okolos-bridge-b1/docs/superpowers/plans/2026-10-27-bridge-b1.md:310-345 (N-011 Tests 2, 10, 13: corpus, bloated fixture, large snapshot), found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The N-010 plan lists launch arguments that CdpPipe.launch already appends ('--remote-debugging-pipe' and '--user-data-dir=<profile>', pipe.ts:120). Read literally, the flags go into argv twice, with the profile coming from two places (Chrome keeps the last value, which is launch's). N-010 Test 1 inspects only the args handed to a fake launch, so it cannot see the final argv or prove that no --enable-automation reaches Chrome (/Users/sshlg/DATA/_worktrees/okolos-bridge-b1/docs/superpowers/plans/2026-10-27-bridge-b1.md:298 (N-010 argument list) and packet N-010.json outputs, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The spike now shares only the frame splitter. Its own client (PipeBrowser, agent-window-spike.mjs:131-222: per-call send timeout, close = Browser.close then SIGKILL to the group with no SIGTERM step) is a second implementation of what CdpPipe does. The comment at agent-window-spike.mjs:37-38 says the spike 'reads the pipe with the same code the daemon will', which is true of framing alone. The design keeps this spike as the re-measurement on every Chrome major (B-143, design §3 line 128), so those re-runs keep proving the spike's client, not CdpPipe (/Users/sshlg/DATA/_worktrees/okolos-b1-n-002/tools/agent-window-spike.mjs:131-222 and its comment at :37-38; evidence note docs/superpowers/evidence/2026-10-06-b0-agent-window.md:7-9, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The three exemption rows this node adds can only be removed (N-019 Test 1) once something reachable imports @okolos/cdp-pipe. tools/imports.mjs derives entries only from tools/build.mjs, its HTML pages, wrangler.toml and apps/*/package.json 'bin' (binEntriesFromPackages). N-011 bundles the daemon through a new tools/build-agent.mjs, which the reachability gate does not read, and apps/agent/package.json (N-005) has no bin. N-019 is allowed to edit only tools/reachable.test.ts. Unless one of them adds a bin or teaches imports.mjs about build-agent.mjs, N-019 cannot go green by removing rows (/Users/sshlg/DATA/_worktrees/okolos-bridge-b1/docs/superpowers/plans/2026-10-27-bridge-b1.md:510-527 (N-019, Files: tools/reachable.test.ts only), N-005 apps/agent/package.json, N-011 tools/build-agent.mjs; rows at /Users/sshlg/DATA/_worktrees/okolos-b1-n-002/tools/reachable.test.ts:51-53, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The new README code-map row says without qualification that close ends the whole browser process group. The package's own close() can resolve with the group still alive: after 3 x graceMs, when the OS refuses the signal, it gives up and writes one stderr line. The test 'never hangs' asserts the browser is still alive after close. Because the browser runs detached, a crash or kill -9 of the owner also leaves the group running. Spec §3 promises no orphans after kill -9, and that rests on a K4 sweep that does not exist yet. A reader of the map takes close as the whole guarantee. (docs/README.md:106, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The runbook says gates do not fail on the clock under heavy machine load, and that a timeout failure means a hang, not a slow machine. pipe.test.ts now has wall-clock upper bounds on real child processes: under 3 x 200 + 50 ms in 'never hangs', and under 2500 ms in 'asks first'. A slow machine can fail those without anything hanging. Measured: 5 of 5 runs passed with 28 busy loops on 14 cores, so the window is narrow but real. (docs/runbooks/development.md:259-261; packages/cdp-pipe/src/pipe.test.ts:178,232, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Spec §1 lists K1 (packages/cdp-pipe) as depending on K0 (contracts). The package as built depends on nothing: package.json has no dependencies, nothing imports @okolos/contracts, and the run's module map and the node brief both say Depends: none. The spec now describes a dependency the product does not have. (/Users/sshlg/DATA/_worktrees/okolos-bridge-b1/docs/superpowers/specs/2026-10-06-bridge-b1-design.md:26, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    }
+  ],
+  "replan": {
+    "possible": true,
+    "add": [],
+    "park": [],
+    "why": "certified at all 3 tiers in round 2"
+  },
+  "evidence": [
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-002 -s exec vitest run packages/cdp-pipe tools/agent-window-spike.test.ts -> Test Files 3 passed (3), Tests 28 passed (28): frames.test.ts 5, agent-window-spike.test.ts 6, pipe.test.ts 17",
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-002 -s run typecheck (tsc -b && tsc -p tsconfig.tests.json) -> exit 0, no output",
+    "unit: pgrep -fl fake-browser after each run -> no process (exit 1)",
+    "unit: node -e import('.../tools/agent-window-spike.mjs') under v26.10.0 and v22.23.1 -> [NATIVE_MESSAGE_LIMIT, chunksNeeded, compactAxTree], exit 0",
+    "unit: scratch probe (scratchpad, not in repo): after close() that could not signal the group, a new send rejected in 3 ms with 'Fake.echo: the browser exited' (the fake leaves once fd 3 closes), so send after an incomplete close does not wait out requestTimeoutMs with the fixture",
+    "unit: git diff ed91214..6c2227c | grep '^+' | grep U+2014 -> nothing (rc 1)",
+    "unit: git ls-tree ed91214 apps/ lists apps/agent: the lockfile's new 'apps/agent: {}' importer is a sync of an existing package, not new scope",
+    "seam: git diff --stat ed91214..6c2227c -> 18 files, 713 insertions, 39 deletions",
+    "seam: pnpm -s exec vitest run packages/cdp-pipe tools/agent-window-spike.test.ts -> 3 files, 28 passed",
+    "seam: pnpm -s exec vitest run tools --exclude 'tools/gates/**' -> 62 files passed, 1027 passed, 1 skipped (includes reachable, docs, licensing, one-deadline, coverage-shape, test-quality, imports, ci)",
+    "seam: pnpm -s exec vitest run tools/gates -> bundle-scan 22 passed (runs pnpm typecheck and pnpm build)",
+    "seam: pnpm run typecheck -> exit 0 (tsc -b and tsconfig.tests.json)",
+    "seam: pnpm -s exec eslint packages/cdp-pipe tools/agent-window-spike.mjs tools/agent-window-spike.test.ts tools/reachable.test.ts -> exit 0",
+    "seam: eslint --stdin --stdin-filename packages/core-snapshot/src/probe-seam.ts with imports of @okolos/cdp-pipe, node:child_process, node:https -> exit 0 (finding 1)",
+    "seam: eslint --stdin --stdin-filename packages/cdp-pipe/src/probe-seam.ts with imports of node:https, node:net -> exit 0 (finding 2)",
+    "seam: scratch tsc probe (scratchpad, outside the repo): fake launch typed as Promise<CdpPipe> -> TS2322 missing private members; CdpPipe.launch assigned unbound -> compiles (finding 3, confirm 5)",
+    "seam: node -e import(tools/agent-window-spike.mjs) -> [NATIVE_MESSAGE_LIMIT, chunksNeeded, compactAxTree] on node v26.10.0",
+    "seam: node import of packages/cdp-pipe/src/index.ts -> ERR_MODULE_NOT_FOUND for ./frames.js: the package entry needs a bundler or vitest, like its siblings; N-011 bundles through tools/build-agent.mjs",
+    "seam: lock importers vs ls -d packages/*/ apps/*/ -> identical",
+    "seam: grep -rn splitFrames (dist and node_modules excluded) -> callers listed in scope; grep for CdpPipe outside the package -> none",
+    "product: ls -d packages/*/ | wc -l → 22; ls -d apps/*/ | wc -l → 4 (worktree at 6c2227c)",
+    "product: git grep for package counts near пакет/package → docs/README.md:16, docs/runbooks/development.md:17, tools/docs.test.ts:63-64 (comment) only",
+    "product: pnpm -s exec vitest run packages/cdp-pipe tools/agent-window-spike.test.ts tools/docs.test.ts tools/runbook.test.ts tools/licensing.test.ts tools/reachable.test.ts → 7 files, 126 tests passed",
+    "product: pnpm -s exec vitest run tools/instants.test.ts tools/journal-kinds.test.ts tools/journal-sentences.test.ts tools/marks-read.test.ts tools/no-modals.test.ts tools/one-deadline.test.ts tools/severity-words.test.ts tools/adr.test.ts → 74 tests passed",
+    "product: python3 docs/ux/lint.py → exit 0; python3 docs/brand/lint.py → exit 0",
+    "product: node (v26.10.0) and ~/.nvm/versions/node/v22.23.1/bin/node import tools/agent-window-spike.mjs → exports NATIVE_MESSAGE_LIMIT,chunksNeeded,compactAxTree, exit 0",
+    "product: git grep \"from '../(packages|apps)/...ts'\" in tools/*.mjs → tools/agent-window-spike.mjs:39 and tools/sign-feed.mjs:26 (precedent)",
+    "product: pipe.test.ts run 5 times with 28 'yes' loops on a 14-core machine → 17/17 passed each run; load processes stopped afterwards (pgrep -x yes → 0)",
+    "product: grep of packages/cdp-pipe/src/pipe.ts → imports node:child_process, node:stream, ./frames.js only; requestTimeoutMs ?? 10_000; stderr give-up line at :44",
+    "product: git diff ed91214..6c2227c -- docs | grep U+2014 on added lines → no hits",
+    "product: git -C /Users/sshlg/DATA/fabric-workspace grep for Okolos package counts or cdp-pipe in knowledge/ → no hits"
+  ],
+  "tested": {
+    "head": "09bfbaab9ac04ea54050f1d8213ad309bfff28fb",
+    "tree": "c028778d36aea2bb06cc00fed2ac33f84123f56f"
+  }
+}

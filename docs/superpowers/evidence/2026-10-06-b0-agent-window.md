@@ -4,7 +4,9 @@
 человека на отдельном профиле под CDP через `--remote-debugging-pipe` — так, как предполагает
 стратегия (§8.6). Инструмент: [`tools/agent-window-spike.mjs`](../../../tools/agent-window-spike.mjs).
 Его чистые части — разбор кадров pipe, сжатие AX-дерева, счёт сообщений по 1 МБ — держит
-`tools/agent-window-spike.test.ts`.
+`tools/agent-window-spike.test.ts`. С 2026-10-27 разбор кадров живёт в пакете моста
+`packages/cdp-pipe/src/frames.ts` (Б1, N-002), спайк импортирует его оттуда, а его тесты
+переехали в `packages/cdp-pipe/src/frames.test.ts`.
 
 Сырые результаты лежат рядом: [run2](2026-10-06-b0-agent-window-run2.json) и
 [run3](2026-10-06-b0-agent-window-run3.json). Run1 перезаписан run2. Из него сохранено одно

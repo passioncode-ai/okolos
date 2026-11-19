@@ -255,15 +255,28 @@ describe('the licences of what this project consumes', () => {
     })
   }
 
+  /**
+   * The package's own `package.json`, found the way Node finds the package: up the `node_modules`
+   * chain from the folder that depends on it. Not `require.resolve('<name>/package.json')`, which
+   * a package whose `exports` does not list `./package.json` refuses (`@modelcontextprotocol/node`).
+   */
+  function manifestOf(name: string, from: string): string {
+    for (let dir = from; ; dir = path.dirname(dir)) {
+      const candidate = path.join(dir, 'node_modules', name, 'package.json')
+      if (existsSync(candidate)) return candidate
+      if (path.dirname(dir) === dir) {
+        return createRequire(import.meta.url).resolve(`${name}/package.json`, { paths: [from] })
+      }
+    }
+  }
+
   it('reads at least one dependency, so an empty list cannot pass as a clean sweep', () => {
     expect(shipped().length).toBeGreaterThan(0)
   })
 
   it('every shipped dependency carries a permissive licence', () => {
     for (const { name, from } of shipped()) {
-      const manifest = createRequire(import.meta.url).resolve(`${name}/package.json`, {
-        paths: [path.dirname(path.join(root, from))],
-      })
+      const manifest = manifestOf(name, path.dirname(path.join(root, from)))
       const { license } = JSON.parse(readFileSync(manifest, 'utf8')) as { license?: string }
       expect(license, `${name} (from ${from}) declares no licence at all`).toBeTruthy()
       expect(

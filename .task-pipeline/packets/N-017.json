@@ -1,0 +1,45 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-017",
+ "intent": "e2e моста",
+ "inputs": [
+  "демон в процессе теста через createAgent({home: <временный>, port, allowLoopbackForTests: true, extraChromeArgs}) импортом из apps/agent/src/agent.ts (типы есть, аудит #35), не через CLI и не через переменную окружения; ключ в X-Okolos-Agent-Key (аудит #31); страницы фикстур по имени fixture.test через --host-resolver-rules; Chrome stable",
+  "N-015: страница для подтверждения",
+  "N-016: скрипт agent:build и релиз"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "e2e/bridge/skeleton.spec.ts",
+   "e2e/bridge/scn-044.spec.ts",
+   "e2e/bridge/scn-045.spec.ts",
+   "playwright.bridge.config.ts",
+   "package.json",
+   "playwright.config.ts",
+   "docs/runbooks/development.md"
+  ]
+ },
+ "outputs": [
+  "`pnpm test:e2e:bridge`"
+ ],
+ "acceptance": [
+  "skeleton: MCP-клиент вызывает инструменты по toolName (session_open …), журнал хранит каноническое написание (session.open) → привязка через страницу → session.open → open → snapshot без скрытой инструкции → close",
+  "SCN-044: неверный код → отклонить; истёкший запрос (часы через createAgent) показан строкой expired; вызов с заголовком Origin виден на SCR-24 как отказ на двери; отзыв → следующий вызов not_paired, задача закрыта (проверки N-013 круг 3, N-007 круг 2)",
+  "SCN-045: страница показывает задачу агента и отказ origin_not_in_task; без задач SCR-24 в состоянии empty (проверки N-013 круг 3, N-007 круг 2)",
+  "playwright test --list основного конфига не показывает e2e/bridge (аудит #15)",
+  "проверка узла: pnpm -s run test:e2e:bridge"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- e2e/bridge/skeleton.spec.ts e2e/bridge/scn-044.spec.ts e2e/bridge/scn-045.spec.ts; затем первый непройденный тест в списке acceptance"
+}

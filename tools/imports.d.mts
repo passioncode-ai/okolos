@@ -15,4 +15,6 @@ export declare function tsEntriesFromBuild(): string[]
 export declare function pageEntriesFromBuild(): string[]
 export declare function workerEntryFromWrangler(): string[]
 export declare function binEntriesFromPackages(): string[]
+/** The entries Okolos Agent's build bundles (build-agent.mjs, build-agent-probe.mjs). */
+export declare function agentEntriesFromBuild(): string[]
 export declare function entryPoints(): string[]

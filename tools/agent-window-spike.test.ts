@@ -1,22 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { NATIVE_MESSAGE_LIMIT, chunksNeeded, compactAxTree, splitFrames } from './agent-window-spike.mjs'
+import { NATIVE_MESSAGE_LIMIT, chunksNeeded, compactAxTree } from './agent-window-spike.mjs'
 
-describe('reading the CDP pipe', () => {
-  it('splits NUL-terminated messages', () => {
-    expect(splitFrames('', '{"id":1}\0{"id":2}\0')).toEqual({ messages: ['{"id":1}', '{"id":2}'], pending: '' })
-  })
-
-  it('carries a message cut by the read into the next one instead of dropping it', () => {
-    const first = splitFrames('', '{"id":1}\0{"id"')
-    expect(first).toEqual({ messages: ['{"id":1}'], pending: '{"id"' })
-    expect(splitFrames(first.pending, ':2}\0')).toEqual({ messages: ['{"id":2}'], pending: '' })
-  })
-
-  it('returns nothing for a read that ends before any message does', () => {
-    expect(splitFrames('', '{"id":3')).toEqual({ messages: [], pending: '{"id":3' })
-  })
-})
+// The pipe's frame splitter moved to packages/cdp-pipe (N-002); its tests moved with it
+// to packages/cdp-pipe/src/frames.test.ts.
 
 describe('the snapshot an agent is handed', () => {
   const node = (nodeId: string, role: string, name?: string, ignored = false) => ({

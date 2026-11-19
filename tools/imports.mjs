@@ -164,10 +164,28 @@ export function binEntriesFromPackages() {
   return out
 }
 
+/**
+ * The entries Okolos Agent's build bundles (`tools/build-agent.mjs`: the daemon;
+ * `tools/build-agent-probe.mjs`: the probe it evaluates in the agent's page), named
+ * there as `path.join(root, 'apps/….ts')`, read the same way as build.mjs.
+ */
+export function agentEntriesFromBuild() {
+  const out = []
+  for (const script of ['build-agent.mjs', 'build-agent-probe.mjs']) {
+    const file = path.join(root, 'tools', script)
+    if (!existsSync(file)) continue
+    for (const [, entry] of readFileSync(file, 'utf8').matchAll(/path\.join\(root,\s*'(apps\/[^']+\.ts)'\)/g)) {
+      out.push(path.join(root, entry ?? ''))
+    }
+  }
+  return out
+}
+
 /** Every entry point the build actually ships. */
 export function entryPoints() {
   return [
     ...tsEntriesFromBuild(),
+    ...agentEntriesFromBuild(),
     ...pageEntriesFromBuild(),
     ...workerEntryFromWrangler(),
     ...binEntriesFromPackages(),

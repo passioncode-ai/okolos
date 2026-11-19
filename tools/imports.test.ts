@@ -11,6 +11,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import {
+  agentEntriesFromBuild,
   binEntriesFromPackages,
   entryPoints,
   pageEntriesFromBuild,
@@ -80,16 +81,21 @@ describe('walking from an entry', () => {
 describe('the entry list', () => {
   it('comes from the build and wrangler, not from a list of its own', () => {
     // The obvious way to defeat a reachability gate is to declare the orphan an
-    // entry point. These four sources are the ones that actually ship code —
-    // the build's scripts and pages, the worker wrangler loads, and the `bin`
-    // an app declares. The equality below is the anti-cheat property: the list
+    // entry point. These five sources are the ones that actually ship code —
+    // the build's scripts and pages, the worker wrangler loads, the `bin`
+    // an app declares, and Okolos Agent's build (the daemon and its probe). The equality below is the anti-cheat property: the list
     // must be exactly their union, never a hand-written addition.
     expect(tsEntriesFromBuild().length).toBeGreaterThanOrEqual(2)
     expect(pageEntriesFromBuild().length).toBeGreaterThanOrEqual(3)
     expect(workerEntryFromWrangler().length).toBe(1)
     expect(binEntriesFromPackages().length).toBeGreaterThanOrEqual(1)
+    expect(agentEntriesFromBuild().map((f) => path.relative(path.resolve(import.meta.dirname, '..'), f).split(path.sep).join('/'))).toEqual([
+      'apps/agent/src/main.ts',
+      'apps/extension/src/agent-probe-page.ts',
+    ])
     expect(entryPoints().length).toBe(
       tsEntriesFromBuild().length +
+        agentEntriesFromBuild().length +
         pageEntriesFromBuild().length +
         workerEntryFromWrangler().length +
         binEntriesFromPackages().length,

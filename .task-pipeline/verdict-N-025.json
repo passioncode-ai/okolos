@@ -1,0 +1,58 @@
+{
+  "node": "N-025",
+  "done": [
+    "gitEnv() returns a copy of process.env without GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE, GIT_OBJECT_DIRECTORY, GIT_ALTERNATE_OBJECT_DIRECTORIES, GIT_COMMON_DIR, GIT_NAMESPACE, GIT_PREFIX; it does not mutate process.env",
+    "every git child in the unit now passes env: gitEnv(): ourCommit's helper (wellknown.ts:83-89), the test helper runGit (wellknown.test.ts:83-88) and the victim log read (wellknown.test.ts:75)",
+    "the victim test discriminates the leak through the test helper: GIT_DIR is set to the victim before dotfilesRelease() runs, so a runGit without gitEnv() would init/add/commit 'dotfiles' into the victim and the log assertion 'the only commit' would go red; GIT_DIR is restored in finally, including when it was set by a hook",
+    "the victim repository is itself built with gitEnv(), so under the real hook its setup cannot land in this checkout",
+    "a pre-push hook in a linked worktree receives an absolute GIT_DIR (probed in a scratch repo: GIT_DIR=<main>/.git/worktrees/wt, no GIT_WORK_TREE); in a main checkout it receives none. The incident shape (worktree branch) is the one the list covers",
+    "the list holds every variable that relocates where git reads and writes a repository (dir, common dir, work tree, index, object store, alternates); compared with `git rev-parse --local-env-vars`",
+    "the gate reads 50+ test files (not vacuous), flags the planted incident line, and reports no offender in the current tree; the only -C shapes outside wellknown.test.ts (install-feed-agent.test.ts:113,156-157) are expected argv arrays for a fake runner and correctly do not match",
+    "acceptance 'test file with git -C without gitEnv() is named; a planted defect is caught' is met by tools/git-env.test.ts:42-51"
+  ],
+  "not_done": [],
+  "not_verified": [
+    "unit: pnpm gates (the node's full check) was not run: only the two named test files and typecheck",
+    "unit: the test under a real pre-push hook with GIT_DIR naming this repository; the victim case stands in for it and I did not reproduce the original red by reverting runGit",
+    "unit: vitest pool isolation of process.env mutation across files (the GIT_DIR window is synchronous within one test, so no in-file overlap)",
+    "unit: git invocations in non-test modules that tests reach (tools/feed-job.mjs, tools/install-feed-agent.mjs and the like): seam tier",
+    "unit: e2e/*.spec.ts and scripts/ are outside the gate's walk; grep found no git call in e2e today"
+  ],
+  "blockers": [
+    {
+      "what": "The env: gitEnv() added to ourCommit is not exercised by any test that would fail without it. Under GIT_DIR=victim, `git -C <release> rev-parse --show-toplevel` returns the release folder itself (probed), the manifest check fails and buildIdentity returns a digest either way, so the victim case passes with or without the ourCommit change. Without it, under the real hook, buildIdentity(AGENT_ROOT) would report a digest instead of the commit (probed: rev-parse --show-toplevel under the worktree's GIT_DIR from apps/agent answers apps/agent). (apps/agent/src/service/wellknown.ts:88; apps/agent/src/service/wellknown.test.ts:54-79, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The gate reads only the `'git', ['-C'` shape and exempts a whole file when the text gitEnv() appears anywhere in it (a comment counts). It misses git run in another directory through the cwd option (execFileSync('git', ['init'], { cwd: tmp }) inherits GIT_DIR just the same), execSync string commands, and backtick-quoted 'git'; and a second -C call without env added to wellknown.test.ts or git-env.test.ts would pass. Today no test hides behind this: the only cwd-form calls (tools/graph-check.test.ts:29, tools/feed-key.test.ts:142, tools/docs.test.ts:752, tools/ci.test.ts:168) are read-only and aimed at this repository. (tools/git-env.test.ts:25-31, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "GIT_LOCATION omits the rest of git's own repository-local list (`git rev-parse --local-env-vars`): GIT_CONFIG, GIT_CONFIG_PARAMETERS, GIT_CONFIG_COUNT, GIT_IMPLICIT_WORK_TREE, GIT_GRAFT_FILE, GIT_NO_REPLACE_OBJECTS, GIT_REPLACE_REF_BASE, GIT_SHALLOW_FILE. None of these sends writes into another repository, but `git -c core.worktree=... push` exports GIT_CONFIG_PARAMETERS to the hook, and a temp repository would then add files from that work tree. GIT_NAMESPACE is in the list though git does not count it local; harmless. (apps/agent/src/service/wellknown.ts:63-72, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    }
+  ],
+  "replan": {
+    "possible": true,
+    "add": [],
+    "park": [],
+    "why": "certified at all 1 tiers in round 1"
+  },
+  "evidence": [
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-025 -s exec vitest run apps/agent/src/service/wellknown.test.ts tools/git-env.test.ts -> Test Files 2 passed (2), Tests 12 passed (12)",
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-025 -s run typecheck -> exit 0",
+    "unit: scratch repo probe (scratchpad, since deleted): pre-push hook in a linked worktree sees GIT_DIR=<main>/.git/worktrees/wt and GIT_PREFIX=, no GIT_WORK_TREE; in the main checkout no GIT_DIR",
+    "unit: GIT_DIR=<scratch>/main/.git git -C <scratch>/rel/x rev-parse --show-toplevel -> <scratch>/rel/x (exit 0): an inherited GIT_DIR makes cwd the work tree, so ourCommit's manifest check rejects it in both the fixed and unfixed code",
+    "unit: GIT_DIR=<this worktree's absolute git dir> git -C <worktree>/apps/agent rev-parse --show-toplevel -> <worktree>/apps/agent (read-only): without gitEnv() buildIdentity(AGENT_ROOT) would lose its commit under the hook",
+    "unit: git rev-parse --local-env-vars (git 2.55.0) -> 15 names, compared with GIT_LOCATION",
+    "unit: grep of *.test.ts under apps, packages, tools for quoted 'git': wellknown.test.ts:75,84 (gitEnv), graph-check.test.ts:29, feed-key.test.ts:142, docs.test.ts:752, ci.test.ts:168 (cwd: root, read-only), install-feed-agent.test.ts:113,156,157 (expected argv of a fake runner)",
+    "unit: git -C /Users/sshlg/DATA/_worktrees/okolos-b1-n-025 log --oneline -1 -> 28f2434; git ls-files | wc -l -> 768; git status --porcelain -> empty"
+  ],
+  "tested": {
+    "head": "da814f658b78bac3874c960f6b9704da8e01d351",
+    "tree": "8496c2efcf93422b942f7b54feefef680c6f42c5"
+  }
+}

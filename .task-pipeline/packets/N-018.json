@@ -1,0 +1,41 @@
+{
+ "schema_version": "task-pipeline/execution-packet/1",
+ "node": "N-018",
+ "intent": "ADR моста и снимка частями",
+ "inputs": [
+  "имена тестов N-006, N-008, N-011",
+  "N-011: механизмы для таблиц ADR"
+ ],
+ "decision_refs": [
+  "docs/superpowers/specs/2026-10-27-bridge-b1-brief.md#решения",
+  "docs/superpowers/specs/2026-10-06-bridge-b1-design.md",
+  "docs/superpowers/specs/2026-10-27-bridge-b1-modules.md"
+ ],
+ "source_scope": {
+  "edit_targets": [
+   "docs/adr/0020-bridge-is-part-of-okolos-agent.md",
+   "docs/adr/0021-agent-snapshot-in-pages-of-32-kb.md",
+   "docs/adr/README.md",
+   "docs/adr/0019-page-content-never-reaches-our-infrastructure.md",
+   "docs/adr/0018-agents-get-their-own-extension.md"
+  ]
+ },
+ "outputs": [
+  "два ADR"
+ ],
+ "acceptance": [
+  "tools/adr.test.ts: каждый названный файл существует",
+  "таблица «Чем держится» ADR-0019 называет тест журнала apps/agent/src/journal/journal.test.ts и тест снимка в Chrome apps/agent/src/verbs/skeleton.chrome.test.ts (ревью F25)",
+  "ADR моста записывает границу угроз Б1, что клиент с оболочкой под инъекцией страницы и есть код от имени человека, что в Б1 от этого пути защищает только очистка снимка, и что расширение Okolos в Б1 не имеет канала к демону (ревью F4, F21, R9)",
+  "проверка узла: pnpm -s exec vitest run tools/adr.test.ts"
+ ],
+ "guards": [
+  "TDD: тест пишется первым и наблюдается красным",
+  "никакого секрета в argv, логах, журнале и URL; единственное исключение: одноразовый код входа в /fabric/v1/login?code= (его требует протокол fabric-service/0.1; живёт 120 с, сгорает при первом использовании, не логируется)",
+  "ничего не уходит в сеть, кроме уже разрешённого @okolos/net",
+  "core-* не трогают браузерные API, сеть, часы, случайность (гейт ESLint и скан бандла)",
+  "лицензия нового package.json: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "без длинного тире в текстах для людей"
+ ],
+ "resume": "git log --oneline origin/main..bridge/b1-run2 -- docs/adr/0020-bridge-is-part-of-okolos-agent.md docs/adr/0021-agent-snapshot-in-pages-of-32-kb.md docs/adr/README.md; затем первый непройденный тест в списке acceptance"
+}

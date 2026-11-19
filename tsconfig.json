@@ -41,6 +41,12 @@
       "path": "packages/core-traps"
     },
     {
+      "path": "packages/core-snapshot"
+    },
+    {
+      "path": "packages/cdp-pipe"
+    },
+    {
       "path": "packages/model"
     },
     {
@@ -51,6 +57,9 @@
     },
     {
       "path": "apps/mail-cli"
+    },
+    {
+      "path": "apps/agent"
     }
   ]
 }

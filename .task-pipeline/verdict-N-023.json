@@ -1,0 +1,181 @@
+{
+  "node": "N-023",
+  "done": [
+    "isLocalHost returns true for every range the packet lists (localhost, *.localhost, 127/8, 0/8, 10/8, 172.16/12, 192.168/16, 169.254/16, 100.64/10, ::, ::1, fe80::/10, fc00::/7, ::ffff:/::a.b.c.d/64:ff9b:: embedded IPv4, *.local, trailing-dot names), bracketed and bare, and false for public addresses and names just outside each range; 100.64.0.1 and [::ffff:100.64.0.1] are true (bridge.test.ts:281-339, 342-380, 404-410)",
+    "validateScope refuses http://100.64.0.1 with 'not a public origin' and the same loop asserts isLocalHost(hostname) is true for every refused URL, the shared-case form the acceptance allows (bridge.test.ts:98-154; normaliseOrigins at bridge.ts:530-531)",
+    "VerbIO is a mapped type over AnyBridgeVerb indexing VerbIOEntries, so a verb without an entry is a compile error: verified by adding 'session.list' to BRIDGE_SESSION_VERBS in a scratch copy, which fails with TS2536 at bridge.ts:440",
+    "canonicalVerb(toolName(v)) === v for every verb in both lists; unknown names, the dotted spelling, '__proto__' and 'hasOwnProperty' return null; it is exported from the package entry (bridge.test.ts:563-578, probe)",
+    "toolName is typed to AnyBridgeVerb only, so the collapse of x.y and x_y cannot occur through it (@ts-expect-error at bridge.test.ts:576-577); tool names match [a-zA-Z0-9_-]{1,64} and are distinct",
+    "isLocalAddress is a delegate of isLocalHost (bridge.ts:645-647), handles brackets, %en0 and %25en0 zones, embedded IPv4, and returns true for the empty string; the test asserts agreement over the full LOCAL/PUBLIC/UNREADABLE tables (bridge.test.ts:483-510)",
+    "Unreadable input fails closed in all three classifiers: canonicalHost returns null on whitespace, path, port, userinfo, bad zone or non-hex IPv6, and both public functions map null to true (bridge.ts:657-676, probe on '127.0.0.1\\t', '8.8.8.8%en0', 'fe80::1%')",
+    "All per-verb types the packet names exist with SessionOpenInput = TaskScope and CensusResult = readonly CensusEntry[]; OpenInput and WaitForInput reject mixed targets at the type level (bridge.test.ts:699-759)",
+    "refusalKey is exhaustive with a never branch; the two new refusals cleaning_incomplete and stale_cursor are non-retryable and have keys in both locales (bridge.test.ts:762-791)",
+    "toSnapshotFinding copies only closed-set fields; a carrier or concealment value outside its set is dropped, and the test proves the payload, locator and free-form detail do not appear in the serialised finding (bridge.test.ts:589-633)",
+    "validateScope now requires profile, with no default to the persistent profile; the missing-profile branch has a test (bridge.ts:504-508, bridge.test.ts:83-89)",
+    "No U+2014 in any added line of the diff",
+    "every refusal code has refusal_<code> in both agent catalogues, and bridge.test.ts:783 reads the catalogues, so a new code fails the build before the page shows a raw key",
+    "toolName gives exactly the eight tool names N-011 lists (session_open, open, snapshot, read, get, waitFor, close, hygiene_census); screenshot is gone from BRIDGE_VERBS, matching N-011's 'tools/list has no screenshot' and spec §2.2",
+    "the eight verb_* catalogue keys equal verb_<toolName(v)> for every AnyBridgeVerb, as N-014's verbKey plan and spec §9 ('восемь фраз verb_*') expect",
+    "toSnapshotFinding reads detail.concealment as a comma list and detail.carrier, which is what core-injection stage1.ts:132-133 and stage3.ts:110-111 write (N-003 input)",
+    "CensusEntry matches N-012's packet field for field; SessionOpenResult/OpenInput/WaitForInput/GetResult/CloseResult match spec §2.2 and its N-023 paragraph",
+    "validateScope now requires profile; no caller in the tree relied on the old 'agent' default, and SCN-045 step 1, spec §2.1 and terminology name both profiles",
+    "e2e fixtures named fixture.test (N-011, N-017) pass isLocalName ('.test' is not in LOCAL_NAME_SUFFIXES and has a dot), so the planned skeleton is not refused by validateScope; only the post-navigation address check needs allowLoopbackForTests",
+    "SCN-045 step 1 and spec §11 F9 list the same names as LOCAL_NAME_SUFFIXES and point to it as the one list; 100.64/10 is named in both",
+    "terminology classes internal, browser_offline, cleaning_incomplete as сбой Okolos Agent, consistent with SCR-24",
+    "the built content.js (chrome, firefox; built 14:50 after bridge.ts 14:44) carries no \"open\", home.arpa, session.open or refusal_ string: no bridge table leaked into the bundle",
+    "b1/n-007 merges with b1/n-023 cleanly and tsc -b apps/agent passes on the merged tree",
+    "spec §2.1 TaskScope (goal, origins read/write, verbs, ttlSeconds ≤ 3600, stepBudget ≤ 500, profile required) is what validateScope accepts; profile has no default, as §11 F26 and SCN-045 step 1 say",
+    "spec §2.2: six task verbs plus session.open and hygiene.census, no screenshot; the N-023 shapes note (TaskCall sessionId, WaitForResult {met}, GetResult tagged by what, CloseResult {closed: true}, CensusResult, toolName/canonicalVerb) matches VerbIO",
+    "spec §2.3 and §3: the 15 refusals are the same list in the same order; every policy refusal is retryable false; cleaning_incomplete and stale_cursor are not retryable, as §3 and SCR-24 say",
+    "SCN-045 step 1 and spec §11 F9 name exactly LOCAL_NAME_SUFFIXES plus single-label names, and 100.64.0.0/10 counts as local; SCN-045 Errors 'browser_offline, marked retryable' matches REFUSAL_RETRYABLE",
+    "close is always allowed (verbAllowed), which FLW-22 and SCR-24 rely on when they say a task out of steps stays until the agent closes it (N-009 plan carries the budget half)",
+    "CensusEntry carries path, pid, parent, owner, age, flags, keep and reason, never argv: SCN-044, pairingGrants and terminology line 135 promise exactly that",
+    "every refusal has refusal_* in both locales, eight verb_* phrases cover the eight calls, both catalogues hold 95 strings as spec §9 says",
+    "FLW-21 and FLW-22 Mermaid: every node id is labelled once (FLW-21: A, K, PR, P, OK, N, C, R, NE; FLW-22: ASK, IS, T, W, S, A, X1, G, Q, X2, H, E, STOP)",
+    "the Okolos extension is untouched by the contract: its built chrome and firefox bundles carry no bridge string"
+  ],
+  "not_done": [],
+  "not_verified": [
+    "unit: pnpm -s run gates, the third command of the node's check: not run here because the launcher scoped this tier to the vitest and typecheck commands and gates builds into the worktree",
+    "unit: the guard 'TDD: test written first and seen red': history of the test order was not inspected",
+    "unit: whether the daemon (N-011) and the door actually call isLocalAddress and canonicalVerb, and whether any detector writes concealment with spaces: callers in other modules, the seam tier's to judge",
+    "unit: the claim in canonicalVerb's comment that a module-level table put \"open\" into content.js: a bundle property, not checkable inside this unit",
+    "unit: apps/agent/_locales/{ru,en}/messages.json wording of the refusal strings: only key presence is checked by the test",
+    "seam: real zod/MCP SDK inference: neither is installed in the workspace, so the exactOptionalPropertyTypes finding rests on a structural probe of zod's documented output shape",
+    "seam: n-006 and n-007 test suites run on the merged trees (typecheck only)",
+    "seam: Chrome behaviour of remoteIPAddress for cached and service-worker responses (stated from CDP semantics, not measured)",
+    "seam: packets N-004, N-010 beyond the loopback/host-resolver lines, N-016..N-021",
+    "product: the daemon's behaviour itself (tasks, verbs, pairing, census): not built on this branch, so every later-node promise was judged from its plan row only",
+    "product: fabric-workspace knowledge/products.md, roadmap RM-18 and org-index repositories.json (outside this worktree)",
+    "product: SECURITY.md's Б1 threat boundary (N-020 plans it)",
+    "product: whether the agent-facing limits in SCOPE_LIMITS (32 origins, 2000-character goal) reach an agent-facing document: none exists yet",
+    "product: the rendered SCR-23/SCR-24 page (visual tier)"
+  ],
+  "blockers": [
+    {
+      "what": "isLocalIPv4/isLocalIPv6 leave out special ranges the packet does not list: 198.18.0.0/15 (benchmarking), 192.0.0.0/24, 224.0.0.0/4 and 255.255.255.255, ff00::/8, Teredo 2001::/32; and local-use NAT64 is read only from the last 32 bits (the /96 placement), so a /56 or /64 local-use prefix with the IPv4 elsewhere reads as public. validateScope accepts http://224.0.0.1 and http://255.255.255.255 (probe). None is in the packet's list, multicast and broadcast cannot carry an HTTP connection, and the response-address check is the backstop the doc comment names (packages/contracts/src/bridge.ts:685-728, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "toSnapshotFinding splits detail.concealment on ',' without trimming, so a detector that writes 'display-none, opacity-zero' loses the second technique silently (probe: concealment ['display-none']). Fails safe (nothing leaks, the finding under-reports how text hid); whether any detector writes a space is outside this unit (packages/contracts/src/bridge.ts:273, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "b1/n-006 merged with b1/n-023 does not compile: journal.ts keeps 'screenshot' in a Readonly<Record<AnyBridgeVerb, true>> literal and its own copies of BridgeSessionVerb/AnyBridgeVerb; with screenshot gone from BRIDGE_VERBS this is TS2353. Planned for N-006 (its comment says the aliases become imports when N-023 lands), but nothing yet enforces it (b1/n-006 apps/agent/src/journal/journal.ts:43-55,92-102 (N-006), found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "calls that are not a bridge verb have no slot: N-006 acceptance writes 'unknown tool' and 'wrong arguments' as outcome refused, and possibly protocol answers as mcp.initialize / mcp.tools_list / mcp.parse_error, but canonicalVerb returns null for them, the refused JournalEntry requires verb: AnyBridgeVerb, and N-014's verbKey covers only the eight verbs, so SCR-24 has no phrase for them (packets N-006 (acceptance 'неизвестный инструмент', 'mcp.initialize'), N-008, N-014 verbKey; contract canonicalVerb packages/contracts/src/bridge.ts:68, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "N-011 plans zod schemas typed z.ZodType<VerbIO[V]['input']>, but the repo has exactOptionalPropertyTypes on, and zod infers optional fields as 'T | undefined'; a structural probe of that inferred shape against SnapshotInput fails with TS2322 ('string | undefined' is not assignable to 'string'). The same applies to ReadInput, GetInput.ref and the '?: never' arms of OpenInput/WaitForInput (packet N-011 outputs (audit #26); tsconfig.base.json:17; packages/contracts/src/bridge.ts:366-399, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "an empty remoteIPAddress has two answers: isLocalAddress('') is true (so origin_not_in_task per N-011's local-address acceptance), while another N-011 acceptance wants cleaning_incomplete. Spec §3 and the cleaning_incomplete comment define that code only for a cleaner that ran out of budget, lost an element or saw the page mutate. A cached or service-worker response has no remoteIPAddress, so the person would read 'сбой Okolos Agent: очистка не завершилась' and the agent 'not retryable' for something that is not cleaning (packet N-011 acceptance (audit #27 and 'проверка unit N-001, риск 2'); bridge.ts:110-112,645-647; spec §3 lines 111-112, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "the split between Okolos Agent failures (internal, browser_offline, cleaning_incomplete) and policy refusals lives only in terminology.md and SCR-24. Unlike refusalKey, the contract has no exhaustive guard for it, so a code added to BRIDGE_REFUSALS gets a string but no class, and N-015 will hold a second list (packet N-015 (refusalFailureLine acceptance); docs/ux/screens.md SCR-24 'A refusal says which kind it is'; docs/brand/terminology.md failure row, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "CensusEntry.reason is an open string, but N-014 plans catalogue keys for the census 'не трогать' reasons. The contract does not say whether reason is a key or English text for the agent, and SCN-044's census description lists every field except reason (packets N-012 outputs and N-014 outputs; bridge.ts:318-327; scenarios.md SCN-044 expected result, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "graph.json declares N-023 payloads only to N-003, N-006, N-008, N-009 and N-012. N-011 (VerbIO, toolName, canonicalVerb, isLocalAddress, toSnapshotFinding) and N-015 (refusalKey) consume the contract without an edge, so the order holds only transitively and those payloads are not checked at the seam (/Users/sshlg/DATA/_worktrees/okolos-bridge-b1/.task-pipeline/graph.json edges; packets N-011 inputs, N-015 inputs, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "the docs still point to the parked node: the module map's table names N-001 as the K0 contracts node and as the dependency of N-003, N-008, N-009 and N-012, and spec §11 F3, F9 and F26 name N-001 as where the decision is held. N-023 is not mentioned in either place, so a reader following F9 lands on a parked node (docs/superpowers/specs/2026-10-27-bridge-b1-modules.md:54-65,76; docs/superpowers/specs/2026-10-06-bridge-b1-design.md:262,268,285, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Product question for the operator: is one agent profile shared by every paired agent intended? profile 'agent' is one persistent Chrome profile (brief decision 6: one path, profiles/agent), so a sign-in a person makes by hand in agent X's window is open to agent Y's tasks and outlives X's revocation. The person is told neither: pairingGrants (the consent line) says nothing about it, and SCR-24 puts «Профиль агента, где сохраняются входы на сайты» / 'Agent profile, which keeps sign-ins' on agent X's task row, where it reads as X's own profile (packages/contracts/src/bridge.ts:329-335; docs/superpowers/specs/2026-10-27-bridge-b1-brief.md decision 6; apps/agent/_locales/ru/messages.json taskProfileAgent, pairingGrants; docs/ux/scenarios.md SCN-045 Preconditions, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Product question for the operator: should the process census be scoped? hygiene.census sits outside any task (no scope, no budget, no TTL), so any paired agent may list this machine's processes, including the person's own Chrome, as often as it likes. That is documented consistently (SCN-044, pairingGrants, terminology), but ADR-0019's title promises «агенту только то, что разрешила задача», and the census is the one answer no task permits (packages/contracts/src/bridge.ts:30-35, 417-420; docs/adr/0019-page-content-never-reaches-our-infrastructure.md title and «Решение»; docs/ux/scenarios.md SCN-044 Expected result, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Product question for the operator: is browser_offline retryable for every cause? The contract always marks it retryable, but two of its documented causes are permanent (Chrome not installed, a policy that forbids the flags), so an agent that trusts 'retryable' retries something that cannot change, and FLW-22 says a retry after a refusal counts against the task's budget. SCN-045 promises 'marked retryable' after the person closes the browser, and no plan test shows that a retry then gets a Chrome again (packages/contracts/src/bridge.ts:92-96, 108; docs/ux/screens.md SCR-24 'browser_offline shows no reason here'; brief decision 7; spec §5 row 2; plan N-011 test 'CdpError exited/closed → browser_offline', found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The closed refusal set has no code for 'the site answered from a local address', so N-011's plan answers a task site that resolves to the local network (a router's own domain such as fritz.box, named in the task) with origin_not_in_task. SCR-24 then tells the person «сайт вне задачи» / 'a site outside the task' while the same page's task row lists that site under «Сайты». The missing remoteIPAddress case becomes cleaning_incomplete, shown as «очистка не завершилась», which is not what happened either (packages/contracts/src/bridge.ts:73-90; plan N-011 tests 'remoteIPAddress loopback/private/100.64 → origin_not_in_task' and 'remoteIPAddress empty → cleaning_incomplete'; apps/agent/_locales/{ru,en}/messages.json refusal_origin_not_in_task, refusal_cleaning_incomplete; docs/ux/scenarios.md SCN-045 alt path (names no code), found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "docs/privacy.md promises one row per store the product keeps. N-020's plan lists the daemon's stores (service events, log, host token, sessions, access list, agents' journal) but not the agent Chrome profile. This contract makes that profile persistent; it keeps sites' cookies and sign-ins and has no retention short of --uninstall --purge. SCN-023/SCN-024 describe it as 'history and cache of the pages agents opened', which leaves out the sign-ins the TaskProfile comment says it keeps (docs/privacy.md:69-73; plan N-020 files ('docs/privacy.md ... его хранилища со сроками'); docs/ux/scenarios.md SCN-023 and SCN-024 Scope; packages/contracts/src/bridge.ts:329-335, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Stale facts a planned node owns (N-020): README.md says no MCP server 'is planned yet'; AGENTS.md Commands and Lifecycle say there is no port and no MCP server; docs/README.md:100 describes @okolos/contracts as verdict, evidence, RPC and gate only, leaving out the bridge contract it now carries (task, verbs, refusals, the local-address rule). N-020's plan names README, AGENTS.md and docs/README 'карта кода' (README.md:84-85; AGENTS.md:34, 76; docs/README.md:100, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "ADR-0018 «Цена» says installing Okolos Bridge is the consent step and «без Bridge агент в браузер не входит». In Б1 an agent enters through the agent window with no Bridge, and consent is pairing on SCR-23. N-018 modifies ADR-0018, but its tests name only the channel and the threat boundary, not this sentence (docs/adr/0018-agents-get-their-own-extension.md «Цена», second bullet; plan N-018 tests, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "A user-visible change nobody plans to write down: CHANGELOG.md «Не выпущено» records what changes the product for the person, and no plan node adds Okolos Agent (the pairing page, the CLI, agents reading pages through the door). grep finds no CHANGELOG in plan_tasks.json (CHANGELOG.md:9-14; /Users/sshlg/DATA/_worktrees/okolos-bridge-b1/.task-pipeline/plan_tasks.json (no CHANGELOG mention), found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    }
+  ],
+  "replan": {
+    "possible": true,
+    "add": [],
+    "park": [],
+    "why": "certified at all 3 tiers in round 6"
+  },
+  "evidence": [
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-023 -s exec vitest run packages/contracts -> 3 files passed, 57 tests passed (bridge.test.ts 41), exit 0",
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-023 -s run typecheck -> exit 0, no output",
+    "unit: scratch copy of bridge.ts with 'session.list' added to BRIDGE_SESSION_VERBS, tsc --noEmit --strict -> error TS2536: Type 'V' cannot be used to index type 'VerbIOEntries' at bridge.ts(440,55); the unmodified copy has no bridge.ts error",
+    "unit: node --experimental-strip-types probe on a scratch copy: [::FFFF:127.0.0.1], [::ffff:a9fe:a9fe], [2002:a9fe:a9fe::], [64:ff9b::a9fe:a9fe], 100.100.100.200, 0, 0x0, 017700000001, 'localhost。', 127.0.0.1.. are local; validateScope refuses http://169.254.169.254., http://[::ffff:169.254.169.254], http://0, https://user:pw@10.0.0.1/, http://metadata.google.internal; accepts http://224.0.0.1 and http://255.255.255.255",
+    "unit: git diff bridge/b1-run2..HEAD -- packages/contracts | grep '^+' | grep -c U+2014 -> 0",
+    "seam: git diff --stat 392e48c 16ce36e -> only packages/contracts/src/{bridge.test.ts,bridge.ts,index.ts}",
+    "seam: grep of every exported bridge symbol over apps/ packages/ tools/ -> only apps/agent/src/service/deps.test.ts:12 outside contracts",
+    "seam: vitest run packages/contracts apps/agent/src/service/deps.test.ts tools/agent-locales.test.ts tools/gates/bundle-scan.test.ts -> 6 files, 87 passed",
+    "seam: scratch copy of 16ce36e: tsc -b -> exit 0; tsc -p tsconfig.tests.json -> exit 0",
+    "seam: git merge-tree --write-tree b1/n-023 b1/n-006 -> clean (7a613da); tsc -b apps/agent on it -> journal.ts(98,3) TS2353 'screenshot', exit 2",
+    "seam: git merge-tree --write-tree b1/n-023 b1/n-007 -> clean (9f909b1); tsc -b apps/agent -> exit 0",
+    "seam: probe under --exactOptionalPropertyTypes: {sessionId; ref?: string|undefined; ...} vs SnapshotInput -> TS2322",
+    "seam: grep -c on dist/{chrome,firefox}/content.js: \"open\" 0, home.arpa 0, session.open 0, refusal_ 0",
+    "seam: python read of apps/agent/_locales/{en,ru}: 15 refusal_* keys = BRIDGE_REFUSALS; 8 verb_* keys = toolName spelling of AnyBridgeVerb",
+    "seam: core-injection stage1.ts:132-133, stage3.ts:110-111 write concealment as join(',') and carrier as a string",
+    "product: read /Users/sshlg/DATA/_worktrees/okolos-b1-n-023/packages/contracts/src/bridge.ts in full (743 lines) at HEAD 16ce36e",
+    "product: node: Object.keys of apps/agent/_locales/{ru,en}/messages.json → 95 each; refusal_* x15, verb_* x8 printed with their text",
+    "product: python3 docs/ux/lint.py /Users/sshlg/DATA/_worktrees/okolos-b1-n-023 → exit 0 ('docs/ux is consistent'); python3 docs/brand/lint.py /Users/sshlg/DATA/_worktrees/okolos-b1-n-023/docs/brand → exit 0",
+    "product: vitest run --root /Users/sshlg/DATA/_worktrees/okolos-b1-n-023 tools/flows-diagrams.test.ts tools/agent-locales.test.ts packages/contracts → 5 files, 63 tests passed",
+    "product: grep -rl 'session\\.open|hygiene|home\\.arpa|not_paired|isLocalName' apps/extension/dist/{chrome,firefox} → no file (dist built 14:50, HEAD merge 14:55)",
+    "product: grep -n agent/bridge/MCP in docs/privacy.md → only an unrelated user-agent line; docs/privacy.md:69-73 'их девять'",
+    "product: plan_tasks.json rows N-009, N-011, N-015, N-016, N-018, N-020 read for the tests that keep later promises; grep CHANGELOG plan_tasks.json → no hit",
+    "product: git ls-files apps/agent → service shell and _locales only; tasks, verbs, pairing and census are not on this branch yet"
+  ],
+  "tested": {
+    "head": "3623ca51150c87b485a2ab51f08c7b1ab3cef6f7",
+    "tree": "d5477d29e6e0ca2bee4e21cf10c099648c8b8d34"
+  }
+}

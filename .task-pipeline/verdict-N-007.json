@@ -1,0 +1,145 @@
+{
+  "node": "N-007",
+  "done": [
+    "requestId is 16 random bytes as 32 hex (pairing.ts:387); PublicRequest carries only handle (8 bytes, pairing.ts:390) and no requestId; notices carry handle/agentId/name/at/cause only; after an end only sha256(requestId) is kept (pairing.ts:560-564), so the id never reaches list(), the store, the journal or events",
+    "claim before confirm answers {pending: true} without creating anything (pairing.ts:434); after confirm it returns a 32-byte (64 hex) key once, only after save() wrote its SHA-256 (pairing.ts:446); a second claim is {refused: 'claimed'}; at confirmedAt + 5 min the request ends as claim_expired (deadline(), pairing.ts:661-663)",
+    "a request ends at createdAt + 5 min (now >= deadline in sweep, pairing.ts:535), matching the expiresAt the CLI is given; a 4th waiting request is refused (byHandle.size >= 3); a 7th accepted request within a sliding 60 s window is refused; refused requests do not count toward the window",
+    "duplicateName is set on every waiting request (pending or confirmed) that has another waiting look-alike (pairing.ts:491), never on an ended row",
+    "agent names pass an allowlist (ASCII letters or basic Cyrillic, never both; at most 2 ASCII digits; space and - _ . ( ) ' / +), at most 40 code points in NFC, with bidi and control/default-ignorable characters refused with distinct NameRefusal codes; probed 'Okolos', 'O k o l o s', 'Околос', '0kolos', 'Oko1os', 'OkoIos', 'Okol()s', 'Oko/os', 'Okolo5', 'Okolos2' all name_reserved; 'Ivan Иван' name_script; 41 chars name_too_long",
+    "verify hashes the presented key with SHA-256 and compares it to every stored hash with timingSafeEqual on 32-byte buffers (pairing.ts:302-306); a revoked key returns null, also after a reopen",
+    "the store is written only through atomicWrite with mode 0o600 (temp file + fsync + rename); foreign content (not JSON, wrong schema, extra fields, bad records, duplicate agentId or keyHash, >1 MiB) throws PairingStoreError with a reason and the file is left untouched",
+    "confirmByHandle/declineByHandle look up byHandle only; a 32-hex requestId offered as a handle finds nothing, and the class has no confirm/decline by requestId",
+    "every method taking now calls checkClock first (touch, close, request, confirmByHandle, declineByHandle, claim, revoke, list), as the current contract requires",
+    "failed writes (unwritable, too_large) leave memory and file unchanged and the key is not handed out; claim can be retried",
+    "git merge-tree --write-tree HEAD b1/n-006 is clean (tree 70d93a07); the merged tools/reachable.test.ts holds the journal row and both pairing rows",
+    "every NameRefusal, RequestRefusal (too_many_pending, too_many_requests, closed), StoreRefusal, ClaimRefusal (including stopped) and EndCause code has words planned in N-014 acceptance; none is in the catalogue yet, which is N-014's job, not a moved contract",
+    "checkFreeText counts maxLength in UTF-16 units as validateScope does (bridge.ts:476), so a goal that passes validateScope never gets text_too_long; a goal of only signs passes validateScope and is text_empty, which N-009 maps to invalid_scope with goal",
+    "PublicRequest.state pending/confirmed/expired/claim_expired, duplicateName, sameNameAgents and AgentRecord.lastCallAt null match SCR-23 states success/confirmed/expired/claim-expired, pairing-duplicate, pairing-lookalike and pairedSinceNever",
+    "close(now) ends open requests with cause stopped and the SCR-23 / SCN-044 text 'a normal stop records each open request as ended by the stop' holds; a crash leaves requested and confirmed only, as the merged docs now say",
+    "PairingStoreError carries file, reason and the fs error as cause, which is what N-015 (error vs store-unwritable split) and N-014 (unwritable words by errno) read",
+    "claim syncs before saving, so a store that became unreadable throws before a key is drawn and the request stays: N-008 acceptance 'internal retryable, key not given, request stays' is reachable",
+    "SCN-044 steps 1 and 2 hold for the pairing rules: six-digit code drawn uniformly, a 256-bit key issued once after the person's confirm, only its SHA-256 kept in the one store (pairings.json, written 0600 and atomically)",
+    "SCN-044 alt paths hold: decline and the five-minute request lifetime give no key; a confirmed request whose key is not collected in five minutes ends as claim_expired; close() ends open requests with cause 'stopped'; requests live in memory, so a crash leaves only the notices already emitted",
+    "SCR-23 states expired, confirmed and claim-expired match the row states list() gives (pending, confirmed, expired, claim_expired), with the confirmed row's deadline being the claim window",
+    "SCR-23 store-unwritable and revoke-failed: a failed write leaves the file and the agents in memory unchanged, so 'agents with access work as before' and 'the agent keeps access' are true; a failed claim leaves the request confirmed for a retry",
+    "SCR-23 'Revoking is immediate': verify() returns null for a revoked key on the next call, and the revoked notice carries the agent id for closing its tasks",
+    "SCR-23 and spec F12 name rule match checkAgentName: 40 code points, Latin A-Z or basic Cyrillic never both, at most two digits 0-9, space and - _ . ( ) ' / +, reserved key containing 'okolos' (so 'Echo Kolos' is refused, as documented)",
+    "pairing-duplicate marks every waiting (pending or confirmed) request whose name shares a key with another, and pairing-lookalike is fed by sameNameAgents for agents with access, as SCR-23 says",
+    "spec F5: request id 128 bits, never in list(), notices, store; confirm and decline only by the page's handle; at most 3 waiting and 6 new requests per minute",
+    "strings pairingConfirmed, pairingCollecting, pairingClaimExpired, pairingExpired, pairingOpenUntil and pairedSinceNever agree with the five-minute windows and with lastCallAt null before the first call",
+    "the promises this node cannot keep alone are carried by later nodes' plan tests: POST /pair refused while the store is unreadable and touch failures not failing a call (N-008), reload removals closing tasks, close() on stop, events per notice kind (N-011), store-reason and claim-refusal words (N-014), store-unwritable and pairingGone on the page (N-015), doctor naming store problems (N-016), SCN-044 e2e (N-017)",
+    "docs/licences.md needs no change: apps/agent/package.json gains no dependency in this node",
+    "python3 docs/ux/lint.py exits 0; python3 docs/brand/lint.py reports the brand pack clean"
+  ],
+  "not_done": [],
+  "not_verified": [
+    "unit: the callers that turn notices into journal entries and events (door /pair and /pair/claim N-008, page N-015, main N-011): that the requestId stays out of the journal there is a seam question",
+    "unit: REQ-58's 'revoke closes tasks': this unit only emits the revoked notice and returns the record; who closes tasks is N-008/N-011",
+    "unit: race-only branches with no test: readStore when the file vanishes between stat and read (pairing.ts:752) or grows past 1 MiB between them (pairing.ts:754), and save() when the stat after rename fails (pairing.ts:638-641)",
+    "unit: the mode of an existing store file is not checked on open; a file restored at 0644 is read and only becomes 0600 at the next write (the content is key hashes only)",
+    "unit: checkFreeText refuses a text with no letter or numeral (an emoji-only goal) as text_empty; documented in name.ts:83-84, its fitness for task goals is N-009's call",
+    "unit: Windows ACL path of atomicWrite (windowsProtect) and multi-process writers: the module documents the daemon as the only writer",
+    "unit: pairing.test.ts bodies from line 1037 on were read by title only, not line by line",
+    "seam: the merged tree with b1/n-006 was not checked out and tested; only the merge result and the disjoint file sets were read",
+    "seam: consumers N-008, N-009, N-011, N-014, N-015, N-016 are unwritten, so every seam to them is read from the plan, not from code",
+    "seam: events.jsonl wording for the seven pairing notices (owned by N-011 and N-014)",
+    "product: whether the unit tests prove the behaviours read here (unit and seam tiers)",
+    "product: the rendered SCR-23 page, which does not exist yet (N-015) and belongs to the visual reading",
+    "product: the CLI's and shim's terminal wording, which is N-008 and N-014 work not yet written",
+    "product: fabric-workspace knowledge pages and org-index rows about Okolos Agent (REQ-69, N-020)"
+  ],
+  "blockers": [
+    {
+      "what": "A name may carry leading, trailing or repeated spaces ('  Claude  ' passes checkAgentName) and is stored and shown verbatim. An HTML page collapses the spaces, so two agents with access whose names differ only by spacing render identically in the agents list; duplicateName and sameNameAgents mark this only while a request waits, not between two agents already paired. Survivable: agentId tells them apart and the request-time marks fire. (/Users/sshlg/DATA/_worktrees/okolos-b1-n-007/apps/agent/src/pairing/name.ts:109-111 and apps/agent/src/pairing/pairing.ts:377, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Pairing.request never looks at the store, so a store that became unreadable after open still takes new requests; SCR-23 (merged in 5ff2e73) and N-008/N-011 acceptance now say POST /pair takes no new request while the access list cannot be read, and N-007 offers no side-effect-free way to ask whether the store reads (N-008 (door /pair), N-011 (createAgent wiring); apps/agent/src/pairing/pairing.ts:371-404, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Pairing stores and shows the NFC form of the name but request() does not return it; spec F6 names the CLI key file clients/<sha256(name)>.key from the name as typed, so a decomposed name (probe: 'Агент И\\u0306' passes checkAgentName, raw and NFC hash to different files) gives pair and mcp-stdio --as different files for one agent (N-008 (apps/agent/src/cli/pair.ts, door/stdio-shim.ts), found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "N-008 acceptance lists CLI words for five claim refusals (declined, expired, claim_expired, claimed, unknown); ClaimRefusal also has stopped and RequestRefusal has closed, both of which the door can return during a stop (N-008 (CLI pair), found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The service shell has no owner stop hook: with handleSignals, SIGTERM drains, finish() releases the lock and exit(0) runs (http.ts:416-421), so Pairing.close(now) and its stopped notices cannot run before the lock goes; N-011 plans the hook (N-011 (apps/agent/src/service/http.ts:367-438), found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The reload path hands N-011 agent ids (onReload removed: string[]) and revoked notices {agentId, name, at}, never an AgentRecord, while the plan names one type onRevoke(record: AgentRecord); revoke() also sends a revoked notice, so closing tasks on both the notice and onRevoke closes twice; verify() and flush() date reload notices with Date.now(), not the clock createAgent takes (N-011 (agent.ts wiring), N-017 (fake-clock e2e), found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The journal on b1/n-006 (b131f7c) names the agent by name only (AgentCall.agent) and its DoorRejection lacks store_unreadable; Pairing lets two agents share a name (duplicateName and sameNameAgents only warn), so SCR-24 cannot tell them apart without agentId (16 hex) and pairedAt (ms since the epoch, while journal at is ISO) (N-006 (apps/agent/src/journal/journal.ts on b1/n-006), N-015 (refusal line with agentLabel), found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "doctor must name an unwritable access list with path and reason; Pairing has no non-mutating writability probe and the errno is only on PairingStoreError.cause (N-016 (okolos-agent doctor), found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "docs/privacy.md says its table names every store the product keeps ('их девять') and that all of it lies in the browser and is erased on «Ваши данные». This node defines Okolos Agent's access list, a new on-device file holding agent names, access dates, last-call times and key hashes with no expiry (kept until revoked). It is not reachable yet (tools/reachable.test.ts exempts it), so nothing is false today, but no later node's plan carries a privacy.md check: N-020's tests are only tools/docs.test.ts and tools/runbook.test.ts. Question for the operator: does privacy.md speak for Okolos Agent too? If yes, N-020 owes a row for the access list with its reason for having no expiry. (docs/privacy.md:71, docs/privacy.md:124; apps/agent/src/pairing/pairing.ts:38, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Pairing again under the same name with --replace (the advice the shim gives when 'access was revoked or the key is wrong', N-008 plan) gives a second access. claim() leaves any earlier access under that name in place, so when the old key was lost rather than revoked, the list keeps an access whose key no client file holds. The page shows it and the lookalike mark warns, so no documented promise breaks. Question for the operator: should --replace revoke the earlier same-name access, or is a manual revoke on SCR-23 the intended path (and should the page or CLI say so)? (apps/agent/src/pairing/pairing.ts:444; spec §11 S5 (docs/superpowers/specs/2026-10-06-bridge-b1-design.md:307), found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "When the access list changes on disk (a restore, a hand edit), agents that disappear get a 'revoked' notice and so an event, but agents that appear get access with no notice at all. A Time Machine restore of an older pairings.json would quietly bring back an agent the person revoked (its client key file is not deleted on revoke), and the service events would show the revoke but not the return. Spec §11 F4 puts code running as the person outside Б1's boundary, so this is not a broken promise. Question for the operator: should the events record access that appeared from the file, as they record access that vanished? (apps/agent/src/pairing/pairing.ts:194, apps/agent/src/pairing/pairing.ts:593-613, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    }
+  ],
+  "replan": {
+    "possible": true,
+    "add": [],
+    "park": [],
+    "why": "certified at all 3 tiers in round 10"
+  },
+  "evidence": [
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-007 -s exec vitest run apps/agent/src/pairing -> 2 files, 133 tests passed (name.test.ts 34, pairing.test.ts 99)",
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-007 -s run typecheck -> exit 0 (tsc -b covers apps/agent via the root tsconfig reference, tsconfig.json:47)",
+    "unit: git diff bridge/b1-run2..HEAD --stat: 5 files, name.ts/pairing.ts and their tests new, tools/reachable.test.ts +2 EXEMPT rows; all inside the packet's edit_targets",
+    "unit: node probe of name.ts (scratchpad probe-name.mjs) over 26 names: reserved, script, digits, empty, too_long outcomes as listed in confirms; checkFreeText('a\\u200db',10) null, bidi refused, emoji-only text refused as text_empty",
+    "unit: read atomicWrite at apps/agent/src/fabric/fabric-paths.mjs:70-92: open wx with mode, fsync, chmod, rename, temp removed on failure",
+    "seam: certified at HEAD 5ff2e73808dbaf8c6b2f04b795ba499424e3e8b9, round 10, blind",
+    "seam: git diff --stat bridge/b1-run2..HEAD -> 5 files: pairing.ts, name.ts, their tests, tools/reachable.test.ts",
+    "seam: git merge-tree --write-tree HEAD b1/n-006 -> 70d93a076dc9455f636ca760f48023f8aedd9891, exit 0",
+    "seam: pnpm -s exec vitest run apps/agent/src/pairing tools/reachable.test.ts apps/agent/src/service -> 9 files, 240 passed",
+    "seam: pnpm -s exec vitest run tools/agent-locales.test.ts tools/docs.test.ts -> 2 files, 73 passed",
+    "seam: pnpm -s run typecheck -> exit 0",
+    "seam: pnpm -s run i18n:sweep -> exit 0, 0 sentences outside the catalogue",
+    "seam: pnpm -s exec eslint apps/agent/src/pairing tools/reachable.test.ts -> exit 0",
+    "seam: grep for pairing symbols outside apps/agent/src/pairing -> reachable.test.ts, docs and plan only",
+    "seam: node --experimental-strip-types probe: checkAgentName('Агент И\\u0306') -> null; raw !== NFC; sha256 prefixes a19907b7de8f vs 5b1ebdc20a03",
+    "seam: diff -rq of .task-pipeline/packets between okolos-b1-n-007 and okolos-bridge-b1 -> exit 0",
+    "seam: python3 over apps/agent/_locales -> ru 95 keys, en 95 keys, no name_*, claim, store-reason or notice keys yet",
+    "product: git -C okolos-b1-n-007 diff --stat bridge/b1-run2..HEAD: 5 files, pairing.ts, name.ts, their tests, tools/reachable.test.ts (+2 exemption rows); no package.json change",
+    "product: read apps/agent/src/pairing/pairing.ts: REQUEST_LIFETIME_MS and CLAIM_WINDOW_MS 5 min, MAX_PENDING 3, MAX_NEW_PER_MINUTE 6, hex(16) request id, hex(32) key, save() writes before taking agents into memory, close() ends with cause 'stopped'",
+    "product: read apps/agent/src/pairing/name.ts: ALLOWED allowlist, MAX_DIGITS 2, MAX_NAME_LENGTH 40 code points, reservedKeys and nameKeys tables",
+    "product: python3 read of apps/agent/_locales/{ru,en}/messages.json: 95 keys each; pairing, store and rejection strings listed and read against the code",
+    "product: grep -n -i 'agent|агент|pairing|привяз' docs/privacy.md docs/licences.md: no Okolos Agent mention; docs/brand/facts.md: no pairing claim",
+    "product: python3 read of .task-pipeline/plan_tasks.json: N-008 tests 20-33, N-011, N-014 lines on store reasons and claim refusals, N-015, N-016, N-017 SCN-044, N-020 (docs.test and runbook.test only)",
+    "product: python3 docs/ux/lint.py → exit 0; python3 docs/brand/lint.py → 'brand pack is clean'",
+    "product: grep for SCR-23 wireframe in docs/ux/wireframes: none (outside this node)"
+  ],
+  "tested": {
+    "head": "5ff2e73808dbaf8c6b2f04b795ba499424e3e8b9",
+    "tree": "4731e6cf302c4aaf5aec9b684dc10257c3a00d21"
+  }
+}

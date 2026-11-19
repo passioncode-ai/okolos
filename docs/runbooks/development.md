@@ -35,7 +35,7 @@
 | Что | Версия | Зачем |
 |---|---|---|
 | Node | `^22.18.0 \|\| >=23.6.0` (`engines` в `package.json`; проверено на 26.4.0 и 26.10.0): ниже `okolos-mail` не запускается, и его тест в `pnpm test` краснеет | всё остальное; с этих версий node снимает типы с TypeScript без флага, а `okolos-mail` запускается из исходников (B-161) |
-| pnpm | `11.10.0`, задан в `packageManager` | воркспейс из 23 пакетов (`apps/*` и `packages/*`) |
+| pnpm | `11.10.0`, задан в `packageManager` | воркспейс из 27 пакетов (`apps/*` и `packages/*`) |
 | Python 3 | 3.7 и новее для линтеров (`tools/python.mjs` берёт первый такой), 3.9 и новее для `tools/model/evaluate.py` (проверено на 3.14.6), под именем `python3`, `python` или `py -3` | `docs/ux/lint.py`, `docs/brand/lint.py`, `tools/model/evaluate.py` |
 | Браузеры Playwright | ставятся командой ниже | e2e в Chromium и Firefox |
 
@@ -164,7 +164,36 @@ pnpm gates             # lint → typecheck → build → test → ux:lint → b
 pnpm test:e2e          # сборка + сборка с хуками + playwright (Chromium)
 pnpm test:e2e:firefox  # geckodriver + selenium, установка расширения в Firefox
 pnpm bench             # бенчмарки горячих путей, vitest
+pnpm agent:build       # бандл Okolos Agent в apps/agent/dist/bin/
+pnpm agent:install     # релиз, команда, дескриптор и задача launchd Okolos Agent
+pnpm agent:doctor      # что мешает Okolos Agent работать, с путём и причиной
 ```
+
+**Установка Okolos Agent** (Okolos Bridge, N-016): `pnpm agent:install` собирает релиз в
+`~/.local/share/okolos-agent/releases/<версия>-<sha12>/` (бандл, пробник, каталог строк, страница),
+ставит ссылку `current`, команду `~/.local/bin/okolos-agent`, дескриптор `fabric-service/0.1` и задачу
+launchd `ai.passioncode.okolos-agent` (через набор Fabric) и ждёт, пока демон ответит на порту 47871.
+`node tools/install-agent.mjs --dry-run` печатает plist и дескриптор, ничего не меняя; `--status` говорит,
+что установлено; `--uninstall` снимает задачу, команду и релизы и оставляет данные (список доступов,
+журнал агентов, события, профиль агента, ключи агентов), `--uninstall --purge` удаляет и их.
+`pnpm agent:build` только собирает бандл в `apps/agent/dist/bin/`; `pnpm agent:doctor` (или
+`okolos-agent doctor [--json]`) называет, что мешает работе: нет Chrome, список доступов или журнал агентов
+не читается, не пишется или не разбирается, с путём и причиной.
+
+**Okolos Agent из исходников** (Okolos Bridge, N-011): `node tools/build-agent.mjs` пишет в
+`apps/agent/dist/bin/` бандл демона `okolos-agent.mjs` (одним ES-модулем, все зависимости внутри) и рядом
+`agent-probe.js`, пробник, который демон исполняет в изолированном мире страницы. Запуск:
+`node apps/agent/dist/bin/okolos-agent.mjs serve [--port <порт>]`; привязка агента
+`... pair --name <имя>`, шим MCP для клиента `... mcp-stdio --name <имя>`. Язык фраз для человека
+`OKOLOS_AGENT_LOCALE` (`ru` по умолчанию, `en`). Сквозной путь глаголов на Chrome: `OKOLOS_CHROME_TESTS=1
+pnpm exec vitest run apps/agent/src/verbs`.
+
+**Окно агента на настоящем Chrome** (Okolos Bridge, N-010): `OKOLOS_CHROME_TESTS=1 pnpm exec vitest run
+apps/agent/src/window/window.chrome.test.ts`. Нужны Chrome stable и экран; без переменной файл
+пропускается с причиной, поэтому ни `pnpm gates`, ни CI не открывают окно перед тем, кто пушит. Проверяет:
+окно видимо и открыто позади приложения человека, полосы автоматизации нет, `kill -9` браузера даёт
+`exited` ожидающему запросу и не оставляет процессов профиля, сирота упавшего демона снимается до
+нового запуска, cookie со сроком переживают перезапуск, одноразовое окно не хранит ничего.
 
 **Что меряет `pnpm bench` и чего он намеренно не делает.** Два файла:
 `packages/core-injection/src/stage1.bench.ts` (первая ступень над страницей в 50

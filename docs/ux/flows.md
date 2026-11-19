@@ -709,34 +709,38 @@ flowchart TD
 
 ### FLW-21: Connect an agent to the browser
 - **Traces:** ST-027 (JTBD-10, JRN-05/#1)
-- **Goal:** an agent the person chose can use the browser, and nothing else on the machine can
-- **Entry points:** an agent's first call to the local door of Okolos Agent; the bridge's panel
-- **Success exit:** the agent is paired, listed with what it may reach, and revocable in one place
+- **Goal:** an agent the person chose can use the browser, and no other agent through the door and no web page can; code running as the person is outside Б1's boundary (spec §11 F4), and a coding agent with a shell on this machine is such code: in Б1 only the snapshot cleaning stands between a page and it (spec §11 R9)
+- **Entry points:** `okolos-agent pair --name "<name>"` in the terminal; the Okolos Agent page in Fabric Dashboards
+- **Success exit:** the agent is paired, listed with when it got access and its last call, and revocable in one place
 - **Task analysis:**
   1. See which agent is asking
-  2. Compare the code it shows with the code the panel shows
+  2. Compare the code the terminal shows with the code the page shows
   3. Allow, or refuse
 - **Flow:**
 
 ```mermaid
 flowchart TD
   A[Agent calls the local door] --> K{Paired key?}
+  PR[okolos-agent pair: POST /pair] --> P
   K -->|yes| OK[Request handled under the agent's scope]
-  K -->|no| P[Panel: agent X asks to connect, code 1234]
-  P -->|person confirms, codes match| R[Key issued to the agent, stored in the keychain]
-  P -->|person refuses or no answer| N[Refused and recorded]
+  K -->|no key| N[Refused and recorded in the agents' journal, SCR-24]
+  P[Page: agent X asks for access, code 123 456]
+  P -->|person confirms, codes match| C[Confirmed: the CLI collects the key within five minutes]
+  C -->|collected| R[Key issued to the agent once; the daemon keeps only its SHA-256]
+  C -->|not collected in time| NE
+  P -->|person declines or no answer| NE[Declined or expired, recorded in the service's events]
   R --> OK
-  K -->|wrong origin, no key| N
+  K -->|any Origin or Sec-Fetch header| N
 ```
 
-- **Screens traversed:** none designed yet. The pairing panel is designed in Б1 and gets its SCR id there; until then this flow traces to no screen, on purpose.
+- **Screens traversed:** SCR-23 (Agent pairing), SCR-24 (Agent activity). Both are a page of Okolos Agent opened in Fabric Dashboards, because in Б1 there is no Okolos Bridge extension yet and the Okolos extension has no channel to the daemon (ADR-0018).
 - **Local clients are not trusted for being local.** Every bridge breach of 2025–2026 that the research found came through a door that believed loopback meant "the person": ClawJacked approved pairing automatically for local clients, and CVE-2025-49596, CVE-2025-52882 and CVE-2025-66414 let a web page reach a localhost server. The pairing is a person's act, every time.
 
 ### FLW-22: An agent does a task in the browser
 - **Traces:** ST-028, ST-029, ST-030 (JTBD-10, JRN-05/#2–#6)
 - **Goal:** the agent finishes the task in the person's browser; anything that matters passed through the person
 - **Entry points:** a paired agent opens a task naming its sites, verbs, time limit and step budget
-- **Success exit:** the task is closed, every step recorded before it ran, its window and processes gone
+- **Success exit:** the task is closed, every answer to a tool call and every refusal recorded in the agents' journal before it was sent (the protocol's own handshake messages are not journaled: spec §3; past the day's 5000 agent entries every tool call ends in an Okolos Agent failure until 00:00 UTC, except the first `close` of each task that succeeds, so nothing is answered unrecorded), its window and processes gone
 - **Task analysis:**
   1. The agent opens a task with its reach
   2. The agent reads and acts inside it
@@ -746,7 +750,9 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  T[Task opened: sites, verbs, TTL, budget] --> W[Own window, in the background, active tab]
+  ASK[Agent asks to open a task] -->|an address of this machine or the local network, or a reserved local name| IS[Refused: invalid_scope, no task]
+  ASK -->|scope valid| T
+  T[Task opened: goal, sites, verbs, profile, TTL, budget] --> W[Own window, in the background, active tab]
   W --> S[Snapshot: cleaned, verdict attached, in parts]
   S --> A{Action}
   A -->|outside the task's sites| X1[Refused: origin_not_in_task]
@@ -760,9 +766,9 @@ flowchart TD
   STOP[Stop control] -.-> E
 ```
 
-- **Screens traversed:** none designed yet — the approval panel, the activity indicator and the hand-off notice are designed in Б1/Б2.
+- **Screens traversed:** SCR-24 (Agent activity) in Б1. The approval panel, the hand-off notice and the stop control are designed in Б2, with the actions they gate; in Б1 a task whose time limit has passed is closed with its window within a minute by Okolos Agent's timer; a task out of steps refuses further calls and stays until its time runs out, the agent's `close` or the person revokes the agent's access.
 - **The task gets its own window, not a background tab.** Measured 2026-10-06 (`docs/superpowers/evidence/2026-10-06-b0-agent-window.md`): input sent to a background tab never reaches the page, even with focus emulation, while a tab in a separate background window is visible and receives trusted input — and the window does not take the person's focus once it is open.
-- **"Refused" is a policy answer, not an error.** An agent that reads a refusal as a failure retries it; the codes say which kind of no it was, and a retry after a refusal counts against the task's budget.
+- **"Refused" is a policy answer, not an error.** An agent that reads a refusal as a failure retries it; the codes say which kind of no it was, and a retry after a refusal counts against the task's budget, except the refusals spec §2.3 names (no task, time over, no steps left).
 
 ### FLW-23: Clean up after agents
 - **Traces:** ST-031 (JTBD-10, JRN-05/#7)

@@ -28,5 +28,8 @@
     "@okolos/core-recovery": "workspace:*",
     "@okolos/core-extensions": "workspace:*",
     "@okolos/i18n": "workspace:*"
+  },
+  "exports": {
+    "./agent-probe": "./src/agent-probe.ts"
   }
 }

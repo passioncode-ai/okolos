@@ -1,0 +1,668 @@
+{
+  "agentPageTitle": {
+    "message": "Agents in the browser"
+  },
+  "agentPageLoading": {
+    "message": "Reading the list of agents and tasks."
+  },
+  "pairingHeading": {
+    "message": "Asking for access"
+  },
+  "pairingAgentName": {
+    "message": "Agent $NAME$ (a name it gave itself)",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingCode": {
+    "message": "Code $CODE$",
+    "placeholders": {
+      "code": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingCompare": {
+    "message": "Confirm only if the agent shows the same code. A different code: decline."
+  },
+  "pairingOpenUntil": {
+    "message": "Open until $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingExpired": {
+    "message": "This request expired. The agent has to ask again."
+  },
+  "pairingConfirm": {
+    "message": "Confirm"
+  },
+  "pairingDecline": {
+    "message": "Decline"
+  },
+  "pairingConfirmed": {
+    "message": "Access for agent $NAME$ is confirmed. The agent has five minutes to collect its key.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingDeclined": {
+    "message": "The request from agent $NAME$ was declined.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairedHeading": {
+    "message": "Agents with access"
+  },
+  "pairedSince": {
+    "message": "Access since $DATE$, last call $LAST$",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      },
+      "last": {
+        "content": "$2"
+      }
+    }
+  },
+  "pairedTasks": {
+    "message": "Open tasks: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "agentRevoke": {
+    "message": "Revoke access"
+  },
+  "agentRevoked": {
+    "message": "Access for agent $NAME$ was revoked and its tasks closed.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingEmpty": {
+    "message": "No agent has access."
+  },
+  "pairingHow": {
+    "message": "An agent asks for access with okolos-agent pair --name \"<name>\" in a terminal. Its code then appears here. The door's address: $URL$",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingStoreError": {
+    "message": "The access list cannot be read: $WHAT$. Until it is fixed, every call that carries a key ends in an Okolos Agent failure: the key cannot be checked. New access requests are not taken. Run okolos-agent doctor to see what is wrong with the file.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
+  },
+  "tasksHeading": {
+    "message": "Agents' tasks now"
+  },
+  "tasksEmpty": {
+    "message": "No agent has an open task now."
+  },
+  "taskGoal": {
+    "message": "Goal, in the agent's words: $GOAL$",
+    "placeholders": {
+      "goal": {
+        "content": "$1"
+      }
+    }
+  },
+  "taskSites": {
+    "message": "Sites: $SITES$",
+    "placeholders": {
+      "sites": {
+        "content": "$1"
+      }
+    }
+  },
+  "taskSteps": {
+    "message": "Steps: $USED$ of $BUDGET$",
+    "placeholders": {
+      "used": {
+        "content": "$1"
+      },
+      "budget": {
+        "content": "$2"
+      }
+    }
+  },
+  "taskTimeLeft": {
+    "message": "$MINUTES$ min left",
+    "placeholders": {
+      "minutes": {
+        "content": "$1"
+      }
+    }
+  },
+  "taskTimeOver": {
+    "message": "The task's time is up, and Okolos Agent is closing its window"
+  },
+  "taskWindowOpen": {
+    "message": "Agent window open"
+  },
+  "taskWindowClosed": {
+    "message": "Agent window closed"
+  },
+  "refusalsHeading": {
+    "message": "Recent refusals and failures"
+  },
+  "refusalsEmpty": {
+    "message": "The agents' journal has no refusals or failures."
+  },
+  "refusalLine": {
+    "message": "$WHEN$. $AGENT$, call “$ASKED$”. Refused: $WHAT$",
+    "placeholders": {
+      "when": {
+        "content": "$1"
+      },
+      "agent": {
+        "content": "$2"
+      },
+      "asked": {
+        "content": "$3"
+      },
+      "what": {
+        "content": "$4"
+      }
+    }
+  },
+  "refusal_not_paired": {
+    "message": "the agent has no access"
+  },
+  "refusal_invalid_scope": {
+    "message": "the task was described wrongly"
+  },
+  "refusal_no_such_task": {
+    "message": "no such task"
+  },
+  "refusal_origin_not_in_task": {
+    "message": "a site outside the task"
+  },
+  "refusal_verb_not_in_task": {
+    "message": "the task does not allow this"
+  },
+  "refusal_budget_exhausted": {
+    "message": "the task ran out of steps"
+  },
+  "refusal_task_expired": {
+    "message": "the task's time ran out"
+  },
+  "refusal_tab_gone": {
+    "message": "the task's tab was gone"
+  },
+  "refusal_busy": {
+    "message": "Okolos Agent was busy with another task"
+  },
+  "refusal_in_use_by_person": {
+    "message": "you were using the agent window"
+  },
+  "refusal_browser_offline": {
+    "message": "the agents' Chrome did not start or did not answer"
+  },
+  "refusal_blocked_by_shield": {
+    "message": "Okolos protection stopped the call"
+  },
+  "refusal_internal": {
+    "message": "no answer was given"
+  },
+  "journalLink": {
+    "message": "Export the agents' journal"
+  },
+  "refusal_cleaning_incomplete": {
+    "message": "cleaning did not finish; no text was given"
+  },
+  "refusal_stale_cursor": {
+    "message": "the cursor is not from the latest snapshot"
+  },
+  "eventStarted": {
+    "message": "Okolos Agent started."
+  },
+  "eventStopping": {
+    "message": "Okolos Agent is stopping and takes on no new work."
+  },
+  "eventDrainCutOff": {
+    "message": "Okolos Agent stopped before all calls finished. Cut off: $COUNT$.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "serviceStopping": {
+    "message": "Okolos Agent is stopping and takes on no new work. Try again once it has started."
+  },
+  "eventsUnreadable": {
+    "message": "The events file had unreadable lines: $COUNT$. They were removed at start.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingCollecting": {
+    "message": "Confirmed. The key waits for the agent until $TIME$.",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingClaimExpired": {
+    "message": "The key was not collected within five minutes. No access was given; the agent has to ask again."
+  },
+  "pairingDuplicate": {
+    "message": "The name looks like another request's name. Compare the code with special care."
+  },
+  "pairingAsked": {
+    "message": "Asked at $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairedSinceNever": {
+    "message": "Access since $DATE$, no calls yet",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "refusalDoorLine": {
+    "message": "$WHEN$, refused at the door: $WHAT$",
+    "placeholders": {
+      "when": {
+        "content": "$1"
+      },
+      "what": {
+        "content": "$2"
+      }
+    }
+  },
+  "rejection_bad_host": {
+    "message": "the call was not addressed to Okolos Agent"
+  },
+  "rejection_bad_origin": {
+    "message": "the call carried an Origin header, as a web page does"
+  },
+  "rejection_cross_site": {
+    "message": "the call carried Sec-Fetch-* headers, as a browser does"
+  },
+  "rejection_bad_content_type": {
+    "message": "the call was in the wrong format"
+  },
+  "rejection_bad_request": {
+    "message": "the call could not be read"
+  },
+  "rejection_stopping": {
+    "message": "Okolos Agent was stopping"
+  },
+  "rejection_not_paired": {
+    "message": "the call had no valid access key"
+  },
+  "journalError": {
+    "message": "The agents' journal could not be written: $WHAT$. Until a write succeeds, every agent call ends in an Okolos Agent failure and no page content is given to agents. Run okolos-agent doctor to see what is wrong with the journal.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingLooksLikeAgent": {
+    "message": "A similar name is among the agents with access, listed below. Compare the code with special care."
+  },
+  "agentRevokeFailed": {
+    "message": "Access for agent $NAME$ was not revoked: the access list could not be written. The agent can still work. Try again. If it fails, run okolos-agent doctor.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "verb_open": {
+    "message": "open a page"
+  },
+  "verb_snapshot": {
+    "message": "take a page snapshot"
+  },
+  "verb_read": {
+    "message": "read the page text"
+  },
+  "verb_get": {
+    "message": "get an address, title, text or element count"
+  },
+  "verb_waitFor": {
+    "message": "wait on the page"
+  },
+  "verb_close": {
+    "message": "close the agent window"
+  },
+  "verb_session_open": {
+    "message": "open a task"
+  },
+  "verb_hygiene_census": {
+    "message": "run the process census"
+  },
+  "agentLabel": {
+    "message": "Agent $NAME$ (access since $DATE$)",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "date": {
+        "content": "$2"
+      }
+    }
+  },
+  "agentLabelRevoked": {
+    "message": "Agent $NAME$ (access since $DATE$, revoked)",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "date": {
+        "content": "$2"
+      }
+    }
+  },
+  "rejection_store_unreadable": {
+    "message": "the access list could not be read; the key was not checked"
+  },
+  "journalUnreadable": {
+    "message": "The agents' journal cannot be read: $WHAT$. Refusals and failures are not shown here. Run okolos-agent doctor to see what is wrong with the journal.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
+  },
+  "journalDayFull": {
+    "message": "The agents' journal is full until 00:00 UTC: it holds 5000 agent entries for the day. Until then every tool call an agent makes ends in an Okolos Agent failure, and no page content reaches agents. An agent can still close its task."
+  },
+  "refusalsIncomplete": {
+    "message": "This list is incomplete: while writes to the agents' journal fail, refusals and failures are not recorded."
+  },
+  "pageSessionExpired": {
+    "message": "The page session expired. Open Okolos Agent again in Fabric Dashboards."
+  },
+  "pageStopping": {
+    "message": "Okolos Agent is stopping. Open the page again once it has started."
+  },
+  "taskProfileAgent": {
+    "message": "Agent profile: persistent and shared by agents with access; what sites keep between runs stays"
+  },
+  "taskProfileDisposable": {
+    "message": "Temporary profile, which keeps no sign-ins"
+  },
+  "pairedAgentName": {
+    "message": "Agent $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "journalExportFailed": {
+    "message": "The agents' journal could not be exported: $WHAT$. Run okolos-agent doctor to see what is wrong with the journal.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
+  },
+  "refusalFailureLine": {
+    "message": "$WHEN$. $AGENT$, call “$ASKED$”. Okolos Agent failure: $WHAT$",
+    "placeholders": {
+      "when": {
+        "content": "$1"
+      },
+      "agent": {
+        "content": "$2"
+      },
+      "asked": {
+        "content": "$3"
+      },
+      "what": {
+        "content": "$4"
+      }
+    }
+  },
+  "pairingStoreUnwritable": {
+    "message": "The access list could not be written: $WHAT$. Until a write succeeds, access cannot be given or revoked; agents with access work as before. Run okolos-agent doctor to see what is wrong with the file.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      }
+    }
+  },
+  "pairingGone": {
+    "message": "This request is gone: it expired, was declined, or the agent has already collected its key."
+  },
+  "agentGone": {
+    "message": "This agent no longer has access."
+  },
+  "journalLinesSkipped": {
+    "message": "The agents' journal has unreadable lines: $COUNT$. They are skipped here.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "refusalsGap": {
+    "message": "From $FROM$ to $TO$ the agents' journal was not written: refusals and failures in that time are not recorded.",
+    "placeholders": {
+      "from": {
+        "content": "$1"
+      },
+      "to": {
+        "content": "$2"
+      }
+    }
+  },
+  "refusalDoorFailureLine": {
+    "message": "$WHEN$, Okolos Agent failure at the door: $WHAT$",
+    "placeholders": {
+      "when": {
+        "content": "$1"
+      },
+      "what": {
+        "content": "$2"
+      }
+    }
+  },
+  "pairingGrants": {
+    "message": "Access lets the agent open and read, in the agent window, the sites it names in its own tasks, in the agent profile shared by every agent with access, and read this device's process census, without command lines."
+  },
+  "verb_unknown": {
+    "message": "an unrecognised tool"
+  },
+  "refusal_bad_call": {
+    "message": "the call was malformed (an unknown tool, wrong arguments or a protocol error)"
+  },
+  "refusal_local_answer": {
+    "message": "a site in the task answered from an address on this device or the local network"
+  },
+  "cliPairCode": {
+    "message": "Agent \"$NAME$\" asks for access. Code: $CODE$. Compare it with the code on the Okolos Agent page and confirm there.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "code": {
+        "content": "$2"
+      }
+    }
+  },
+  "cliPairWaiting": {
+    "message": "Waiting for the confirmation on the Okolos Agent page…"
+  },
+  "cliPairSaved": {
+    "message": "Access given. The key is saved in $FILE$",
+    "placeholders": {
+      "file": {
+        "content": "$1"
+      }
+    }
+  },
+  "cliPairRefused": {
+    "message": "Access not given: $WHY$",
+    "placeholders": {
+      "why": {
+        "content": "$1"
+      }
+    }
+  },
+  "cliNotPaired": {
+    "message": "Agent \"$NAME$\" has no access. Run okolos-agent pair --name \"$NAME$\" first.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "eventAgentAsked": {
+    "message": "Agent $NAME$ asks for access.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "eventAgentConfirmed": {
+    "message": "Access for agent $NAME$ was confirmed; the key waits for the agent.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "eventAgentDeclined": {
+    "message": "The request from agent $NAME$ was declined.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "eventAgentRequestExpired": {
+    "message": "The request from agent $NAME$ expired at $TIME$.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "time": {
+        "content": "$2"
+      }
+    }
+  },
+  "eventAgentClaimExpired": {
+    "message": "Agent $NAME$ did not collect its key by $TIME$; no access was given.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "time": {
+        "content": "$2"
+      }
+    }
+  },
+  "eventAgentPaired": {
+    "message": "Agent $NAME$ collected its key and has access.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "eventAgentRevoked": {
+    "message": "Access for agent $NAME$ was revoked and its tasks closed.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "eventWindowCloseIncomplete": {
+    "message": "The agents' Chrome did not close fully: process $PID$ was left.",
+    "placeholders": {
+      "pid": {
+        "content": "$1"
+      }
+    }
+  },
+  "cliPairExists": {
+    "message": "Agent $NAME$ already has access. To get a new key in place of the old one, run okolos-agent pair --name \"$NAME$\" --replace.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "cliReleaseFailed": {
+    "message": "The earlier access of agent $NAME$ was not revoked: $WHY$. Revoke it on the Okolos Agent page.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "why": {
+        "content": "$2"
+      }
+    }
+  },
+  "doctorOk": {
+    "message": "No problems found: the agents' Chrome is in place, and the access list and the agents' journal can be read and written."
+  },
+  "doctorChromeMissing": {
+    "message": "Chrome stable was not found: agents have nothing to open pages with. Install Google Chrome."
+  },
+  "doctorProblem": {
+    "message": "$WHAT$: $PATH$, $WHY$.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      },
+      "path": {
+        "content": "$2"
+      },
+      "why": {
+        "content": "$3"
+      }
+    }
+  },
+  "doctorWhatPairing": {
+    "message": "the access list"
+  },
+  "doctorWhatJournal": {
+    "message": "the agents' journal"
+  },
+  "doctorWhyNoRead": {
+    "message": "no permission to read"
+  },
+  "doctorWhyNoWrite": {
+    "message": "no permission to write"
+  },
+  "doctorWhyUnparsable": {
+    "message": "the file cannot be parsed"
+  }
+}

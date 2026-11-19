@@ -1,0 +1,24 @@
+{
+  "name": "@okolos/agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "description": "Okolos Agent: the local door through which paired agents read the person's browser, cleaned.",
+  "bin": {
+    "okolos-agent": "./src/main.ts"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/node": "^2.1.2",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "@okolos/cdp-pipe": "workspace:*",
+    "@okolos/contracts": "workspace:*",
+    "@okolos/core-snapshot": "workspace:*",
+    "@okolos/i18n": "workspace:*",
+    "@okolos/storage": "workspace:*",
+    "zod": "^4.6.7"
+  }
+}

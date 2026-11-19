@@ -1,0 +1,148 @@
+{
+  "node": "N-009",
+  "done": [
+    "Every member of the plan's Produces line exists with the planned signature: open(agentId, scopeInput, now): OpenTaskResult, get, charge(task, verb, now, url?), setWindow(task, {windowId?, windowOpen?}), close, closeAllOf, list(now): TaskSnapshot[] with expired, sweep(now): Task[], Task {id, agentId, scope, openedAt, stepsUsed, windowId?, windowOpen}, checkLanded(task, actualUrl), goalShown, GOAL_SHOWN_MAX = 200; typecheck exits 0",
+    "Each refusal the tasks issue (invalid_scope, no_such_task, origin_not_in_task, verb_not_in_task, budget_exhausted, task_expired) is produced through contracts refuse(), so retryable comes from REFUSAL_RETRYABLE (all false), and each has its own test (plan test 1)",
+    "Another agent's task gives a no_such_task identical to a missing id in get and close, and an expired foreign task is no_such_task, not task_expired (plan test 2, review F8)",
+    "Task id is exactly 16 random bytes as 32 hex, redrawn on collision with a bounded 8 draws, and a source of the wrong length throws before anything enters the table (plan test 3)",
+    "charge order matches spec 2.3: no_such_task and task_expired and budget_exhausted charge nothing; otherwise the step is charged before verb and origin checks, so a refused call costs a step and refusals alone exhaust the budget; stepsUsed never exceeds stepBudget (plan test 5)",
+    "close is never charged and never refused for budget or verbs; Tasks.close works on an exhausted task and on an expired one (plan test 8, spec 2.3 decision 2026-10-27)",
+    "The origin check uses URL.origin through originOf, so a fragment never changes the answer in charge or checkLanded (plan tests 4 and 6)",
+    "The goal is checked before validateScope: raw UTF-16 length against SCOPE_LIMITS.maxGoalChars, content of the trimmed goal through checkFreeText, refused as invalid_scope with field 'goal' and reason the FreeTextRefusal code (plan tests 7 and 9, spec 2.1). goalFault is strictly tighter than validateScope's own goal checks on the same trimmed string, so the two cannot disagree about a goal",
+    "Expiry is one function (expired: now >= openedAt + ttlSeconds*1000) used by get, charge, list and sweep, so the boundary is the same everywhere and tested on both sides",
+    "The table and the liveTasks WeakSet are mutated together in open, close, closeAllOf and sweep; newId throws before either is touched, so a failed open leaves no half-registered task",
+    "list and sweep hand out frozen copies with a frozen scope; charge, setWindow and checkLanded refuse a copy as no_such_task by identity, not by id",
+    "goalShown cuts by grapheme clusters to 199 plus the ellipsis (200 visible), and returns a goal of 200 or fewer unchanged",
+    "No method reads the clock; every method taking now throws TypeError on a non-safe-integer or negative time before acting",
+    "N-011 test 49 matches the built signatures: charge(task, verb, now, url?) checks clock, identity (record === task), close, expiry, budget, then charges and checks verb and origin; setWindow(task, {windowId?, windowOpen?}) refuses copies and closed tasks",
+    "N-011 test 47 is satisfiable: Tasks.close(agentId, taskId) has no expiry check and works on an expired or exhausted task; sweep(now) returns frozen copies carrying id and agentId, so N-011 can keep the per-agent memory of swept ids it needs to answer close with success",
+    "N-011 test 48 is satisfiable: checkLanded refuses any task no longer in liveTasks (close, closeAllOf, sweep) as no_such_task; get(agentId, id, now) is the URL-free alternative",
+    "N-011 test 46: open returns GoalRefusal {code: invalid_scope, field: 'goal', reason, message, retryable: false}; carrying both fields over MCP is left to N-011 and pinned there",
+    "N-011 test 33 and SCR-24 'within a minute': sweep(now) removes exactly the tasks list(now) marks expired and returns windowId so the timer can close windows",
+    "N-015 test 38 and SCR-24 taskTimeOver: list(now) keeps expired-not-swept tasks with expired: true; TaskSnapshot = Task & {expired} as the plan packet states; taskTimeOver exists in both agent catalogues",
+    "N-015 test 23 (time left ms to minutes): TaskSnapshot carries openedAt (ms) and scope.ttlSeconds (s) and list takes the same now, so time left <= 0 and expired agree",
+    "N-015 test 37: goalShown and GOAL_SHOWN_MAX are exported from tasks.ts and run in Node (Intl.Segmenter); the plan already requires goalShown at /api/state assembly in the daemon because tasks.ts imports node:crypto",
+    "the goal length rule has one measure: goalFault and validateScope both compare the raw string's UTF-16 length with SCOPE_LIMITS.maxGoalChars, so they never disagree about too long",
+    "expiry boundary agrees with Pairing: both treat now equal to the deadline as over",
+    "the reachable gate stays honest: the new EXEMPT row names a real file with a reason over 40 characters and points at N-011 to remove it",
+    "no contract in packages/contracts moved: tasks.ts only consumes it; typecheck passes over the whole workspace",
+    "Goal length is the raw string in UTF-16 units against SCOPE_LIMITS.maxGoalChars (2000), the same measure validateScope uses, as spec §2.1 and SCN-045 step 1 say (tasks.ts:120-124, bridge.ts:478)",
+    "Goal content is the trimmed goal through checkFreeText; a failing goal is refused invalid_scope with field 'goal' and the checkFreeText code; the task stores the trimmed goal (tasks.ts:139-151, bridge.ts:515)",
+    "goalShown keeps up to 200 grapheme clusters and cuts a longer goal to 199 plus «…», so the ellipsis is the 200th visible character and no multi-code-point character is split, matching spec §2.1 and SCR-24 (tasks.ts:270-284)",
+    "taskGoal labels the goal as the agent's words in both locales ('Цель словами агента: $GOAL$' / 'Goal, in the agent's words: $GOAL$'), as SCR-24 requires",
+    "TTL ≤ 3600 s and step budget ≤ 500, both integers ≥ 1, held by validateScope, which open runs (bridge.ts:499-505)",
+    "A refused call costs its step: verb_not_in_task and origin_not_in_task are charged after the step is taken, so retries count against the budget, as spec §2.3, SCN-045 and FLW-22 say (tasks.ts:189-193)",
+    "A task out of steps stays open: further calls are budget_exhausted, stepsUsed stays at the budget (SCR-24 'steps shown as used up'), and close still works (tasks.ts:187-189, 214-220)",
+    "close is never charged and never refused, even unnamed in verbs, out of steps or out of time (spec §2.2 close row, FLW-22 'the task ends cleanly')",
+    "An expired task stays in list() marked expired until sweep removes it, so the SCR-24 row can show taskTimeOver until the timer closes the window; sweep returns the tasks whose windows must close (tasks.ts:237-251)",
+    "Another agent's task answers no_such_task with the same wording as a missing id (spec §2.2 'задача принадлежит открывшему агенту'); close of another agent's task leaves it open",
+    "Revocation: closeAllOf removes every task of the agent, and checkLanded refuses a call in flight after it, so SCN-044 step 3 'any task it holds stops' is reachable through this API",
+    "The list snapshot carries what the SCR-24 row needs: agentId (for agentLabel), scope.profile, scope.goal, scope.origins.read, openedAt + ttlSeconds (time left), stepsUsed of stepBudget, windowOpen",
+    "sessionId is 128 random bits as 32 hex characters (spec §2.2 session.open row)",
+    "Every refusal code this node can return (invalid_scope, no_such_task, task_expired, budget_exhausted, verb_not_in_task, origin_not_in_task) has a refusal_* string in both locales and a unit test, as REQ-59 asks"
+  ],
+  "not_done": [],
+  "not_verified": [
+    "unit: checkFreeText's own character classes in apps/agent/src/pairing/name.ts (owned by N-007): TEXT_JOINERS lets ZWJ, ZWNJ and VS15/VS16 stand anywhere, so 'Pay <ZWJ>the bill' is accepted as a goal; whether that is acceptable for page text is that rule's question, not this diff's",
+    "unit: How N-011 carries GoalRefusal.field and reason onto the MCP wire, re-checks a task after a verb answers, and calls setWindow from window events (seam; plan N-011 tests 46-49)",
+    "unit: How N-015 renders goalShown and the expired flag on SCR-24, and the taskGoal/taskTimeOver locale strings beyond the two substrings the unit test asserts",
+    "unit: checkLanded does not judge ttl by design (documented at tasks.ts:296-299): a landing on an expired but unswept task passes; whether the verb layer re-checks with get is seam work",
+    "unit: The non-diff files the branch also changed (graph.json, packets, docs/ux, docs/brand/terminology.md, spec and plan edits) beyond the plan and spec sections named in scope",
+    "seam: N-011, N-015, N-010, N-003 and N-006 code: not on this branch (apps/agent/src has fabric, pairing, service, tasks only), so every caller finding is against plan packets, not code",
+    "seam: the MCP wire shape of GoalRefusal (field, reason): depends on N-008/N-011 tool serialisation that does not exist yet",
+    "seam: outside this node but seen on the way: N-010 openWindow() takes no profile while TaskScope.profile 'disposable' asks for a temporary profile per task; whoever owns N-010/N-011 should confirm how a disposable task gets its own profile",
+    "seam: copy of taskTimeOver ('closing its window') next to taskWindowClosed for a window the person already closed: product tier",
+    "product: the page rendering of SCR-24 (N-015): ordering newest first (list() gives oldest first, so the page must reverse it), minute rounding of taskTimeLeft, and the agentLabel join from agentId",
+    "product: the verbs and the journal (N-011, N-006): whether every call is actually routed through charge(), and whether calls Okolos Agent fails to answer are charged before they run",
+    "product: the expiry timer's one-minute cadence (FLW-22, SCR-24): sweep exists; the timer that calls it is a later node",
+    "product: the local-address refusal list in SCN-045 step 1 (LOCAL_NAME_SUFFIXES, CGNAT): contract code that predates this node, used through validateScope but not re-read here",
+    "product: python3 docs/ux/lint.py and tools/docs.test.ts on this worktree were not run in this reading"
+  ],
+  "blockers": [
+    {
+      "what": "close and closeAllOf return the live, unfrozen TaskRecord, while sweep and list return frozen copies. The returned record is out of the table and out of liveTasks, so charge, setWindow and checkLanded already refuse it and mutating it changes nothing the table holds; the asymmetry only means a caller cannot rely on 'everything that leaves by a read or removal path is frozen' (apps/agent/src/tasks/tasks.ts:214-230, found by the `unit` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "The spec's per-task key for refs ('ref непрозрачен (HMAC номера узла ключом задачи)', spec §3) and the per-task snapshot store (for stale_cursor) have no home: Task carries neither, N-003 needs refOf(backendId, taskKey), and no packet names who creates the key or who drops both when a task leaves through close, closeAllOf or sweep. The one per-task value Task offers is id, which is the sessionId the agent knows, so an implementer reaching for it would make refs forgeable (docs/superpowers/plans/2026-10-27-bridge-b1.md N-011 packet (Produces/acceptance) and N-003 line 164 refOf(backendId, taskKey); apps/agent/src/tasks/tasks.ts Task, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Tasks.open puts the task in the table before its window exists. If AgentWindows.openWindow then fails (browser_offline, tab_gone), the agent never receives the sessionId, cannot close the task, and Tasks.list keeps showing it on SCR-24 (windowOpen false) until its ttl, up to 3600 s. No N-011 acceptance closes the task on that path (N-011 session.open handler (plan N-011 tests 23 and 31), consuming apps/agent/src/tasks/tasks.ts open and close, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Recording a window closed by the person or by a browser exit (N-011 test 31) needs the live handle, but get refuses an expired task with task_expired and list/sweep give copies that setWindow refuses. For an expired task not yet swept the event can be recorded only through a handle N-011 kept from open; Tasks has no lookup by windowId, and no Tasks test proves setWindow works on an expired live handle (N-011 test 31 (window event to setWindow); apps/agent/src/tasks/tasks.ts setWindow and get, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Ordering: list returns tasks oldest first (insertion order; tasks.test.ts 'list gives the tasks of every agent, oldest first'), while SCR-24 success says 'tasks first, newest first'. N-015's packet has no acceptance that pins the order, so a page that renders list() as is contradicts its screen record (docs/ux/screens.md:646 (SCR-24 success) and the N-015 packet, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Spec §2.3, SCR-24 and SCN-045 now say every call but close costs a step, refused ones too. charge refuses task_expired, no_such_task and budget_exhausted without a step. The exceptions are sound (no live task, or no step left) but the documents state a wider rule than the code (docs/superpowers/specs/2026-10-06-bridge-b1-design.md §2.3; docs/ux/screens.md SCR-24 note 'A task's time runs out'; docs/ux/scenarios.md SCN-045 Errors & recovery, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "N-015's Consumes line (plan and packet) lists only 'Tasks.list (N-009)' and the graph edge says 'список активных задач', while its acceptance now needs goalShown and TaskSnapshot.expired, which includes tasks that are no longer active (docs/superpowers/plans/2026-10-27-bridge-b1.md N-015 Interfaces/Consumes and the wave table row D; .task-pipeline/packets/N-015.json, found by the `seam` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "Spec §2.3, SCN-045 and SCR-24 say every call but close costs a step, refused ones too. The code has two unstated exceptions. A call on a task whose time ran out is refused task_expired with no step charged, and a call on a task already out of steps is refused budget_exhausted with no step charged. The second follows from the budget being a ceiling. The first means the expired row's 'Шаги: X из Y' does not count the calls the journal lists after expiry. The purpose of the rule (retries cannot get around the budget) still holds, because neither state lets the agent do anything (apps/agent/src/tasks/tasks.ts:188-189 against docs/superpowers/specs/2026-10-06-bridge-b1-design.md:107-108, docs/ux/scenarios.md:1001, docs/ux/screens.md:647, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "taskTimeOver, new in this node, says 'Okolos Agent закрывает её окно' / 'Okolos Agent is closing its window'. The task table can hold an expired task whose window is already closed (windowOpen starts false and setWindow can set it false while the task is open). In that state the row would claim a window is being closed beside taskWindowClosed. SCR-24 does not say which wording the expired row uses when the window is already closed. The page is N-015, and this node's API exposes windowOpen, so nothing is impossible yet (apps/agent/_locales/ru/messages.json and en/messages.json key taskTimeOver; apps/agent/src/tasks/tasks.ts:58, 151, 201-207; docs/ux/screens.md:647, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    },
+    {
+      "what": "After the timer sweeps an expired task, an agent's next call on it is refused no_such_task ('такой задачи нет'), not task_expired ('время задачи вышло'). SCR-24's refusal list will name the same cause in two ways, depending on whether the call came before or after the sweep (within a minute). No document promises task_expired after the window closes, so this is not false, but it is a user-visible wording the documents do not mention (apps/agent/src/tasks/tasks.ts:162-167, 243-251; docs/ux/screens.md:647, found by the `product` tier)",
+      "blocks": [],
+      "can_continue_around": true
+    }
+  ],
+  "replan": {
+    "possible": true,
+    "add": [],
+    "park": [],
+    "why": "certified at all 3 tiers in round 4"
+  },
+  "evidence": [
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-009 -s exec vitest run apps/agent/src/tasks -> 1 file, 70 passed (70)",
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-009 -s run typecheck -> exit 0, no output",
+    "unit: pnpm --dir /Users/sshlg/DATA/_worktrees/okolos-b1-n-009 -s exec vitest run tools/reachable.test.ts -> 4 passed (the new EXEMPT row is accepted and not stale)",
+    "unit: scratch probe (vitest, outside the worktree) on Tasks.open: a goal of only U+FEFF -> invalid_scope text_empty field goal; U+2028 around 'Pay' -> trimmed and accepted as 'Pay'; e + three combining marks -> text_control; 2000 x plus U+3000 -> text_too_long; [] as scope -> invalid_scope field goal text_not_text; checkLanded after close -> no_such_task; close and closeAllOf results not frozen",
+    "unit: git diff 084228d..HEAD -- apps/agent/src/tasks tools/reachable.test.ts: two new files and one EXEMPT row, nothing else in the unit",
+    "seam: git -C /Users/sshlg/DATA/_worktrees/okolos-b1-n-009 diff 084228d..HEAD --stat: tasks.ts +348, tasks.test.ts +642, tools/reachable.test.ts +1, plus plan, packets, spec, ux, locales",
+    "seam: grep -rln over the worktree for the API symbols: no caller in code outside tasks.ts and its test (list in scope)",
+    "seam: pnpm -s exec vitest run apps/agent/src/tasks apps/agent/src/pairing/name.test.ts packages/contracts/src/bridge.test.ts: 3 files, 145 passed (tasks 70, name 34, bridge 41)",
+    "seam: pnpm -s exec vitest run tools/reachable.test.ts: 4 passed",
+    "seam: pnpm -s run typecheck: exit 0",
+    "seam: pnpm -s run i18n:sweep: exit 0, no sentence outside the catalogue",
+    "seam: pnpm -s exec eslint apps/agent/src/tasks: exit 0",
+    "seam: pnpm -s exec vitest run tools/agent-locales.test.ts tools/docs.test.ts tools/locales.test.ts: 85 passed",
+    "seam: python3 docs/ux/lint.py: exit 0",
+    "seam: apps/agent/src/pairing/pairing.ts:532-536 sweep uses 'if (now < endedAt) continue', same boundary as tasks.ts expired()",
+    "seam: docs/ux/screens.md:646 'tasks first, newest first'; tasks.test.ts:352 'oldest first'",
+    "product: git -C /Users/sshlg/DATA/_worktrees/okolos-b1-n-009 diff 084228d..HEAD --stat: tasks.ts (348 lines), tasks.test.ts, the taskTimeOver locale key in ru and en, and the spec, scenarios, flows, screens and terminology edits",
+    "product: read apps/agent/src/tasks/tasks.ts in full; read validateScope, SCOPE_LIMITS, verbAllowed, inScope in packages/contracts/src/bridge.ts:444-515, 737-745; checkFreeText and textFault in apps/agent/src/pairing/name.ts:40-104",
+    "product: read docs/ux/scenarios.md:968-1005, docs/ux/flows.md:725-757, docs/ux/screens.md:632-653, spec :40-111 and :157-173, brief :79",
+    "product: node printed every task*/refusal* key of apps/agent/_locales/{ru,en}/messages.json: taskGoal, taskSteps, taskTimeLeft, taskTimeOver present in both; refusal_* covers every BridgeRefusal plus bad_call and local_answer",
+    "product: grep docs/brand/terminology.md: задача/task :141, шаг/step :142, отказ/refusal :143, окно агента :134; the code's comments and refusal messages use these terms",
+    "product: pnpm -C /Users/sshlg/DATA/_worktrees/okolos-b1-n-009 exec vitest run apps/agent/src/tasks/tasks.test.ts: 1 file, 70 tests passed",
+    "product: tools/reachable.test.ts adds an EXEMPT row for tasks.ts naming N-011 and N-015 as its callers, with the condition that the branch does not merge to main until K3 removes it (spec §8 REQ-68 still requires removal)"
+  ],
+  "tested": {
+    "head": "7913bc3b93c3be402e776e25f73e42ff639742f5",
+    "tree": "9bf777e225aebc70cface27f016fbab4a80c5bec"
+  }
+}
