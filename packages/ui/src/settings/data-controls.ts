@@ -244,12 +244,22 @@ export function renderDataControls(
      * never touched would be inventing a state.
      */
     let outcome: WipeOutcome
+    // Busy while the erase runs: it may first wait for a send of usage data to end, up to half a
+    // minute on a slow network (B-214), and a button that stands as it was reads as nothing done.
+    const busy = section.querySelector<HTMLButtonElement>('[data-role=wipe]')
+    busy?.setAttribute('aria-busy', 'true')
+    busy?.setAttribute('data-pending', 'true')
+    if (busy) busy.disabled = true
     try {
       outcome = await handlers.onWipe()
     } catch (cause) {
       note('wipe-failed', t('dataWipeUnavailable'), String(cause))
       offerRetry()
       return
+    } finally {
+      busy?.removeAttribute('aria-busy')
+      busy?.removeAttribute('data-pending')
+      if (busy) busy.disabled = false
     }
 
     if (outcome.ok) {

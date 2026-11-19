@@ -67,7 +67,7 @@ import {
 } from './views.js'
 import '../pages.css'
 import { runUsageSwitch } from './usage-switch.js'
-import { answeredWithin } from './usage-wait.js'
+import { afterSends, answeredWithin } from './usage-wait.js'
 import { countUncaughtErrors } from '../ui-errors.js'
 
 /**
@@ -1074,8 +1074,9 @@ async function dataSection(): Promise<HTMLElement> {
     {
       onExport: download,
       onWipe: async () => {
-        const db = await openDb()
-        const wiped = await wipeAll(db)
+        // A send of usage data under way finishes first, so its line goes into the outbound log
+        // before the erase and not into the log just cleared (B-214); at most SEND_SETTLE_MS.
+        const wiped = await afterSends(platform.runtime.send('usage/state', {}), SEND_SETTLE_MS, async () => wipeAll(await openDb()))
         // The stores' outcome is said at once and stands on its own: the leak screen resets after a
         // full wipe whatever the renewal does. The renewal follows (one worker step, usage/renew,
         // which may wait behind a send), and one that failed repaints the usage block in its own words.
@@ -1126,6 +1127,8 @@ async function renewUsage(): Promise<boolean> {
 
 /** How long «Ваши данные» waits for `usage/state` before it is drawn without the usage block. */
 const USAGE_STATE_WAIT_MS = 2_000
+/** One send of usage data ends within about 28 s (B-214); the erase waits for it at most this long. */
+const SEND_SETTLE_MS = 30_000
 
 /** Whether the last switch did not save, shown once on the repaint that follows it. */
 let usageFailed = false
