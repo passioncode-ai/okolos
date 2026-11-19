@@ -233,6 +233,12 @@
   "refusal_stale_cursor": {
     "message": "the cursor is not from the latest snapshot"
   },
+  "refusal_extension_not_connected": {
+    "message": "Okolos is not connected to Okolos Agent"
+  },
+  "refusal_extension_asleep": {
+    "message": "Okolos did not answer within 90 seconds"
+  },
   "eventStarted": {
     "message": "Okolos Agent started."
   },
@@ -362,6 +368,9 @@
   },
   "verb_hygiene_census": {
     "message": "run the process census"
+  },
+  "verb_okolos_ping": {
+    "message": "check the connection to Okolos"
   },
   "agentLabel": {
     "message": "Agent $NAME$ (access since $DATE$)",

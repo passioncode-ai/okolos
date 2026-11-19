@@ -112,7 +112,10 @@
 1. UX: сценарий привязки Okolos к Okolos Agent (новый SCN), поток, состояния блока «Okolos Agent» в SCR-12
    и кнопки в SCR-23, макет; тексты через Copylot.
 2. Демон: `/extension/pair`, `/extension/next`, `/extension/answer`, `/extension/release`, очередь
-   запросов с ожиданием 90 с, операция `okolos.ping`; тесты на WA-3, WA-5, WA-6.
+   запросов с ожиданием 90 с, операция `okolos.ping`; тесты на WA-3, WA-5, WA-6. Сделано 2026-11-19 (ветка `waves/b218-daemon`):
+   `apps/agent/src/extension/link.ts`, `route.ts`, исключение `originAllowed` в охране оболочки
+   (`apps/agent/src/service/http.ts`), операция `okolos.ping` в `verbs.ts`, отказы `extension_not_connected`
+   и `extension_asleep` в контракте. Код для человека выдаёт пока только API: кнопка на SCR-23 идёт с шагом 3.
 3. Расширение: блок настроек, хранение токена, будильник `okolos:agent`, опрос через сетевой модуль,
    обработка 401; тесты на WA-1, WA-2, WA-4, WA-7.
 4. Документы: privacy, Lifecycle, facts, ADR-0022 «Чем держится».

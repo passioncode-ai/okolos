@@ -233,6 +233,12 @@
   "refusal_stale_cursor": {
     "message": "курсор не от последнего снимка"
   },
+  "refusal_extension_not_connected": {
+    "message": "Okolos не привязан к Okolos Agent"
+  },
+  "refusal_extension_asleep": {
+    "message": "Okolos не ответил за 90 секунд"
+  },
   "eventStarted": {
     "message": "Okolos Agent запущен."
   },
@@ -362,6 +368,9 @@
   },
   "verb_hygiene_census": {
     "message": "провести перепись процессов"
+  },
+  "verb_okolos_ping": {
+    "message": "проверить связь с Okolos"
   },
   "agentLabel": {
     "message": "Агент $NAME$ (доступ с $DATE$)",

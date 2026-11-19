@@ -129,6 +129,12 @@ export interface StartOptions {
    * A hook that throws makes the answer a 500 with no body. The URL comes without its query.
    */
   readonly onRefused?: (req: IncomingMessage, url: URL | null, reason: RefusalReason) => Promise<void>
+  /**
+   * The one exception to the guard's Origin and Fetch Metadata checks: true lets this origin reach
+   * this path, and the route behind it decides (B-218: the paired Okolos extension on
+   * `/extension/*` only). The Host check is never excepted. Absent, nothing is.
+   */
+  readonly originAllowed?: (pathname: string | undefined, origin: string | undefined) => boolean
 }
 
 const HOST = '127.0.0.1'
@@ -288,7 +294,7 @@ export async function startService(options: StartOptions): Promise<RunningServic
       ),
     )
     // The guard answers first, whatever the target looks like.
-    const refusal = guard(port, req)
+    const refusal = guard(port, req, options.originAllowed?.(url?.pathname, firstHeader(req.headers.origin)) === true)
     if (refusal !== null) {
       await refuse(req, res, url, refusal.reason, () =>
         json(res, 403, { error: 'forbidden', message: refusal.sentence }),
@@ -456,10 +462,12 @@ export type RefusalReason = 'bad_host' | 'bad_origin' | 'cross_site' | 'bad_requ
  * The kit's checkRequest, asked one header at a time so the refusal carries its reason. The
  * sentence is the kit's own; the decision is the kit's alone.
  */
-function guard(port: number, req: IncomingMessage): { reason: RefusalReason; sentence: string } | null {
+function guard(port: number, req: IncomingMessage, originExcepted: boolean): { reason: RefusalReason; sentence: string } | null {
   const own = `${HOST}:${port}`
   const host = checkRequest(port, req.headers.host, undefined, undefined)
   if (host !== null) return { reason: 'bad_host', sentence: host }
+  // A route that takes a browser's own origin (`originAllowed`) checks it itself.
+  if (originExcepted) return null
   const origin = checkRequest(port, own, req.headers.origin, undefined)
   if (origin !== null) return { reason: 'bad_origin', sentence: origin }
   const site = checkRequest(port, own, undefined, firstHeader(req.headers['sec-fetch-site']))

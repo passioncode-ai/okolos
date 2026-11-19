@@ -15,6 +15,8 @@ import { JournalError, journalTime, Journal, RETENTION_DAYS_JOURNAL } from './jo
 import { agentEvents } from './agent-events.js'
 import { dashboard } from './dashboard/page.js'
 import { DOOR_PATHS, door } from './door/door.js'
+import { ExtensionLink, extensionStoreFile } from './extension/link.js'
+import { extensionOrigin, extensionRoute } from './extension/route.js'
 import { readCensus } from './hygiene/census.js'
 import { Pairing, PairingStoreError, pairingStoreFile } from './pairing/pairing.js'
 import { serviceDirs, type ServiceDirs } from './service/dirs.js'
@@ -88,6 +90,8 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
     ...(options.localesDir === undefined ? {} : { localesDir: options.localesDir }),
     ...(options.exit === undefined ? {} : { exit: options.exit }),
     handleSignals: false,
+    // The paired Okolos extension reaches its own route; every other browser is still refused (B-218).
+    originAllowed: extensionOrigin,
     onRefused: async (_req, url, reason) => {
       // Only the door's own routes go into the agents' journal; Fabric's polls do not (test 25).
       if (journal === undefined || url === null || !(DOOR_PATHS as readonly string[]).includes(url.pathname)) return
@@ -140,9 +144,11 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
         ...(options.extraChromeArgs === undefined ? {} : { extraArgs: options.extraChromeArgs }),
         onCloseIncomplete: (pid) => ctx.events.append('window_close_incomplete', 'warning', events.windowCloseIncomplete(pid)),
       })
+      const link = new ExtensionLink({ file: extensionStoreFile(dirs), now })
       verbs = createVerbs({
         tasks,
         windows,
+        extension: link,
         probeSource: options.probeSource,
         census: () => readCensus({ selfPid: process.pid, agentProfileDir: profileDir }),
         now,
@@ -162,6 +168,11 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
       for (const timer of timers) timer.unref()
       return [
         door({ pairing: opened, journal: openedJournal, operations: verbs, version: options.version, now }),
+        extensionRoute({
+          link,
+          // i18n-exempt: a line of the service log, read by a developer
+          refused: (route, reason) => ctx.log.write('warn', 'extension route refused', { path: route, reason }),
+        }),
         dashboard({
           pairing: opened,
           tasks,

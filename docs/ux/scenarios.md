@@ -1206,5 +1206,5 @@ every rule below; where they differ, the scenario says so.
 - **States covered:** not connected, connecting, connected, code refused, Okolos Agent unreachable, disconnected elsewhere
 - **Errors & recovery:** a request to the route from any other origin, with no origin, or with the wrong `Host` or token -> refused and recorded by Okolos Agent; Firefox may close the event page while it answers a queue -> the queue stays with Okolos Agent and is picked up on the next wake (spec O-3)
 - **Status:** draft
-- **Coverage:** none yet; design in `docs/superpowers/specs/2026-11-19-agent-door-wave-a.md` (requirements WA-1 to WA-8)
+- **Coverage:** the daemon's side only (step 2 of the spec): apps/agent/src/extension/link.test.ts (the code once and for five minutes, the token kept as SHA-256, the wait of 90 s, at most 10 a wake, disconnecting), apps/agent/src/extension/route.test.ts (the guard lets an extension origin through to `/extension/*` only, CORS to that origin exactly, a wrong code, token or second extension refused, release); the extension's side and the pages are not built; design in `docs/superpowers/specs/2026-11-19-agent-door-wave-a.md` (requirements WA-1 to WA-8)
 

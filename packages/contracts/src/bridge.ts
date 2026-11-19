@@ -32,7 +32,7 @@ export type BridgeVerb = (typeof BRIDGE_VERBS)[number]
  * and the census reads the machine, not a page. A scope cannot name them, so
  * they are a separate list rather than members of `BRIDGE_VERBS`.
  */
-export const BRIDGE_SESSION_VERBS = ['session.open', 'hygiene.census'] as const
+export const BRIDGE_SESSION_VERBS = ['session.open', 'hygiene.census', 'okolos.ping'] as const
 export type BridgeSessionVerb = (typeof BRIDGE_SESSION_VERBS)[number]
 
 /**
@@ -85,6 +85,8 @@ export const BRIDGE_REFUSALS = [
   'blocked_by_shield',
   'cleaning_incomplete',
   'stale_cursor',
+  'extension_not_connected',
+  'extension_asleep',
   'internal',
 ] as const
 export type BridgeRefusal = (typeof BRIDGE_REFUSALS)[number]
@@ -112,6 +114,10 @@ export const REFUSAL_RETRYABLE: Readonly<Record<BridgeRefusal, boolean>> = {
   cleaning_incomplete: false,
   // A cursor belongs to one stored snapshot; it never starts naming another.
   stale_cursor: false,
+  // The person has to connect Okolos to Okolos Agent first (B-218); asking again changes nothing.
+  extension_not_connected: false,
+  // Okolos is connected and wakes once a minute: the same call made after it wakes is answered.
+  extension_asleep: true,
   internal: true,
 }
 
@@ -154,6 +160,10 @@ export function refusalKey(code: BridgeRefusal): string {
       return 'refusal_cleaning_incomplete'
     case 'stale_cursor':
       return 'refusal_stale_cursor'
+    case 'extension_not_connected':
+      return 'refusal_extension_not_connected'
+    case 'extension_asleep':
+      return 'refusal_extension_asleep'
     case 'internal':
       return 'refusal_internal'
     default: {
@@ -416,6 +426,15 @@ export interface CloseResult {
   readonly closed: true
 }
 
+/** `okolos.ping` takes nothing: it asks the connected Okolos extension whether it answers (B-218 wave (a)). */
+export type OkolosPingInput = Record<string, never>
+
+/** What the extension answers: its version and since when it is connected to Okolos Agent. */
+export interface OkolosPingResult {
+  readonly extensionVersion: string
+  readonly connectedSince: string
+}
+
 /** The census reads the machine, not a task, and takes nothing. */
 export type CensusInput = Record<string, never>
 
@@ -430,6 +449,7 @@ interface VerbIOEntries {
   readonly waitFor: { readonly input: WaitForInput; readonly output: WaitForResult }
   readonly close: { readonly input: CloseInput; readonly output: CloseResult }
   readonly 'hygiene.census': { readonly input: CensusInput; readonly output: CensusResult }
+  readonly 'okolos.ping': { readonly input: OkolosPingInput; readonly output: OkolosPingResult }
 }
 
 /**
