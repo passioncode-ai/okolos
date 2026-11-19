@@ -473,6 +473,19 @@ its owner** ([evidence/06](../evidence/06-competitors.md) §6.3).
 - **Status:** proposed
 - **Source:** operator decision 2026-11-04 for all PassionCode products (B-198, B-199); it replaces the old promise "no analytics" in `docs/privacy.md`
 
+### ST-033: Let my agents use Okolos's own actions, after I connect Okolos once
+- **Story:** As P-01, I want to connect the Okolos extension to Okolos Agent once, with a code I type myself, so that the agents I paired can read Okolos's verdicts and change its settings through the same door, and I can take that connection back from either side.
+- **Traces:** JTBD-10, JRN-05/#1
+- **Acceptance criteria:**
+  - Given Okolos is not connected, then it makes no request to Okolos Agent and wakes for nothing on its account.
+  - Given the person asked Okolos Agent for a code and typed it into Okolos's settings within five minutes, then Okolos is connected, and its settings say since when.
+  - Given a connected Okolos, then it asks Okolos Agent for waiting requests at most once a minute, and an agent's request it has not answered within 90 seconds is refused with when Okolos will look next.
+  - Given the person disconnects on either side, then the next look is refused, Okolos forgets the connection and its settings say so.
+  - A web page cannot reach this route even knowing its port: only the connected extension's own origin and token pass.
+- **Priority:** should
+- **Status:** proposed
+- **Source:** operator decision 2026-11-07 (B-218), ADR-0022; spec `docs/superpowers/specs/2026-11-19-agent-door-wave-a.md`
+
 ## Assumptions register
 
 | # | Assumption | Type | Risk | How to test |

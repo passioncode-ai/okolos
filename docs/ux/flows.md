@@ -821,3 +821,27 @@ flowchart TD
 
 - **Screens traversed:** SCR-01, SCR-12, SCR-10 (the requests show in the self-audit log)
 
+### FLW-25: Connect Okolos to Okolos Agent
+- **Traces:** ST-033 (JTBD-10, JRN-05/#1)
+- **Goal:** the agents the person paired can reach Okolos's actions through Okolos Agent's door, and nothing else can; designed, not built (B-218 wave (a), spec `docs/superpowers/specs/2026-11-19-agent-door-wave-a.md`)
+- **Entry points:** «Привязать Okolos» on the Okolos Agent page (SCR-23); the «Okolos Agent» block in Okolos's settings (SCR-12)
+- **Success exit:** Okolos is connected, its settings say since when, and either side can take it back
+- **Task analysis:**
+  1. Ask Okolos Agent for a code
+  2. Type it into Okolos's settings
+  3. See it connected, or why not
+- **Flow:**
+
+```mermaid
+flowchart TD
+  P[SCR-23: Pair Okolos] --> C[Six-digit code, five minutes]
+  C --> T[SCR-12: the person types the code, Pair]
+  T --> R{POST /extension/pair}
+  R -->|code valid, from the extension's own origin| OK[Connected since date; alarm every 60 s]
+  R -->|wrong or expired code| E[Block says the code did not fit; nothing stored]
+  R -->|Okolos Agent not running| U[Block says Okolos Agent did not answer]
+  OK --> L[Each wake: POST /extension/next]
+  L -->|requests waiting| A[Answer them in the same wake, at most 20 s]
+  L -->|401| X[Forget the token and the alarm; block says it was disconnected]
+  OK -->|Disconnect on either side| X
+```

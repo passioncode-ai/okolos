@@ -455,7 +455,7 @@ generator, and the sheet declares no colour of its own.
 - **Scenarios:** SCN-015, SCN-023, SCN-024, SCN-051, SCN-052
 - **Usage block (B-199):** block "Данные об использовании и ошибках": a switch, one sentence on what is sent; in Firefox the switch asks the browser, and on Firefox 129 to 139 it says nothing is sent because the browser has no consent
 - **Resources:** settings store, exporter, wipe routine
-- **Agent door (B-218):** none today. Actions: brand list, quiet mode, proxy, retention, the HIBP key, usage and error data, «Выгрузить все данные», «Удалить все данные». Planned through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25); «Удалить все данные» goes through `fabric_effect_request` (deletion that cannot be undone), the HIBP key stays a typed secret
+- **Agent door (B-218):** none today. Actions: brand list, quiet mode, proxy, retention, the HIBP key, usage and error data, «Выгрузить все данные», «Удалить все данные». Planned through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25); «Удалить все данные» goes through `fabric_effect_request` (deletion that cannot be undone), the HIBP key stays a typed secret. Wave (a) designs the connection itself (SCN-054, FLW-25, spec `docs/superpowers/specs/2026-11-19-agent-door-wave-a.md`): a block «Okolos Agent» here with a code field, «Привязать», the connection state and «Отвязать»; not built, so not in Elements or States yet
 - **Status:** built
 
 ### SCR-13: Recovery checklist
