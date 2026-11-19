@@ -23,5 +23,7 @@ describe('«Помощь» in «Ваши данные» (B-232)', () => {
     expect(onSupport).toHaveBeenCalledOnce()
     expect(onPrivacy).toHaveBeenCalledOnce()
     expect(el.querySelectorAll('button')).toHaveLength(2)
+    // Both in the row pages.css spaces, so they never render as one run of text.
+    expect(el.querySelectorAll('[data-role=help-actions] > button')).toHaveLength(2)
   })
 })

@@ -17,7 +17,12 @@ export function renderHelp(doc: Document, handlers: HelpHandlers): HTMLElement {
   const heading = doc.createElement('h2')
   heading.setAttribute('data-role', 'help-title')
   heading.textContent = t('helpTitle')
-  section.append(heading, button(doc, 'help-support', t('helpSupport'), handlers.onSupport), button(doc, 'help-privacy', t('helpPrivacy'), handlers.onPrivacy))
+  // In a row of their own: `[data-role$='actions']` in pages.css spaces them, and two buttons
+  // side by side without it rendered as one run of text (e2e/no-flush-text.spec.ts).
+  const actions = doc.createElement('div')
+  actions.setAttribute('data-role', 'help-actions')
+  actions.append(button(doc, 'help-support', t('helpSupport'), handlers.onSupport), button(doc, 'help-privacy', t('helpPrivacy'), handlers.onPrivacy))
+  section.append(heading, actions)
   return section
 }
 
