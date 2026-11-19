@@ -144,4 +144,23 @@ describe('the verbs (N-011)', () => {
     const { run } = verbsWith()
     expect(await run('okolos.audit', {})).toMatchObject({ success: false, error: { code: 'extension_not_connected' } })
   })
+
+  it('hands an agent\'s action to the extension with the agent that asked, and holds no gate among them (B-218 wave (c))', async () => {
+    const asked: Array<{ verb: string; input: unknown; by: unknown }> = []
+    const extension = {
+      ask: (verb: string, input: unknown, by: unknown) => {
+        asked.push({ verb, input, by })
+        return Promise.resolve({ success: true, data: { done: true } })
+      },
+    } as unknown as NonNullable<Parameters<typeof createVerbs>[0]['extension']>
+    const ops = createVerbs({ tasks: new Tasks(), windows: fakeWindows(), probeSource: '', census: () => Promise.resolve([]), extension })
+    const op = (verb: string) => ops.find((o) => o.verb === verb) as (typeof ops)[number]
+    expect(op('okolos.finding.defer').input.safeParse({ id: 'f1', days: 31 }).success).toBe(false)
+    expect(op('okolos.trust.revoke').input.safeParse({ domain: 'https://example.com/' }).success).toBe(false)
+    expect(await op('okolos.finding.resolve').run({ id: 'f1' }, { agent: AGENT })).toEqual({ success: true, data: { done: true } })
+    expect(asked).toEqual([{ verb: 'okolos.finding.resolve', input: { id: 'f1' }, by: { agentId: 'a1', name: 'agent' } }])
+    // WC-5: what lowers a gate is not a verb an agent has.
+    const verbs = ops.map((o) => o.verb as string)
+    for (const gate of ['okolos.trust.add', 'okolos.extension.disable', 'okolos.data.delete', 'okolos.block.allow']) expect(verbs).not.toContain(gate)
+  })
 })

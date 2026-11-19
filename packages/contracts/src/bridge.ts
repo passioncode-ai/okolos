@@ -41,6 +41,10 @@ export const BRIDGE_SESSION_VERBS = [
   'okolos.journal',
   'okolos.audit',
   'okolos.extensions',
+  'okolos.trust.revoke',
+  'okolos.finding.resolve',
+  'okolos.finding.defer',
+  'okolos.extension.accept',
 ] as const
 export type BridgeSessionVerb = (typeof BRIDGE_SESSION_VERBS)[number]
 
@@ -539,6 +543,34 @@ export interface OkolosExtensionsResult {
   readonly changes: readonly OkolosExtensionChange[]
 }
 
+/**
+ * What an agent does in Okolos that the person can undo (B-218 wave (c), spec
+ * `docs/superpowers/specs/2026-11-19-agent-door-wave-c.md`): each is journaled with the agent's
+ * name, and the three that weaken protection are shown to the person and undone in one press.
+ */
+export interface OkolosTrustRevokeInput {
+  readonly domain: string
+}
+
+export interface OkolosFindingInput {
+  readonly id: string
+}
+
+/** Defers a finding for 1 to 30 days. */
+export interface OkolosFindingDeferInput {
+  readonly id: string
+  readonly days: number
+}
+
+export interface OkolosExtensionAcceptInput {
+  readonly id: string
+}
+
+/** What an action answers: done. A refusal says why it was not. */
+export interface OkolosActionResult {
+  readonly done: true
+}
+
 /** The census reads the machine, not a task, and takes nothing. */
 export type CensusInput = Record<string, never>
 
@@ -559,6 +591,10 @@ interface VerbIOEntries {
   readonly 'okolos.journal': { readonly input: OkolosListInput; readonly output: OkolosJournalResult }
   readonly 'okolos.audit': { readonly input: OkolosListInput; readonly output: OkolosAuditResult }
   readonly 'okolos.extensions': { readonly input: OkolosExtensionsInput; readonly output: OkolosExtensionsResult }
+  readonly 'okolos.trust.revoke': { readonly input: OkolosTrustRevokeInput; readonly output: OkolosActionResult }
+  readonly 'okolos.finding.resolve': { readonly input: OkolosFindingInput; readonly output: OkolosActionResult }
+  readonly 'okolos.finding.defer': { readonly input: OkolosFindingDeferInput; readonly output: OkolosActionResult }
+  readonly 'okolos.extension.accept': { readonly input: OkolosExtensionAcceptInput; readonly output: OkolosActionResult }
 }
 
 /**

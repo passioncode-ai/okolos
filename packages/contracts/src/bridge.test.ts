@@ -554,6 +554,10 @@ describe('the verbs', () => {
       'okolos.journal',
       'okolos.audit',
       'okolos.extensions',
+      'okolos.trust.revoke',
+      'okolos.finding.resolve',
+      'okolos.finding.defer',
+      'okolos.extension.accept',
     ])
   })
 
@@ -650,6 +654,7 @@ describe('the answers', () => {
     expect(contracts.verbAllowed).toBe(verbAllowed)
     expectTypeOf<BridgeSessionVerb>().toEqualTypeOf<
       'session.open' | 'hygiene.census' | 'okolos.ping' | 'okolos.queue' | 'okolos.verdict' | 'okolos.journal' | 'okolos.audit' | 'okolos.extensions'
+      | 'okolos.trust.revoke' | 'okolos.finding.resolve' | 'okolos.finding.defer' | 'okolos.extension.accept'
     >()
   })
 

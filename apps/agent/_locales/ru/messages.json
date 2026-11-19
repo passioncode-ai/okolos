@@ -719,5 +719,17 @@
   },
   "verb_okolos_extensions": {
     "message": "прочитать изменения расширений"
+  },
+  "verb_okolos_trust_revoke": {
+    "message": "убрать сайт из доверенных"
+  },
+  "verb_okolos_finding_resolve": {
+    "message": "отметить находку решённой"
+  },
+  "verb_okolos_finding_defer": {
+    "message": "отложить находку"
+  },
+  "verb_okolos_extension_accept": {
+    "message": "принять изменение расширения"
   }
 }

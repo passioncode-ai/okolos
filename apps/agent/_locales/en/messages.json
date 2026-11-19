@@ -719,5 +719,17 @@
   },
   "verb_okolos_extensions": {
     "message": "read the changes to extensions"
+  },
+  "verb_okolos_trust_revoke": {
+    "message": "remove a site from the trusted ones"
+  },
+  "verb_okolos_finding_resolve": {
+    "message": "mark a finding resolved"
+  },
+  "verb_okolos_finding_defer": {
+    "message": "put a finding off"
+  },
+  "verb_okolos_extension_accept": {
+    "message": "accept an extension's change"
   }
 }
