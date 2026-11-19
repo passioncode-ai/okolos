@@ -483,6 +483,12 @@ try {
    * differ in the *other* direction: with the row-of-controls rule removed,
    * Chromium renders three buttons flush and Gecko does not, which is the argument
    * for keeping both checks rather than either.
+   *
+   * **The pages themselves have their harness now (B-231, 2026-11-19).** The "different
+   * harness" named above is `e2e/gecko/firefox.ts`: it starts Firefox with the flag and
+   * `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1` and attaches geckodriver with `--connect-existing`, and
+   * `e2e/gecko/*.spec.ts` (`playwright.gecko.config.ts`) types into «Ваши данные» in Firefox.
+   * This file stays on web pages, where the capabilities route is enough.
    */
 
 } catch (cause) {

@@ -82,6 +82,7 @@ describe('the workflow runs what the project has', () => {
     expect(workflow).toContain('docs/ux/lint.py')
     expect(workflow).toContain('pnpm test:e2e')
     expect(workflow).toContain('tools/firefox-e2e.mjs')
+    expect(workflow).toContain('playwright.gecko.config.ts')
   })
 
   it('runs every gate the local chain runs', () => {

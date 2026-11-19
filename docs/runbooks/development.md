@@ -162,7 +162,7 @@ pnpm gates             # lint → typecheck → build → test → ux:lint → b
 
 ```bash
 pnpm test:e2e          # сборка + сборка с хуками + playwright (Chromium)
-pnpm test:e2e:firefox  # geckodriver + selenium, установка расширения в Firefox
+pnpm test:e2e:firefox  # geckodriver + selenium, установка расширения в Firefox, его страницы (e2e/gecko)
 pnpm bench             # бенчмарки горячих путей, vitest
 pnpm agent:build       # бандл Okolos Agent в apps/agent/dist/bin/
 pnpm agent:install     # релиз, команда, дескриптор и задача launchd Okolos Agent
@@ -338,6 +338,14 @@ Firefox-прогон берёт бинарник так (`tools/find-firefox.mjs
 `FIREFOX_BINARY` его не меняет: нужен `pnpm exec playwright install firefox chromium`. Первый шаг
 (`tools/firefox-e2e.mjs`) поднимает geckodriver на порту 4444; занятый порт бывает самой частой
 причиной непонятного падения.
+
+Страницы самого расширения (настройки, попап) в Firefox проходит третий шаг,
+`playwright test -c playwright.gecko.config.ts` (B-231): `e2e/gecko/firefox.ts` запускает Firefox
+сам, с `-marionette -remote-allow-system-access` и `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1`, и
+присоединяет к нему geckodriver (`--connect-existing`); страницу открывает из контекста chrome с
+системным принципалом. Через capabilities Firefox этот флаг не принимает, поэтому первый шаг этого
+не умеет. Порты берутся свободные: на машине с запущенным safaridriver порт 4445 занят им.
+Playwright здесь только запускает файлы и ждёт (`expect.poll`); браузер ведёт geckodriver.
 
 ## Генерируемое — руками не править
 

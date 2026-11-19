@@ -88,7 +88,8 @@
 - **Private Network Access (О-4), измерено на шаге 5.** Chromium из Playwright не требует
   `Access-Control-Allow-Private-Network: true` для запроса фона расширения к `127.0.0.1`: тест прошёл и без
   него. Демон ставит его на предварительный ответ по-прежнему, на случай если Chrome начнёт требовать.
-  Firefox не измерен: его стенд не открывает страницы расширения (`tools/firefox-e2e.mjs`, «Known limit»).
+  Firefox измерен 2026-11-19 (B-231, `e2e/gecko/scn-054.spec.ts`): страница событий достаёт до `127.0.0.1`
+  с разрешением хоста из манифеста, привязка и `okolos.ping` проходят.
 
 ### 3.4. Сеть и приватность
 
@@ -130,8 +131,10 @@
 5. e2e: Chrome и Firefox с демоном на loopback. Chrome сделан 2026-11-19: `e2e/scn-054.spec.ts`, демон в
    процессе теста на свободном порту (тестовая сборка берёт порт из `test:agentDoorPort`, в магазинной только
    47871), код со страницы Okolos Agent, привязка в «Ваших данных», `okolos.ping` через `execute`, отвязка со
-   страницы. Firefox не сделан: стенд geckodriver не открывает страницы расширения, код ввести негде; нужен
-   другой стенд (запуск Firefox с `-remote-allow-system-access` и подключение к нему), строка в бэклоге.
+   страницы. Firefox сделан 2026-11-19 (B-231): `e2e/gecko/scn-054.spec.ts` через `e2e/gecko/firefox.ts`,
+   Firefox запущен с `-remote-allow-system-access` и `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1`, geckodriver
+   подключён к нему; код вводится в «Ваших данных», привязка, `okolos.ping` через `execute`, отвязка со
+   страницы Okolos Agent. Волна (а) закрыта в Chrome и Firefox.
 
 ## 7. Открытые вопросы
 
