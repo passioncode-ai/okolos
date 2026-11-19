@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { MODEL } from '../packages/model/src/runtime.js'
 
+import { settledDir } from './dist-swap.mjs'
 import { filesUnder } from './tree.mjs'
 
 /**
@@ -46,6 +47,7 @@ describe('the model stage stays out of what ships', () => {
 
   it('builds background bundles that carry none of the model', () => {
     for (const bundle of BUNDLES) {
+      settledDir(path.dirname(path.join(root, bundle)))
       const text = readFileSync(path.join(root, bundle), 'utf8')
       expect(text.length, `${bundle} is empty: run \`pnpm build\` first`).toBeGreaterThan(1000)
       for (const marker of MARKERS) {
