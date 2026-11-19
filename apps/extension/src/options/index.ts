@@ -67,6 +67,7 @@ import {
 } from './views.js'
 import '../pages.css'
 import { runUsageSwitch } from './usage-switch.js'
+import { countUncaughtErrors } from '../ui-errors.js'
 
 /**
  * The options page is, first of all, the self-audit panel: the product's
@@ -77,6 +78,7 @@ import { runUsageSwitch } from './usage-switch.js'
  */
 
 const platform = detectPlatform()
+countUncaughtErrors(window, () => platform.runtime.send('usage/uiError', {}))
 
 /**
  * Before anything paints.

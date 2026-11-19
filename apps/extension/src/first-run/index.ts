@@ -6,6 +6,7 @@ import '../pages.css'
 import { optionsPageFor } from '../options/views.js'
 import { firstRunResult } from './result.js'
 import { repaintOnReturn } from './return.js'
+import { countUncaughtErrors } from '../ui-errors.js'
 
 /**
  * What the first run can honestly check.
@@ -18,6 +19,7 @@ import { repaintOnReturn } from './return.js'
  */
 
 const platform = detectPlatform()
+countUncaughtErrors(window, () => platform.runtime.send('usage/uiError', {}))
 
 /**
  * Before anything paints.

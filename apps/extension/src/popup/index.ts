@@ -6,6 +6,7 @@ import { renderPopup, type PopupState } from '@okolos/ui'
 import { buildPopupState } from './state.js'
 import '../pages.css'
 import { optionsPageFor, type ViewId } from '../options/views.js'
+import { countUncaughtErrors } from '../ui-errors.js'
 
 /**
  * The popup footer's three links, and the area each one opens.
@@ -32,6 +33,7 @@ const FOOTER_VIEW: Readonly<Record<'self-audit' | 'journal' | 'settings' | 'reco
 const LAST_CHECK_KEY = 'popup:lastCheck'
 
 const platform = detectPlatform()
+countUncaughtErrors(window, () => platform.runtime.send('usage/uiError', {}))
 
 /**
  * Before anything paints.

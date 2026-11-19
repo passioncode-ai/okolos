@@ -6,6 +6,7 @@ import '../pages.css'
 import { appealLinkFor } from './appeal-link.js'
 import { isFramed } from './framed.js'
 import { settleContext, type BlockContext } from './context.js'
+import { countUncaughtErrors } from '../ui-errors.js'
 
 /**
  * The page shown in place of a blocked one.
@@ -17,6 +18,7 @@ import { settleContext, type BlockContext } from './context.js'
  */
 
 const platform = detectPlatform()
+countUncaughtErrors(window, () => platform.runtime.send('usage/uiError', {}))
 
 // Before anything paints. A renderer that asks for a message before this line
 // runs gets `[key]` — visible, which is the point, but not on a real page.

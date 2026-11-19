@@ -200,6 +200,8 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
       return journalTrap(message.payload as { kind: string; signals: string; shown?: boolean }) as Promise<RpcMap[T]['res']>
     case 'usage/firstRun':
       return countFirstRun(message.payload as { result: string }) as Promise<RpcMap[T]['res']>
+    case 'usage/uiError':
+      return countUiError(from) as Promise<RpcMap[T]['res']>
     case 'warning/shown':
       return countShownWarning(message.payload as { kind: string }) as Promise<RpcMap[T]['res']>
     case 'recovery/open':
@@ -540,7 +542,10 @@ async function notePageEvent(
   } catch (cause) {
     // The note is the least important thing on the page at that moment.
     console.warn('okolos: could not journal a page note', cause)
+    void usage.error('storage', storageFailureKind(cause))
   }
+  // A scan that never finished, counted once a UTC day; the content script sends no event itself (B-206).
+  if (payload.kind === 'scan-failed') void usage.error('scan', 'unexpected')
   return { ok: true }
 }
 
@@ -1063,6 +1068,15 @@ async function countFirstRun(payload: { result: string }): Promise<{ ok: true }>
   } catch (cause) {
     console.warn('okolos: could not count the first run', cause)
   }
+  return { ok: true }
+}
+
+/**
+ * An extension page met an error nothing caught (`countUncaughtErrors`, B-206). Not counted from a
+ * web page's origin: only a content script runs there, and its failures are the scan's.
+ */
+async function countUiError(from: RpcSender): Promise<{ ok: true }> {
+  if (!/^(https?|file):/.test(from.origin ?? '')) void usage.error('ui', 'unexpected')
   return { ok: true }
 }
 
