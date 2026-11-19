@@ -4,7 +4,17 @@ export default defineConfig({
   test: {
     include: ['packages/**/*.test.ts', 'apps/**/*.test.ts', 'tools/**/*.test.ts'],
     // e2e belongs to Playwright; vitest must not try to run those specs.
-    exclude: ['e2e/**', '**/node_modules/**', '**/dist/**'],
+    exclude: [
+      'e2e/**',
+      '**/node_modules/**',
+      '**/dist/**',
+      // Okolos Agent Б1 runs on macOS only (ADR-0020): its store and journal rely on POSIX
+      // modes and fsync, CDP on a POSIX process group, the installer on launchd. Windows is
+      // its own phase (B-171); until then these suites do not run there.
+      ...(process.platform === 'win32'
+        ? ['apps/agent/**', 'packages/cdp-pipe/**', 'tools/install-agent.test.ts', 'tools/build-agent.test.ts']
+        : []),
+    ],
     // Per-file environments are set with a docblock:
     //   /** @vitest-environment happy-dom */
     environment: 'node',

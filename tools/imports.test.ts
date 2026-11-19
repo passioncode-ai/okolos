@@ -89,7 +89,7 @@ describe('the entry list', () => {
     expect(pageEntriesFromBuild().length).toBeGreaterThanOrEqual(3)
     expect(workerEntryFromWrangler().length).toBe(1)
     expect(binEntriesFromPackages().length).toBeGreaterThanOrEqual(1)
-    expect(agentEntriesFromBuild().map((f) => path.relative(path.resolve(import.meta.dirname, '..'), f))).toEqual([
+    expect(agentEntriesFromBuild().map((f) => path.relative(path.resolve(import.meta.dirname, '..'), f).split(path.sep).join('/'))).toEqual([
       'apps/agent/src/main.ts',
       'apps/extension/src/agent-probe-page.ts',
     ])

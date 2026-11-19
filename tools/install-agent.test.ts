@@ -40,7 +40,7 @@ describe('installing Okolos Agent (N-016, REQ-63)', () => {
     const paths = layout(home)
     expect(descriptorFor(paths)).toMatchObject({ auth: { tokenFile: servicePaths(serviceDirs(home)).hostToken }, origin: 'http://127.0.0.1:47871' })
     // --uninstall --purge removes the kit's folders: they must be the daemon's own.
-    expect(kitDirs('okolos-agent')).toEqual(serviceDirs(os.homedir()))
+    expect(kitDirs('okolos-agent', 'darwin')).toEqual(serviceDirs(os.homedir()))
     expect(commandScript(paths, '/node')).toBe(`#!/bin/sh\nexec "/node" "${paths.current}/dist/bin/okolos-agent.mjs" "$@"\n`)
   })
 
