@@ -175,6 +175,27 @@ describe('the message catalogue', () => {
   })
 })
 
+describe('text a person reads carries no em dash (operator rule; B-236)', () => {
+  // U+2014, written as an escape so this file is not a counter-example of its own rule.
+  const DASH = '\u2014'
+
+  it('in no message of any catalogue', () => {
+    for (const locale of locales) {
+      const dashed = Object.entries(read(locale))
+        .filter(([, entry]) => entry.message.includes(DASH))
+        .map(([key]) => key)
+      expect(dashed, `${locale}: rewrite with a colon, a full stop or parentheses`).toEqual([])
+    }
+  })
+
+  it('nor between the time and the line of the journal and the trusted list', () => {
+    for (const file of ['packages/ui/src/journal/journal.ts', 'packages/ui/src/trusted/trusted.ts']) {
+      const code = readFileSync(path.join(root, file), 'utf8')
+      expect(code.includes(`} ${DASH} \${`), `${file} joins two parts of a line with an em dash`).toBe(false)
+    }
+  })
+})
+
 describe('the catalogue in the format the browser will actually parse', () => {
   /**
    * This is not pedantry about syntax. A catalogue Chrome cannot parse does not

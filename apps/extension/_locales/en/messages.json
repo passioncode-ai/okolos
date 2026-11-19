@@ -12,7 +12,7 @@
     "message": "Finds text on a page hidden for your assistant, checks links and downloads, and shows you everything that leaves the device."
   },
   "appName": {
-    "message": "Okolos — a guard against hidden instructions"
+    "message": "Okolos: a guard against hidden instructions"
   },
   "areaAudit": {
     "message": "What was sent"
@@ -311,7 +311,7 @@
     "message": "Leave"
   },
   "comparisonReasonBrandSubdomain": {
-    "message": "The familiar name is here, but it is not the site you are on — it has been put in front of a different address."
+    "message": "The familiar name is here, but it is not the site you are on: it has been put in front of a different address."
   },
   "comparisonReasonHomograph": {
     "message": "Some characters here only look like the letters they stand for."
@@ -362,7 +362,7 @@
     "message": "Nothing could be restored. "
   },
   "contentRestoreChanged": {
-    "message": "left alone: $COUNT$ — the page has written its own content there since, and adding the hidden text back beside it would put the instruction into the page again",
+    "message": "left alone: $COUNT$ (the page has written its own content there since, and adding the hidden text back beside it would put the instruction into the page again)",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -378,7 +378,7 @@
     }
   },
   "contentRestoreGone": {
-    "message": "not put back: $COUNT$ — the page had already removed them",
+    "message": "not put back: $COUNT$ (the page had already removed them)",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -419,10 +419,10 @@
     }
   },
   "credUnknownHowLong": {
-    "message": "how long you have been visiting this site — no earlier visit is recorded on this device"
+    "message": "how long you have been visiting this site (no earlier visit is recorded on this device)"
   },
   "credUnknownWhenRegistered": {
-    "message": "when the domain was registered — that would require asking the service about this address"
+    "message": "when the domain was registered (that would require asking the service about this address)"
   },
   "dashboardBack": {
     "message": "← Overview"
@@ -501,7 +501,7 @@
     "message": "Try again"
   },
   "dataWipeUnavailable": {
-    "message": "The deletion failed. Nothing was wiped — the data is still there."
+    "message": "The deletion failed. Nothing was wiped: the data is still there."
   },
   "downloadFeedUnread": {
     "message": "the blocklists could not be read, so the source was not checked"
@@ -734,7 +734,7 @@
     }
   },
   "extensionsInspectNote": {
-    "message": "No browser hands one extension another’s code, so nothing here can be analysed on its own. Choose a package you downloaded and it is read on this device — nothing is uploaded."
+    "message": "No browser hands one extension another’s code, so nothing here can be analysed on its own. Choose a package you downloaded and it is read on this device. Nothing is uploaded."
   },
   "extensionsInspectTitle": {
     "message": "Inspect a package"
@@ -775,7 +775,7 @@
     "message": "And it applies on every site."
   },
   "extensionsRiskyPair": {
-    "message": "Holds $ONE$ and $TWO$ together — ordinary permissions apart, together they read your sessions and change what leaves the browser.",
+    "message": "Holds $ONE$ and $TWO$ together. Each is ordinary alone; together they read your sessions and change what leaves the browser.",
     "placeholders": {
       "one": {
         "content": "$1"
@@ -969,7 +969,7 @@
     "message": "Every check below runs on this device. The addresses and text of the pages you visit are not sent anywhere, and you can check that yourself at any time."
   },
   "firstRunNothingFound": {
-    "message": "Nothing found — $COUNT$ checks ran.",
+    "message": "Nothing found. $COUNT$ checks ran.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -1239,7 +1239,7 @@
     "message": "A finding was recorded"
   },
   "journalEmpty": {
-    "message": "Nothing to show yet — this is your first check."
+    "message": "Nothing to show yet: this is your first check."
   },
   "journalIncomplete": {
     "message": "Some records could not be read, so this view is incomplete. Unreadable: $COUNT$",
@@ -1433,7 +1433,7 @@
     }
   },
   "leaksGroupFreshTitle": {
-    "message": "Recent — a machine was infected"
+    "message": "Recent: a machine was infected"
   },
   "leaksGroupFreshWhy": {
     "message": "Everything stored in that browser went at once, including session cookies that keep working after a password change. Sign out of your sessions as well as changing the password."
@@ -1526,7 +1526,7 @@
     }
   },
   "logPasswordUnchecked": {
-    "message": "The password could not be checked. There is no answer about it — neither \"in a breach\" nor \"clean\"."
+    "message": "The password could not be checked. There is no answer about it, neither \"in a breach\" nor \"clean\"."
   },
   "logRulesTruncated": {
     "message": "$COUNT$ entries from $FEED$ could not be enforced: the browser limits how many blocking rules an extension may install.",
@@ -1540,7 +1540,7 @@
     }
   },
   "logStorageFull": {
-    "message": "Storage is full and could not be cleared. Nothing will be sent while the audit log cannot be written — that is the guarantee working, not a fault to ignore."
+    "message": "Storage is full and could not be cleared. Nothing will be sent while the audit log cannot be written. That is the guarantee working, not a fault to ignore."
   },
   "logSweptToMakeRoom": {
     "message": "Storage was full, so records past their retention window were deleted to make room for the audit log."
@@ -1566,10 +1566,10 @@
     }
   },
   "noteScanBlinded": {
-    "message": "The check of this page did not finish: there was more markup than the product will read in the time it allows itself, and it found nothing of note. That does not mean the page is clean — it means it was not checked in full."
+    "message": "The check of this page did not finish: there was more markup than the product will read in the time it allows itself, and it found nothing of note. That does not mean the page is clean. It means it was not checked in full."
   },
   "noteScanFailed": {
-    "message": "The page check did not finish. That does not mean there is nothing on the page — it means the page was not checked."
+    "message": "The page check did not finish. That does not mean there is nothing on the page. It means the page was not checked."
   },
   "noteSecondWarning": {
     "message": "A second warning ($KIND$, $SEVERITY$) was not shown on the page: the panel already holds a more serious finding.",
@@ -1633,7 +1633,7 @@
     }
   },
   "overviewNeverChecked": {
-    "message": "Nothing has been checked yet — which is not the same as clean."
+    "message": "Nothing has been checked yet, which is not the same as clean."
   },
   "overviewNothing": {
     "message": "Nothing needs you right now."
@@ -1793,7 +1793,7 @@
     "message": "Open"
   },
   "queueSeverityOnly": {
-    "message": "Ordered by severity alone — the rest of the ranking data is unavailable."
+    "message": "Ordered by severity alone: the rest of the ranking data is unavailable."
   },
   "recoveryAllDone": {
     "message": "Every step is done."
@@ -1811,7 +1811,7 @@
     "message": "This one cannot be done in this browser."
   },
   "recoveryPickAsk": {
-    "message": "Choose what happened. The steps depend on it — and if you are not sure, say so: the list will be the broadest safe one."
+    "message": "Choose what happened. The steps depend on it. If you are not sure, say so: the list will be the broadest safe one."
   },
   "recoveryPickCalled": {
     "message": "I called a number from a page, or gave someone my screen"
@@ -1844,7 +1844,7 @@
     "message": "Every remaining step can be done here, but you can still take the list with you."
   },
   "recoveryPortableElsewhere": {
-    "message": "$COUNT$ of the remaining steps cannot be done in this browser. Take the list with you — nothing is sent anywhere.",
+    "message": "$COUNT$ of the remaining steps cannot be done in this browser. Take the list with you: nothing is sent anywhere.",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -1914,7 +1914,7 @@
     "message": "That software is how they get back in, and it keeps working long after the call ends."
   },
   "recoveryStepWhyScan": {
-    "message": "It looks for what the command installed. Do this after the accounts are safe, not before — the accounts are what an attacker uses first."
+    "message": "It looks for what the command installed. Do this after the accounts are safe, not before: the accounts are what an attacker uses first."
   },
   "recoveryStepWhySessions": {
     "message": "A stolen session cookie keeps working after a password change until the session itself is ended."
@@ -1980,7 +1980,7 @@
     "message": "The local data cannot be opened"
   },
   "storageNewerVersion": {
-    "message": "This data was written by a newer version of Okolos. Install that one again — the data is intact and will open. Or clear the local data and start over."
+    "message": "This data was written by a newer version of Okolos. Install that one again: the data is intact and will open. Or clear the local data and start over."
   },
   "storageReset": {
     "message": "Clear the local data"
@@ -1992,10 +1992,10 @@
     "message": "Try again"
   },
   "storageShapeIncomplete": {
-    "message": "The store opened, and it is not the shape this version expects: some of the data cannot be read. Updating will not fix it — a browser changes a store’s shape only when its version changes."
+    "message": "The store opened, and it is not the shape this version expects: some of the data cannot be read. Updating will not fix it, because a browser changes a store’s shape only when its version changes."
   },
   "storageUnknown": {
-    "message": "The store did not open. The reason is below — you will need it if you report this."
+    "message": "The store did not open. The reason is below; you will need it if you report this."
   },
   "storageVersions": {
     "message": "The profile holds version $FOUND$; this build understands $EXPECTED$.",
@@ -2311,7 +2311,7 @@
     "message": " This page was too large to check in full, so there may be more."
   },
   "warnTechsupportDialogs": {
-    "message": "This page keeps raising dialogs that cannot be stopped from here — closing the tab is the way out."
+    "message": "This page keeps raising dialogs that cannot be stopped from here. Closing the tab is the way out."
   },
   "warnTechsupportHeadline": {
     "message": "The warning on this page is fake"
@@ -2497,7 +2497,7 @@
     "message": "The download warning was not shown, because no page was open"
   },
   "mailHeader": {
-    "message": "From $WHO$ <$ADDRESS$> — “$SUBJECT$” — $DATE$",
+    "message": "From $WHO$ <$ADDRESS$> · “$SUBJECT$” · $DATE$",
     "placeholders": {
       "who": {
         "content": "$1"
@@ -2535,7 +2535,7 @@
     "message": "attachments"
   },
   "mailNotRun": {
-    "message": "Not checked: $CHECK$ — $WHY$",
+    "message": "Not checked: $CHECK$ ($WHY$)",
     "placeholders": {
       "check": {
         "content": "$1"
@@ -2552,7 +2552,7 @@
     "message": "No model review was made"
   },
   "mailReviewLocal": {
-    "message": "Reviewed on this device: $REVIEWER$ — $SUMMARY$",
+    "message": "Reviewed on this device by $REVIEWER$: $SUMMARY$",
     "placeholders": {
       "reviewer": {
         "content": "$1"
@@ -2563,7 +2563,7 @@
     }
   },
   "mailReviewCloud": {
-    "message": "Reviewed in the cloud: $REVIEWER$ — $SUMMARY$",
+    "message": "Reviewed in the cloud by $REVIEWER$: $SUMMARY$",
     "placeholders": {
       "reviewer": {
         "content": "$1"
@@ -2577,7 +2577,7 @@
     "message": "this check is not built yet"
   },
   "mailUnreadable": {
-    "message": "The message was not read: $WHY$. There is no verdict — a message that could not be read is not a clean one",
+    "message": "The message was not read: $WHY$. There is no verdict: a message that could not be read is not a clean one",
     "placeholders": {
       "why": {
         "content": "$1"
@@ -2603,7 +2603,7 @@
     "message": "the file cannot be read"
   },
   "mailVerdictUnchecked": {
-    "message": "No check ran at all — there is no verdict about this message"
+    "message": "No check ran at all: there is no verdict about this message"
   },
   "mailCheckSenderAuth": {
     "message": "sender authentication"
