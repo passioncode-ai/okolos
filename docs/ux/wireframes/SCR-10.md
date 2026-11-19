@@ -20,6 +20,12 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 - `window`
 - `window-week`
 - `window-all`
+- `entry-group`
+- `group-detail`
+- `group-summary`
+- `group-line`
+- `group-note`
+- `group-entries`
 - `entry`
 - `entry-detail`
 - `entry-summary`

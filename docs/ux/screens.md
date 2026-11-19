@@ -375,7 +375,7 @@ generator, and the sheet declares no colour of its own.
   | loading | opening the log | - | skeleton rows |
   | empty | nothing sent yet | - | "Nothing has been sent from this device" |
   | error | journal unreadable | - | states the problem and offers repair; never shows an empty list on error |
-  | success | entries exist | - | newest first, grouped by purpose |
+  | success | entries exist | - | newest first; what Okolos sends on its own schedule folded into one line per purpose and UTC day |
 - **Behavior notes:** this log is written by the single network choke point before each request; if a request could bypass it, the guarantee is void — enforced by lint and test, not by convention
 - **Behavior notes — what the summary may claim.** The one-line summary names no absence it cannot prove. Until 2026-08-21 it ended "no page address, **email** or page content" unconditionally, while [facts.md](../brand/facts.md) says in its own table that `leak-lookup` sends the email address and `domain-status` sends the domain: a list containing such a request, under a sentence denying it exists. The unconditional half is now only what the choke point keeps — no page address, no page content — and what did leave is named per purpose, **and the person's Have I Been Pwned key is counted on its own when it left** (rows whose shape names `header:hibp-api-key`, B-125), because the address count alone would hide that a credential went with some of those requests. A purpose this build cannot read drops the absence claim entirely and says why
 - **Behavior notes — the window is applied, not just worded.** The panel receives the boundary as an instant (`windowStartIso`) and filters on it; retention is ninety days, and it used to be handed all of them under the words "the last seven". A row whose time is unreadable is kept, because understating what left is this screen's dangerous direction
@@ -400,8 +400,20 @@ generator, and the sheet declares no colour of its own.
   the newest-first order this screen's own scenario promises in step 1; with a seven-day
   window the flat list of requests the person caused is short enough that grouping only adds nesting;
   the usage-data rows are the exception, B-205
+- **What Okolos sends on its own schedule is folded by day (B-205, B-218 О-1).** Usage data (up
+  to 100 rows a day) and the wakes for Okolos Agent (1440 a day while connected) are each written
+  as a row, because ADR-0003 allows no request the log did not record first, and listed flat they
+  buried what the person caused. `[data-role=entry-group]` is one line per purpose and UTC day
+  (`[data-role=group-line]`, «2026-11-19 UTC, связь с Okolos Agent на этом устройстве: запросов
+  1440», and `[data-role=group-note]`, that Okolos sent them on its own schedule), placed where
+  its newest row would be; opening it (`[data-role=group-detail]`, a native `<details>`) draws
+  `[data-role=group-entries]`, every row as any other row, on the first opening only, so ninety
+  days of hidden rows are never built. Which rows fold is `madeOnItsOwn`: every `usage-data` row,
+  and `agent-door` rows triggered by its alarm; connecting and disconnecting are the person's acts
+  and stay rows. A row whose time is unreadable is never folded. The summary still counts every
+  request, and the overview (SCR-15) counts these apart: «отправок: N · сам по расписанию: M»
 - **Wireframe:** wireframes/SCR-10.md
-- **Coverage:** packages/ui/src/self-audit/panel.ts:renderSelfAudit, apps/extension/src/options/index.ts, packages/ui/src/self-audit/panel.test.ts (35 checks), e2e/scn-019.spec.ts (four, including opening a row and widening the period), e2e/rendered-instants.spec.ts (nine areas, seeded stores, one row written the way an older build leaves it)
+- **Coverage:** packages/ui/src/self-audit/panel.ts:renderSelfAudit, packages/ui/src/self-audit/panel.ts:madeOnItsOwn, apps/extension/src/options/index.ts, packages/ui/src/self-audit/panel.test.ts (39 checks), e2e/scn-019.spec.ts (four, including opening a row and widening the period), e2e/rendered-instants.spec.ts (nine areas, seeded stores, one row written the way an older build leaves it)
 - **Scenarios:** SCN-019
 - **Resources:** net layer journal, exporter
 - **Agent door (B-218):** none today. Actions: the period, opening a request, export. Planned: read first (the outbound log) and the export, through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
