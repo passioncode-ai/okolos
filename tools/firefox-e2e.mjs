@@ -37,6 +37,7 @@ import { Options } from 'selenium-webdriver/firefox.js'
 import { endTree, spawnTree } from './bin.mjs'
 import { buildTooOld } from './build-age.mjs'
 import { findFirefox } from './find-firefox.mjs'
+import { proxyHost } from './proxy-host.mjs'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const BUILD = path.join(root, 'apps/extension/dist/firefox')
@@ -199,6 +200,9 @@ try {
     .setBinary(BINARY)
     .addArguments('-headless')
     .setPreference('extensions.webextensions.uuids', JSON.stringify({ [EXT_ID]: EXT_UUID }))
+    // The proxy resolves here, where nothing answers on 443: the feed pull fails as the Chromium
+    // suite's 503 makes it fail, and a run does not fetch the published feed (B-235).
+    .setPreference('network.dns.localDomains', proxyHost())
   driver = await new Builder()
     .forBrowser('firefox')
     .usingServer('http://127.0.0.1:4444')
@@ -392,7 +396,8 @@ try {
       new Options()
         .setBinary(BINARY)
         .addArguments('-headless')
-        .setPreference('extensions.webextensions.uuids', JSON.stringify({ [EXT_ID]: EXT_UUID })),
+        .setPreference('extensions.webextensions.uuids', JSON.stringify({ [EXT_ID]: EXT_UUID }))
+        .setPreference('network.dns.localDomains', proxyHost()),
     )
     .build()
 

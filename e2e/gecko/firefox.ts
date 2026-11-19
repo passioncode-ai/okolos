@@ -44,6 +44,8 @@ export interface Gecko {
   readonly driver: Driver
   /** Opens an extension page in a new tab and makes it the one the driver talks to. */
   open(page: string): Promise<void>
+  /** Opens a web address in a new tab and makes it the one the driver talks to. */
+  visit(url: string): Promise<void>
   close(): Promise<void>
 }
 
@@ -133,24 +135,28 @@ export async function launchGecko(asked: Readonly<Record<string, Pref>> = {}): P
     throw cause
   }
 
+  /** A new tab on `url`, made current once it has loaded. */
+  async function tab(url: string): Promise<void> {
+    await driver.setContext(Context.CHROME)
+    await driver.executeScript(
+      `const w = Services.wm.getMostRecentWindow('navigator:browser');
+       w.gBrowser.selectedTab = w.gBrowser.addTab(arguments[0], { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });`,
+      url,
+    )
+    await driver.setContext(Context.CONTENT)
+    const handles = await driver.getAllWindowHandles()
+    await driver.switchTo().window(handles[handles.length - 1] as string)
+    // The new tab starts as about:blank; wait for the page before anyone scripts it.
+    await driver.wait(
+      async () => (await driver.getCurrentUrl()).startsWith(url.split('#')[0] as string) && (await driver.executeScript('return document.readyState')) === 'complete',
+      WORKER_REGISTER_MS,
+    )
+  }
+
   return {
     driver,
-    async open(page) {
-      await driver.setContext(Context.CHROME)
-      await driver.executeScript(
-        `const w = Services.wm.getMostRecentWindow('navigator:browser');
-         w.gBrowser.selectedTab = w.gBrowser.addTab(arguments[0], { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });`,
-        `${EXT_BASE}/${page}`,
-      )
-      await driver.setContext(Context.CONTENT)
-      const handles = await driver.getAllWindowHandles()
-      await driver.switchTo().window(handles[handles.length - 1] as string)
-      // The new tab starts as about:blank; wait for the extension page before anyone scripts it.
-      await driver.wait(
-        async () => (await driver.getCurrentUrl()).startsWith(EXT_BASE) && (await driver.executeScript('return document.readyState')) === 'complete',
-        WORKER_REGISTER_MS,
-      )
-    },
+    open: (page) => tab(`${EXT_BASE}/${page}`),
+    visit: (url) => tab(url),
     async close() {
       try {
         await driver.quit()
