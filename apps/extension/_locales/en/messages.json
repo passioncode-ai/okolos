@@ -2833,5 +2833,69 @@
   },
   "journalUndone": {
     "message": "You undid what the agent did"
+  },
+  "agentRequestBlock": {
+    "message": "Agent $AGENT$ asks to lift the block on $HOST$",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "host": {
+        "content": "$2"
+      }
+    }
+  },
+  "agentRequestLookalike": {
+    "message": "Agent $AGENT$ asks to be let through to the look-alike address $HOST$",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "host": {
+        "content": "$2"
+      }
+    }
+  },
+  "agentRequestAllow": {
+    "message": "Allow"
+  },
+  "agentRequestDecline": {
+    "message": "Decline"
+  },
+  "agentRequestNote": {
+    "message": "If you allow it, Okolos remembers this site and stops asking."
+  },
+  "logAgentAsked": {
+    "message": "Agent $AGENT$ asked to lift a gate on $HOST$.",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "host": {
+        "content": "$2"
+      }
+    }
+  },
+  "logAgentAllowed": {
+    "message": "You let agent $AGENT$ through to $HOST$.",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "host": {
+        "content": "$2"
+      }
+    }
+  },
+  "logAgentDeclined": {
+    "message": "You declined agent $AGENT$'s request about $HOST$.",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "host": {
+        "content": "$2"
+      }
+    }
   }
 }

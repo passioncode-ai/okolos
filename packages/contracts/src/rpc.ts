@@ -317,6 +317,8 @@ export interface RpcMap {
   'finding/resolve': { req: { id: string }; res: { ok: true } }
   /** The person undoes what an agent did that lowered a protection (B-218 wave (c), WC-2). */
   'agent/undo': { req: { entryId: string }; res: { ok: boolean } }
+  /** The person answers an agent's request to lift a gate, from the popup (B-218 wave (d)). */
+  'agent/decide': { req: { requestId: string; allow: boolean }; res: { ok: boolean } }
   /** Not today. It ranks last until the given time rather than disappearing. */
   'finding/defer': { req: { id: string; until: string }; res: { ok: true } }
   'site/facts': { req: { host: string }; res: { trusted: boolean; firstSeen: string | null } }

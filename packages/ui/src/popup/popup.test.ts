@@ -195,3 +195,23 @@ describe('the way out', () => {
     }
   })
 })
+
+describe('an agent asks to lift a gate (B-218 wave (d))', () => {
+  it('shows each request first after the verdict, and the person allows or declines it', () => {
+    const onRequest = vi.fn()
+    const el = render({ ...READY, requests: [{ id: 'r1', line: 'Агент scout просит снять блокировку для phish.example' }] }, handlers({ onRequest }))
+    const request = role(el, 'agent-request') as HTMLElement
+    expect(el.querySelector('[data-role=verdict] + [data-role=agent-requests]')).not.toBeNull()
+    expect(role(request, 'agent-request-line')?.textContent).toBe('Агент scout просит снять блокировку для phish.example')
+    ;(role(request, 'agent-request-allow') as HTMLButtonElement).click()
+    ;(role(request, 'agent-request-decline') as HTMLButtonElement).click()
+    expect(onRequest.mock.calls).toEqual([
+      ['r1', true],
+      ['r1', false],
+    ])
+  })
+
+  it('shows nothing when no request waits', () => {
+    expect(role(render({ ...READY, requests: [] }, handlers({ onRequest: vi.fn() })), 'agent-requests')).toBeNull()
+  })
+})

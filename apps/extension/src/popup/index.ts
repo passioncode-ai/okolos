@@ -3,6 +3,7 @@ import { detectPlatform } from '@okolos/platform'
 import { openDb } from '@okolos/storage'
 import { renderPopup, type PopupState } from '@okolos/ui'
 
+import { REQUESTS_KEY, type LiftRequest } from '../background/agent-requests.js'
 import { buildPopupState } from './state.js'
 import '../pages.css'
 import { optionsPageFor, type ViewId } from '../options/views.js'
@@ -59,6 +60,7 @@ async function load(): Promise<PopupState> {
       db.getAll('settings'),
       platform.tabs.activeUrl().catch(() => null),
     ])
+    const requests = await platform.storage.get<LiftRequest[]>(REQUESTS_KEY).catch(() => undefined)
 
     const deferrals = new Map(
       settings
@@ -74,6 +76,7 @@ async function load(): Promise<PopupState> {
       expanded,
       deferrals,
       now: new Date().toISOString(),
+      ...(requests === undefined ? {} : { requests }),
     })
   } catch (cause) {
     return { kind: 'error', message: String(cause) }
@@ -111,6 +114,9 @@ function paint(state: PopupState): void {
       // it said, for as long as the page was one scrolling stack.
       onOpen: (target) => void openPage(optionsPageFor(FOOTER_VIEW[target])),
       onRepair: () => void reload(),
+      onRequest: (requestId, allow) => {
+        void platform.runtime.send('agent/decide', { requestId, allow }).finally(() => void reload())
+      },
     }),
   )
 }

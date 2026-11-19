@@ -75,6 +75,7 @@ import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 import { recordPageRequest } from './page-requests.js'
 import { recordTrap } from './trap-journal.js'
 import { downloadWarningShown, extensionsCheckResult, leakCheckResult, passwordCheckResult, passwordError, surfaceWarning, trapWarning } from './usage/catalogue.js'
+import { decideRequest, REQUESTS_KEY, type LiftRequest, type RequestDeps } from './agent-requests.js'
 import { AGENT_DOOR_ALARM, AGENT_DOOR_KEY, AGENT_DOOR_PERIOD_MINUTES, AGENT_PORT, agentDoorPost, pairAgentDoor, releaseAgentDoor, wakeAgentDoor, type AgentDoorDeps, type AgentDoorLink } from './agent-door.js'
 import { storageFailureKind } from './usage/errors.js'
 import { startUsage } from './usage/start.js'
@@ -203,6 +204,10 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
       return countFirstRun(message.payload as { result: string }) as Promise<RpcMap[T]['res']>
     case 'usage/uiError':
       return countUiError(from) as Promise<RpcMap[T]['res']>
+    case 'agent/decide': {
+      const { requestId, allow } = message.payload as { requestId?: unknown; allow?: unknown }
+      return fromExtensionPage(from, () => decideRequest(String(requestId ?? ''), allow === true, agentRequests())) as Promise<RpcMap[T]['res']>
+    }
     case 'agent/undo':
       return fromExtensionPage(from, () => undoAgentAction(String((message.payload as { entryId?: unknown }).entryId ?? ''))) as Promise<RpcMap[T]['res']>
     case 'agentDoor/state':
@@ -1164,6 +1169,35 @@ const agentDoor: AgentDoorDeps = {
     },
     now: () => Date.now(),
   },
+  requests: agentRequests(),
+}
+
+/**
+ * Where an agent's requests to lift a gate wait for the person (wave (d)). Lifting a block or a
+ * look-alike address does what the person's «Всё равно продолжить» does: the host joins the
+ * trusted ones and the rules are rebuilt without it.
+ */
+function agentRequests(): RequestDeps {
+  return {
+    load: async () => (await platform.storage.get<LiftRequest[]>(REQUESTS_KEY)) ?? [],
+    save: (requests) => platform.storage.set(REQUESTS_KEY, requests),
+    newId: () => `r-${crypto.randomUUID().replaceAll('-', '').slice(0, 20)}`,
+    now: () => Date.now(),
+    journal: async (explainKey, args, agentId) => {
+      const now = new Date().toISOString()
+      await (await openDb()).put('journal', {
+        id: `agent-request:${explainKey}:${now}`,
+        createdAt: now,
+        kind: 'action',
+        detail: { explainKey, explainArgs: [...args], reason: explainKey === 'logAgentAsked' ? 'agent-action' : 'user-allowed', agentId },
+      })
+    },
+    lift: async (_gate, host) => {
+      const db = await openDb()
+      await db.put('exceptions', { scope: 'domain', ref: host, createdAt: new Date().toISOString(), reasonKey: 'trustContinuedPastBlock' })
+      await refreshBlockRules()
+    },
+  }
 }
 
 declare const __OKOLOS_TEST_HOOKS__: boolean | undefined

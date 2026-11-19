@@ -3,6 +3,8 @@ import { buildQueue, diffSince, QUEUE_LIMIT, type JournalEntry, type QueueItem }
 import type { FindingRecord, JournalRecord } from '@okolos/storage'
 import type { PopupState } from '@okolos/ui'
 
+import { waitingRequests, type LiftRequest } from '../background/agent-requests.js'
+
 /** The popup's ready state — the only one this module can produce. */
 type ReadyState = Extract<PopupState, { kind: 'ready' }>
 
@@ -102,6 +104,8 @@ export interface PopupInputs {
   readonly deferrals?: ReadonlyMap<string, string>
   /** ISO now. Without it the ranker cannot tell a live deferral from a stale one. */
   readonly now?: string
+  /** Agents' requests to lift a gate (B-218 wave (d)); only the waiting ones are shown. */
+  readonly requests?: readonly LiftRequest[]
 }
 
 export function buildPopupState(inputs: PopupInputs): ReadyState {
@@ -119,6 +123,12 @@ export function buildPopupState(inputs: PopupInputs): ReadyState {
     queue,
     changed: diffSince(entries, inputs.lastCheck, { unreadable }).total,
     lastCheck: inputs.lastCheck,
+    // The sentence is the agent's checked name, the gate in the catalogue's words and the host:
+    // never a word the agent wrote (WD-2).
+    requests: waitingRequests(inputs.requests ?? [], Date.parse(inputs.now ?? '') || Date.now()).map((request) => ({
+      id: request.id,
+      line: t(request.gate === 'lookalike' ? 'agentRequestLookalike' : 'agentRequestBlock', request.agentName, request.host),
+    })),
   }
 }
 

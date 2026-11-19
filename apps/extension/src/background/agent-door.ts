@@ -3,6 +3,7 @@ import { request, type RequestDeps } from '@okolos/net'
 
 import { ACTION_VERBS, answerAction, type ActionSinks } from './agent-actions.js'
 import { answerRead, READ_VERBS, type ReadSources } from './agent-reads.js'
+import { answerRequest, REQUEST_VERBS, type RequestDeps } from './agent-requests.js'
 
 /**
  * Okolos's side of its link to Okolos Agent (B-218 wave (a), ADR-0022, spec
@@ -47,6 +48,8 @@ export interface AgentDoorDeps {
   reads?: ReadSources
   /** What the undoable actions call (wave (c)); without it they are refused as unknown. */
   act?: ActionSinks
+  /** Where an agent's requests to lift a gate wait for the person (wave (d)). */
+  requests?: RequestDeps
 }
 
 export type PairOutcome = { readonly ok: true; readonly pairedAt: string } | { readonly ok: false; readonly reason: 'bad_code' | 'expired' | 'unreachable' }
@@ -131,6 +134,7 @@ async function answer(verb: unknown, input: unknown, by: unknown, link: AgentDoo
   }
   if (deps.reads !== undefined && (READ_VERBS as readonly unknown[]).includes(verb)) return answerRead(String(verb), input, deps.reads)
   if (deps.act !== undefined && (ACTION_VERBS as readonly unknown[]).includes(verb)) return answerAction(String(verb), input, by, deps.act)
+  if (deps.requests !== undefined && (REQUEST_VERBS as readonly unknown[]).includes(verb)) return answerRequest(String(verb), input, by, deps.requests)
   // i18n-exempt: read by the agent through Okolos Agent, not by the person
   return { success: false, error: { code: 'internal', message: 'This version of Okolos does not answer that verb.', retryable: false } }
 }

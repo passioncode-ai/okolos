@@ -327,3 +327,16 @@ describe('what a journal record says, and in whose language', () => {
     expect(summary).toContain('Somebody Else’s List')
   })
 })
+
+describe('an agent\'s request in the popup (B-218 wave (d), WD-2)', () => {
+  it('says the agent\'s checked name, the gate in words and the host, and only while it waits', () => {
+    const now = Date.parse('2026-11-19T12:00:00.000Z')
+    const request = { id: 'r1', gate: 'block' as const, host: 'phish.example', agentId: 'a1', agentName: 'scout', createdAt: now, expiresAt: now + 600_000, state: 'waiting' as const }
+    const expired = { ...request, id: 'r2', expiresAt: now - 1 }
+    const state = buildPopupState({ findings: [], journal: [], activeUrl: null, lastCheck: null, expanded: false, now: new Date(now).toISOString(), requests: [request, expired] })
+    expect(state.requests?.map((r) => r.id)).toEqual(['r1'])
+    expect(state.requests?.[0]?.line).toContain('scout')
+    expect(state.requests?.[0]?.line).toContain('phish.example')
+  })
+})
+

@@ -30,6 +30,8 @@ export type PopupState =
       readonly queue: Queue
       readonly changed: number
       readonly lastCheck: string | null
+      /** Agents' requests to lift a gate, each a sentence the caller built with no word of the agent's (B-218 wave (d)). */
+      readonly requests?: readonly { readonly id: string; readonly line: string }[]
     }
 
 export interface PopupHandlers {
@@ -40,6 +42,8 @@ export interface PopupHandlers {
   readonly onWhatChanged: () => void
   readonly onOpen: (target: 'self-audit' | 'journal' | 'settings' | 'recovery') => void
   readonly onRepair: () => void
+  /** The person's answer to an agent's request (B-218 wave (d)). */
+  readonly onRequest?: (requestId: string, allow: boolean) => void
 }
 
 export function renderPopup(
@@ -72,6 +76,25 @@ export function renderPopup(
 
   root.setAttribute('data-verdict', state.page.verdict)
   root.append(text(doc, 'verdict', state.page.reason))
+  // First after the verdict: an agent waits on the answer, and it expires in ten minutes.
+  if ((state.requests?.length ?? 0) > 0 && handlers.onRequest !== undefined) {
+    const onRequest = handlers.onRequest
+    const list = doc.createElement('section')
+    list.setAttribute('data-role', 'agent-requests')
+    for (const request of state.requests ?? []) {
+      const item = doc.createElement('div')
+      item.setAttribute('data-role', 'agent-request')
+      item.setAttribute('data-request', request.id)
+      item.append(
+        text(doc, 'agent-request-line', request.line),
+        text(doc, 'agent-request-note', t('agentRequestNote')),
+        button(doc, 'agent-request-allow', t('agentRequestAllow'), () => onRequest(request.id, true)),
+        button(doc, 'agent-request-decline', t('agentRequestDecline'), () => onRequest(request.id, false)),
+      )
+      list.append(item)
+    }
+    root.append(list)
+  }
   root.append(changedLine(doc, state.changed, state.lastCheck, handlers))
   root.append(
     renderQueue(doc, state.queue, {
