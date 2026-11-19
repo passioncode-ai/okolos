@@ -428,6 +428,8 @@ generator, and the sheet declares no colour of its own.
   |-------|---------|-------------|----------|
   | empty | nothing changed | - | "Nothing changed since <time>" |
   | success | changes exist | - | grouped diff, newest first |
+  | agent-undo | an agent's action through Okolos Agent lowered a protection (resolved or put off a finding, accepted an extension change) | - | the row says «это сделал агент», and `[data-role=entry-undo]` «Вернуть» stands beside it; pressing it opens the finding again, drops the deferral or brings the extension's change back, and the row then says «Вы отменили это действие агента» (`[data-role=entry-undone]`) |
+- **Behavior notes — what an agent did is the agent's (B-218 wave (c)).** An action an agent takes through Okolos Agent is written with its name («Агент scout отметил решённой находку на example.com») and labelled «это сделал агент», never «сделано автоматически» or «это сделали вы». The three that lower a protection carry «Вернуть» beside the row (the row is itself a button); the undo is the person's and is written into the same entry. Untrusting a site lowers nothing and has no undo. Spec `docs/superpowers/specs/2026-11-19-agent-door-wave-c.md`, WC-1 and WC-2
 - **Behavior notes — a failure's own words sit under the sentence, never inside it.** Two writers interpolated `String(cause)` into a catalogue sentence, so a reader got a Russian line with an English exception in the middle. The entry carries a `diagnostic` beside its explanation now, and the row draws it as a muted second line in a monospace face — last, the way SCR-20 shows the storage detail, because it is what a bug report needs and not what a reader should meet first (B-115)
 - **Behavior notes — the history line is a row.** It is a `<button>`, and until 2026-08-21 it
   inherited the chip look: a bordered box the width of its text, reading as a disabled input.
@@ -438,7 +440,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/core-queue/src/diff.ts:diffSince, packages/ui/src/journal/journal.ts:renderJournal, e2e/scn-020.spec.ts
 - **Scenarios:** SCN-021
 - **Resources:** event journal, diff selector
-- **Agent door (B-218):** **read today** through Okolos Agent (B-218 wave (b)): `okolos.journal`, each entry by kind, an outcome that is a word, a host and when, never the explanation with its arguments. «Full history» stays the person's
+- **Agent door (B-218):** **read today** through Okolos Agent (B-218 wave (b)): `okolos.journal`, each entry by kind, an outcome that is a word, a host and when, never the explanation with its arguments. «Full history» stays the person's; an agent's own actions (wave (c)) land here with its name and, when they lower a protection, the person's «Вернуть»
 - **Status:** built
 
 ### SCR-12: Settings

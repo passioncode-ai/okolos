@@ -14,6 +14,8 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 - `history`
 - `retention`
 - `group`
+- `entry-undo`
+- `entry-undone`
 - `entry`
 - `entry-line`
 - `entry-diagnostic`
@@ -22,6 +24,7 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 
 - **empty** — nothing changed
 - **success** — changes exist
+- **agent-undo** — an agent's action through Okolos Agent lowered a protection (resolved or put off a finding, accepted an extension change)
 
 **Source of truth:** `packages/ui/src/journal/journal.ts`. This file is derived from it; if the two
 disagree, the renderer is right and this file is stale.

@@ -2824,5 +2824,14 @@
         "content": "$2"
       }
     }
+  },
+  "journalByAgent": {
+    "message": "an agent did this"
+  },
+  "journalUndo": {
+    "message": "Undo"
+  },
+  "journalUndone": {
+    "message": "You undid what the agent did"
   }
 }

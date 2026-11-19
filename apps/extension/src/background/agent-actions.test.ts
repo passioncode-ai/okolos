@@ -14,7 +14,10 @@ function sinks() {
     trusted: async (domain) => domain === 'bank.example',
     resolve: async (id) => void calls.push(`resolve ${id}`),
     defer: async (id, until) => void calls.push(`defer ${id} ${until}`),
-    accept: async (id) => void calls.push(`accept ${id}`),
+    accept: async (id) => {
+      calls.push(`accept ${id}`)
+      return '{"extensionId":"ext1","permissions":["storage"]}'
+    },
     untrust: async (domain) => void calls.push(`untrust ${domain}`),
     journal: async (entry) => void journal.push(entry),
     now: () => NOW,
@@ -44,6 +47,7 @@ describe('an agent acts in Okolos as the button does, and the journal names it (
     await answerAction('okolos.extension.accept', { id: 'ext1' }, AGENT, s)
     await answerAction('okolos.trust.revoke', { domain: 'Bank.example' }, AGENT, s)
     expect(calls).toEqual(['accept ext1', 'untrust bank.example'])
+    expect(journal[0]?.previous).toBe('{"extensionId":"ext1","permissions":["storage"]}')
     expect(journal.map((entry) => [entry.explainKey, entry.weakens])).toEqual([
       ['logAgentAccepted', true],
       ['logAgentUntrusted', false],

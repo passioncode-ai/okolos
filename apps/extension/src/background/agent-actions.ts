@@ -25,6 +25,8 @@ export interface AgentActionEntry {
   readonly ref: string
   /** It lowered a protection, and the person can undo it (WC-2). */
   readonly weakens: boolean
+  /** What the undo puts back, when the action replaced something: an extension's earlier snapshot. */
+  readonly previous?: string
 }
 
 export interface ActionSinks {
@@ -35,7 +37,8 @@ export interface ActionSinks {
   trusted(domain: string): Promise<boolean>
   resolve(id: string): Promise<void>
   defer(id: string, until: string): Promise<void>
-  accept(id: string): Promise<void>
+  /** Accepts the change and answers what it replaced, for the undo (JSON, or null when there was none). */
+  accept(id: string): Promise<string | null>
   untrust(domain: string): Promise<void>
   journal(entry: AgentActionEntry): Promise<void>
   now(): number
@@ -87,8 +90,16 @@ export async function answerAction(verb: string, input: unknown, by: unknown, si
       const id = String(args.id ?? '')
       // i18n-exempt: read by the agent through Okolos Agent, not by the person
       if (!(await sinks.changedExtension(id))) return refused('Okolos lists no change of an extension with that id.')
-      await sinks.accept(id)
-      await sinks.journal({ explainKey: 'logAgentAccepted', explainArgs: [agent.name, id], agentId: agent.agentId, verb, ref: id, weakens: true })
+      const previous = await sinks.accept(id)
+      await sinks.journal({
+        explainKey: 'logAgentAccepted',
+        explainArgs: [agent.name, id],
+        agentId: agent.agentId,
+        verb,
+        ref: id,
+        weakens: true,
+        ...(previous === null ? {} : { previous }),
+      })
       return done
     }
     case 'okolos.trust.revoke': {
