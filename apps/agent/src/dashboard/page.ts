@@ -5,6 +5,8 @@
  *   GET  /api/state                                           what the page shows (`pageView`)
  *   POST /api/pairing/<handle>/confirm | /decline             the person's decision on a request
  *   POST /api/agents/<agentId>/revoke                         ends an agent's access and its tasks
+ *   POST /api/extension/code                                  a code for the person to type into Okolos (B-218)
+ *   POST /api/extension/release                               ends the Okolos extension's link
  *   GET  /api/journal?day=YYYY-MM-DD                          the agents' journal, one day as JSON lines
  *
  * Every /api route needs the operator session the shell gave Fabric Dashboards
@@ -20,6 +22,7 @@ import { fileURLToPath } from 'node:url'
 
 import type { Resolver } from '@okolos/i18n'
 
+import type { ExtensionLink } from '../extension/link.js'
 import { JournalError, type Journal } from '../journal/journal.js'
 import { PairingStoreError, type AgentRecord, type Pairing } from '../pairing/pairing.js'
 import type { Route } from '../service/http.js'
@@ -48,6 +51,8 @@ export interface DashboardDeps {
   readonly writeGaps?: () => readonly { readonly from: number; readonly to: number }[]
   /** The reason of the access list's last failed write, or null while writes succeed. */
   readonly pairingWriteFailure?: () => string | null
+  /** The Okolos extension's link (B-218); without it the page says the extension is not connected. */
+  readonly extension?: ExtensionLink
   readonly staticDir?: string
   readonly timeZone?: string
 }
@@ -110,6 +115,7 @@ export function dashboard(deps: DashboardDeps): Route {
       writeGaps: deps.writeGaps?.() ?? [],
       pairingWriteFailure: deps.pairingWriteFailure?.() ?? null,
       format,
+      ...(deps.extension === undefined ? {} : { okolos: { link: deps.extension.state(), code: deps.extension.pendingCode() } }),
     })
   }
 
@@ -176,6 +182,17 @@ export function dashboard(deps: DashboardDeps): Route {
         if (error instanceof PairingStoreError) return json(res, 500, { notice: deps.say('agentRevokeFailed', [before?.name ?? '?']) })
         throw error
       }
+    }
+    if (pathname === '/api/extension/code' || pathname === '/api/extension/release') {
+      const link = deps.extension
+      if (link === undefined) return json(res, 404, { error: 'not_found' })
+      if (pathname === '/api/extension/release') {
+        link.release()
+        return json(res, 200, { notice: deps.say('okolosDisconnected') })
+      }
+      // A new code replaces the last; the page shows it from the state, so the answer carries none.
+      if (!link.state().paired) link.issueCode()
+      return json(res, 200, {})
     }
     return json(res, 404, { error: 'not_found' })
   }

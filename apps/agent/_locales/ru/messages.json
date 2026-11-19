@@ -673,5 +673,36 @@
   },
   "doctorWhyUnparsable": {
     "message": "файл не разбирается"
+  },
+  "okolosHeading": {
+    "message": "Расширение Okolos"
+  },
+  "okolosUnpaired": {
+    "message": "Расширение Okolos не привязано. Пока вы его не привяжете, агенты не могут обращаться к Okolos."
+  },
+  "okolosConnect": {
+    "message": "Привязать Okolos"
+  },
+  "okolosCode": {
+    "message": "Введите этот код в настройках Okolos, в разделе «Ваши данные». Код действует до $TIME$.",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "okolosPaired": {
+    "message": "Расширение Okolos привязано с $DATE$",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "okolosDisconnect": {
+    "message": "Отвязать Okolos"
+  },
+  "okolosDisconnected": {
+    "message": "Расширение Okolos отвязано"
   }
 }

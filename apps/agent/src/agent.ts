@@ -184,6 +184,7 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
           journalWriteFailure: () => journalFailure,
           writeGaps: () => writeGaps,
           pairingWriteFailure: () => pairingFailure,
+          extension: link,
           ...(options.staticDir === undefined ? {} : { staticDir: options.staticDir }),
           ...(options.timeZone === undefined ? {} : { timeZone: options.timeZone }),
         }),
