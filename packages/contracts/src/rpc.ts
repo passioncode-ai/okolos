@@ -209,6 +209,8 @@ export interface RpcMap {
   'usage/state': { req: Record<string, never>; res: { state: UsageDataState } }
   /** The first-run screen finished its checks: `first_run_completed`, once per install (B-206). */
   'usage/firstRun': { req: { result: 'clean' | 'findings' | 'partial' }; res: { ok: true } }
+  /** An extension page met an error nothing caught: `error_occurred{ui, unexpected}`, once a UTC day (B-206). */
+  'usage/uiError': { req: Record<string, never>; res: { ok: true } }
   /**
    * The settings switch. In Firefox the page asks the browser inside the click first, because
    * `permissions.request` refuses outside a user gesture; the worker then reads the answer.
