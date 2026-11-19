@@ -30,9 +30,9 @@ import { extensionWorker } from './ready.js'
  * it, and the extension's next look forgets the link (WA-4).
  *
  * The wake is not waited for: the alarm is set to fire now from the worker, which an unpacked
- * extension may do at any interval. Firefox runs the connect, ping and disconnect part of it in
- * `e2e/gecko/scn-054.spec.ts` (B-231), through geckodriver; the reads, actions and requests of
- * waves (b) to (d) run here only.
+ * extension may do at any interval. Firefox runs the same path in `e2e/gecko/scn-054.spec.ts`
+ * (B-231), through geckodriver: connect, a read, an undoable action and its undo, a request the
+ * popup answers, disconnect. The look-alike gate and the verdict read are asserted here only.
  */
 
 const here = path.dirname(fileURLToPath(import.meta.url))
