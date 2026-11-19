@@ -70,6 +70,7 @@ import {
 import '../pages.css'
 import { runUsageSwitch } from './usage-switch.js'
 import { afterSends, answeredWithin } from './usage-wait.js'
+import { onAuditWritten } from '../audit-signal.js'
 import { countUncaughtErrors } from '../ui-errors.js'
 
 /**
@@ -1432,6 +1433,12 @@ async function storageProblem(): Promise<HTMLElement | null> {
 async function reload(): Promise<void> {
   await paint(routeFor(location.hash))
 }
+
+// A request sent while the self-audit panel is open shows on it without a reload (B-234). Only
+// that area repaints: elsewhere a background request changes nothing on the screen.
+onAuditWritten(() => {
+  if (routeFor(location.hash).view === 'audit') void reload()
+})
 
 /**
  * An action, with the pressed control marked until its result lands.

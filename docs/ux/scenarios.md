@@ -597,6 +597,7 @@ See [foundation.md](foundation.md) → Personas.
   3. User clicks "Export log" -> system produces a JSON file the user can compare against a browser network trace
 - **Expected result:** the user can state what left the device this week, from the product's own records, and verify it independently
 - **What a fresh install shows:** one entry — the blocking feed being downloaded, with its purpose in plain words, `none` as the payload and `alarm:feeds` as the trigger. Until 2026-08-08 it showed the sentence "nothing has been sent", and that was true only because nothing fetched a feed: the block list was empty on every install, so the panel's honesty rested on the product doing nothing
+- **While the panel is open:** a request sent then appears on it without a reload (B-234); the panel re-reads the store when the background says a row was written, and the message says nothing else
 - **Alt paths:** nothing was sent -> the empty state says so explicitly rather than showing an empty table
 - **UI elements:** summary line, labelled log rows (time, destination, purpose, payload shape, trigger) that open onto what the purpose sends and holds back, a two-position period control, "Export log"; `[data-role=entry-group]`, one line per purpose and UTC day for what Okolos sends on its own schedule (usage data, the wakes for Okolos Agent), opening onto its rows
 - **States covered:** loading, empty, error, success
