@@ -4,6 +4,7 @@ import { detectPlatform } from '@okolos/platform'
 import { openDb } from '@okolos/storage'
 import '../pages.css'
 import { optionsPageFor } from '../options/views.js'
+import { firstRunResult } from './result.js'
 import { repaintOnReturn } from './return.js'
 
 /**
@@ -106,9 +107,16 @@ async function usageState(): Promise<'on' | 'off' | 'unsupported' | 'not-sent'> 
 const USAGE_STATE_TRIES = 3
 const USAGE_STATE_RETRY_MS = 1_000
 
+let counted = false
+
 async function paint(): Promise<void> {
   if (!root) return
   const [{ rows, findings }, usage] = await Promise.all([checks(), usageState()])
+  if (!counted) {
+    counted = true
+    // The worker counts it once per install; a page cannot send events itself (ADR-0021).
+    void platform.runtime.send('usage/firstRun', { result: firstRunResult(rows, findings) }).catch(() => {})
+  }
   root.replaceChildren(
     renderFirstRun(document, { checks: rows, findings, usage }, {
       onUsageSettings: () => void platform.tabs.create(platform.runtime.getUrl(optionsPageFor('data'))),

@@ -8,6 +8,7 @@ import {
   downloadWarningShown,
   leakCheckResult,
   passwordCheckResult,
+  extensionsCheckResult,
   surfaceWarning,
   trapWarning,
 } from './catalogue.js'
@@ -100,15 +101,26 @@ describe('surfaceWarning (B-206)', () => {
     expect(surfaceWarning('lookalike')).toBe('lookalike')
     expect(surfaceWarning('credential')).toBe('credential-guard')
     expect(surfaceWarning('blocked-page')).toBe('blocked-page')
+    // The password panel is drawn only for a compromised verdict (B-206).
+    expect(surfaceWarning('password')).toBe('leaked-password')
   })
 
-  it('counts nothing it cannot name: traps and downloads are counted where decided, and a password verdict is not always a leak', () => {
-    for (const kind of ['trap', 'download', 'password', 'constructor', '']) expect(surfaceWarning(kind), kind).toBeNull()
+  it('counts nothing it cannot name: traps and downloads are counted where decided', () => {
+    for (const kind of ['trap', 'download', 'constructor', '']) expect(surfaceWarning(kind), kind).toBeNull()
   })
 
   it('maps only to values the catalogue holds', () => {
-    for (const kind of ['injection', 'lookalike', 'credential', 'blocked-page']) {
+    for (const kind of ['injection', 'lookalike', 'credential', 'blocked-page', 'password']) {
       expect(CATALOGUE.warning_shown.kind).toContain(surfaceWarning(kind))
     }
+  })
+})
+
+describe('the extension review counted as check_done (B-206)', () => {
+  it('is found with a change, ok with none, unavailable without an inventory', () => {
+    expect(extensionsCheckResult({ changes: 2 })).toBe('found')
+    expect(extensionsCheckResult({ changes: 0 })).toBe('ok')
+    expect(extensionsCheckResult('unavailable')).toBe('unavailable')
+    for (const result of ['found', 'ok', 'unavailable'] as const) expect(CATALOGUE.check_done.result).toContain(result)
   })
 })

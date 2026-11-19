@@ -164,3 +164,16 @@ describe('repairing the rules only when they are wrong', () => {
     expect(chrome.calls.dnrUpdate).toBe(1)
   })
 })
+
+describe('a once-per-install count (first_run_completed, B-206)', () => {
+  it('runs on the first call only, whatever the clock does after', async () => {
+    const store = memoryDueStore()
+    const ran: number[] = []
+    for (const now of [1_000, 2_000, 10 * 365 * 86_400_000]) {
+      await runIfDue(store, 'usage:firstRunCounted', Number.MAX_SAFE_INTEGER, now, async () => {
+        ran.push(now)
+      })
+    }
+    expect(ran).toEqual([1_000])
+  })
+})

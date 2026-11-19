@@ -74,7 +74,7 @@ import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 
 import { recordPageRequest } from './page-requests.js'
 import { recordTrap } from './trap-journal.js'
-import { downloadWarningShown, leakCheckResult, passwordCheckResult, surfaceWarning, trapWarning } from './usage/catalogue.js'
+import { downloadWarningShown, extensionsCheckResult, leakCheckResult, passwordCheckResult, surfaceWarning, trapWarning } from './usage/catalogue.js'
 import { startUsage } from './usage/start.js'
 import { optionsPageFor } from '../options/views.js'
 
@@ -197,6 +197,8 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
       ) as Promise<RpcMap[T]['res']>
     case 'trap/warned':
       return journalTrap(message.payload as { kind: string; signals: string; shown?: boolean }) as Promise<RpcMap[T]['res']>
+    case 'usage/firstRun':
+      return countFirstRun(message.payload as { result: string }) as Promise<RpcMap[T]['res']>
     case 'warning/shown':
       return countShownWarning(message.payload as { kind: string }) as Promise<RpcMap[T]['res']>
     case 'recovery/open':
@@ -1037,6 +1039,25 @@ async function journalTrap(payload: { kind: string; signals: string; shown?: boo
   return { ok: true }
 }
 
+/** The first-run screen's result, counted once per install (B-206); an unknown value is not counted. */
+const FIRST_RUN_COUNTED_KEY = 'usage:firstRunCounted'
+const FIRST_RUN_RESULTS: ReadonlySet<string> = new Set(['clean', 'findings', 'partial'])
+
+async function countFirstRun(payload: { result: string }): Promise<{ ok: true }> {
+  const result = String(payload?.result ?? '')
+  if (!FIRST_RUN_RESULTS.has(result)) return { ok: true }
+  try {
+    // Never due again once it ran: the screen repaints on every return to it, and an install
+    // has one first run.
+    await runIfDue(await settingsDueStore(), FIRST_RUN_COUNTED_KEY, Number.MAX_SAFE_INTEGER, Date.now(), async () => {
+      await usage.track('first_run_completed', { result: result as 'clean' | 'findings' | 'partial' })
+    })
+  } catch (cause) {
+    console.warn('okolos: could not count the first run', cause)
+  }
+  return { ok: true }
+}
+
 async function countShownWarning(payload: { kind: string }): Promise<{ ok: true }> {
   // The kind only, mapped to the catalogue's value; an unmapped kind is not counted (B-206).
   const kind = surfaceWarning(String(payload?.kind ?? ''))
@@ -1261,19 +1282,27 @@ platform.downloads.onCreated((item, named) => {
  * does not need checking twice an hour.
  */
 async function reviewExtensions(): Promise<void> {
-  if (!platform.extensions.available()) return
+  // One check_done a review (B-206): `found` when it journalled a change, `ok` when none,
+  // `unavailable` when the browser gives no inventory or the review failed.
+  if (!platform.extensions.available()) {
+    void usage.track('check_done', { check: 'extensions', result: extensionsCheckResult('unavailable') })
+    return
+  }
   try {
     // Journals what it finds and records nothing else. Recording here would hide
     // the change from the screen the user has not opened yet, which is the same
     // defect on a twenty-four-hour clock.
     const deps = inventoryDeps(await openDb())
-    await journalChanges(deps, await compareInventory(deps))
+    const changes = await compareInventory(deps)
+    await journalChanges(deps, changes)
     // The snapshots of extensions that stayed gone for the whole window go too, or an
     // unaccepted removal would be kept and re-journalled forever (B-134).
     const installed = new Set((await deps.list()).map((entry) => entry.id))
     await pruneRemovedSnapshots(deps.db, installed, Date.now())
+    void usage.track('check_done', { check: 'extensions', result: extensionsCheckResult({ changes: changes.length }) })
   } catch (cause) {
     console.warn('okolos: the extension review failed', cause)
+    void usage.track('check_done', { check: 'extensions', result: extensionsCheckResult('unavailable') })
   }
 }
 
@@ -1350,6 +1379,10 @@ async function sweepIfDue(): Promise<void> {
  * refusal, rollback, rule building — was built and tested and never reached.
  */
 async function pullFeed(): Promise<void> {
+  // Counted only for a pull that was owed (B-206): before the due check the only thing that can
+  // throw is the store itself, and an event cannot be queued in a store that does not open, so a
+  // failure there was one more event per wake that never left.
+  let owed = false
   try {
     const db = await openDb()
 
@@ -1377,6 +1410,7 @@ async function pullFeed(): Promise<void> {
       return
     }
     await db.put('settings', { key: LAST_FEED_KEY, value: new Date().toISOString() })
+    owed = true
 
     /**
      * Asked before the request, not after it.
@@ -1435,7 +1469,7 @@ async function pullFeed(): Promise<void> {
     })
   } catch (cause) {
     console.warn('okolos: feed sync failed', cause)
-    void usage.track('error_occurred', { area: 'feed', kind: 'unexpected' })
+    if (owed) void usage.track('error_occurred', { area: 'feed', kind: 'unexpected' })
   }
 }
 
