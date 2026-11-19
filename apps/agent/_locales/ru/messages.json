@@ -540,5 +540,75 @@
         "content": "$1"
       }
     }
+  },
+  "eventAgentAsked": {
+    "message": "Агент $NAME$ просит доступ.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "eventAgentConfirmed": {
+    "message": "Доступ для агента $NAME$ подтверждён, ключ ждёт агента.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "eventAgentDeclined": {
+    "message": "Запрос агента $NAME$ отклонён.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "eventAgentRequestExpired": {
+    "message": "Запрос агента $NAME$ истёк в $TIME$.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "time": {
+        "content": "$2"
+      }
+    }
+  },
+  "eventAgentClaimExpired": {
+    "message": "Агент $NAME$ не забрал ключ до $TIME$, доступ не выдан.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "time": {
+        "content": "$2"
+      }
+    }
+  },
+  "eventAgentPaired": {
+    "message": "Агент $NAME$ забрал ключ и получил доступ.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "eventAgentRevoked": {
+    "message": "Доступ агента $NAME$ отозван, его задачи закрыты.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "eventWindowCloseIncomplete": {
+    "message": "Chrome для агентов закрылся не полностью: процесс $PID$ остался.",
+    "placeholders": {
+      "pid": {
+        "content": "$1"
+      }
+    }
   }
 }

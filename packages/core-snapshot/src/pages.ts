@@ -41,11 +41,21 @@ const MAX_CURSOR_CHARS = 64
  * another digest, so its cursor is refused instead of paging into other lines.
  */
 export function snapshotDigest(lines: readonly SnapshotLine[]): string {
+  const known = digests.get(lines)
+  if (known !== undefined) return known
   const hash = sha256(utf8Encode(lines.map(renderLine).join('\n')))
   let hex = ''
   for (const byte of hash.subarray(0, 12)) hex += byte.toString(16).padStart(2, '0')
+  digests.set(lines, hex)
   return hex
 }
+
+/**
+ * The digest of each snapshot's lines, computed once: the daemon keeps a snapshot
+ * and pages it, and hashing 30 000 lines on every page made paging quadratic.
+ * A snapshot's lines never change after it is built, so the array is the key.
+ */
+const digests = new WeakMap<readonly SnapshotLine[], string>()
 
 export function encodeCursor(cursor: SnapshotCursor): string {
   return `p${cursor.from}.${cursor.digest}`

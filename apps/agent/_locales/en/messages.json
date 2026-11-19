@@ -540,5 +540,75 @@
         "content": "$1"
       }
     }
+  },
+  "eventAgentAsked": {
+    "message": "Agent $NAME$ asks for access.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "eventAgentConfirmed": {
+    "message": "Access for agent $NAME$ was confirmed; the key waits for the agent.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "eventAgentDeclined": {
+    "message": "The request from agent $NAME$ was declined.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "eventAgentRequestExpired": {
+    "message": "The request from agent $NAME$ expired at $TIME$.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "time": {
+        "content": "$2"
+      }
+    }
+  },
+  "eventAgentClaimExpired": {
+    "message": "Agent $NAME$ did not collect its key by $TIME$; no access was given.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "time": {
+        "content": "$2"
+      }
+    }
+  },
+  "eventAgentPaired": {
+    "message": "Agent $NAME$ collected its key and has access.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "eventAgentRevoked": {
+    "message": "Access for agent $NAME$ was revoked and its tasks closed.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "eventWindowCloseIncomplete": {
+    "message": "The agents' Chrome did not close fully: process $PID$ was left.",
+    "placeholders": {
+      "pid": {
+        "content": "$1"
+      }
+    }
   }
 }

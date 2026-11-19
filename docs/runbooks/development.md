@@ -166,6 +166,14 @@ pnpm test:e2e:firefox  # geckodriver + selenium, установка расшир
 pnpm bench             # бенчмарки горячих путей, vitest
 ```
 
+**Okolos Agent из исходников** (Okolos Bridge, N-011): `node tools/build-agent.mjs` пишет в
+`apps/agent/dist/bin/` бандл демона `okolos-agent.mjs` (одним ES-модулем, все зависимости внутри) и рядом
+`agent-probe.js`, пробник, который демон исполняет в изолированном мире страницы. Запуск:
+`node apps/agent/dist/bin/okolos-agent.mjs serve [--port <порт>]`; привязка агента
+`... pair --name <имя>`, шим MCP для клиента `... mcp-stdio --name <имя>`. Язык фраз для человека
+`OKOLOS_AGENT_LOCALE` (`ru` по умолчанию, `en`). Сквозной путь глаголов на Chrome: `OKOLOS_CHROME_TESTS=1
+pnpm exec vitest run apps/agent/src/verbs`.
+
 **Окно агента на настоящем Chrome** (Okolos Bridge, N-010): `OKOLOS_CHROME_TESTS=1 pnpm exec vitest run
 apps/agent/src/window/window.chrome.test.ts`. Нужны Chrome stable и экран; без переменной файл
 пропускается с причиной, поэтому ни `pnpm gates`, ни CI не открывают окно перед тем, кто пушит. Проверяет:

@@ -103,7 +103,10 @@ export function cdpRefusal(error: unknown): BridgeError {
   return refuse('internal', 'The operation failed inside Okolos Agent.').error
 }
 
-export function createVerbs(deps: VerbsDeps): Operation[] {
+/** The operations, and the hook that closes the windows of tasks closed elsewhere (revoked, expired). */
+export type Verbs = Operation[] & { closeWindows(tasks: readonly Task[]): Promise<void> }
+
+export function createVerbs(deps: VerbsDeps): Verbs {
   const now = deps.now ?? Date.now
   const pages = new Map<string, TaskPage>()
 
@@ -451,4 +454,3 @@ export function createVerbs(deps: VerbsDeps): Operation[] {
   })
 }
 
-export type Verbs = ReturnType<typeof createVerbs>
