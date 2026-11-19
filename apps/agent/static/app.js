@@ -48,6 +48,7 @@ function renderPairing(view) {
   $('paired-heading').textContent = strings.pairedHeading
   $('pairing-how').textContent = strings.pairingHow
   show($('pairing-error'), view.state === 'error' ? view.error : null)
+  show($('pairing-unwritable'), view.unwritable ?? null)
   show($('pairing-empty'), view.state === 'empty' ? strings.pairingEmpty : null)
   const requests = $('pairing-requests')
   requests.replaceChildren(

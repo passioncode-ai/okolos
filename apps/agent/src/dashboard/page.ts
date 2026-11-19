@@ -44,6 +44,10 @@ export interface DashboardDeps {
   readonly onRevoke: (agent: AgentRecord) => Promise<void>
   /** The reason of the journal's last failed write in words, or null while writes succeed. */
   readonly journalWriteFailure: () => string | null
+  /** The spans the journal could not be written in this run. */
+  readonly writeGaps?: () => readonly { readonly from: number; readonly to: number }[]
+  /** The reason of the access list's last failed write, or null while writes succeed. */
+  readonly pairingWriteFailure?: () => string | null
   readonly staticDir?: string
   readonly timeZone?: string
 }
@@ -103,6 +107,8 @@ export function dashboard(deps: DashboardDeps): Route {
       tasks: deps.tasks.list(now),
       journal,
       journalWriteFailure: deps.journalWriteFailure(),
+      writeGaps: deps.writeGaps?.() ?? [],
+      pairingWriteFailure: deps.pairingWriteFailure?.() ?? null,
       format,
     })
   }

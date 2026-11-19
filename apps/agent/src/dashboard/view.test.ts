@@ -122,4 +122,29 @@ describe('pageView (N-015)', () => {
     expect(view({ journalWriteFailure: 'no_space' }).activity).toMatchObject({ notes: [say('refusalsIncomplete')], journalError: say('journalError', ['no_space']) })
     expect(view({ journal: { failure: 'unreadable' } }).activity).toMatchObject({ state: 'journal-unreadable', refusals: [], door: [] })
   })
+
+  it('shows the day-full state with its hour, marks the list incomplete, and names an earlier full day and a write gap', () => {
+    const journal = {
+      ...EMPTY_JOURNAL,
+      dayFull: [
+        { at: '2026-11-17T20:00:00.000Z', outcome: 'day_full' },
+        { at: '2026-11-19T10:00:00.000Z', outcome: 'day_full' },
+      ],
+    } as unknown as RecentJournal
+    const v = view({ journal: { recent: journal }, writeGaps: [{ from: Date.UTC(2026, 10, 18, 8), to: Date.UTC(2026, 10, 18, 9) }] })
+    expect(v.activity.state).toBe('day-full')
+    expect(v.activity.journalError).toBe(say('journalDayFull'))
+    expect(v.activity.notes).toEqual([
+      say('refusalsIncomplete'),
+      say('refusalsGap', ['2026-11-17 20:00', '2026-11-18 00:00']),
+      say('refusalsGap', ['2026-11-18 08:00', '2026-11-18 09:00']),
+    ])
+  })
+
+  it('shows the store-unwritable state while the access list cannot be written, and the lists as before', () => {
+    const v = view({ pairing: { requests: [], agents: [AGENT] }, pairingWriteFailure: 'no_space' })
+    if (v.pairing.state === 'error') throw new Error('error state')
+    expect(v.pairing.unwritable).toBe(say('pairingStoreUnwritable', ['no_space']))
+    expect(v.pairing.agents).toHaveLength(1)
+  })
 })

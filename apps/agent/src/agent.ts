@@ -16,7 +16,7 @@ import { agentEvents } from './agent-events.js'
 import { dashboard } from './dashboard/page.js'
 import { DOOR_PATHS, door } from './door/door.js'
 import { readCensus } from './hygiene/census.js'
-import { Pairing, pairingStoreFile } from './pairing/pairing.js'
+import { Pairing, PairingStoreError, pairingStoreFile } from './pairing/pairing.js'
 import { serviceDirs, type ServiceDirs } from './service/dirs.js'
 import { defaultLocalesDir } from './service/messages.js'
 import { startService, type Locale, type RunningService } from './service/http.js'
@@ -73,6 +73,9 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
   const tasks = new Tasks()
   const timers: NodeJS.Timeout[] = []
   let journalFailure: string | null = null
+  let journalFailingSince: number | null = null
+  const writeGaps: { from: number; to: number }[] = []
+  let pairingFailure: string | null = null
   const catalogueFile = path.join(options.localesDir ?? defaultLocalesDir(), locale, 'messages.json')
   const say = fromCatalogue(JSON.parse(readFileSync(catalogueFile, 'utf8')) as Catalogue)
 
@@ -97,9 +100,12 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
       openedJournal.record = async (entry) => {
         try {
           await record(entry)
+          if (journalFailingSince !== null) writeGaps.push({ from: journalFailingSince, to: now() })
           journalFailure = null
+          journalFailingSince = null
         } catch (error) {
           journalFailure = error instanceof JournalError ? error.code : 'other'
+          journalFailingSince ??= now()
           throw error
         }
       }
@@ -113,6 +119,20 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
         onNoticeError: (error) => ctx.log.write('warn', 'pairing_notice_failed', { error: error instanceof Error ? error.name : 'unknown' }),
       })
       pairing = opened
+      // The page's store-unwritable state: the last write of the access list failed (a claim, a revoke).
+      for (const method of ['claim', 'revoke'] as const) {
+        const original = opened[method].bind(opened) as (...args: unknown[]) => unknown
+        ;(opened as unknown as Record<string, (...args: unknown[]) => unknown>)[method] = (...args: unknown[]) => {
+          try {
+            const result = original(...args)
+            pairingFailure = null
+            return result
+          } catch (error) {
+            if (error instanceof PairingStoreError) pairingFailure = error.reason
+            throw error
+          }
+        }
+      }
       const profileDir = path.join(dirs.data, 'profiles', 'agent')
       windows = new AgentWindows({
         binary: options.chromeBinary === undefined ? (findChrome() ?? '') : (options.chromeBinary ?? ''),
@@ -151,6 +171,8 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
           now,
           onRevoke: (agent) => opsVerbs.closeWindows(tasks.closeAllOf(agent.agentId)),
           journalWriteFailure: () => journalFailure,
+          writeGaps: () => writeGaps,
+          pairingWriteFailure: () => pairingFailure,
           ...(options.staticDir === undefined ? {} : { staticDir: options.staticDir }),
           ...(options.timeZone === undefined ? {} : { timeZone: options.timeZone }),
         }),

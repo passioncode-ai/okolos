@@ -53,9 +53,15 @@ export interface PageView {
   readonly strings: Readonly<Record<string, string>>
   readonly pairing:
     | { readonly state: 'error'; readonly error: string }
-    | { readonly state: 'empty' | 'success'; readonly requests: readonly RequestRow[]; readonly agents: readonly AgentRow[] }
+    | {
+        readonly state: 'empty' | 'success'
+        readonly requests: readonly RequestRow[]
+        readonly agents: readonly AgentRow[]
+        /** The store-unwritable state: the last write of the access list failed, in words, or null. */
+        readonly unwritable: string | null
+      }
   readonly activity: {
-    readonly state: 'empty' | 'success' | 'journal-unreadable'
+    readonly state: 'empty' | 'success' | 'journal-unreadable' | 'day-full'
     readonly tasks: readonly TaskRow[]
     readonly refusals: readonly string[]
     readonly door: readonly string[]
@@ -96,6 +102,10 @@ export interface ViewInput {
   readonly journal: { readonly recent: RecentJournal } | { readonly failure: string }
   /** The last failed write of the journal, as a reason in words, or null. */
   readonly journalWriteFailure: string | null
+  /** Spans in which the journal could not be written, ms since the epoch, oldest first. */
+  readonly writeGaps?: readonly { readonly from: number; readonly to: number }[]
+  /** The last failed write of the access list, as a reason in words, or null. */
+  readonly pairingWriteFailure?: string | null
   readonly format: (at: number) => string
 }
 
@@ -150,7 +160,12 @@ export function pageView(input: ViewInput): PageView {
               tasks: say('pairedTasks', [String(held)]),
             }
           })
-          return { state: rows.length + agentRows.length === 0 ? 'empty' : 'success', requests: rows, agents: agentRows }
+          return {
+            state: rows.length + agentRows.length === 0 ? 'empty' : 'success',
+            requests: rows,
+            agents: agentRows,
+            unwritable: input.pairingWriteFailure == null ? null : say('pairingStoreUnwritable', [input.pairingWriteFailure]),
+          }
         })()
 
   const nameOf = (agentId: string): AgentRecord | undefined => agents.find((a) => a.agentId === agentId)
@@ -179,8 +194,18 @@ export function pageView(input: ViewInput): PageView {
   }
   const journal = input.journal.recent
   const notes: string[] = []
-  if (input.journalWriteFailure !== null) notes.push(say('refusalsIncomplete'))
+  const today = utcDay(input.now)
+  const fullToday = journal.dayFull.some((line) => utcDay(Date.parse(line.at)) === today)
+  if (input.journalWriteFailure !== null || fullToday) notes.push(say('refusalsIncomplete'))
   if (journal.unreadable > 0) notes.push(say('journalLinesSkipped', [String(journal.unreadable)]))
+  // A day that filled earlier, and a span the journal could not be written, are gaps the list names (N-006 round 8).
+  const gaps = [
+    ...journal.dayFull
+      .filter((line) => utcDay(Date.parse(line.at)) !== today)
+      .map((line) => ({ from: Date.parse(line.at), to: (utcDay(Date.parse(line.at)) + 1) * DAY_MS })),
+    ...(input.writeGaps ?? []),
+  ].sort((a, b) => a.from - b.from)
+  for (const gap of gaps) notes.push(say('refusalsGap', [format(gap.from), format(gap.to)]))
   const refusals = journal.refusals.slice(-REFUSALS_SHOWN).reverse().map((entry) => refusalLine(say, format, entry, label))
   const door = [...journal.rejections.state, ...journal.rejections.request]
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
@@ -190,14 +215,21 @@ export function pageView(input: ViewInput): PageView {
     strings,
     pairing,
     activity: {
-      state: tasks.length === 0 ? 'empty' : 'success',
+      state: fullToday ? 'day-full' : tasks.length === 0 ? 'empty' : 'success',
       tasks,
       refusals,
       door,
       notes,
-      journalError: input.journalWriteFailure === null ? null : say('journalError', [input.journalWriteFailure]),
+      journalError: fullToday ? say('journalDayFull') : input.journalWriteFailure === null ? null : say('journalError', [input.journalWriteFailure]),
     },
   }
+}
+
+const DAY_MS = 86_400_000
+
+/** The UTC day an instant falls on, as a day number: the journal's days are UTC days. */
+function utcDay(ms: number): number {
+  return Math.floor(ms / DAY_MS)
 }
 
 const FAILURES: ReadonlySet<string> = new Set(['internal', 'browser_offline', 'cleaning_incomplete'])
