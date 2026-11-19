@@ -497,3 +497,55 @@ describe('usage and error data in the summary', () => {
     expect(summary).toContain(message('auditSummaryCarriedInstall').replace('$COUNT$', '2'))
   })
 })
+
+describe('what Okolos sends on its own schedule is folded by day, never hidden (B-205, spec О-1)', () => {
+  const wakes = Array.from({ length: 30 }, (_, i) =>
+    entry({
+      id: `w${i}`,
+      createdAt: `2026-08-04T08:${String(i).padStart(2, '0')}:00.000Z`,
+      destination: '127.0.0.1',
+      purpose: 'agent-door',
+      payloadShape: 'agent-door:next',
+      triggeredBy: 'alarm:okolos:agent',
+    }),
+  )
+  const yesterday = entry({ id: 'y1', createdAt: '2026-08-03T23:00:00.000Z', destination: '127.0.0.1', purpose: 'agent-door', payloadShape: 'agent-door:next', triggeredBy: 'alarm:okolos:agent' })
+  const connect = entry({ id: 'c1', createdAt: '2026-08-04T07:59:00.000Z', destination: '127.0.0.1', purpose: 'agent-door', payloadShape: 'agent-door:pair', triggeredBy: 'user:settings' })
+  const usage = entry({ id: 'u1', createdAt: '2026-08-04T06:00:00.000Z', destination: 'analytics.passioncode.ai', purpose: 'usage-data', payloadShape: 'events:3', triggeredBy: 'alarm:feeds' })
+  const person = entry({ id: 'p1', createdAt: '2026-08-04T08:15:30.000Z' })
+  const ready = (entries: AuditEntry[]) =>
+    renderSelfAudit(document, { kind: 'ready', entries, windowStartIso: '2026-08-01T00:00:00.000Z', since: '7 дней', window: 'week' }, handlers)
+
+  it('shows one line per purpose and UTC day where its newest row would be, and the person\'s rows as rows', () => {
+    const el = ready([...wakes, yesterday, connect, usage, person])
+    const items = [...(el.querySelector('[data-role=entries]')?.children ?? [])].map((li) => li.getAttribute('data-role') === 'entry-group' ? `group:${li.getAttribute('data-purpose')}` : li.getAttribute('data-entry'))
+    expect(items).toEqual(['group:agent-door', 'p1', 'c1', 'group:usage-data', 'group:agent-door'])
+    const line = el.querySelector('[data-role=group-line]')?.textContent
+    expect(line).toBe(message('auditGroupLine').replace('$DAY$', '2026-08-04').replace('$PURPOSE$', message('auditPurposeAgentDoor')).replace('$COUNT$', '30'))
+    expect(el.querySelector('[data-role=group-note]')?.textContent).toBe(message('auditGroupNote'))
+  })
+
+  it('still counts every request in the summary', () => {
+    const el = ready([...wakes, person])
+    expect(el.querySelector('[data-role=summary]')?.textContent).toContain(': 31')
+  })
+
+  it('draws the rows only when the group is opened, once, each openable as any row', () => {
+    const el = ready([...wakes])
+    const detail = el.querySelector('[data-role=group-detail]') as HTMLDetailsElement
+    expect(el.querySelectorAll('[data-role=entry]')).toHaveLength(0)
+    detail.open = true
+    detail.dispatchEvent(new Event('toggle'))
+    detail.dispatchEvent(new Event('toggle'))
+    const rows = el.querySelectorAll('[data-role=group-entries] [data-role=entry]')
+    expect(rows).toHaveLength(30)
+    expect(rows[0]?.getAttribute('data-entry')).toBe('w29')
+    expect(rows[0]?.querySelector('[data-role=entry-detail]')).not.toBeNull()
+  })
+
+  it('never folds a row whose time is unreadable', () => {
+    const el = ready([...wakes.slice(0, 2), { ...wakes[2], id: 'x', createdAt: undefined } as unknown as AuditEntry])
+    expect(el.querySelector('[data-entry=x]')).not.toBeNull()
+    expect(el.querySelectorAll('[data-role=entry-group]')).toHaveLength(1)
+  })
+})

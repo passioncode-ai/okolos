@@ -21,6 +21,7 @@ import {
   renderOverview,
   renderQueue,
   renderRecovery,
+  madeOnItsOwn,
   renderSelfAudit,
   type AuditWindow,
   renderStorageProblem,
@@ -768,7 +769,11 @@ async function areaRows(): Promise<AreaRow[]> {
     }),
     count(async () => {
       const entries = await (await openDb()).getAll('outbound_log')
-      return t('areaStateSent', String(entries.length))
+      // What Okolos sends on its own schedule is counted beside, not inside, what the person's
+      // use caused: a connected day is 1440 wakes for Okolos Agent (B-205, spec О-1).
+      const own = entries.filter((entry) => madeOnItsOwn(entry)).length
+      const sent = t('areaStateSent', String(entries.length - own))
+      return own === 0 ? sent : `${sent} · ${t('areaStateSentOnItsOwn', String(own))}`
     }),
   ])
 

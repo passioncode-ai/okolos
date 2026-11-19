@@ -2752,5 +2752,30 @@
   },
   "usageNotSent": {
     "message": "This build of Okolos is not from a store and sends no usage and error data, whatever the switch shows."
+  },
+  "auditGroupLine": {
+    "message": "$DAY$ UTC, $PURPOSE$: $COUNT$ requests",
+    "placeholders": {
+      "day": {
+        "content": "$1"
+      },
+      "purpose": {
+        "content": "$2"
+      },
+      "count": {
+        "content": "$3"
+      }
+    }
+  },
+  "auditGroupNote": {
+    "message": "Okolos sent these on its own schedule, with no action of yours. Open to see each one."
+  },
+  "areaStateSentOnItsOwn": {
+    "message": "on its own schedule: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

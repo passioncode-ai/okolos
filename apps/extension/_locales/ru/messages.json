@@ -2752,5 +2752,30 @@
   },
   "usageNotSent": {
     "message": "Эта сборка Okolos не из магазина и данные об использовании и ошибках не отправляет, что бы ни показывал переключатель."
+  },
+  "auditGroupLine": {
+    "message": "$DAY$ UTC, $PURPOSE$: запросов $COUNT$",
+    "placeholders": {
+      "day": {
+        "content": "$1"
+      },
+      "purpose": {
+        "content": "$2"
+      },
+      "count": {
+        "content": "$3"
+      }
+    }
+  },
+  "auditGroupNote": {
+    "message": "Okolos отправил их сам по расписанию, без ваших действий. Откройте, чтобы увидеть каждый."
+  },
+  "areaStateSentOnItsOwn": {
+    "message": "сам по расписанию: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

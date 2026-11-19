@@ -65,6 +65,7 @@ export {
   type FirstRunProps,
 } from './first-run/screen.js'
 export {
+  madeOnItsOwn,
   renderSelfAudit,
   type AuditWindow,
   type PanelHandlers,

@@ -3,7 +3,7 @@ import { HIBP_KEY_HEADER_SHAPE } from '@okolos/core-leaks'
 import { t } from '@okolos/i18n'
 import type { AuditEntry } from '@okolos/contracts'
 
-import { exactInstant } from '../when.js'
+import { exactInstant, shortDate } from '../when.js'
 
 /**
  * The self-audit panel: what left this device, and why.
@@ -98,7 +98,7 @@ export function renderSelfAudit(
       )
       const list = doc.createElement('ol')
       list.setAttribute('data-role', 'entries')
-      for (const entry of shown) list.append(row(doc, entry))
+      for (const item of grouped(shown)) list.append(Array.isArray(item) ? group(doc, item) : row(doc, item))
       section.append(list, action(doc, 'export', t('auditExport'), handlers.onExport))
       return section
     }
@@ -216,6 +216,81 @@ function windowControl(doc: Document, chosen: AuditWindow, handlers: PanelHandle
 
   bar.append(week, all)
   return bar
+}
+
+/**
+ * Whether Okolos made this request on its own schedule, with nothing the person did behind it.
+ *
+ * Usage and error data (up to 100 rows a day, B-205) and the wakes for Okolos Agent (one a
+ * minute while connected, 1440 a day: spec О-1, B-218) are written one row per request, because
+ * ADR-0003 allows no request the log did not record first. Listed flat, they bury the requests a
+ * person caused, which is what this screen is read for. Connecting and disconnecting Okolos
+ * Agent are the person's acts and stay single rows.
+ */
+export function madeOnItsOwn(entry: AuditEntry): boolean {
+  const purpose = said(entry.purpose)
+  if (purpose === 'usage-data') return true
+  return purpose === 'agent-door' && (said(entry.triggeredBy) ?? '').startsWith('alarm:')
+}
+
+/**
+ * The rows in the order shown, with the background ones of one purpose and one UTC day folded
+ * into a group that stands where its newest row would. A row whose time is unreadable is never
+ * folded: it cannot be placed in a day, and this screen does not hide what it cannot place.
+ */
+function grouped(entries: readonly AuditEntry[]): ReadonlyArray<AuditEntry | AuditEntry[]> {
+  const items: Array<AuditEntry | AuditEntry[]> = []
+  const groups = new Map<string, AuditEntry[]>()
+  for (const entry of entries) {
+    const at = said(entry.createdAt)
+    if (at === undefined || !madeOnItsOwn(entry)) {
+      items.push(entry)
+      continue
+    }
+    const key = `${said(entry.purpose)}|${shortDate(at)}`
+    const known = groups.get(key)
+    if (known !== undefined) {
+      known.push(entry)
+      continue
+    }
+    const fresh = [entry]
+    groups.set(key, fresh)
+    items.push(fresh)
+  }
+  return items
+}
+
+/**
+ * One line for a day of background requests of one purpose, opening to every one of them.
+ *
+ * The rows are drawn when the group is first opened, not before: a connected day is 1440 of
+ * them, and the screen should not build ninety days of hidden rows to show one line each.
+ */
+function group(doc: Document, entries: readonly AuditEntry[]): HTMLLIElement {
+  const first = entries[0] as AuditEntry
+  const purpose = said(first.purpose) ?? ''
+  const item = doc.createElement('li')
+  item.setAttribute('data-role', 'entry-group')
+  item.setAttribute('data-purpose', purpose)
+  const disclosure = doc.createElement('details')
+  disclosure.setAttribute('data-role', 'group-detail')
+  const summary = doc.createElement('summary')
+  summary.setAttribute('data-role', 'group-summary')
+  const key = purposeKey(purpose)
+  summary.append(
+    text(doc, 'group-line', t('auditGroupLine', shortDate(said(first.createdAt) ?? ''), key === undefined ? purpose : t(key), String(entries.length))),
+    text(doc, 'group-note', t('auditGroupNote')),
+  )
+  disclosure.append(summary)
+  disclosure.addEventListener('toggle', () => {
+    if (!disclosure.open || disclosure.querySelector('[data-role="group-entries"]') !== null) return
+    const rows = doc.createElement('ol')
+    rows.setAttribute('data-role', 'group-entries')
+    for (const entry of entries) rows.append(row(doc, entry))
+    disclosure.append(rows)
+  })
+  item.append(disclosure)
+  return item
 }
 
 function row(doc: Document, entry: AuditEntry): HTMLLIElement {
