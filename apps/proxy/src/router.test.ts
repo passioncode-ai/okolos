@@ -598,3 +598,13 @@ describe('the privacy policy, where someone can read it before installing', () =
     ).toBe(true)
   })
 })
+
+describe('the public pages carry no em dash (operator rule; B-236)', () => {
+  // U+2014, written as an escape so this file is not a counter-example of its own rule.
+  const DASH = '—'
+
+  it.each(['/', '/privacy', '/status', '/status?domain=example.test'])('%s', async (page) => {
+    const html = await (await handle(get(page), env())).text()
+    expect(html.includes(DASH), `${page}: rewrite with a colon, a full stop or parentheses`).toBe(false)
+  })
+})
