@@ -101,3 +101,4 @@ export {
  */
 export { exactInstant, shortDate, shortTime } from './when.js'
 export { renderAgentRequests, type AgentRequestLine } from './agent-requests.js'
+export { renderHelp, type HelpHandlers } from './settings/help.js'
