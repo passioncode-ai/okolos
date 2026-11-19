@@ -1,8 +1,9 @@
 import { t, useResolver } from '@okolos/i18n'
 import { detectPlatform } from '@okolos/platform'
-import { renderInterstitial } from '@okolos/ui'
+import { renderAgentRequests, renderInterstitial } from '@okolos/ui'
 import '../pages.css'
 
+import { REQUESTS_KEY, waitingRequests, type LiftRequest } from '../background/agent-request-state.js'
 import { appealLinkFor } from './appeal-link.js'
 import { isFramed } from './framed.js'
 import { settleContext, type BlockContext } from './context.js'
@@ -81,6 +82,35 @@ function paint(context: BlockContext | null): void {
       },
     ),
   )
+  void showAgentRequests(context)
+}
+
+/**
+ * An agent's request to lift this very block (B-218 wave (d)), answered here as in the popup. Only
+ * on an unframed copy: `paint` never runs in a frame, so a site that embeds this page cannot put
+ * «Разрешить» under someone's cursor.
+ */
+async function showAgentRequests(context: BlockContext | null): Promise<void> {
+  if (!root || context?.url === undefined) return
+  let host: string
+  try {
+    host = new URL(context.url).hostname
+  } catch {
+    return
+  }
+  const stored = (await platform.storage.get<LiftRequest[]>(REQUESTS_KEY).catch(() => undefined)) ?? []
+  const lines = waitingRequests(stored, Date.now())
+    .filter((request) => request.gate === 'block' && request.host === host)
+    .map((request) => ({ id: request.id, line: t('agentRequestBlock', request.agentName, request.host) }))
+  root.querySelector("[data-role='agent-requests']")?.remove()
+  const section = renderAgentRequests(document, lines, (requestId, allow) => {
+    void (async () => {
+      await platform.runtime.send('agent/decide', { requestId, allow }).catch(() => undefined)
+      if (allow) location.replace(context.url as string)
+      else root?.querySelector("[data-role='agent-requests']")?.remove()
+    })()
+  })
+  if (section !== null) root.append(section)
 }
 
 /**
