@@ -41,6 +41,7 @@ import {
   type PanelState,
   type TrustedDomain,
 } from '@okolos/ui'
+import { PROXY_ORIGIN } from '../config.js'
 import {
   DATA_KIND_KEY,
   DB_VERSION,
@@ -1084,7 +1085,7 @@ async function selfAuditSection(): Promise<HTMLElement> {
  * do not exist yet, so neither has a link.
  */
 const SUPPORT_ADDRESS = 'mailto:support@passioncode.ai'
-const PRIVACY_PAGE = 'https://okolos-proxy.sergeysheleg4.workers.dev/privacy'
+const PRIVACY_PAGE = `${PROXY_ORIGIN}/privacy`
 
 async function dataSection(): Promise<HTMLElement> {
   const section = await dataControlsSection()
