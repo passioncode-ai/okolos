@@ -63,6 +63,7 @@ are specified once in [screens.md](screens.md).
 | SCN-051 | The person switches usage and error data off, and on again | privacy | P-01 | ST-032, FLW-24 | implemented | 2026-11-05 e2e |
 | SCN-052 | In Firefox the browser asks, and the product obeys | privacy | P-01 | ST-032, FLW-24 | implemented | 2026-11-05 unit |
 | SCN-053 | An error the person hit reaches us without their data | privacy | P-01 | ST-032, FLW-24 | partial | 2026-11-05 unit |
+| SCN-054 | Okolos is connected to Okolos Agent, so paired agents can reach its actions | agent-door | P-01 | ST-033, FLW-25 | draft | - |
 
 ## Personas
 
@@ -1187,3 +1188,23 @@ every rule below; where they differ, the scenario says so.
 - **An agent cleans only its own.** Asked by one session, the cleaner removes that session's tree; another session's is the scheduled cleaner's to judge
 - **Status:** draft
 - **Coverage:** none — designed 2026-10-06, not built
+
+### SCN-054: Okolos is connected to Okolos Agent, so paired agents can reach its actions
+- **Persona:** P-01
+- **Feature:** agent-door
+- **Traces:** ST-033, FLW-25 (JTBD-10, JRN-05/#1)
+- **Entry point:** «Привязать Okolos» on the Okolos Agent page, then the «Okolos Agent» block in Okolos's settings
+- **Preconditions:** Okolos Agent is running; Okolos is not connected to it
+- **Steps:**
+  1. The person asks Okolos Agent to pair Okolos -> the page shows a six-digit code valid for five minutes
+  2. The person types the code into the «Okolos Agent» block in Okolos's settings and presses «Привязать» -> the extension sends it to Okolos Agent from its own origin; Okolos is connected, and the block says since when
+  3. A paired agent calls `okolos.ping` through `execute` -> within a minute Okolos wakes, finds the request, answers with its version and connection state; the call is in the agents' journal
+  4. The person disconnects, in either place -> Okolos's next look is refused, it forgets the token and its alarm, and the block says it was disconnected
+- **Expected result:** paired agents reach Okolos only through Okolos Agent's door; an unconnected Okolos makes no request and never wakes on this account
+- **Alt paths:** the code is wrong or expired -> nothing is stored and the block says the code did not fit; Okolos Agent does not answer -> the block says so and nothing is stored; an agent's request is not answered within 90 s -> the agent gets `extension_asleep` with when Okolos looks next; erasing all data also removes the connection
+- **UI elements:** planned, not built: SCR-12 block «Okolos Agent» (code field, «Привязать», the connection state, «Отвязать», a failure line); SCR-23 «Привязать Okolos» with the code
+- **States covered:** not connected, connecting, connected, code refused, Okolos Agent unreachable, disconnected elsewhere
+- **Errors & recovery:** a request to the route from any other origin, with no origin, or with the wrong `Host` or token -> refused and recorded by Okolos Agent; Firefox may close the event page while it answers a queue -> the queue stays with Okolos Agent and is picked up on the next wake (spec O-3)
+- **Status:** draft
+- **Coverage:** none yet; design in `docs/superpowers/specs/2026-11-19-agent-door-wave-a.md` (requirements WA-1 to WA-8)
+
