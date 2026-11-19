@@ -42,7 +42,16 @@ export interface CleanSnapshotOptions {
 }
 
 export type CleanSnapshot =
-  | { readonly snapshot: Snapshot; readonly verdict: SnapshotVerdict }
+  | {
+      readonly snapshot: Snapshot
+      readonly verdict: SnapshotVerdict
+      /**
+       * The page's title as the tree's root names it: the tab shows it to the person, so the
+       * probe has nothing to cut there, but a secret field's value the page repeats in it is
+       * masked as in the lines, and it is cut at 160 characters like a line's name.
+       */
+      readonly title: string
+    }
   | { readonly refused: 'cleaning_incomplete' }
 
 interface ProbeCounts {
@@ -112,7 +121,17 @@ async function readOnce(browser: CdpTransport, sessionId: string, options: Clean
   })
   const verdict = snapshotVerdict(counts, snapshot)
   if ('refused' in verdict) return verdict
-  return { snapshot, verdict }
+  return { snapshot, verdict, title: titleOf(nodes, domValues) }
+}
+
+/** The longest title answered, as a line's name. */
+const TITLE_LIMIT = 160
+
+function titleOf(nodes: readonly AxNode[], secrets: ReadonlyMap<number, string>): string {
+  const root = nodes.find((node) => node.role?.value === 'RootWebArea')
+  let title = typeof root?.name?.value === 'string' ? root.name.value : ''
+  for (const value of secrets.values()) if (value.length >= 3) title = title.split(value).join('***')
+  return title.slice(0, TITLE_LIMIT)
 }
 
 /**

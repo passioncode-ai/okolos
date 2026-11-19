@@ -5,7 +5,7 @@ import { McpServer } from '@modelcontextprotocol/server'
 import { canonicalVerb, type AnyBridgeVerb, type BridgeError } from '@okolos/contracts'
 import * as z from 'zod'
 
-import { answerAfterRecord, journalTime, type Journal, type JournalEntry, type RejectionCode } from '../journal/journal.js'
+import { answerAfterRecord, journalTime, type Journal, type JournalEntry, type JournalRefusalCode, type RejectionCode } from '../journal/journal.js'
 import { PairingStoreError, type AgentRecord, type Pairing } from '../pairing/pairing.js'
 import type { Route } from '../service/http.js'
 
@@ -46,7 +46,14 @@ export type OperationOutcome =
       readonly origin?: string
       readonly verdict?: 'clean' | 'finding'
     }
-  | { readonly success: false; readonly error: BridgeError; readonly task?: string; readonly origin?: string }
+  | {
+      readonly success: false
+      readonly error: BridgeError
+      readonly task?: string
+      readonly origin?: string
+      /** What the journal records when it says more than the agent's code (`local_answer` for `origin_not_in_task`). */
+      readonly journalCode?: JournalRefusalCode
+    }
 
 /** One operation `execute` runs: a verb of the contract, with what `search` says about it. */
 export interface Operation {
@@ -269,7 +276,7 @@ export function door(deps: DoorDeps): Route {
         const bytes = Buffer.byteLength(JSON.stringify(payload))
         const entry: JournalEntry = outcome.success
           ? { at: journalTime(now()), ...who, ...where, outcome: 'answered', verb, bytes, ...(outcome.verdict === undefined ? {} : { verdict: outcome.verdict }) }
-          : { at: journalTime(now()), ...who, ...where, outcome: 'refused', verb, code: outcome.error.code, bytes }
+          : { at: journalTime(now()), ...who, ...where, outcome: 'refused', verb, code: outcome.journalCode ?? outcome.error.code, bytes }
         return answered(entry, payload)
       },
     )
