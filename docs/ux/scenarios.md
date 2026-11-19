@@ -53,8 +53,8 @@ are specified once in [screens.md](screens.md).
 | SCN-041 | An attachment is judged without being opened | mail-guard | P-01 | ST-025, FLW-19 | draft | — |
 | SCN-042 | A message arrives and is judged before it is read | mail-guard | P-01 | ST-022, FLW-20 | draft | — |
 | SCN-043 | Who reviewed, where it ran, and what left | mail-guard | P-01 | ST-026, FLW-19 | draft | — |
-| SCN-044 | An agent is paired once, by the person, and can be taken back | agent-bridge | P-01 | ST-027, FLW-21 | draft | — |
-| SCN-045 | An agent reads a page, cleaned, in its own background window | agent-bridge | P-01 | ST-028, FLW-22 | draft | — |
+| SCN-044 | An agent is paired once, by the person, and can be taken back | agent-bridge | P-01 | ST-027, FLW-21 | draft | partial: apps/agent/src/bridge.chrome.test.ts |
+| SCN-045 | An agent reads a page, cleaned, in its own background window | agent-bridge | P-01 | ST-028, FLW-22 | draft | partial: apps/agent/src/bridge.chrome.test.ts |
 | SCN-046 | An action that spends, sends, deletes or signs in waits for the person | agent-bridge | P-01 | ST-029, FLW-22 | draft | — |
 | SCN-047 | The person takes over a step, hands back, or stops every agent | agent-bridge | P-01 | ST-030, FLW-22 | draft | — |
 | SCN-048 | What agents left behind is cleaned, and nothing in use is touched | agent-bridge | P-01 | ST-031, FLW-23 | draft | — |
@@ -1105,7 +1105,7 @@ every rule below; where they differ, the scenario says so.
 - **States covered:** loading, success, error, empty, expired, confirmed (the agent has not collected its key yet), claim-expired (the key was not collected), store-unwritable (the access list cannot be written; agents with access keep working), revoke-failed (the access list could not be written; the agent keeps access and the page says so), session-expired, stopping
 - **Errors & recovery:** a call carrying no key or a wrong key -> refused and recorded (past the day's limit of door refusals, spec §3, such refusals are counted rather than written one by one, and SCR-24 shows the count); a call carrying any `Origin` or `Sec-Fetch-*` header (a web page) -> refused before any pairing request is made, and recorded, never treated as "local, so the person". Loopback is not a person: the research behind this feature found that every 2025–2026 bridge breach came through a door that believed loopback meant the person. A call that cannot be tied to an agent with access is shown on SCR-24 as refused at the door, from the agents' journal, except while the access list cannot be read: then a call that carries a key is an Okolos Agent failure at the door (its key was not checked) and a call with no key is still refused as `not_paired`; declined and expired requests go to the service's events
 - **Status:** draft
-- **Coverage:** none — designed 2026-10-06, not built
+- **Coverage:** partial, branch bridge/b1-next: apps/agent/src/bridge.chrome.test.ts (steps 1 and 2 end to end on Chrome stable: `pair`, the same code on the page, confirm, the key collected, MCP over `mcp-stdio`), apps/agent/src/dashboard/page.test.ts (step 3: revoke, the key refused after), apps/agent/src/agent.test.ts (events by name only). Not built yet: `pair --replace`, the store-unwritable and revoke-failed row states (they are notices)
 
 ### SCN-045: An agent reads a page, cleaned, in its own background window
 - **Persona:** P-01
@@ -1126,7 +1126,7 @@ every rule below; where they differ, the scenario says so.
 - **Why a window and not a tab.** Measured 2026-10-06: input to a background tab never reaches the page, while a separate background window's tab is visible and receives trusted input, and an open agent window took the person's focus in none of the readings (`docs/superpowers/evidence/2026-10-06-b0-agent-window.md`)
 - **Why the snapshot comes in parts.** Measured the same day: Wikipedia's raw tree is about 10.5 MB, and even compacted it is about 66 thousand tokens
 - **Status:** draft
-- **Coverage:** none — designed 2026-10-06, not built
+- **Coverage:** partial, branch bridge/b1-next: apps/agent/src/bridge.chrome.test.ts and apps/agent/src/verbs/skeleton.chrome.test.ts (steps 1 to 3 on Chrome stable: a task with its own background window, the page cleaned of a hidden instruction with the finding attached, a site outside the task and a local answer refused), apps/agent/src/verbs/page.chrome.test.ts (a password the page repeats shown as `***`), packages/core-snapshot/src/pages.test.ts (step 4: parts of at most 32 KB). Not built yet: the day-full state and the journal gap line on SCR-24
 
 ### SCN-046: An action that spends, sends, deletes or signs in waits for the person
 - **Persona:** P-01
