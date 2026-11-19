@@ -115,7 +115,7 @@ function entryRow(doc: Document, item: JournalEntry, handlers: JournalHandlers):
 
   const line = doc.createElement('span')
   line.setAttribute('data-role', 'entry-line')
-  line.textContent = `${shortTime(item.createdAt)} — ${item.summary} (${
+  line.textContent = `${shortTime(item.createdAt)} · ${item.summary} (${
     item.byAgent === true ? t('journalByAgent') : item.automatic ? t('journalAutomatic') : t('journalManual')
   })`
   row.append(line)
