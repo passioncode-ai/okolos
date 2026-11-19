@@ -613,7 +613,7 @@ generator, and the sheet declares no colour of its own.
 - **Design system:** the shared overlay tokens, like the other three. It carries no palette of its own, and a test asserts there are no hex literals in its stylesheet — three surfaces once accumulated twenty-two hexes between them
 - **Coverage:** packages/ui/src/comparison/comparison.ts:mountComparison, packages/ui/src/comparison/comparison.test.ts, e2e/scn-006.spec.ts, e2e/a11y-overlays.spec.ts
 - **Scenarios:** SCN-006, SCN-024
-- **Agent door (B-218):** none today. Actions: as SCR-05 for the address shown; the same rule: lifting the warning takes the operator's confirmation
+- **Agent door (B-218):** an agent asks with `okolos.request.lift` (`gate: 'lookalike'`) and the person answers in the popup (SCR-02), not on this surface: it lives in the page, and `agent/decide` is taken only from extension pages (wave (d) spec, section 7). No verb lifts the warning by itself
 - **Status:** built
 
 ### SCR-20: Local store unavailable
