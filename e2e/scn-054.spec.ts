@@ -159,6 +159,17 @@ test('connects Okolos to Okolos Agent by a code, answers an agent through execut
   expect(queue.data?.['items']).toContainEqual(expect.objectContaining({ host: 'fixture.test', category: 'injection' }))
   expect(JSON.stringify(queue)).not.toContain('Ignore all previous')
   expect(JSON.stringify(queue)).not.toContain('/news')
+
+  // Wave (c): the agent marks it resolved; the journal names the agent and the person undoes it.
+  const findingId = String((queue.data?.['items'] as Array<{ id: string }>)[0]?.id)
+  expect(await execute('okolos.finding.resolve', { id: findingId })).toEqual({ success: true, data: { done: true } })
+  expect(await openFindings()).toBe(0)
+  const journal = await context.newPage()
+  await journal.goto(`chrome-extension://${extensionId}/options.html#journal`)
+  await expect(journal.locator('[data-role=entry-line]').filter({ hasText: 'Agent scout marked the finding on fixture.test resolved.' })).toHaveCount(1)
+  await journal.locator('[data-role=entry-undo]').click()
+  await expect(journal.locator('[data-role=entry-undone]')).toHaveCount(1)
+  expect(await openFindings()).toBeGreaterThan(0)
   expect(await execute('okolos.verdict', { url: 'https://example.com/login' })).toMatchObject({
     success: true,
     data: { host: 'example.com', blocked: null, findings: {}, trusted: false },
