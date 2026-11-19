@@ -75,14 +75,17 @@ const TRAP_WARNING: Readonly<Record<TrapKind, EventProps<'warning_shown'>['kind'
 
 /**
  * The surfaces the content script and the block page draw, mapped to `warning_shown` (B-206). Traps
- * and downloads are counted where they are decided (`trapWarning`, `downloadWarningShown`), and the
- * password surface draws every verdict, not only a leak, so `leaked-password` is not counted here.
+ * and downloads are counted where they are decided (`trapWarning`, `downloadWarningShown`). The
+ * password surface is drawn only for a compromised verdict: the content script returns before
+ * drawing a clean one, and the worker holds a verdict for the next document only when it is
+ * compromised (`handlePasswordCheck`), so a drawn password panel is a `leaked-password` warning.
  */
 const SURFACE_WARNING: Readonly<Record<string, EventProps<'warning_shown'>['kind']>> = {
   injection: 'hidden-instruction',
   lookalike: 'lookalike',
   credential: 'credential-guard',
   'blocked-page': 'blocked-page',
+  password: 'leaked-password',
 }
 
 export function surfaceWarning(kind: string): EventProps<'warning_shown'>['kind'] | null {
@@ -130,4 +133,14 @@ export function leakCheckResult(leaks: number, complete: boolean): EventProps<'c
  */
 export function downloadWarningShown(action: 'block' | 'warn' | 'inform', told: boolean): boolean {
   return told && (action === 'block' || action === 'warn')
+}
+
+/**
+ * The daily extension review, by what it found out (B-206): a change journalled is `found`, none
+ * is `ok`, and a browser that gives no inventory, or a review that failed, is a question not
+ * answered, never a clean result.
+ */
+export function extensionsCheckResult(review: { readonly changes: number } | 'unavailable'): EventProps<'check_done'>['result'] {
+  if (review === 'unavailable') return 'unavailable'
+  return review.changes > 0 ? 'found' : 'ok'
 }
