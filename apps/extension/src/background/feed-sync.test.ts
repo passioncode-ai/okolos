@@ -86,7 +86,7 @@ describe('pulling the blocking feed', () => {
       apply: async () => ({
         accepted: false,
         explainKey: 'feedRefusedSignature',
-        explainArgs: ['Список Okolos: фишинг', '7'],
+        explainArgs: ['Okolos: фишинг', '7'],
         explainArgKeys: ['feedNamePhishing', null],
       }),
     })
@@ -103,7 +103,7 @@ describe('pulling the blocking feed', () => {
      */
     expect(notes).toHaveLength(1)
     expect(notes[0]?.explainKey).toBe('feedRefusedSignature')
-    expect(notes[0]?.explainArgs).toEqual(['Список Okolos: фишинг', '7'])
+    expect(notes[0]?.explainArgs).toEqual(['Okolos: фишинг', '7'])
   })
 
   it('says so when the server refuses, rather than failing silently', async () => {

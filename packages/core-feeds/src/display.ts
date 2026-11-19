@@ -46,7 +46,7 @@ export interface FeedName {
 
 /** The lists this project publishes itself. Everything else belongs to someone. */
 export const OUR_FEEDS: Readonly<Record<string, FeedName>> = {
-  phishing: { messageKey: 'feedNamePhishing', ru: 'Список Okolos: фишинг' },
+  phishing: { messageKey: 'feedNamePhishing', ru: 'Okolos: фишинг' },
 }
 
 /** Is this identifier one of ours, and therefore ours to name? */
