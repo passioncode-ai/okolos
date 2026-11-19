@@ -123,12 +123,13 @@ function answer(verb: unknown, link: AgentDoorLink, deps: AgentDoorDeps) {
  * outbound log first. The token rides in a header and never in the address or the body, so the
  * log row and the redactor see neither.
  */
-export function agentDoorPost(audit: () => Promise<RequestDeps>, port = AGENT_PORT): AgentDoorDeps['post'] {
+export function agentDoorPost(audit: () => Promise<RequestDeps>, port: number | (() => Promise<number>) = AGENT_PORT): AgentDoorDeps['post'] {
   return async (path, body, token) => {
     const text = JSON.stringify(body)
+    const at = typeof port === 'number' ? port : await port()
     const response = await request(
       {
-        url: `http://127.0.0.1:${port}${path}`,
+        url: `http://127.0.0.1:${at}${path}`,
         method: 'POST',
         purpose: 'agent-door',
         // The path names what was asked; nothing of the person's is in any of the four.
