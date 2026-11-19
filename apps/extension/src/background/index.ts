@@ -74,7 +74,7 @@ import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 
 import { recordPageRequest } from './page-requests.js'
 import { recordTrap } from './trap-journal.js'
-import { downloadWarningShown, extensionsCheckResult, leakCheckResult, passwordCheckResult, surfaceWarning, trapWarning } from './usage/catalogue.js'
+import { downloadWarningShown, extensionsCheckResult, leakCheckResult, passwordCheckResult, passwordError, surfaceWarning, trapWarning } from './usage/catalogue.js'
 import { startUsage } from './usage/start.js'
 import { optionsPageFor } from '../options/views.js'
 
@@ -680,6 +680,8 @@ async function handlePasswordCheck(
     check: 'password',
     result: passwordCheckResult(verdict.explain.code),
   })
+  const failed = passwordError(verdict.explain.code)
+  if (failed !== null) void usage.track('error_occurred', { area: 'password', kind: failed })
 
   const answer: PasswordAnswer = {
     compromised: verdict.compromised,
@@ -800,6 +802,8 @@ async function handleLeakCheck(payload: { address: string }): Promise<RpcMap['le
     check: 'leak-inventory',
     result: leakCheckResult(inventory.leaks.length, inventory.complete),
   })
+  // One error per source that was asked and failed; a source with no key was never asked.
+  for (const kind of inventory.failures) void usage.track('error_occurred', { area: 'leak', kind })
   return {
     leaks: inventory.leaks.map((leak) => ({ ...leak, classes: [...leak.classes] })),
     sources: inventory.sources.map((source) => ({ ...source })),

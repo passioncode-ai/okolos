@@ -50,6 +50,13 @@ export interface LeakSource {
  */
 class KeyRefused extends Error {}
 
+/**
+ * How a source that was asked failed, for `error_occurred{leak}` (B-206): its deadline passed, it
+ * refused the key, or anything else on the way (`network`). A source never asked, because it has
+ * no key, is not a failure.
+ */
+export type LeakFailure = 'timeout' | 'refused' | 'network'
+
 /** The key remedies, named once. */
 const KEY_MISSING: KeyRemedy = 'missing'
 const KEY_REFUSED: KeyRemedy = 'refused'
@@ -170,8 +177,9 @@ export async function lookupLeaks(
   sources: readonly LeakSource[],
   deps: RequestDeps,
   timeoutMs = SOURCE_TIMEOUT_MS,
-): Promise<LeakInventory> {
+): Promise<LeakInventory & { readonly failures: readonly LeakFailure[] }> {
   const statuses: SourceStatus[] = []
+  const failures: LeakFailure[] = []
 
   for (const source of sources) {
     if (source.unavailable) {
@@ -183,16 +191,14 @@ export async function lookupLeaks(
       })
       continue
     }
+    const deadline = t('leakSourceTimedOut', source.name, String(Math.round(timeoutMs / 1000)))
     try {
-      const leaks = await withDeadline(
-        source.lookup(address, deps),
-        timeoutMs,
-        t('leakSourceTimedOut', source.name, String(Math.round(timeoutMs / 1000))),
-      )
+      const leaks = await withDeadline(source.lookup(address, deps), timeoutMs, deadline)
       statuses.push({ name: source.name, answered: true, leaks })
     } catch (cause) {
       // One source failing must not take the others with it, and must not be
       // mistaken for that source having nothing to report.
+      failures.push(cause instanceof KeyRefused ? 'refused' : cause instanceof Error && cause.message === deadline ? 'timeout' : 'network')
       statuses.push({
         name: source.name,
         answered: false,
@@ -202,7 +208,7 @@ export async function lookupLeaks(
     }
   }
 
-  return mergeLeaks(statuses)
+  return { ...mergeLeaks(statuses), failures }
 }
 
 /** What the audit log shows: enough to recognise, not enough to be the address. */

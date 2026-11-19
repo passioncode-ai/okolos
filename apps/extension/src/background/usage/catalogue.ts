@@ -144,3 +144,19 @@ export function extensionsCheckResult(review: { readonly changes: number } | 'un
   if (review === 'unavailable') return 'unavailable'
   return review.changes > 0 ? 'found' : 'ok'
 }
+
+/**
+ * A password check that could not be answered, for `error_occurred{password}` (B-206): the range
+ * query that did not get through is `network`, a list that could not be read is `unexpected`; an
+ * answered check is no error.
+ */
+export function passwordError(code: PasswordVerdict['explain']['code']): EventProps<'error_occurred'>['kind'] | null {
+  switch (code) {
+    case 'unreachable':
+      return 'network'
+    case 'unreadable':
+      return 'unexpected'
+    default:
+      return null
+  }
+}

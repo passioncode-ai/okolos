@@ -9,6 +9,7 @@ import {
   leakCheckResult,
   passwordCheckResult,
   extensionsCheckResult,
+  passwordError,
   surfaceWarning,
   trapWarning,
 } from './catalogue.js'
@@ -122,5 +123,14 @@ describe('the extension review counted as check_done (B-206)', () => {
     expect(extensionsCheckResult({ changes: 0 })).toBe('ok')
     expect(extensionsCheckResult('unavailable')).toBe('unavailable')
     for (const result of ['found', 'ok', 'unavailable'] as const) expect(CATALOGUE.check_done.result).toContain(result)
+  })
+})
+
+describe('a password check that could not be answered, for error_occurred (B-206)', () => {
+  it('is network when the query did not get through, unexpected when the list could not be read, and no error otherwise', () => {
+    expect(passwordError('unreachable')).toBe('network')
+    expect(passwordError('unreadable')).toBe('unexpected')
+    for (const code of ['found', 'absent', 'in-common-list'] as const) expect(passwordError(code)).toBeNull()
+    expect(CATALOGUE.error_occurred.kind).toEqual(expect.arrayContaining(['network', 'unexpected']))
   })
 })
