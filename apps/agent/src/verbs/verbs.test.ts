@@ -121,4 +121,27 @@ describe('the verbs (N-011)', () => {
     const census = ops.find((o) => o.verb === 'hygiene.census')
     expect(await census?.run({}, { agent: AGENT })).toMatchObject({ success: true, data: [{ pid: 1 }] })
   })
+
+  it('hands an agent\'s read of Okolos to the extension, and checks its input first (B-218 wave (b))', async () => {
+    const asked: Array<{ verb: string; input: unknown }> = []
+    const extension = {
+      ask: (verb: string, input: unknown) => {
+        asked.push({ verb, input })
+        return Promise.resolve({ success: true, data: {} })
+      },
+    } as unknown as NonNullable<Parameters<typeof createVerbs>[0]['extension']>
+    const ops = createVerbs({ tasks: new Tasks(), windows: fakeWindows(), probeSource: '', census: () => Promise.resolve([]), extension })
+    const op = (verb: string) => ops.find((o) => o.verb === verb) as (typeof ops)[number]
+    for (const verb of ['okolos.queue', 'okolos.journal', 'okolos.audit']) {
+      expect(op(verb).input.safeParse({ limit: 51 }).success, verb).toBe(false)
+      expect(op(verb).input.safeParse({ limit: 50 }).success, verb).toBe(true)
+    }
+    expect(op('okolos.verdict').input.safeParse({ url: 'file:///etc/passwd' }).success).toBe(false)
+    expect(op('okolos.verdict').input.safeParse({ url: 'https://example.com/login' }).success).toBe(true)
+    expect(op('okolos.extensions').input.safeParse({ all: true }).success).toBe(false)
+    expect(await op('okolos.queue').run({ limit: 5 }, { agent: AGENT })).toEqual({ success: true, data: {} })
+    expect(asked).toEqual([{ verb: 'okolos.queue', input: { limit: 5 } }])
+    const { run } = verbsWith()
+    expect(await run('okolos.audit', {})).toMatchObject({ success: false, error: { code: 'extension_not_connected' } })
+  })
 })

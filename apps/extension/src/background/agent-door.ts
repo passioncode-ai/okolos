@@ -1,5 +1,7 @@
-import type { OkolosPingResult } from '@okolos/contracts'
+import type { BridgeResult, OkolosPingResult } from '@okolos/contracts'
 import { request, type RequestDeps } from '@okolos/net'
+
+import { answerRead, READ_VERBS, type ReadSources } from './agent-reads.js'
 
 /**
  * Okolos's side of its link to Okolos Agent (B-218 wave (a), ADR-0022, spec
@@ -40,6 +42,8 @@ export interface AgentDoorDeps {
   alarm(on: boolean): Promise<void>
   version(): string
   now(): number
+  /** What the read verbs answer from (wave (b)); without it they are refused as unknown. */
+  reads?: ReadSources
 }
 
 export type PairOutcome = { readonly ok: true; readonly pairedAt: string } | { readonly ok: false; readonly reason: 'bad_code' | 'expired' | 'unreachable' }
@@ -101,19 +105,27 @@ export async function wakeAgentDoor(deps: AgentDoorDeps): Promise<WakeOutcome> {
     if (!Array.isArray(requests) || requests.length === 0) return answered ? 'answered' : 'idle'
     for (const request of requests) {
       if (typeof request.id !== 'string') continue
-      await deps.post('/extension/answer', { id: request.id, result: answer(request.verb, link, deps) }, link.token).catch(() => undefined)
+      const result = await answer(request.verb, (request as { input?: unknown }).input, link, deps).catch(() => ({
+        success: false as const,
+        // i18n-exempt: read by the agent through Okolos Agent, not by the person
+        error: { code: 'internal' as const, message: 'Okolos could not read what was asked.', retryable: true },
+      }))
+      // The verb rides beside the answer so the outbound log can name what was answered (WB-3).
+      const verb = typeof request.verb === 'string' ? request.verb : 'unknown'
+      await deps.post('/extension/answer', { id: request.id, verb, result }, link.token).catch(() => undefined)
       answered = true
     }
   }
   return answered ? 'answered' : 'idle'
 }
 
-/** What Okolos answers to one verb. Wave (a) knows only `okolos.ping`. */
-function answer(verb: unknown, link: AgentDoorLink, deps: AgentDoorDeps) {
+/** What Okolos answers to one verb: `okolos.ping` (wave (a)) and the read verbs (wave (b)). */
+async function answer(verb: unknown, input: unknown, link: AgentDoorLink, deps: AgentDoorDeps): Promise<BridgeResult<unknown>> {
   if (verb === 'okolos.ping') {
     const data: OkolosPingResult = { extensionVersion: deps.version(), connectedSince: link.pairedAt }
     return { success: true, data }
   }
+  if (deps.reads !== undefined && (READ_VERBS as readonly unknown[]).includes(verb)) return answerRead(String(verb), input, deps.reads)
   // i18n-exempt: read by the agent through Okolos Agent, not by the person
   return { success: false, error: { code: 'internal', message: 'This version of Okolos does not answer that verb.', retryable: false } }
 }
@@ -133,7 +145,7 @@ export function agentDoorPost(audit: () => Promise<RequestDeps>, port: number | 
         method: 'POST',
         purpose: 'agent-door',
         // The path names what was asked; nothing of the person's is in any of the four.
-        payloadShape: `agent-door:${path.slice('/extension/'.length)}`,
+        payloadShape: `agent-door:${path.slice('/extension/'.length)}${answeredVerb(path, body)}`,
         triggeredBy: path === '/extension/pair' || path === '/extension/release' ? 'user:settings' : `alarm:${AGENT_DOOR_ALARM}`,
         body: text,
         headers: { 'Content-Type': 'application/json', ...(token === undefined ? {} : { Authorization: `Bearer ${token}` }) },
@@ -148,4 +160,10 @@ export function agentDoorPost(audit: () => Promise<RequestDeps>, port: number | 
     }
     return { status: response.status, body: parsed }
   }
+}
+
+/** `:okolos.queue` for an answer, so the outbound log names what was answered (WB-3); else nothing. */
+function answeredVerb(path: string, body: unknown): string {
+  const verb = (body as { verb?: unknown } | null)?.verb
+  return path === '/extension/answer' && typeof verb === 'string' && /^okolos\.[a-z]{1,20}$/.test(verb) ? `:${verb}` : ''
 }

@@ -81,7 +81,7 @@ describe('a wake (WA-1, WA-2, WA-4)', () => {
     )
     expect(await wakeAgentDoor(h.d)).toBe('answered')
     expect(h.sent.map((s) => s.path)).toEqual(['/extension/next', '/extension/answer', '/extension/next'])
-    expect(h.sent[1]?.body).toEqual({ id: 'r1', result: { success: true, data: { extensionVersion: '1.4.0', connectedSince: LINK.pairedAt } } })
+    expect(h.sent[1]?.body).toEqual({ id: 'r1', verb: 'okolos.ping', result: { success: true, data: { extensionVersion: '1.4.0', connectedSince: LINK.pairedAt } } })
     expect(h.sent.every((s) => s.token === 'tok')).toBe(true)
   })
 

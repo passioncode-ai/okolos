@@ -32,7 +32,16 @@ export type BridgeVerb = (typeof BRIDGE_VERBS)[number]
  * and the census reads the machine, not a page. A scope cannot name them, so
  * they are a separate list rather than members of `BRIDGE_VERBS`.
  */
-export const BRIDGE_SESSION_VERBS = ['session.open', 'hygiene.census', 'okolos.ping'] as const
+export const BRIDGE_SESSION_VERBS = [
+  'session.open',
+  'hygiene.census',
+  'okolos.ping',
+  'okolos.queue',
+  'okolos.verdict',
+  'okolos.journal',
+  'okolos.audit',
+  'okolos.extensions',
+] as const
 export type BridgeSessionVerb = (typeof BRIDGE_SESSION_VERBS)[number]
 
 /**
@@ -435,6 +444,101 @@ export interface OkolosPingResult {
   readonly connectedSince: string
 }
 
+/**
+ * What an agent reads from Okolos through the Okolos Agent door (B-218 wave (b), spec
+ * `docs/superpowers/specs/2026-11-19-agent-door-wave-b.md`).
+ *
+ * **No page content crosses** (WB-1): Okolos's findings hold the attacker's own text, the hidden
+ * instruction it found, and handing it to an agent is handing over the very instruction Okolos
+ * protects it from. So every field below is an enumeration, a number, a time or a host: never a
+ * snippet, a whole page address or an explanation with its arguments.
+ */
+export const OKOLOS_READ_LIMIT = 50
+
+/** How many rows a read verb answers with, 1 to `OKOLOS_READ_LIMIT` (20 when absent). */
+export interface OkolosListInput {
+  readonly limit?: number
+}
+
+/** One open finding in the queue, without what was found on the page. */
+export interface OkolosQueueItem {
+  readonly id: string
+  /** `injection`, `phishing`, `lookalike`, … as the verdict names it. */
+  readonly category: string
+  readonly severity: 'info' | 'minor' | 'major' | 'critical'
+  readonly host: string | null
+  readonly foundAt: string
+}
+
+export interface OkolosQueueResult {
+  readonly items: readonly OkolosQueueItem[]
+  /** Open findings in all, which can be more than `items`. */
+  readonly open: number
+}
+
+/** `okolos.verdict` asks about one http or https address and answers by its host. */
+export interface OkolosVerdictInput {
+  readonly url: string
+}
+
+export interface OkolosVerdictResult {
+  readonly host: string
+  /** On a block list Okolos holds: the list's name as Okolos shows it, and its entry's date. */
+  readonly blocked: { readonly list: string; readonly entryDate: string | null } | null
+  /** Open findings on this host, counted by category. */
+  readonly findings: Readonly<Record<string, number>>
+  /** The person marked this host trusted. */
+  readonly trusted: boolean
+}
+
+export interface OkolosJournalEntry {
+  readonly at: string
+  /** The entry's kind as the journal stores it: `verdict`, `action`, `error`, … */
+  readonly kind: string
+  /** Its outcome, when it has one: `blocked`, `discarded`, … */
+  readonly outcome: string | null
+  readonly host: string | null
+}
+
+export interface OkolosJournalResult {
+  readonly entries: readonly OkolosJournalEntry[]
+}
+
+/** One row of the outbound log, as SCR-10 shows it, with the shape's kind and not its value. */
+export interface OkolosAuditRow {
+  readonly at: string
+  readonly destination: string
+  readonly purpose: string
+  /**
+   * The kind of what was sent (`email`, `hash-prefix`, `agent-door`), the part of the recorded
+   * shape before its first colon: the value after it, even redacted (`s***@example.test`), is the
+   * person's and stays on the screen they read it on.
+   */
+  readonly payloadKind: string
+  readonly outcome: string
+}
+
+export interface OkolosAuditResult {
+  readonly rows: readonly OkolosAuditRow[]
+}
+
+export type OkolosExtensionsInput = Record<string, never>
+
+/**
+ * An extension whose change Okolos noticed since the person last looked. By its id only: its name
+ * is written by that extension's author, third-party text like a page's.
+ */
+export interface OkolosExtensionChange {
+  readonly id: string
+  /** What changed: `newly-installed`, `removed`, `publisher-changed`, `permission-added`, … */
+  readonly change: string
+  readonly severity: 'info' | 'minor' | 'major' | 'critical'
+}
+
+export interface OkolosExtensionsResult {
+  readonly changes: readonly OkolosExtensionChange[]
+}
+
 /** The census reads the machine, not a task, and takes nothing. */
 export type CensusInput = Record<string, never>
 
@@ -450,6 +554,11 @@ interface VerbIOEntries {
   readonly close: { readonly input: CloseInput; readonly output: CloseResult }
   readonly 'hygiene.census': { readonly input: CensusInput; readonly output: CensusResult }
   readonly 'okolos.ping': { readonly input: OkolosPingInput; readonly output: OkolosPingResult }
+  readonly 'okolos.queue': { readonly input: OkolosListInput; readonly output: OkolosQueueResult }
+  readonly 'okolos.verdict': { readonly input: OkolosVerdictInput; readonly output: OkolosVerdictResult }
+  readonly 'okolos.journal': { readonly input: OkolosListInput; readonly output: OkolosJournalResult }
+  readonly 'okolos.audit': { readonly input: OkolosListInput; readonly output: OkolosAuditResult }
+  readonly 'okolos.extensions': { readonly input: OkolosExtensionsInput; readonly output: OkolosExtensionsResult }
 }
 
 /**

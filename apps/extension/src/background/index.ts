@@ -2,7 +2,7 @@ import { standingFindings } from '@okolos/core-extensions'
 import { detectHidden } from '@okolos/core-injection'
 import { detectPlatform, type RpcSender } from '@okolos/platform'
 
-import { buildRules, matchUrl, type FeedSnapshot,
+import { buildRules, displayFeedName, matchUrl, type FeedSnapshot,
 } from '@okolos/core-feeds'
 import {
   FEED_INTERVAL_MS,
@@ -1093,6 +1093,21 @@ const agentDoor: AgentDoorDeps = {
   alarm: (on) => (on ? platform.alarms.create(AGENT_DOOR_ALARM, AGENT_DOOR_PERIOD_MINUTES) : platform.alarms.clear(AGENT_DOOR_ALARM)),
   version: () => platform.runtime.version(),
   now: () => Date.now(),
+  // What an agent reads (wave (b)); `agent-reads.ts` takes from these only what may cross (WB-1).
+  reads: {
+    findings: async () => (await openDb()).getAll('findings'),
+    journal: async () => (await openDb()).getAll('journal'),
+    outbound: async () => (await openDb()).getAll('outbound_log'),
+    blockedBy: async (url) => {
+      const feed = await currentFeed()
+      const match = feed === null ? null : matchUrl(url, feed)
+      if (match === null) return null
+      return { list: displayFeedName(match.feed, t) ?? match.feed, entryDate: match.updatedAt?.slice(0, 10) ?? null }
+    },
+    trusted: async () => (await listTrusted()).domains,
+    extensionChanges: async () =>
+      platform.extensions.available() ? compareInventory(inventoryDeps(await openDb())).catch(() => []) : [],
+  },
 }
 
 declare const __OKOLOS_TEST_HOOKS__: boolean | undefined

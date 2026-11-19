@@ -17,9 +17,11 @@ import { randomBytes } from 'node:crypto'
 import { CdpError, type CdpTransport } from '@okolos/cdp-pipe'
 import {
   BRIDGE_VERBS,
+  OKOLOS_READ_LIMIT,
   isLocalAddress,
   originOf,
   refuse,
+  type AnyBridgeVerb,
   type BridgeError,
   type BridgeResult,
   type BridgeVerb,
@@ -461,7 +463,61 @@ export function createVerbs(deps: VerbsDeps): Verbs {
         : deps.extension.ask('okolos.ping', {}),
   }
 
-  const operations = [sessionOpen, open, snapshot, read, get, waitFor, close, census, ping]
+  /**
+   * What an agent reads from Okolos (B-218 wave (b), spec 2026-11-19-agent-door-wave-b.md): the
+   * extension answers each from what it holds, and never with page content (WB-1). The daemon
+   * checks the input here and hands it over as is.
+   */
+  const list = z.object({ limit: z.number().int().min(1).max(OKOLOS_READ_LIMIT).optional() }).strict()
+  const reads: ReadonlyArray<{ verb: AnyBridgeVerb; purpose: string; input: z.ZodType; example: unknown }> = [
+    {
+      verb: 'okolos.queue',
+      purpose: "Lists Okolos's open findings: category, severity, host and when, never what was found on the page; waits for the extension like okolos.ping.",
+      input: list,
+      example: { limit: 20 },
+    },
+    {
+      verb: 'okolos.verdict',
+      purpose: "Says what Okolos holds about an http or https address's host: on a block list (which, since when), open findings by category, trusted by the person.",
+      input: z.object({ url: z.string().url().max(2048).refine((url) => /^https?:\/\//i.test(url)) }).strict(),
+      example: { url: 'https://example.com/login' },
+    },
+    {
+      verb: 'okolos.journal',
+      // i18n-exempt: read by the agent over MCP, not by the person
+      purpose: "Lists the latest entries of Okolos's journal: kind, outcome, host and when, never the page's text.",
+      input: list,
+      example: { limit: 20 },
+    },
+    {
+      verb: 'okolos.audit',
+      // i18n-exempt: read by the agent over MCP, not by the person
+      purpose: 'Lists what left this device through Okolos: when, where, why, the shape of what was sent and the outcome, as the outbound log shows it.',
+      input: list,
+      example: { limit: 20 },
+    },
+    {
+      verb: 'okolos.extensions',
+      // i18n-exempt: read by the agent over MCP, not by the person
+      purpose: 'Lists the changes Okolos noticed in the browser extensions: which extension, what changed and when.',
+      input: z.object({}).strict(),
+      example: {},
+    },
+  ]
+  const readOperations: Operation[] = reads.map(({ verb, purpose, input, example }) => ({
+    verb,
+    purpose,
+    input,
+    gate: 'agent',
+    example,
+    run: async (args: unknown) =>
+      deps.extension === undefined
+        ? // i18n-exempt: read by the agent over MCP, not by the person
+          refuse('extension_not_connected', 'Okolos is not connected to Okolos Agent.')
+        : deps.extension.ask(verb, args),
+  }))
+
+  const operations = [sessionOpen, open, snapshot, read, get, waitFor, close, census, ping, ...readOperations]
   return Object.assign(operations, {
     /** Closes the windows of tasks closed elsewhere (revoked, expired). */
     closeWindows: async (tasks: readonly Task[]) => {
