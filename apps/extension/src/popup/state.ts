@@ -3,7 +3,7 @@ import { buildQueue, diffSince, QUEUE_LIMIT, type JournalEntry, type QueueItem }
 import type { FindingRecord, JournalRecord } from '@okolos/storage'
 import type { PopupState } from '@okolos/ui'
 
-import { waitingRequests, type LiftRequest } from '../background/agent-requests.js'
+import { waitingRequests, type LiftRequest } from '../background/agent-request-state.js'
 
 /** The popup's ready state — the only one this module can produce. */
 type ReadyState = Extract<PopupState, { kind: 'ready' }>
@@ -127,7 +127,7 @@ export function buildPopupState(inputs: PopupInputs): ReadyState {
     // never a word the agent wrote (WD-2).
     requests: waitingRequests(inputs.requests ?? [], Date.parse(inputs.now ?? '') || Date.now()).map((request) => ({
       id: request.id,
-      line: t(request.gate === 'lookalike' ? 'agentRequestLookalike' : 'agentRequestBlock', request.agentName, request.host),
+      line: request.gate === 'lookalike' ? t('agentRequestLookalike', request.agentName, request.host) : t('agentRequestBlock', request.agentName, request.host),
     })),
   }
 }

@@ -75,7 +75,7 @@ import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 import { recordPageRequest } from './page-requests.js'
 import { recordTrap } from './trap-journal.js'
 import { downloadWarningShown, extensionsCheckResult, leakCheckResult, passwordCheckResult, passwordError, surfaceWarning, trapWarning } from './usage/catalogue.js'
-import { decideRequest, REQUESTS_KEY, type LiftRequest, type RequestDeps } from './agent-requests.js'
+import { decideRequest, REQUEST_LOG_KEY, REQUESTS_KEY, type AgentRequestDeps, type LiftRequest } from './agent-requests.js'
 import { AGENT_DOOR_ALARM, AGENT_DOOR_KEY, AGENT_DOOR_PERIOD_MINUTES, AGENT_PORT, agentDoorPost, pairAgentDoor, releaseAgentDoor, wakeAgentDoor, type AgentDoorDeps, type AgentDoorLink } from './agent-door.js'
 import { storageFailureKind } from './usage/errors.js'
 import { startUsage } from './usage/start.js'
@@ -1177,7 +1177,7 @@ const agentDoor: AgentDoorDeps = {
  * look-alike address does what the person's «Всё равно продолжить» does: the host joins the
  * trusted ones and the rules are rebuilt without it.
  */
-function agentRequests(): RequestDeps {
+function agentRequests(): AgentRequestDeps {
   return {
     load: async () => (await platform.storage.get<LiftRequest[]>(REQUESTS_KEY)) ?? [],
     save: (requests) => platform.storage.set(REQUESTS_KEY, requests),
@@ -1189,7 +1189,7 @@ function agentRequests(): RequestDeps {
         id: `agent-request:${explainKey}:${now}`,
         createdAt: now,
         kind: 'action',
-        detail: { explainKey, explainArgs: [...args], reason: explainKey === 'logAgentAsked' ? 'agent-action' : 'user-allowed', agentId },
+        detail: { explainKey, explainArgs: [...args], reason: explainKey === REQUEST_LOG_KEY.asked ? 'agent-action' : 'user-allowed', agentId },
       })
     },
     lift: async (_gate, host) => {

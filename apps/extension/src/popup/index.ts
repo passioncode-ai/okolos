@@ -3,7 +3,7 @@ import { detectPlatform } from '@okolos/platform'
 import { openDb } from '@okolos/storage'
 import { renderPopup, type PopupState } from '@okolos/ui'
 
-import { REQUESTS_KEY, type LiftRequest } from '../background/agent-requests.js'
+import { REQUESTS_KEY, type LiftRequest } from '../background/agent-request-state.js'
 import { buildPopupState } from './state.js'
 import '../pages.css'
 import { optionsPageFor, type ViewId } from '../options/views.js'

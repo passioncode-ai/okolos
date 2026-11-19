@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { answerRequest, decideRequest, REQUEST_LIFETIME_MS, waitingRequests, type LiftRequest, type RequestDeps } from './agent-requests.js'
+import { answerRequest, decideRequest, REQUEST_LIFETIME_MS, waitingRequests, type LiftRequest, type AgentRequestDeps } from './agent-requests.js'
 
 const AGENT = { agentId: 'a1', name: 'scout' }
 
@@ -10,7 +10,7 @@ function deps(start = Date.parse('2026-11-19T12:00:00.000Z')) {
   let next = 0
   const journal: string[] = []
   const lifted: string[] = []
-  const d: RequestDeps = {
+  const d: AgentRequestDeps = {
     load: async () => stored,
     save: async (requests) => {
       stored = requests

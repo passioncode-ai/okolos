@@ -1,4 +1,8 @@
-import { OKOLOS_GATES, refuse, type BridgeResult, type OkolosGate, type OkolosRequestLiftResult, type OkolosRequestState } from '@okolos/contracts'
+import { OKOLOS_GATES, refuse, type BridgeResult, type OkolosGate, type OkolosRequestLiftResult } from '@okolos/contracts'
+
+import { stateOf, type LiftRequest } from './agent-request-state.js'
+
+export { REQUESTS_KEY, stateOf, waitingRequests, type LiftRequest } from './agent-request-state.js'
 
 /**
  * An agent asks to lift a gate, and only the person lifts it (B-218 wave (d), spec
@@ -12,41 +16,20 @@ import { OKOLOS_GATES, refuse, type BridgeResult, type OkolosGate, type OkolosRe
 
 export const REQUEST_VERBS = ['okolos.request.lift', 'okolos.request.state'] as const
 export const REQUEST_LIFETIME_MS = 10 * 60_000
-/** Where the requests live in `storage.local`. */
-export const REQUESTS_KEY = 'agent:requests'
+/** The journal's sentences for a request, by what happened. */
+export const REQUEST_LOG_KEY = { asked: 'logAgentAsked', allowed: 'logAgentAllowed', declined: 'logAgentDeclined' } as const
 
-export interface LiftRequest {
-  readonly id: string
-  readonly gate: OkolosGate
-  readonly host: string
-  readonly agentId: string
-  readonly agentName: string
-  readonly createdAt: number
-  readonly expiresAt: number
-  readonly state: 'waiting' | 'allowed' | 'declined'
-}
-
-export interface RequestDeps {
+export interface AgentRequestDeps {
   load(): Promise<readonly LiftRequest[]>
   save(requests: readonly LiftRequest[]): Promise<void>
   newId(): string
   now(): number
-  journal(explainKey: 'logAgentAsked' | 'logAgentAllowed' | 'logAgentDeclined', args: readonly string[], agentId: string): Promise<void>
+  journal(explainKey: (typeof REQUEST_LOG_KEY)[keyof typeof REQUEST_LOG_KEY], args: readonly string[], agentId: string): Promise<void>
   /** Lifts `gate` for `host` as the person's own press on that gate does. */
   lift(gate: OkolosGate, host: string): Promise<void>
 }
 
 const HOST = /^[a-z0-9.-]{1,253}$/
-
-/** Its state now: a waiting request past its ten minutes has expired. */
-export function stateOf(request: LiftRequest, now: number): OkolosRequestState {
-  return request.state === 'waiting' && now > request.expiresAt ? 'expired' : request.state
-}
-
-/** The requests the person still has to answer, oldest first. */
-export function waitingRequests(requests: readonly LiftRequest[], now: number): LiftRequest[] {
-  return requests.filter((request) => stateOf(request, now) === 'waiting').sort((a, b) => a.createdAt - b.createdAt)
-}
 
 /** Drops what is over and a day old, so the list never grows without end. */
 function kept(requests: readonly LiftRequest[], now: number): LiftRequest[] {
@@ -57,7 +40,7 @@ function refused(message: string): BridgeResult<unknown> {
   return refuse('internal', message)
 }
 
-export async function answerRequest(verb: string, input: unknown, by: unknown, deps: RequestDeps): Promise<BridgeResult<unknown>> {
+export async function answerRequest(verb: string, input: unknown, by: unknown, deps: AgentRequestDeps): Promise<BridgeResult<unknown>> {
   const now = deps.now()
   const requests = await deps.load()
   if (verb === 'okolos.request.state') {
@@ -100,19 +83,19 @@ export async function answerRequest(verb: string, input: unknown, by: unknown, d
     state: 'waiting',
   }
   await deps.save([...kept(requests, now), request])
-  await deps.journal('logAgentAsked', [request.agentName, host], request.agentId)
+  await deps.journal(REQUEST_LOG_KEY.asked, [request.agentName, host], request.agentId)
   const data: OkolosRequestLiftResult = { requestId: request.id, state: 'waiting' }
   return { success: true, data }
 }
 
 /** The person's answer to one request, from the popup. A request already answered or expired stays as it is. */
-export async function decideRequest(id: string, allow: boolean, deps: RequestDeps): Promise<{ ok: boolean }> {
+export async function decideRequest(id: string, allow: boolean, deps: AgentRequestDeps): Promise<{ ok: boolean }> {
   const now = deps.now()
   const requests = await deps.load()
   const request = requests.find((candidate) => candidate.id === id)
   if (request === undefined || stateOf(request, now) !== 'waiting') return { ok: false }
   if (allow) await deps.lift(request.gate, request.host)
   await deps.save(requests.map((candidate) => (candidate.id === id ? { ...candidate, state: allow ? 'allowed' : 'declined' } : candidate)))
-  await deps.journal(allow ? 'logAgentAllowed' : 'logAgentDeclined', [request.agentName, request.host], request.agentId)
+  await deps.journal(allow ? REQUEST_LOG_KEY.allowed : REQUEST_LOG_KEY.declined, [request.agentName, request.host], request.agentId)
   return { ok: true }
 }
