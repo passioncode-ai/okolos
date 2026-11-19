@@ -29,3 +29,15 @@ export async function answeredWithin<T>(
     timers.clear(handle)
   }
 }
+
+/**
+ * Runs `then` once the worker has finished the send under way, or after `ms` (B-214).
+ *
+ * The erase clears the outbound log from this page, outside the worker's one-at-a-time steps, and a
+ * send already under way wrote its line into the log just cleared. `settled` is a worker step
+ * queued behind that send (`usage/state`); a refusal or a late answer does not hold the erase.
+ */
+export async function afterSends<T>(settled: Promise<unknown>, ms: number, then: () => Promise<T>): Promise<T> {
+  await answeredWithin(settled, ms, () => undefined).catch(() => undefined)
+  return then()
+}

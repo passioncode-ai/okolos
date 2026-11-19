@@ -120,6 +120,19 @@ describe('wiping asks once, and says what it will take', () => {
     await vi.waitFor(() => expect(h.onWipe).toHaveBeenCalledOnce())
   })
 
+  it('marks the erase button busy while the erase runs, and frees it after (B-214)', async () => {
+    let finish!: (outcome: { ok: boolean; failed: string[] }) => void
+    const { el } = mount(handlers({ onWipe: vi.fn(() => new Promise<{ ok: boolean; failed: string[] }>((resolve) => (finish = resolve))) }))
+    const wipe = el.querySelector<HTMLButtonElement>('[data-role=wipe]') as HTMLButtonElement
+    wipe.click()
+    el.querySelector<HTMLButtonElement>('[data-role=confirm-yes]')?.click()
+    await vi.waitFor(() => expect(wipe.getAttribute('aria-busy')).toBe('true'))
+    expect(wipe.disabled).toBe(true)
+    finish({ ok: false, failed: ['journal'] })
+    await vi.waitFor(() => expect(wipe.disabled).toBe(false))
+    expect(wipe.hasAttribute('aria-busy')).toBe(false)
+  })
+
   it('lets the user back out, leaving everything in place', () => {
     const { el, h } = mount()
     el.querySelector<HTMLButtonElement>('[data-role=wipe]')?.click()
