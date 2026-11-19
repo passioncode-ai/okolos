@@ -207,6 +207,11 @@ describe('the send limits the documents state', () => {
     expect(analyticsDoc).toContain(`без ответа ${deadline / 1000} секунд`)
     expect(analyticsDoc).toContain(`больше чем на ${skew / 60_000} минут`)
   })
+
+  it('drops an event that would turn a day old during one request, the log opening included (B-214)', () => {
+    const start = readFileSync(path.join(root, 'apps/extension/src/background/usage/start.ts'), 'utf8')
+    expect(value(sink, 'IN_FLIGHT_MS')).toBeGreaterThanOrEqual(value(start, 'AUDIT_OPEN_MS') + deadline)
+  })
 })
 
 /**

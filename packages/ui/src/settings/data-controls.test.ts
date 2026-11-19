@@ -553,6 +553,14 @@ describe('usage and error data (B-199, SCN-051, SCN-052)', () => {
     expect(role(off, 'usage-state')?.textContent).toBe(message('usageOff'))
   })
 
+  it('keeps the wipe confirmation above the usage block when there is no key block (B-215)', () => {
+    const el = renderDataControls(document, handlers(), kinds, undefined, panel())
+    expect(role(el, 'leak-key')).toBeNull()
+    role(el, 'wipe')?.click()
+    const confirm = role(el, 'confirm') as HTMLElement
+    expect(confirm.compareDocumentPosition(role(el, 'usage') as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+
   it('in a Firefox with no built-in consent shows the switch off and unusable, and says why', () => {
     const el = renderDataControls(document, handlers(), kinds, undefined, panel({ state: 'unsupported', firefox: true }))
     const box = el.querySelector<HTMLInputElement>('[data-role=usage-switch]')
