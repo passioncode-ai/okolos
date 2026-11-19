@@ -67,6 +67,7 @@ import {
 } from './views.js'
 import '../pages.css'
 import { runUsageSwitch } from './usage-switch.js'
+import { answeredWithin } from './usage-wait.js'
 import { countUncaughtErrors } from '../ui-errors.js'
 
 /**
@@ -1123,6 +1124,9 @@ async function renewUsage(): Promise<boolean> {
   }
 }
 
+/** How long «Ваши данные» waits for `usage/state` before it is drawn without the usage block. */
+const USAGE_STATE_WAIT_MS = 2_000
+
 /** Whether the last switch did not save, shown once on the repaint that follows it. */
 let usageFailed = false
 /** The latest switch: an earlier one whose Firefox answer arrives late does not overrule it. */
@@ -1138,7 +1142,11 @@ let usageRenewFailed = false
 async function usagePanel(): Promise<UsagePanel | undefined> {
   let state: UsagePanel['state']
   try {
-    state = (await platform.runtime.send('usage/state', {})).state
+    // Not longer than a moment: the section is drawn without the block, and again once the
+    // worker answers (B-214). The flags below stay for that paint.
+    const answer = await answeredWithin(platform.runtime.send('usage/state', {}), USAGE_STATE_WAIT_MS, () => void reload())
+    if (answer === 'late') return undefined
+    state = answer.state
   } catch {
     return undefined
   }
