@@ -30,6 +30,7 @@ import { clampMaxBytes, paginate, withoutFragment, type Snapshot, type SnapshotL
 import * as z from 'zod'
 
 import type { Operation, OperationOutcome } from '../door/door.js'
+import type { ExtensionLink } from '../extension/link.js'
 import { checkLanded, type Task, type Tasks } from '../tasks/tasks.js'
 import type { AgentWindows } from '../window/window.js'
 import { cleanSnapshot } from './page.js'
@@ -48,6 +49,8 @@ export interface VerbsDeps {
   /** The probe's script (`buildAgentProbe`, or the file the release ships). */
   readonly probeSource: string
   readonly census: () => Promise<CensusEntry[]>
+  /** The link to the Okolos extension (B-218); without it `okolos.ping` answers not connected. */
+  readonly extension?: Pick<ExtensionLink, 'ask'>
   readonly now?: () => number
   /**
    * Only tests set it: the fixtures are served from 127.0.0.1. `main.ts` never passes it,
@@ -445,7 +448,21 @@ export function createVerbs(deps: VerbsDeps): Verbs {
     run: async () => ({ success: true, data: await deps.census() }),
   }
 
-  const operations = [sessionOpen, open, snapshot, read, get, waitFor, close, census]
+  const ping: Operation = {
+    verb: 'okolos.ping',
+    // i18n-exempt: read by the agent over MCP, not by the person
+    purpose: 'Asks the Okolos extension connected to Okolos Agent whether it answers, with its version; it looks for requests about once a minute, so this waits up to 90 seconds.',
+    input: z.object({}).strict(),
+    gate: 'agent',
+    example: {},
+    run: async () =>
+      deps.extension === undefined
+        ? // i18n-exempt: read by the agent over MCP, not by the person
+          refuse('extension_not_connected', 'Okolos is not connected to Okolos Agent.')
+        : deps.extension.ask('okolos.ping', {}),
+  }
+
+  const operations = [sessionOpen, open, snapshot, read, get, waitFor, close, census, ping]
   return Object.assign(operations, {
     /** Closes the windows of tasks closed elsewhere (revoked, expired). */
     closeWindows: async (tasks: readonly Task[]) => {
