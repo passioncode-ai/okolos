@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{title}}</title>
+<link rel="stylesheet" href="/dashboard/app.css">
+<script src="/dashboard/app.js" defer></script>
+</head>
+<body>
+<main data-role="agent-page" data-state="loading">
+<h1 data-role="page-title">{{title}}</h1>
+<p data-role="page-loading">{{loading}}</p>
+<p data-role="page-problem" hidden></p>
+<section data-role="pairing" data-state="loading" hidden>
+<h2 data-role="pairing-heading"></h2>
+<p data-role="pairing-notice" aria-live="polite" hidden></p>
+<p data-role="pairing-error" hidden></p>
+<ul data-role="pairing-requests"></ul>
+<h3 data-role="paired-heading"></h3>
+<p data-role="pairing-empty" hidden></p>
+<ul data-role="paired-agents"></ul>
+<p data-role="pairing-how"></p>
+</section>
+<section data-role="activity" data-state="loading" hidden>
+<h2 data-role="tasks-heading"></h2>
+<p data-role="tasks-empty" hidden></p>
+<ul data-role="agent-tasks"></ul>
+<h2 data-role="refusals-heading"></h2>
+<p data-role="journal-error" hidden></p>
+<ul data-role="agent-journal-notes"></ul>
+<p data-role="refusals-empty" hidden></p>
+<ul data-role="agent-refusals"></ul>
+<ul data-role="door-refusals"></ul>
+<p><a data-role="agent-journal-link" href="/api/journal" download></a></p>
+</section>
+</main>
+</body>
+</html>

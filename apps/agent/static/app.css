@@ -1,0 +1,9 @@
+:root { color-scheme: light dark; font: 15px/1.5 system-ui, sans-serif; }
+body { margin: 0; padding: 24px; max-width: 920px; }
+section { margin-top: 24px; }
+ul { list-style: none; padding: 0; margin: 8px 0; }
+li { border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius: 10px; padding: 12px 14px; margin: 8px 0; }
+[data-role="pairing-code"] { font: 600 28px/1.2 ui-monospace, monospace; letter-spacing: 0.08em; margin: 6px 0; }
+[data-role="pairing-duplicate"], [data-role="pairing-lookalike"], [data-role="page-problem"], [data-role="pairing-error"], [data-role="journal-error"] { font-weight: 600; }
+button { font: inherit; padding: 6px 14px; border-radius: 8px; margin-right: 8px; cursor: pointer; }
+.muted { opacity: 0.75; }

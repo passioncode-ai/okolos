@@ -6,14 +6,19 @@
  * copy on the same home leaves with 75 before it opens the journal, the access
  * list or Chrome (plan N-011, test 21).
  */
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { journalTime, Journal, RETENTION_DAYS_JOURNAL } from './journal/journal.js'
+import { fromCatalogue, type Catalogue } from '@okolos/i18n'
+
+import { JournalError, journalTime, Journal, RETENTION_DAYS_JOURNAL } from './journal/journal.js'
 import { agentEvents } from './agent-events.js'
+import { dashboard } from './dashboard/page.js'
 import { DOOR_PATHS, door } from './door/door.js'
 import { readCensus } from './hygiene/census.js'
 import { Pairing, pairingStoreFile } from './pairing/pairing.js'
 import { serviceDirs, type ServiceDirs } from './service/dirs.js'
+import { defaultLocalesDir } from './service/messages.js'
 import { startService, type Locale, type RunningService } from './service/http.js'
 import { Tasks } from './tasks/tasks.js'
 import { createVerbs, type Verbs } from './verbs/verbs.js'
@@ -42,6 +47,10 @@ export interface AgentOptions {
   readonly allowLoopbackForTests?: boolean
   readonly now?: () => number
   readonly exit?: (code: number) => void
+  /** The page's folder; apps/agent/static unless a release names its own. */
+  readonly staticDir?: string
+  /** The page's time zone; the system's when left out (tests pin it). */
+  readonly timeZone?: string
 }
 
 export interface Agent {
@@ -56,13 +65,16 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
   const now = options.now ?? Date.now
   const dirs = options.dirs ?? serviceDirs(options.home)
   const locale = options.locale ?? 'ru'
-  const say = agentEvents(locale, options.localesDir)
+  const events = agentEvents(locale, options.localesDir, options.timeZone)
   let journal: Journal | undefined
   let pairing: Pairing | undefined
   let windows: AgentWindows | undefined
   let verbs: Verbs | undefined
   const tasks = new Tasks()
   const timers: NodeJS.Timeout[] = []
+  let journalFailure: string | null = null
+  const catalogueFile = path.join(options.localesDir ?? defaultLocalesDir(), locale, 'messages.json')
+  const say = fromCatalogue(JSON.parse(readFileSync(catalogueFile, 'utf8')) as Catalogue)
 
   const service = await startService({
     port: options.port,
@@ -79,10 +91,22 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
       await journal.record({ at: journalTime(now()), outcome: 'rejected', code: reason })
     },
     setup: async (ctx) => {
-      journal = Journal.open(path.join(dirs.data, 'journal'), { retentionDays: RETENTION_DAYS_JOURNAL })
+      const openedJournal = Journal.open(path.join(dirs.data, 'journal'), { retentionDays: RETENTION_DAYS_JOURNAL })
+      // The page names the last failed write (SCR-24 error, journalError) until a write succeeds again.
+      const record = openedJournal.record.bind(openedJournal)
+      openedJournal.record = async (entry) => {
+        try {
+          await record(entry)
+          journalFailure = null
+        } catch (error) {
+          journalFailure = error instanceof JournalError ? error.code : 'other'
+          throw error
+        }
+      }
+      journal = openedJournal
       const opened = Pairing.open(pairingStoreFile(dirs), {
         onNotice: (notice) => {
-          const event = say.notice(notice)
+          const event = events.notice(notice)
           ctx.events.append(event.kind, event.level, event.text)
           if (notice.kind === 'revoked') void verbs?.closeWindows(tasks.closeAllOf(notice.agentId))
         },
@@ -94,7 +118,7 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
         binary: options.chromeBinary === undefined ? (findChrome() ?? '') : (options.chromeBinary ?? ''),
         profileDir,
         ...(options.extraChromeArgs === undefined ? {} : { extraArgs: options.extraChromeArgs }),
-        onCloseIncomplete: (pid) => ctx.events.append('window_close_incomplete', 'warning', say.windowCloseIncomplete(pid)),
+        onCloseIncomplete: (pid) => ctx.events.append('window_close_incomplete', 'warning', events.windowCloseIncomplete(pid)),
       })
       verbs = createVerbs({
         tasks,
@@ -111,12 +135,26 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
           void opsVerbs.closeWindows(tasks.sweep(now()))
         }, MINUTE_MS),
         setInterval(() => {
-          journal?.sweep(now())
+          openedJournal.sweep(now())
           ctx.events.trim(now())
         }, DAY_MS),
       )
       for (const timer of timers) timer.unref()
-      return [door({ pairing: opened, journal, operations: verbs, version: options.version, now })]
+      return [
+        door({ pairing: opened, journal: openedJournal, operations: verbs, version: options.version, now }),
+        dashboard({
+          pairing: opened,
+          tasks,
+          journal: openedJournal,
+          say,
+          locale,
+          now,
+          onRevoke: (agent) => opsVerbs.closeWindows(tasks.closeAllOf(agent.agentId)),
+          journalWriteFailure: () => journalFailure,
+          ...(options.staticDir === undefined ? {} : { staticDir: options.staticDir }),
+          ...(options.timeZone === undefined ? {} : { timeZone: options.timeZone }),
+        }),
+      ]
     },
   })
 

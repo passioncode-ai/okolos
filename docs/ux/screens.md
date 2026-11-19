@@ -11,7 +11,7 @@ its wireframe is regenerated. That inverts the usual order: here the record of
 intent is this file, and the wireframe is derived evidence rather than a mockup
 drawn ahead of the code.
 
-**Twenty screens are `built` and four are `designed`** (SCR-21 and SCR-22 for the mail check, SCR-23 and SCR-24 for the agents' bridge; counted 2026-10-27 from the index below). SCR-15, the dashboard overview, was
+**Twenty-two screens are `built` and two are `designed`** (SCR-21 and SCR-22 for the mail check; SCR-23 and SCR-24, the agents' bridge, are built on the bridge branch; counted 2026-11-19 from the index below). SCR-15, the dashboard overview, was
 specified in [plans/2026-08-12-options-dashboard.md](plans/2026-08-12-options-dashboard.md)
 and shipped in the same pass. (The paragraph here previously said most screens were
 `designed` and exactly two were `built`; it was written before the build and
@@ -43,8 +43,8 @@ never updated, which is the same drift this file exists to catch.)
 | SCR-20 | Local store unavailable | FLW-14 | - | built | packages/ui/src/storage/storage-problem.ts:renderStorageProblem |
 | SCR-21 | Message verdict | FLW-19, FLW-20 | - | designed | none — Ф0 |
 | SCR-22 | Message alert | FLW-20 | - | designed | none — Ф1 |
-| SCR-23 | Agent pairing | FLW-21 | - | designed | none yet: Б1 of the bridge, B-142 |
-| SCR-24 | Agent activity | FLW-21, FLW-22 | - | designed | none yet: Б1 of the bridge, B-142 |
+| SCR-23 | Agent pairing | FLW-21 | - | built | `apps/agent/src/dashboard/view.ts`, `apps/agent/src/dashboard/page.ts`, `apps/agent/static/` (branch bridge/b1-next, N-015 first cut: pending, confirmed, expired, claim-expired, error, empty, session-expired, stopping; store-unwritable and revoke-failed as notices; e2e SCN-044 is N-017) |
+| SCR-24 | Agent activity | FLW-21, FLW-22 | - | built | `apps/agent/src/dashboard/view.ts`, `apps/agent/src/dashboard/page.ts`, `apps/agent/static/` (branch bridge/b1-next, N-015 first cut: tasks, refusals and door refusals in words, journal-unreadable, incomplete list, journal export by day; day-full and the gap line are not shown yet; e2e SCN-045 is N-017) |
 
 ## Design system
 
@@ -683,7 +683,8 @@ generator, and the sheet declares no colour of its own.
 - **Revoking is immediate.** The agent's next call is refused with `not_paired`, and every task it holds is closed with its window.
 - **Scenarios:** SCN-044
 - **Resources:** the pairing store (the one place a key's SHA-256 lives), the journal
-- **Status:** designed
+- **Coverage:** apps/agent/src/dashboard/view.ts:pageView, apps/agent/src/dashboard/page.ts:dashboard, apps/agent/static/app.js, apps/agent/src/dashboard/page.test.ts (store-unwritable and revoke-failed are notices, not row states yet; e2e SCN-044 is N-017)
+- **Status:** built
 
 ### SCR-24: Agent activity
 - **Used by:** FLW-21 (after pairing), FLW-22 (watching a task)
@@ -707,4 +708,5 @@ generator, and the sheet declares no colour of its own.
 - **A refusal says which kind it is.** A policy answer (outside the task, out of steps, time over, no access) is listed with what was asked and why, never as a failure of the product. A failure of Okolos Agent (`internal`, `browser_offline`, `cleaning_incomplete`) is listed in the same place with its own line, «Сбой Okolos Agent: …» / "Okolos Agent failure: …" (`refusalFailureLine`), never under «Отказ», so the person does not blame the task or the agent.
 - **Scenarios:** SCN-045
 - **Resources:** the task table, the journal
-- **Status:** designed
+- **Coverage:** apps/agent/src/dashboard/view.ts:pageView, apps/agent/src/dashboard/page.ts:dashboard, apps/agent/static/app.js, apps/agent/src/dashboard/view.test.ts (day-full and the gap line are not shown yet; e2e SCN-045 is N-017)
+- **Status:** built
