@@ -31,3 +31,5 @@
 | [0020](0020-okolos-agent-b1-runs-on-macos-only.md) | Okolos Agent фазы Б1 только на macOS; Windows отдельной фазой | `docs/brand/facts.md`, строка B-171 в `docs/backlog.md` |
 | [0021](0021-usage-and-error-data-on-by-default.md) | Данные об использовании и ошибках включены по умолчанию и выключаются в настройках | `apps/extension/src/background/usage/`, `docs/analytics.md`, `docs/privacy.md` |
 | [0022](0022-okolos-actions-get-their-agent-door-through-okolos-agent.md) | Действия Okolos получают дверь для агента через Okolos Agent, тремя классами глаголов (B-218) | `tools/manifest.test.ts`, `docs/ux/screens.md` |
+| [0023](0023-the-bridge-is-part-of-okolos-agent.md) | Мост для агентов живёт в Okolos Agent: две двери, задача в своём окне, граница угроз Б1 | `apps/agent/src/door/door.ts`, `apps/agent/src/bridge.chrome.test.ts` |
+| [0024](0024-the-agent-snapshot-comes-in-pages-of-32-kb.md) | Снимок для агента приходит частями не больше 32 КБ, с курсором этого снимка | `packages/core-snapshot/src/pages.ts` |
