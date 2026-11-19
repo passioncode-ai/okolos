@@ -11,8 +11,8 @@ import { isExtensionOrigin, WAKE_PERIOD_MS, type ExtensionLink } from './link.js
  * service's guard lets an extension origin through to these paths only (`extensionOrigin` in
  * `agent.ts`); everything else it refuses as before.
  *
- * The extension reads the answers through the host permissions it already holds (`http://*/*`
- * covers 127.0.0.1), so the browser applies no CORS to it: measured in `e2e/scn-054.spec.ts`
+ * The extension reads the answers through the host permissions it already holds (every http site,
+ * 127.0.0.1 included), so the browser applies no CORS to it: measured in `e2e/scn-054.spec.ts`
  * (spec §3.3а). The CORS headers stay, for this origin exactly and never `*`, in case those
  * permissions narrow; what guards the route is the origin and the token.
  */
