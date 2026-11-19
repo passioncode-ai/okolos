@@ -205,16 +205,18 @@ if (unexpected.length > 0) {
 if (pending === null) {
   console.error(
     '\n  No manifest beside the graph, so which sources are in it cannot be established.' +
-      '\n  An unknown age is not a young age — rebuild with `/graphify . --update`.\n',
+      '\n  An unknown age is not a young age: rebuild with `graphify update .` (code), then the' +
+      '\n  semantic pass (docs/runbooks/development.md, B-72).\n',
   )
   refused = true
 } else if (describePending(pending).length > 0) {
   /**
    * The refusal names the pass that is missing, because the two halves are unblocked
    * differently. `changed` and `never extracted` are fixed by a run of the update. The
-   * semantic pass over documents and images is not: it needs an LLM, which means either
-   * `GEMINI_API_KEY` set in the environment or an agent host willing to dispatch
-   * subagents. Saying "rebuild it" to someone whose blocker is a missing key sends them
+   * semantic pass over documents and images is not: it needs an LLM, which means
+   * `graphify extract . --backend openai` through the Observatory-backed `graphify()`
+   * wrapper, `GEMINI_API_KEY` in the environment, or an agent host willing to dispatch
+   * subagents. A run Fabric dispatched gets no key unless its packet names the slot. Saying "rebuild it" to someone whose blocker is a missing key sends them
    * round the loop again.
    */
   console.error(
@@ -223,13 +225,15 @@ if (pending === null) {
       '\n  gets believed.\n',
   )
   if (pending.changed.length > 0 || pending.unknown.length > 0) {
-    console.error('  Changed and never-extracted sources: `/graphify . --update`.')
+    console.error('  Changed and never-extracted code: `graphify update .` (no LLM, no key).')
   }
   if (pending.awaiting.length > 0) {
     console.error(
-      '  Sources awaiting meaning need the semantic pass, which needs an LLM — either' +
-        '\n  GEMINI_API_KEY in the environment, or a host that dispatches subagents. The' +
-        '\n  AST half of an update runs without either and does not clear them.\n',
+      '  Sources awaiting meaning, and changed documents, need the semantic pass, which' +
+        '\n  needs an LLM: `graphify extract . --backend openai` through the graphify()' +
+        '\n  wrapper (key from Observatory), GEMINI_API_KEY, or `/graphify . --update` on a' +
+        '\n  host that dispatches subagents. `graphify update .` runs without any of them' +
+        '\n  and does not clear them (docs/runbooks/development.md, B-72).\n',
     )
   }
   refused = true
