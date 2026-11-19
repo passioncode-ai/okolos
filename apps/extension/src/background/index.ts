@@ -1384,8 +1384,9 @@ async function sweepIfDue(): Promise<void> {
  */
 async function pullFeed(): Promise<void> {
   // Counted only for a pull that was owed (B-206): before the due check the only thing that can
-  // throw is the store itself, and an event cannot be queued in a store that does not open, so a
-  // failure there was one more event per wake that never left.
+  // throw is the store itself. Such an event is queued (the queue is in storage.local) but cannot
+  // leave while the store fails, because the send journal it is written to first lives there, and
+  // it is dropped after a day; counting it on every wake only filled the queue.
   let owed = false
   try {
     const db = await openDb()
