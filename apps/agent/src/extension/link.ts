@@ -57,6 +57,8 @@ export interface ExtensionRequest {
   readonly id: string
   readonly verb: AnyBridgeVerb
   readonly input: unknown
+  /** The agent that asked, for an action the extension journals with its name (wave (c), WC-1). */
+  readonly by?: { readonly agentId: string; readonly name: string }
 }
 
 interface Waiting extends ExtensionRequest {
@@ -165,7 +167,7 @@ export class ExtensionLink {
   }
 
   /** An agent's call for the extension: answered when the extension next wakes, or refused. */
-  ask(verb: AnyBridgeVerb, input: unknown): Promise<BridgeResult<unknown>> {
+  ask(verb: AnyBridgeVerb, input: unknown, by?: ExtensionRequest['by']): Promise<BridgeResult<unknown>> {
     if (this.#stored === null) {
       // i18n-exempt: read by the agent over MCP, not by the person
       return Promise.resolve(refuse('extension_not_connected', 'Okolos is not connected to Okolos Agent; the person connects it on the Okolos Agent page.'))
@@ -178,7 +180,7 @@ export class ExtensionLink {
         if (waiting !== undefined) this.#settle(waiting, refuse('extension_asleep', this.#asleep()))
       }, ANSWER_WAIT_MS)
       timer.unref?.()
-      this.#waiting.set(id, { id, verb, input, handed: false, settle: resolve, timer })
+      this.#waiting.set(id, { id, verb, input, ...(by === undefined ? {} : { by }), handed: false, settle: resolve, timer })
     })
   }
 
@@ -190,7 +192,7 @@ export class ExtensionLink {
       if (batch.length === MAX_BATCH) break
       if (waiting.handed) continue
       waiting.handed = true
-      batch.push({ id: waiting.id, verb: waiting.verb, input: waiting.input })
+      batch.push({ id: waiting.id, verb: waiting.verb, input: waiting.input, ...(waiting.by === undefined ? {} : { by: waiting.by }) })
     }
     return batch
   }

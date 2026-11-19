@@ -613,6 +613,9 @@ async function journalSection(): Promise<HTMLElement> {
         // Each entry already carries its sentence; there is no second screen to
         // open yet, and a dead control would be worse than none.
       },
+      onUndo: (entryId) => {
+        void platform.runtime.send('agent/undo', { entryId }).finally(() => void reload())
+      },
     },
   )
 }

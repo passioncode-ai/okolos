@@ -154,3 +154,26 @@ describe('a failure’s own words sit under the sentence, not inside it', () => 
     expect(role(shown(''), 'entry-diagnostic')).toBeNull()
   })
 })
+
+describe('what an agent did (B-218 wave (c))', () => {
+  it('says an agent did it, offers «Вернуть» beside the row, and says once it was undone', () => {
+    const onUndo = vi.fn()
+    const el = render(
+      [
+        entry({ id: 'a1', kind: 'action', automatic: false, byAgent: true, undo: 'available' }),
+        entry({ id: 'a2', kind: 'action', automatic: false, byAgent: true, undo: 'done' }),
+      ],
+      null,
+      {},
+      handlers({ onUndo }),
+    )
+    expect(el.querySelector('[data-entry=a1] [data-role=entry-line]')?.textContent).toContain(CATALOGUE['journalByAgent']?.message as string)
+    const undo = el.querySelector('[data-role=entry-undo]') as HTMLButtonElement
+    expect(undo.textContent).toBe(CATALOGUE['journalUndo']?.message)
+    expect(undo.closest('[data-role=entry]')).toBeNull()
+    undo.click()
+    expect(onUndo).toHaveBeenCalledWith('a1')
+    expect(el.querySelector('[data-role=entry-undone]')?.textContent).toBe(CATALOGUE['journalUndone']?.message)
+  })
+})
+

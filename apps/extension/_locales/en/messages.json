@@ -2777,5 +2777,61 @@
         "content": "$1"
       }
     }
+  },
+  "logAgentResolved": {
+    "message": "Agent $AGENT$ marked the finding on $HOST$ resolved.",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "host": {
+        "content": "$2"
+      }
+    }
+  },
+  "logAgentDeferred": {
+    "message": "Agent $AGENT$ put the finding on $HOST$ off until $DATE$.",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "host": {
+        "content": "$2"
+      },
+      "date": {
+        "content": "$3"
+      }
+    }
+  },
+  "logAgentAccepted": {
+    "message": "Agent $AGENT$ accepted the change to extension $ID$.",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "id": {
+        "content": "$2"
+      }
+    }
+  },
+  "logAgentUntrusted": {
+    "message": "Agent $AGENT$ removed $DOMAIN$ from the trusted sites.",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "domain": {
+        "content": "$2"
+      }
+    }
+  },
+  "journalByAgent": {
+    "message": "an agent did this"
+  },
+  "journalUndo": {
+    "message": "Undo"
+  },
+  "journalUndone": {
+    "message": "You undid what the agent did"
   }
 }

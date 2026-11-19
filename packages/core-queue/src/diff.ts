@@ -31,6 +31,10 @@ export interface JournalEntry {
   readonly diagnostic?: string
   /** Whether the product did it, or the user did. */
   readonly automatic: boolean
+  /** An agent did it through Okolos Agent (B-218 wave (c)): neither the product nor the person. */
+  readonly byAgent?: boolean
+  /** What the agent did lowered a protection: the person can undo it, or already did (WC-2). */
+  readonly undo?: 'available' | 'done'
 }
 
 export interface DiffGroup {

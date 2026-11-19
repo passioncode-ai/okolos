@@ -315,6 +315,8 @@ export interface RpcMap {
   'extensions/trust': { req: { id: string }; res: { ok: true } }
   /** The user dealt with a finding; it leaves the queue. */
   'finding/resolve': { req: { id: string }; res: { ok: true } }
+  /** The person undoes what an agent did that lowered a protection (B-218 wave (c), WC-2). */
+  'agent/undo': { req: { entryId: string }; res: { ok: boolean } }
   /** Not today. It ranks last until the given time rather than disappearing. */
   'finding/defer': { req: { id: string; until: string }; res: { ok: true } }
   'site/facts': { req: { host: string }; res: { trusted: boolean; firstSeen: string | null } }

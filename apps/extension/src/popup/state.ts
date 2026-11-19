@@ -69,7 +69,11 @@ export function mapJournal(records: readonly JournalRecord[]): MappedJournal {
         : {}),
       // A decision the user made is not the same event as one the product made,
       // and the journal is the place where that difference is legible.
-      automatic: detail.reason !== 'user-blocked' && detail.reason !== 'user-allowed',
+      automatic: detail.reason !== 'user-blocked' && detail.reason !== 'user-allowed' && detail.reason !== 'agent-action',
+      ...(detail.reason === 'agent-action' ? { byAgent: true } : {}),
+      ...(detail.reason === 'agent-action' && detail.weakens === true
+        ? { undo: typeof detail.undoneAt === 'string' ? ('done' as const) : ('available' as const) }
+        : {}),
     })
   }
 

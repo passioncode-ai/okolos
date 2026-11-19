@@ -233,7 +233,7 @@ export function madeOnItsOwn(entry: AuditEntry): boolean {
   if (purpose !== 'agent-door' || !(said(entry.triggeredBy) ?? '').startsWith('alarm:')) return false
   // An answer to what an agent asked is the agent's question, not Okolos's schedule: the person
   // sees each one (B-218 wave (b), spec §3.3). A ping says only that Okolos is there.
-  const answered = /^agent-door:answer:(okolos\.[a-z]+)$/.exec(said(entry.payloadShape) ?? '')?.[1]
+  const answered = /^agent-door:answer:(okolos(?:\.[a-z]+){1,2})$/.exec(said(entry.payloadShape) ?? '')?.[1]
   return answered === undefined || answered === 'okolos.ping'
 }
 

@@ -2777,5 +2777,61 @@
         "content": "$1"
       }
     }
+  },
+  "logAgentResolved": {
+    "message": "Агент $AGENT$ отметил решённой находку на $HOST$.",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "host": {
+        "content": "$2"
+      }
+    }
+  },
+  "logAgentDeferred": {
+    "message": "Агент $AGENT$ отложил находку на $HOST$ до $DATE$.",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "host": {
+        "content": "$2"
+      },
+      "date": {
+        "content": "$3"
+      }
+    }
+  },
+  "logAgentAccepted": {
+    "message": "Агент $AGENT$ принял изменение расширения $ID$.",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "id": {
+        "content": "$2"
+      }
+    }
+  },
+  "logAgentUntrusted": {
+    "message": "Агент $AGENT$ убрал $DOMAIN$ из доверенных.",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "domain": {
+        "content": "$2"
+      }
+    }
+  },
+  "journalByAgent": {
+    "message": "это сделал агент"
+  },
+  "journalUndo": {
+    "message": "Вернуть"
+  },
+  "journalUndone": {
+    "message": "Вы отменили это действие агента"
   }
 }

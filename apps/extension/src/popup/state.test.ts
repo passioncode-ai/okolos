@@ -153,6 +153,14 @@ describe('reading the journal', () => {
     expect(mapJournal([record({ detail: { reason: 'timeout' } })]).entries[0]?.automatic).toBe(true)
   })
 
+  it('says an agent did what an agent did, and offers its undo once (B-218 wave (c))', () => {
+    const agent = { reason: 'agent-action', weakens: true, agentVerb: 'okolos.finding.resolve', ref: 'f1' }
+    const mapped = mapJournal([record({ detail: agent }), record({ id: 'j3', detail: { ...agent, undoneAt: '2026-08-05T10:00:00.000Z' } })]).entries
+    expect(mapped[0]).toMatchObject({ automatic: false, byAgent: true, undo: 'available' })
+    expect(mapped[1]?.undo).toBe('done')
+    expect(mapJournal([record({ detail: { reason: 'agent-action', weakens: false } })]).entries[0]?.undo).toBeUndefined()
+  })
+
   it('counts a record it cannot read instead of dropping it silently', () => {
     const broken = { id: 'j2' } as unknown as JournalRecord
     const mapped = mapJournal([record(), broken])

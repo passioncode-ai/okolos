@@ -117,15 +117,15 @@ export const REJECTED_LINES_PER_DAY = 2_000
  * 2026-10-27, N-006 round 4). The next agent entry that day is not written: `record` rejects with
  * JournalError `day_full`, so `answerAfterRecord` sends the `internal` refusal with that cause, and
  * one DAY_FULL line is written once that day for SCR-24. Bound (the line sizes are pinned by a
- * test): an agent line is at most 726 bytes (a 40-code-point name of 4-byte characters, an origin of
+ * test): an agent line is at most 732 bytes (a 40-code-point name of 4-byte characters, an origin of
  * MAX_ORIGIN_LENGTH, the longest verb and code, the largest `bytes`, the newline and a TORN_SEAL
  * before it), a DAY_FULL line 63. Past the cap only the first successful close of each task is
  * written (round 8), and a task closed on a day was opened that day or, its time limit being at
  * most an hour (SCOPE_LIMITS.maxTtlSeconds), the day before; each open is an agent line under a
  * day's cap, so past the cap a day adds at most 10 000 closes. So the agents' part of a day file
- * stays under 15 000 x 726 + 63 = 10 890 063 bytes, about 10.9 MB, and over the 92 day files the
- * journal can hold (see REJECTED_LINES_PER_DAY) under 1 002 MB; with the door's part (213 MB), the
- * whole journal stays under 1.22 GB. Without a flood past the cap a day stays under 3.7 MB (5 000 x 726 + 63).
+ * stays under 15 000 x 732 + 63 = 10 980 063 bytes, about 11.0 MB, and over the 92 day files the
+ * journal can hold (see REJECTED_LINES_PER_DAY) under 1 011 MB; with the door's part (213 MB), the
+ * whole journal stays under 1.23 GB. Without a flood past the cap a day stays under 3.7 MB (5 000 x 732 + 63).
  * 5 000 is ten tasks of the 500-step budget a day (decision 2026-10-27, N-006 round 4).
  */
 export const AGENT_LINES_PER_DAY = 5_000

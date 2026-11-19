@@ -203,6 +203,8 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
       return countFirstRun(message.payload as { result: string }) as Promise<RpcMap[T]['res']>
     case 'usage/uiError':
       return countUiError(from) as Promise<RpcMap[T]['res']>
+    case 'agent/undo':
+      return fromExtensionPage(from, () => undoAgentAction(String((message.payload as { entryId?: unknown }).entryId ?? ''))) as Promise<RpcMap[T]['res']>
     case 'agentDoor/state':
       return fromExtensionPage(from, agentDoorState) as Promise<RpcMap[T]['res']>
     case 'agentDoor/pair':
@@ -1108,6 +1110,60 @@ const agentDoor: AgentDoorDeps = {
     extensionChanges: async () =>
       platform.extensions.available() ? compareInventory(inventoryDeps(await openDb())).catch(() => []) : [],
   },
+  /**
+   * What an agent's undoable action calls (wave (c)): the state changes the buttons make, without
+   * their journal lines, which say «вы»; `agent-actions.ts` writes its own, naming the agent (WC-1).
+   */
+  act: {
+    openFinding: async (id) => {
+      const finding = await (await openDb()).get('findings', id)
+      if (finding === undefined || finding.resolvedAt !== null) return null
+      try {
+        return { host: new URL(finding.subject.replace(/^page:/, '')).hostname || null }
+      } catch {
+        return { host: null }
+      }
+    },
+    changedExtension: async (id) =>
+      platform.extensions.available() && (await compareInventory(inventoryDeps(await openDb())).catch(() => [])).some((change) => change.id === id),
+    trusted: async (domain) => (await (await openDb()).get('exceptions', ['domain', domain])) !== undefined,
+    resolve: async (id) => {
+      await resolveFinding({ id })
+    },
+    defer: async (id, until) => {
+      await deferFinding({ id, until })
+    },
+    accept: async (id) => {
+      const db = await openDb()
+      const before = await db.get('snapshots', id)
+      await acceptInventoryChange(inventoryDeps(db), id)
+      return before === undefined ? null : JSON.stringify(before)
+    },
+    untrust: async (domain) => {
+      await (await openDb()).delete('exceptions', ['domain', domain])
+      // As the person's revocation does: the rules were built with this domain excused.
+      await refreshBlockRules()
+    },
+    journal: async (entry) => {
+      const now = new Date().toISOString()
+      await (await openDb()).put('journal', {
+        id: `agent-action:${entry.verb}:${entry.ref}:${now}`,
+        createdAt: now,
+        kind: 'action',
+        detail: {
+          explainKey: entry.explainKey,
+          explainArgs: entry.explainArgs,
+          reason: 'agent-action',
+          agentId: entry.agentId,
+          agentVerb: entry.verb,
+          ref: entry.ref,
+          weakens: entry.weakens,
+          ...(entry.previous === undefined ? {} : { previous: entry.previous }),
+        },
+      })
+    },
+    now: () => Date.now(),
+  },
 }
 
 declare const __OKOLOS_TEST_HOOKS__: boolean | undefined
@@ -1120,6 +1176,41 @@ declare const __OKOLOS_TEST_HOOKS__: boolean | undefined
 function agentDoorPort(): number | (() => Promise<number>) {
   if (typeof __OKOLOS_TEST_HOOKS__ === 'undefined' || !__OKOLOS_TEST_HOOKS__) return AGENT_PORT
   return async () => (await platform.storage.get<number>('test:agentDoorPort')) ?? AGENT_PORT
+}
+
+/**
+ * Undoes what an agent did that lowered a protection (B-218 wave (c), WC-2): the finding is open
+ * again, its deferral gone, or the extension's earlier snapshot back so the change is pending.
+ * Once, and only for an entry an agent's action wrote; the entry then says the person undid it.
+ */
+async function undoAgentAction(entryId: string): Promise<{ ok: boolean }> {
+  const db = await openDb()
+  const entry = await db.get('journal', entryId)
+  const detail = entry?.detail ?? {}
+  if (entry === undefined || detail['reason'] !== 'agent-action' || detail['weakens'] !== true || typeof detail['undoneAt'] === 'string') {
+    return { ok: false }
+  }
+  const ref = String(detail['ref'] ?? '')
+  switch (detail['agentVerb']) {
+    case 'okolos.finding.resolve': {
+      const finding = await db.get('findings', ref)
+      if (finding !== undefined) await db.put('findings', { ...finding, resolvedAt: null })
+      break
+    }
+    case 'okolos.finding.defer':
+      await db.delete('settings', `defer:${ref}`)
+      break
+    case 'okolos.extension.accept': {
+      const previous = detail['previous']
+      if (typeof previous === 'string') await db.put('snapshots', JSON.parse(previous))
+      else await db.delete('snapshots', ref)
+      break
+    }
+    default:
+      return { ok: false }
+  }
+  await db.put('journal', { ...entry, detail: { ...detail, undoneAt: new Date().toISOString() } })
+  return { ok: true }
 }
 
 async function agentDoorState(): Promise<{ paired: false } | { paired: true; pairedAt: string }> {

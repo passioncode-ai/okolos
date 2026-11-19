@@ -31,6 +31,8 @@ export interface JournalMeta {
 export interface JournalHandlers {
   readonly onToggleHistory: () => void
   readonly onOpenEntry: (entryId: string) => void
+  /** Undoes what an agent did that lowered a protection (B-218 wave (c), WC-2). */
+  readonly onUndo?: (entryId: string) => void
 }
 
 export function renderJournal(
@@ -90,7 +92,18 @@ function groupBlock(doc: Document, group: DiffGroup, handlers: JournalHandlers):
   title.textContent = `${t(KIND_TITLE_KEY[group.kind])} (${group.entries.length})`
   el.append(title)
 
-  for (const item of group.entries) el.append(entryRow(doc, item, handlers))
+  for (const item of group.entries) {
+    el.append(entryRow(doc, item, handlers))
+    // Beside the row, not inside it: the row is itself a button.
+    if (item.undo === 'available' && handlers.onUndo !== undefined) {
+      const onUndo = handlers.onUndo
+      const undo = button(doc, 'entry-undo', t('journalUndo'), () => onUndo(item.id))
+      undo.setAttribute('data-entry', item.id)
+      el.append(undo)
+    } else if (item.undo === 'done') {
+      el.append(text(doc, 'entry-undone', t('journalUndone')))
+    }
+  }
   return el
 }
 
@@ -103,7 +116,7 @@ function entryRow(doc: Document, item: JournalEntry, handlers: JournalHandlers):
   const line = doc.createElement('span')
   line.setAttribute('data-role', 'entry-line')
   line.textContent = `${shortTime(item.createdAt)} — ${item.summary} (${
-    item.automatic ? t('journalAutomatic') : t('journalManual')
+    item.byAgent === true ? t('journalByAgent') : item.automatic ? t('journalAutomatic') : t('journalManual')
   })`
   row.append(line)
 
