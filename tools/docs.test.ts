@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+import { settledDir } from './dist-swap.mjs'
 import { directoriesIn, filesIn, filesUnder } from './tree.mjs'
 import { SCREENS } from './wireframes.mjs'
 // A relative path, not the package name: `tools/` is not a workspace member, so
@@ -637,7 +638,7 @@ describe('the brand pack states facts, and a fact is checkable', () => {
         `apps/extension/${manifest}`,
       )
       const dist = path.join(extension, 'dist', manifest.split('.')[1] as string)
-      expect(existsSync(dist), `${path.relative(root, dist)} is missing: ${rebuild}`).toBe(true)
+      expect(settledDir(dist), `${path.relative(root, dist)} is missing: ${rebuild}`).toBe(true)
       const bundles = filesUnder(dist, '.js', { skip: [] })
       expect(bundles.length, `${path.relative(root, dist)} holds no script: ${rebuild}`).toBeGreaterThan(0)
       for (const file of bundles) {

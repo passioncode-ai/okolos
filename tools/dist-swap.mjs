@@ -44,3 +44,31 @@ export async function sweepLeftovers(distDir) {
   }
   return gone
 }
+
+/** True while a build is swapping a directory beside `finalDir`: its `*.old-*` or `*.building-*` is there. */
+function swapping(finalDir) {
+  const parent = path.dirname(finalDir)
+  if (!existsSync(parent)) return false
+  const base = path.basename(finalDir)
+  return directoriesIn(parent).some((name) => name.startsWith(`${base}.old-`) || name.startsWith(`${base}.building-`))
+}
+
+/**
+ * Whether `finalDir` is there, waiting out a swap that is in flight.
+ *
+ * `swapInto` is two renames, and between them `finalDir` does not exist. The unit suite reads
+ * `dist` from several files while `tools/gates/bundle-scan.test.ts` rebuilds it in its
+ * `beforeAll`, so a reader could land in that gap: `tools/model-stage.test.ts` failed once on a
+ * missing `dist/chrome/background.js` (B-215). A reader asks here first. It waits only while a
+ * swap's own directory is beside the target; a build nobody ran is answered at once, as before.
+ * Synchronous, because the readers are, and short: the gap is two renames.
+ */
+export function settledDir(finalDir, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs
+  const pause = new Int32Array(new SharedArrayBuffer(4))
+  for (;;) {
+    if (existsSync(finalDir)) return true
+    if (!swapping(finalDir) || Date.now() > deadline) return false
+    Atomics.wait(pause, 0, 0, 25)
+  }
+}
