@@ -53,8 +53,12 @@ function nameOf(by: unknown): ActionAgent | null {
   return { agentId: agent.agentId.slice(0, 64), name: agent.name.slice(0, 40) }
 }
 
+function done(): BridgeResult<unknown> {
+  const data: OkolosActionResult = { done: true }
+  return { success: true, data }
+}
+
 function refused(message: string): BridgeResult<unknown> {
-  // i18n-exempt: read by the agent through Okolos Agent, not by the person
   return refuse('internal', message)
 }
 
@@ -63,7 +67,6 @@ export async function answerAction(verb: string, input: unknown, by: unknown, si
   // i18n-exempt: read by the agent through Okolos Agent, not by the person
   if (agent === null) return refused('This version of Okolos Agent does not say which agent asked.')
   const args = (input ?? {}) as { id?: unknown; days?: unknown; domain?: unknown }
-  const done: BridgeResult<unknown> = { success: true, data: { done: true } satisfies OkolosActionResult }
 
   switch (verb) {
     case 'okolos.finding.resolve':
@@ -76,7 +79,7 @@ export async function answerAction(verb: string, input: unknown, by: unknown, si
       if (verb === 'okolos.finding.resolve') {
         await sinks.resolve(id)
         await sinks.journal({ explainKey: 'logAgentResolved', explainArgs: [agent.name, host], agentId: agent.agentId, verb, ref: id, weakens: true })
-        return done
+        return done()
       }
       const days = Number(args.days)
       // i18n-exempt: read by the agent through Okolos Agent, not by the person
@@ -84,7 +87,7 @@ export async function answerAction(verb: string, input: unknown, by: unknown, si
       const until = new Date(sinks.now() + days * DAY_MS).toISOString()
       await sinks.defer(id, until)
       await sinks.journal({ explainKey: 'logAgentDeferred', explainArgs: [agent.name, host, until.slice(0, 10)], agentId: agent.agentId, verb, ref: id, weakens: true })
-      return done
+      return done()
     }
     case 'okolos.extension.accept': {
       const id = String(args.id ?? '')
@@ -100,7 +103,7 @@ export async function answerAction(verb: string, input: unknown, by: unknown, si
         weakens: true,
         ...(previous === null ? {} : { previous }),
       })
-      return done
+      return done()
     }
     case 'okolos.trust.revoke': {
       const domain = String(args.domain ?? '').toLowerCase()
@@ -108,7 +111,7 @@ export async function answerAction(verb: string, input: unknown, by: unknown, si
       if (!(await sinks.trusted(domain))) return refused('That site is not among the trusted ones.')
       await sinks.untrust(domain)
       await sinks.journal({ explainKey: 'logAgentUntrusted', explainArgs: [agent.name, domain], agentId: agent.agentId, verb, ref: domain, weakens: false })
-      return done
+      return done()
     }
     default:
       // i18n-exempt: read by the agent through Okolos Agent, not by the person

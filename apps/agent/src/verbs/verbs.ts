@@ -527,24 +527,28 @@ export function createVerbs(deps: VerbsDeps): Verbs {
   const actions: ReadonlyArray<{ verb: AnyBridgeVerb; purpose: string; input: z.ZodType; example: unknown }> = [
     {
       verb: 'okolos.trust.revoke',
+      // i18n-exempt: read by the agent over MCP, not by the person
       purpose: 'Removes a site from the ones the person trusts in Okolos, so Okolos checks it again; the person sees which agent did it.',
       input: z.object({ domain: z.string().min(1).max(253).regex(/^[a-z0-9.-]+$/i) }).strict(),
       example: { domain: 'example.com' },
     },
     {
       verb: 'okolos.finding.resolve',
+      // i18n-exempt: read by the agent over MCP, not by the person
       purpose: "Marks an open finding of okolos.queue resolved; the person sees which agent did it and can undo it in Okolos's journal.",
       input: z.object({ id }).strict(),
       example: { id: 'f1' },
     },
     {
       verb: 'okolos.finding.defer',
+      // i18n-exempt: read by the agent over MCP, not by the person
       purpose: "Puts an open finding of okolos.queue off for 1 to 30 days; the person sees which agent did it and can undo it in Okolos's journal.",
       input: z.object({ id, days: z.number().int().min(1).max(30) }).strict(),
       example: { id: 'f1', days: 7 },
     },
     {
       verb: 'okolos.extension.accept',
+      // i18n-exempt: read by the agent over MCP, not by the person
       purpose: "Accepts a change okolos.extensions listed, by the extension's id; the person sees which agent did it and can undo it in Okolos's journal.",
       input: z.object({ id }).strict(),
       example: { id: 'abcdefghijklmnopabcdefghijklmnop' },

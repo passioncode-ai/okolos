@@ -1118,13 +1118,11 @@ const agentDoor: AgentDoorDeps = {
     openFinding: async (id) => {
       const finding = await (await openDb()).get('findings', id)
       if (finding === undefined || finding.resolvedAt !== null) return null
-      let host: string | null = null
       try {
-        host = new URL(finding.subject.replace(/^page:/, '')).hostname || null
+        return { host: new URL(finding.subject.replace(/^page:/, '')).hostname || null }
       } catch {
-        host = null
+        return { host: null }
       }
-      return { host }
     },
     changedExtension: async (id) =>
       platform.extensions.available() && (await compareInventory(inventoryDeps(await openDb())).catch(() => [])).some((change) => change.id === id),
