@@ -212,7 +212,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/popup/popup.ts:renderPopup, apps/extension/src/popup/index.ts, e2e/scn-020.spec.ts
 - **Scenarios:** SCN-020, SCN-021
 - **Resources:** verdict store, queue selector
-- **Agent door (B-218):** none today. Actions: the top queued item, the diff count, the footer links. Planned: read first (current verdict, queue) through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
+- **Agent door (B-218):** **read today** through Okolos Agent (B-218 wave (b)): `okolos.verdict` (what Okolos holds about an address's host) and `okolos.queue`, by host, category and severity, never the page's text. Actions (the top queued item, the diff count, the footer links): planned in the later waves of ADR-0022
 - **Status:** built
 
 ### SCR-03: In-page warning banner
@@ -312,7 +312,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/core-queue/src/rank.ts:buildQueue, packages/ui/src/queue/queue.ts:renderQueue, e2e/scn-020.spec.ts
 - **Scenarios:** SCN-002, SCN-022
 - **Resources:** priority scorer, action registry
-- **Agent door (B-218):** none today. Actions: per-item action, «show all». Planned: read first (the queue), then the actions, through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
+- **Agent door (B-218):** **read today** through Okolos Agent (B-218 wave (b)): `okolos.queue`, each open finding by id, category, severity, host and time, never what was found on the page. Actions (per item, «show all»): planned in the later waves of ADR-0022
 - **Status:** built
 
 ### SCR-08: Leaks and repair
@@ -362,7 +362,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/extensions/extensions.ts:renderExtensions, packages/core-extensions/src/diff.ts:diffInventory, e2e/scn-017.spec.ts
 - **Scenarios:** SCN-017, SCN-018
 - **Resources:** management adapter, snapshot store, CRX static analyser
-- **Agent door (B-218):** none today. Actions: per-change actions, «Это изменение в порядке». Planned: read first (the inventory and its changes), then acceptance, through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
+- **Agent door (B-218):** **read today** through Okolos Agent (B-218 wave (b)): `okolos.extensions`, each noticed change by the extension's id, what changed and how much it matters, without the extension's name (third-party text). «Это изменение в порядке»: planned in the later waves of ADR-0022
 - **Status:** built
 
 ### SCR-10: Self-audit
@@ -416,7 +416,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/ui/src/self-audit/panel.ts:renderSelfAudit, packages/ui/src/self-audit/panel.ts:madeOnItsOwn, apps/extension/src/options/index.ts, packages/ui/src/self-audit/panel.test.ts (39 checks), e2e/scn-019.spec.ts (four, including opening a row and widening the period), e2e/rendered-instants.spec.ts (nine areas, seeded stores, one row written the way an older build leaves it)
 - **Scenarios:** SCN-019
 - **Resources:** net layer journal, exporter
-- **Agent door (B-218):** none today. Actions: the period, opening a request, export. Planned: read first (the outbound log) and the export, through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
+- **Agent door (B-218):** **read today** through Okolos Agent (B-218 wave (b)): `okolos.audit`, each row by when, where, why, the kind of what was sent (never its value) and the outcome. The period, opening a row and the export stay the person's; the export is a gate of wave (d) (spec 2026-11-19-agent-door-wave-b.md, О-5)
 - **Status:** built
 
 ### SCR-11: Journal and weekly diff
@@ -438,7 +438,7 @@ generator, and the sheet declares no colour of its own.
 - **Coverage:** packages/core-queue/src/diff.ts:diffSince, packages/ui/src/journal/journal.ts:renderJournal, e2e/scn-020.spec.ts
 - **Scenarios:** SCN-021
 - **Resources:** event journal, diff selector
-- **Agent door (B-218):** none today. Actions: full history. Planned: read first (the journal), through Okolos Agent MCP (ADR-0018; form and order of waves in the ADR B-218 asks for by 2026-11-25)
+- **Agent door (B-218):** **read today** through Okolos Agent (B-218 wave (b)): `okolos.journal`, each entry by kind, an outcome that is a word, a host and when, never the explanation with its arguments. «Full history» stays the person's
 - **Status:** built
 
 ### SCR-12: Settings

@@ -2716,7 +2716,7 @@
     "message": "Okolos Agent"
   },
   "agentDoorWhat": {
-    "message": "Connect Okolos to Okolos Agent so the agents you connected to it can reach Okolos. The Okolos Agent page shows the code after you press “Connect Okolos”. Until you connect it, Okolos does not contact Okolos Agent."
+    "message": "Connect Okolos to Okolos Agent so the agents you connected to it can reach Okolos. The Okolos Agent page shows the code after you press “Connect Okolos”. Until you connect it, Okolos does not contact Okolos Agent. Agents can read the queue, the journal, the outbound log and the changes to extensions, but not the text of pages: what Okolos found on a page does not reach them."
   },
   "agentDoorCode": {
     "message": "Code from Okolos Agent"

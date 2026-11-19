@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { HIBP_KEY_HEADER_SHAPE } from '@okolos/core-leaks'
 import type { AuditEntry } from '@okolos/contracts'
 
-import { renderSelfAudit } from './panel.js'
+import { madeOnItsOwn, renderSelfAudit } from './panel.js'
 
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -547,5 +547,15 @@ describe('what Okolos sends on its own schedule is folded by day, never hidden (
     const el = ready([...wakes.slice(0, 2), { ...wakes[2], id: 'x', createdAt: undefined } as unknown as AuditEntry])
     expect(el.querySelector('[data-entry=x]')).not.toBeNull()
     expect(el.querySelectorAll('[data-role=entry-group]')).toHaveLength(1)
+  })
+
+  it('never folds an answer to what an agent asked, only the pings and the empty looks (B-218 wave (b))', () => {
+    const answer = (id: string, verb: string) =>
+      entry({ id, createdAt: '2026-08-04T08:40:00.000Z', destination: '127.0.0.1', purpose: 'agent-door', payloadShape: `agent-door:answer:${verb}`, triggeredBy: 'alarm:okolos:agent' })
+    expect(madeOnItsOwn(answer('q', 'okolos.queue'))).toBe(false)
+    expect(madeOnItsOwn(answer('p', 'okolos.ping'))).toBe(true)
+    expect(madeOnItsOwn(wakes[0] as AuditEntry)).toBe(true)
+    const el = ready([...wakes, answer('q', 'okolos.queue')])
+    expect(el.querySelector('[data-entry=q]')).not.toBeNull()
   })
 })

@@ -2716,7 +2716,7 @@
     "message": "Okolos Agent"
   },
   "agentDoorWhat": {
-    "message": "Привяжите Okolos к Okolos Agent, чтобы агенты, которых вы к нему привязали, могли обращаться к Okolos. Код покажет страница Okolos Agent по кнопке «Привязать Okolos». Без привязки Okolos не обращается к Okolos Agent."
+    "message": "Привяжите Okolos к Okolos Agent, чтобы агенты, которых вы к нему привязали, могли обращаться к Okolos. Код покажет страница Okolos Agent по кнопке «Привязать Okolos». Без привязки Okolos не обращается к Okolos Agent. Агенты могут прочесть очередь, журнал, журнал отправок и изменения расширений, но не текст страниц: то, что Okolos нашёл на странице, к ним не уходит."
   },
   "agentDoorCode": {
     "message": "Код из Okolos Agent"
