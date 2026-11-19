@@ -89,6 +89,15 @@ describe('a source that fails mid-flight', () => {
   })
 })
 
+describe('how an asked source failed, for error_occurred{leak} (B-206)', () => {
+  it('names a timeout, a refused key and anything else, and never a source with no key', async () => {
+    const { deps: d } = deps(async () => new Response('[]', { status: 401 }))
+    const slow: LeakSource = { name: 'Slow Source', unavailable: null, lookup: () => new Promise(() => {}) }
+    const inventory = await lookupLeaks('a@b.test', [hibp(null), silent, hibp('key'), slow], d, 20)
+    expect(inventory.failures).toEqual(['network', 'refused', 'timeout'])
+  })
+})
+
 describe('what the audit log records', () => {
   it('names the purpose and shows the address only in part', async () => {
     const { deps: d, audit } = deps(async () => new Response(JSON.stringify({ stealers: [] })))
