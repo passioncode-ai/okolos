@@ -11,8 +11,8 @@
 
 ## Имя
 
-**ru:** `Okolos — защита от скрытых инструкций`
-**en:** `Okolos — a guard against hidden instructions`
+**ru:** `Okolos: защита от скрытых инструкций`
+**en:** `Okolos: a guard against hidden instructions`
 
 Имя берётся из `_locales`, а не пишется здесь второй раз: в манифесте стоит
 `__MSG_appName__`.

@@ -108,7 +108,7 @@ export function renderTrusted(
         // Key first, stored sentence second, date alone when there is neither
         // — the same order the journal reads in, for the same reason.
         entry.reasonKey ?? entry.reason
-          ? `${shortDate(entry.grantedAt)} — ${entry.reasonKey ? t(entry.reasonKey) : entry.reason}`
+          ? `${shortDate(entry.grantedAt)} · ${entry.reasonKey ? t(entry.reasonKey) : entry.reason}`
           : t('trustedGrantedOn', shortDate(entry.grantedAt)),
       ),
       button(doc, 'revoke', t('trustedRevoke'), () => handlers.onRevoke(entry.domain)),
