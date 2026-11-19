@@ -68,6 +68,7 @@ import { feedArg } from './feed-words.js'
 import { gateExplain } from './gate-words.js'
 import { holdVerdict, releaseVerdict, takeVerdict } from './pending-password.js'
 import { canVerify, createVerifier, FEED_PUBLIC_KEY, updateFeed } from './feeds.js'
+import { signalAuditWritten } from '../audit-signal.js'
 import { syncFeed } from './feed-sync.js'
 import { explained, t, useResolver } from '@okolos/i18n'
 import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
@@ -572,6 +573,8 @@ async function auditDeps() {
   const write = spaceAwareWrite({
     write: async (entry) => {
       await db.put('outbound_log', entry as never)
+      // An open self-audit panel reads the log again, so a request sent while it is open shows (B-234).
+      signalAuditWritten()
     },
     // The sweep the extension already runs on a schedule. Discovering the
     // device is full is exactly the moment to run it: without this, a full
