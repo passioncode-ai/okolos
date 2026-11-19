@@ -153,4 +153,11 @@ describe('the request goes through the network module', () => {
     expect(JSON.stringify(audits)).not.toContain('tok')
     expect(transport).toHaveBeenCalledWith(expect.objectContaining({ url: 'http://127.0.0.1:47871/extension/next', headers: expect.objectContaining({ Authorization: 'Bearer tok' }) }))
   })
+
+  it('asks for the port at each request when given a function (the e2e build only)', async () => {
+    const transport = vi.fn(async () => new Response('{}', { status: 200 }))
+    const deps = async () => ({ writeAudit: async () => undefined, transport, now: () => '2026-11-19T10:00:00.000Z', newId: () => 'id' })
+    await agentDoorPost(deps, async () => 51234)('/extension/release', {}, 'tok')
+    expect(transport).toHaveBeenCalledWith(expect.objectContaining({ url: 'http://127.0.0.1:51234/extension/release' }))
+  })
 })

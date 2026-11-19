@@ -75,7 +75,7 @@ import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 import { recordPageRequest } from './page-requests.js'
 import { recordTrap } from './trap-journal.js'
 import { downloadWarningShown, extensionsCheckResult, leakCheckResult, passwordCheckResult, passwordError, surfaceWarning, trapWarning } from './usage/catalogue.js'
-import { AGENT_DOOR_ALARM, AGENT_DOOR_KEY, AGENT_DOOR_PERIOD_MINUTES, agentDoorPost, pairAgentDoor, releaseAgentDoor, wakeAgentDoor, type AgentDoorDeps, type AgentDoorLink } from './agent-door.js'
+import { AGENT_DOOR_ALARM, AGENT_DOOR_KEY, AGENT_DOOR_PERIOD_MINUTES, AGENT_PORT, agentDoorPost, pairAgentDoor, releaseAgentDoor, wakeAgentDoor, type AgentDoorDeps, type AgentDoorLink } from './agent-door.js'
 import { storageFailureKind } from './usage/errors.js'
 import { startUsage } from './usage/start.js'
 import { optionsPageFor } from '../options/views.js'
@@ -1086,13 +1086,25 @@ async function countFirstRun(payload: { result: string }): Promise<{ ok: true }>
  * while it exists, every request through the network module under `agent-door`.
  */
 const agentDoor: AgentDoorDeps = {
-  post: agentDoorPost(auditDeps),
+  post: agentDoorPost(auditDeps, agentDoorPort()),
   load: () => platform.storage.get<AgentDoorLink>(AGENT_DOOR_KEY),
   save: (link) => platform.storage.set(AGENT_DOOR_KEY, link),
   forget: () => platform.storage.remove(AGENT_DOOR_KEY),
   alarm: (on) => (on ? platform.alarms.create(AGENT_DOOR_ALARM, AGENT_DOOR_PERIOD_MINUTES) : platform.alarms.clear(AGENT_DOOR_ALARM)),
   version: () => platform.runtime.version(),
   now: () => Date.now(),
+}
+
+declare const __OKOLOS_TEST_HOOKS__: boolean | undefined
+
+/**
+ * Okolos Agent's port. Only the test-hook build (`dist/<target>-e2e`) reads another from
+ * `test:agentDoorPort`, so the e2e daemon runs beside one the person has on 47871; the store
+ * build has the number alone, and the branch is not in its bundle.
+ */
+function agentDoorPort(): number | (() => Promise<number>) {
+  if (typeof __OKOLOS_TEST_HOOKS__ === 'undefined' || !__OKOLOS_TEST_HOOKS__) return AGENT_PORT
+  return async () => (await platform.storage.get<number>('test:agentDoorPort')) ?? AGENT_PORT
 }
 
 async function agentDoorState(): Promise<{ paired: false } | { paired: true; pairedAt: string }> {

@@ -11,8 +11,10 @@ import { isExtensionOrigin, WAKE_PERIOD_MS, type ExtensionLink } from './link.js
  * service's guard lets an extension origin through to these paths only (`extensionOrigin` in
  * `agent.ts`); everything else it refuses as before.
  *
- * The extension's background has no host permission for 127.0.0.1 (WA-7), so it reads an answer
- * only through CORS: a preflight is answered with this origin exactly, never `*`.
+ * The extension reads the answers through the host permissions it already holds (every http site,
+ * 127.0.0.1 included), so the browser applies no CORS to it: measured in `e2e/scn-054.spec.ts`
+ * (spec §3.3а). The CORS headers stay, for this origin exactly and never `*`, in case those
+ * permissions narrow; what guards the route is the origin and the token.
  */
 
 export const EXTENSION_PATHS = ['/extension/pair', '/extension/next', '/extension/answer', '/extension/release'] as const
@@ -48,7 +50,7 @@ export function extensionRoute(deps: ExtensionRouteDeps): Route & { readonly pat
         ...cors(from),
         'Access-Control-Allow-Methods': 'POST',
         'Access-Control-Allow-Headers': 'authorization, content-type',
-        // Chrome's Private Network Access asks for it on a request to loopback (spec O-4).
+        // Private Network Access: measured not needed for an extension holding host permissions (spec O-4); kept in case Chrome asks.
         'Access-Control-Allow-Private-Network': 'true',
         'Access-Control-Max-Age': '600',
       })

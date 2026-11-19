@@ -86,7 +86,7 @@ Contract: brand-contract v1
 | Пакетов | 23 | `ls -d packages/*/ \| wc -l` |
 | Приложений | 4 | `ls -d apps/*/ \| wc -l` |
 | Юнит-тестов | печатает прогон | `pnpm test` |
-| Спек e2e | 42 файла, число проверок печатает прогон | `pnpm test:e2e` |
+| Спек e2e | 43 файла, число проверок печатает прогон | `pnpm test:e2e` |
 | Проверок в Firefox | печатает прогон | `pnpm test:e2e:firefox` |
 | Требований закрыто | 36 из 37; 37-е закрыто решением не выпускать | `docs/superpowers/briefs/` |
 | Сценариев | 54, реализовано 44 | `docs/ux/scenarios.md` |
