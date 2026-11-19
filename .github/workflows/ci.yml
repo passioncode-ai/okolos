@@ -227,3 +227,8 @@ jobs:
       # build itself and says what to run if there is none.
       - name: scenarios in Firefox
         run: node tools/firefox-e2e.mjs
+
+      # The extension's own pages in Firefox (B-231): Firefox started with system access and
+      # geckodriver attached to it, so a scenario can type into «Ваши данные» as a person does.
+      - name: extension pages in Firefox
+        run: pnpm exec playwright test -c playwright.gecko.config.ts

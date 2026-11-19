@@ -19,8 +19,8 @@ import { extensionWorker } from './ready.js'
  * hosts are on the feed, so both are blocked; what is asserted is what the person would see
  * and what the browser says happened to the file.
  *
- * Firefox is not driven here: its harness is `tools/firefox-e2e.mjs`, and its download case
- * (a cancel Firefox refuses for a finished file) stays a row of B-201.
+ * Firefox runs the same two cases in `e2e/gecko/scn-012-real-download.spec.ts` (B-201), through
+ * geckodriver, with real host names pointed at a local server.
  */
 
 /** Puts `hosts` on the phishing feed the extension reads, as the feed pull would. */

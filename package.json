@@ -25,7 +25,7 @@
     "brand:lint": "node tools/brand-gate.mjs",
     "gates": "pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm ux:lint && pnpm brand:lint && pnpm i18n:sweep && pnpm package:check",
     "build:e2e": "node tools/build.mjs --with-test-hooks",
-    "test:e2e:firefox": "pnpm build && node tools/firefox-e2e.mjs && node tools/gecko-layout.mjs",
+    "test:e2e:firefox": "pnpm build && pnpm build:e2e && node tools/firefox-e2e.mjs && playwright test -c playwright.gecko.config.ts && node tools/gecko-layout.mjs",
     "wireframes": "node tools/wireframes.mjs",
     "public:style": "node tools/public-style.mjs",
     "graph:check": "node tools/graph-check.mjs",

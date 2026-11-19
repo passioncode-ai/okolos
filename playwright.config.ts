@@ -11,6 +11,8 @@ import { defineConfig } from '@playwright/test'
  */
 export default defineConfig({
   testDir: 'e2e',
+  // Firefox through geckodriver, with its own config: playwright.gecko.config.ts (B-231).
+  testIgnore: ['gecko/**'],
   /**
    * Longer than the two waits a single test can stack.
    *
