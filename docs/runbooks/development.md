@@ -166,6 +166,13 @@ pnpm test:e2e:firefox  # geckodriver + selenium, установка расшир
 pnpm bench             # бенчмарки горячих путей, vitest
 ```
 
+**Окно агента на настоящем Chrome** (Okolos Bridge, N-010): `OKOLOS_CHROME_TESTS=1 pnpm exec vitest run
+apps/agent/src/window/window.chrome.test.ts`. Нужны Chrome stable и экран; без переменной файл
+пропускается с причиной, поэтому ни `pnpm gates`, ни CI не открывают окно перед тем, кто пушит. Проверяет:
+окно видимо и открыто позади приложения человека, полосы автоматизации нет, `kill -9` браузера даёт
+`exited` ожидающему запросу и не оставляет процессов профиля, сирота упавшего демона снимается до
+нового запуска, cookie со сроком переживают перезапуск, одноразовое окно не хранит ничего.
+
 **Что меряет `pnpm bench` и чего он намеренно не делает.** Два файла:
 `packages/core-injection/src/stage1.bench.ts` (первая ступень над страницей в 50
 и 1000 кандидатов) и `packages/core-feeds/src/rules.bench.ts` (сборка блокирующих
