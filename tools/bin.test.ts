@@ -62,11 +62,13 @@ process.stdout.write(result.stdout)
     expect(binInvocation('npx', ['a & calc'], 'linux').args).toEqual(['a & calc'])
   })
 
+  // A real process, so its own time: on a machine under load (2026-11-19, load average 60 to 135)
+  // `pnpm --version` took 7.6 s alone and 38 s inside the suite, past the 30 s default (B-229).
   it('starts the real pnpm on this machine', () => {
     const run = binInvocation('pnpm', ['--version'])
     const version = execFileSync(run.command, run.args, { shell: run.shell, encoding: 'utf8' })
     expect(version.trim()).toMatch(/^\d+\.\d+\.\d+/)
-  })
+  }, 120_000)
 })
 
 describe('finding a POSIX sh', () => {
