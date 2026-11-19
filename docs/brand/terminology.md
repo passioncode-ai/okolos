@@ -135,6 +135,7 @@ Contract: brand-contract v1
 |---|---|---|---|
 | Расширение для агентов (Б2) | **Okolos Bridge**, не переводится и не склоняется | Okolos Bridge | `okolos-bridge` |
 | Локальная служба, через которую агенты входят в браузер | **Okolos Agent**, не переводится и не склоняется | Okolos Agent | `apps/agent`, служба `okolos-agent` |
+| Связь расширения Okolos с Okolos Agent, по коду со страницы Okolos Agent (B-218) | **привязка Okolos**: «Привязать», «Привязан с …», «Отвязать» | connect Okolos: Connect, Connected since …, Disconnect | `agentDoor/pair`, `/extension/pair`, блок `agent-door` в SCR-12 |
 | Отдельное фоновое окно Chrome, в котором работает задача | **окно агента** | agent window | `AgentWindows` |
 | Разрешение одному агенту ходить в браузер по задачам и читать перепись процессов (без командных строк) | **доступ** (выдать, отозвать) | access (grant, revoke) | `Pairing` |
 | Запрос агента на доступ | **запрос** | request | `PublicRequest` (строка страницы), `Pairing.request` |

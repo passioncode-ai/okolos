@@ -33,6 +33,7 @@ import {
   type ExtensionsState,
   type LeakKeyPanel,
   type UsagePanel,
+  type AgentDoorPanel,
   type LeaksState,
   type OverviewHandlers,
   type PanelState,
@@ -1106,6 +1107,7 @@ async function dataSection(): Promise<HTMLElement> {
     Object.values(DATA_KIND_KEY),
     await leakKeyPanel(),
     await usagePanel(),
+    await agentDoorPanel(),
   )
 }
 
@@ -1124,6 +1126,44 @@ async function renewUsage(): Promise<boolean> {
   } catch (cause) {
     console.warn('okolos: the wipe could not renew the usage install number', cause)
     return false
+  }
+}
+
+/** Why the last code was not taken; said once, on the repaint after it (SCN-054). */
+let agentDoorFailure: AgentDoorPanel['failure']
+
+/**
+ * The «Okolos Agent» block (B-218 wave (a), SCN-054): the link's state from the worker, a code to
+ * pair with, a way to disconnect. A worker that does not answer leaves the block out.
+ */
+async function agentDoorPanel(): Promise<AgentDoorPanel | undefined> {
+  let state: AgentDoorPanel['state']
+  try {
+    state = await platform.runtime.send('agentDoor/state', {})
+  } catch {
+    return undefined
+  }
+  const failure = agentDoorFailure
+  agentDoorFailure = undefined
+  return {
+    state,
+    ...(failure === undefined ? {} : { failure }),
+    formatDate: shortDate,
+    onPair: (code) => {
+      void (async () => {
+        const answer = await platform.runtime
+          .send('agentDoor/pair', { code })
+          .catch(() => ({ ok: false as const, reason: 'unreachable' as const }))
+        if (!answer.ok) agentDoorFailure = answer.reason
+        await reload()
+      })()
+    },
+    onRelease: () => {
+      void platform.runtime
+        .send('agentDoor/release', {})
+        .catch(() => undefined)
+        .then(() => reload())
+    },
   }
 }
 

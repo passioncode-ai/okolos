@@ -69,6 +69,19 @@ export interface UsagePanel {
   readonly onSwitch: (on: boolean) => void
 }
 
+/**
+ * The link to Okolos Agent (B-218 wave (a), SCN-054): a code typed from the Okolos Agent page,
+ * then since when Okolos is connected and a way to disconnect.
+ */
+export interface AgentDoorPanel {
+  readonly state: { readonly paired: false } | { readonly paired: true; readonly pairedAt: string }
+  /** Why the last code was not taken, said once on the repaint that follows. */
+  readonly failure?: 'bad_code' | 'expired' | 'unreachable'
+  readonly formatDate: (iso: string) => string
+  readonly onPair: (code: string) => void
+  readonly onRelease: () => void
+}
+
 export interface DataControlsHandlers {
   readonly onExport: () => Promise<void>
   readonly onWipe: () => Promise<WipeOutcome>
@@ -94,8 +107,10 @@ export function renderDataControls(
   dataKinds: readonly string[],
   /** The key block, drawn under the data actions. Absent, the screen has no key block. */
   leakKey?: LeakKeyPanel,
-  /** The usage and error data block, last. Absent, the screen has none. */
+  /** The usage and error data block. Absent, the screen has none. */
   usage?: UsagePanel,
+  /** The Okolos Agent block, last (B-218). Absent, the screen has none. */
+  agentDoor?: AgentDoorPanel,
 ): HTMLElement {
   // An empty list would render a confirmation that names nothing, which reads as
   // "nothing will be deleted" over a button that deletes everything. Refused
@@ -142,7 +157,9 @@ export function renderDataControls(
   if (keyBlock !== null) section.append(keyBlock)
   const usageBlock = usage === undefined ? null : renderUsage(doc, usage)
   if (usageBlock !== null) section.append(usageBlock)
-  const after = keyBlock ?? usageBlock
+  const doorBlock = agentDoor === undefined ? null : renderAgentDoor(doc, agentDoor)
+  if (doorBlock !== null) section.append(doorBlock)
+  const after = keyBlock ?? usageBlock ?? doorBlock
   const place = (el: HTMLElement): void => {
     if (after !== null) section.insertBefore(el, after)
     else section.append(el)
@@ -380,6 +397,50 @@ function renderUsage(doc: Document, panel: UsagePanel): HTMLElement {
   if (panel.failed) block.append(text(doc, 'usage-failed', t('usageSaveFailed')))
   // Only while collection is on: off and unsupported keep no install number to replace (B-215).
   if (panel.renewFailed && panel.state === 'on') block.append(text(doc, 'usage-renew-failed', t('usageRenewFailed', t('usageSwitch'))))
+  return block
+}
+
+const AGENT_DOOR_FAILURE_KEY = {
+  bad_code: 'agentDoorBadCode',
+  expired: 'agentDoorExpired',
+  unreachable: 'agentDoorUnreachable',
+} as const
+
+/** The «Okolos Agent» block (B-218 wave (a), SCN-054). */
+function renderAgentDoor(doc: Document, panel: AgentDoorPanel): HTMLElement {
+  const block = doc.createElement('section')
+  block.setAttribute('data-role', 'agent-door')
+  const heading = doc.createElement('h2')
+  heading.setAttribute('data-role', 'agent-door-title')
+  heading.textContent = t('agentDoorTitle')
+  block.append(heading, text(doc, 'agent-door-what', t('agentDoorWhat')))
+
+  if (panel.state.paired) {
+    block.append(
+      text(doc, 'agent-door-state', t('agentDoorPaired', panel.formatDate(panel.state.pairedAt))),
+      button(doc, 'agent-door-release', t('agentDoorRelease'), () => panel.onRelease()),
+    )
+    return block
+  }
+
+  const field = doc.createElement('input')
+  field.type = 'text'
+  field.inputMode = 'numeric'
+  field.maxLength = 6
+  field.setAttribute('data-role', 'agent-door-code')
+  field.setAttribute('autocomplete', 'off')
+  field.setAttribute('aria-label', t('agentDoorCode'))
+  field.placeholder = t('agentDoorCode')
+  const pair = (): void => {
+    const code = field.value.trim()
+    // Six digits or nothing: anything else could not be a code, and is not sent.
+    if (/^\d{6}$/.test(code)) panel.onPair(code)
+  }
+  field.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') pair()
+  })
+  block.append(field, button(doc, 'agent-door-pair', t('agentDoorPair'), pair))
+  if (panel.failure !== undefined) block.append(text(doc, 'agent-door-failed', t(AGENT_DOOR_FAILURE_KEY[panel.failure])))
   return block
 }
 

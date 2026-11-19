@@ -2712,6 +2712,38 @@
       }
     }
   },
+  "agentDoorTitle": {
+    "message": "Okolos Agent"
+  },
+  "agentDoorWhat": {
+    "message": "Connect Okolos to Okolos Agent so the agents you connected to it can reach Okolos. The Okolos Agent page shows the code after you press “Connect Okolos”. Until you connect it, Okolos does not contact Okolos Agent."
+  },
+  "agentDoorCode": {
+    "message": "Code from Okolos Agent"
+  },
+  "agentDoorPair": {
+    "message": "Connect"
+  },
+  "agentDoorPaired": {
+    "message": "Connected since $DATE$",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "agentDoorRelease": {
+    "message": "Disconnect"
+  },
+  "agentDoorBadCode": {
+    "message": "The code did not match. Check the digits or ask the Okolos Agent page for a new one."
+  },
+  "agentDoorExpired": {
+    "message": "The code has expired. Ask the Okolos Agent page for a new one."
+  },
+  "agentDoorUnreachable": {
+    "message": "Okolos Agent did not answer. Check that it is running and try again."
+  },
   "usageFirefoxOld": {
     "message": "This version of Firefox has no built-in consent to data collection, so Okolos sends no usage and error data. Update Firefox to version 140 to choose."
   },

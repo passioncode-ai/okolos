@@ -38,6 +38,14 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 - `usage-firefox`
 - `usage-failed`
 - `usage-renew-failed`
+- `agent-door`
+- `agent-door-title`
+- `agent-door-what`
+- `agent-door-state`
+- `agent-door-release`
+- `agent-door-code`
+- `agent-door-pair`
+- `agent-door-failed`
 
 **States**
 
@@ -46,6 +54,9 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 - **usage on** — usage and error data is on (Chrome and Edge from the first run; Firefox while it grants it)
 - **usage off** — the switch was turned off
 - **usage unsupported** — Firefox 129 to 139, with no built-in data consent
+- **agent door not connected** — Okolos is not connected to Okolos Agent (the default)
+- **agent door connected** — the code was taken
+- **agent door code refused** — the code was wrong or expired, or Okolos Agent did not answer
 - **erasing** — the erase was confirmed and runs; it first waits for a send of usage data under way to end, at most 30 s (B-214)
 - **usage state late** — the worker has not answered `usage/state` within 2 s, because a send of usage data is under way on a slow network (B-214)
 - **usage not renewed** — «Удалить все данные» or «Очистить локальные данные» could not replace the install number, and the unsent events stay (SCN-023, SCN-032)

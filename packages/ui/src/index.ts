@@ -75,6 +75,7 @@ export {
   type DataControlsHandlers,
   type LeakKeyPanel,
   type UsagePanel,
+  type AgentDoorPanel,
   type WipeOutcome,
 } from './settings/data-controls.js'
 export { shadowMode } from './shadow.js'

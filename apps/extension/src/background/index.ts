@@ -1105,7 +1105,6 @@ async function agentDoorState(): Promise<{ paired: false } | { paired: true; pai
  * web page: the link to Okolos Agent is the settings page's to change.
  */
 async function fromExtensionPage<R>(from: RpcSender, answer: () => Promise<R>): Promise<R> {
-  // i18n-exempt: an RPC refusal the page never shows; a web page cannot send it at all
   if (/^(https?|file):/.test(from.origin ?? '')) throw new Error('agent door: only the extension pages may ask')
   return answer()
 }

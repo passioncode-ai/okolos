@@ -6,6 +6,7 @@ import {
   type DataControlsHandlers,
   type LeakKeyPanel,
   type UsagePanel,
+  type AgentDoorPanel,
 } from './data-controls.js'
 
 import { readFileSync } from 'node:fs'
@@ -611,5 +612,59 @@ describe('usage and error data (B-199, SCN-051, SCN-052)', () => {
   it('says a change that did not save did not save', () => {
     const el = renderDataControls(document, handlers(), kinds, undefined, panel({ failed: true }))
     expect(role(el, 'usage-failed')?.textContent).toBe(message('usageSaveFailed'))
+  })
+})
+
+describe('the Okolos Agent block (B-218, SCN-054)', () => {
+  const role = (root: HTMLElement, name: string) => root.querySelector<HTMLElement>(`[data-role=${name}]`)
+  const kinds = ['dataKindFindings']
+  const door = (overrides: Partial<AgentDoorPanel> = {}): AgentDoorPanel => ({
+    state: { paired: false },
+    formatDate: (iso) => iso.slice(0, 10),
+    onPair: vi.fn(),
+    onRelease: vi.fn(),
+    ...overrides,
+  })
+
+  it('asks for the code while Okolos is not connected, and says what connecting does', () => {
+    const el = renderDataControls(document, handlers(), kinds, undefined, undefined, door())
+    expect(role(el, 'agent-door-title')?.textContent).toBe(message('agentDoorTitle'))
+    expect(role(el, 'agent-door-what')?.textContent).toBe(message('agentDoorWhat'))
+    expect(role(el, 'agent-door-code')?.getAttribute('aria-label')).toBe(message('agentDoorCode'))
+    expect(role(el, 'agent-door-release')).toBeNull()
+  })
+
+  it('sends six digits and nothing else', () => {
+    const onPair = vi.fn()
+    const el = renderDataControls(document, handlers(), kinds, undefined, undefined, door({ onPair }))
+    const field = role(el, 'agent-door-code') as HTMLInputElement
+    for (const typed of ['12345', 'abcdef', '1234567']) {
+      field.value = typed
+      role(el, 'agent-door-pair')?.click()
+    }
+    expect(onPair).not.toHaveBeenCalled()
+    field.value = ' 123456 '
+    role(el, 'agent-door-pair')?.click()
+    expect(onPair).toHaveBeenCalledWith('123456')
+  })
+
+  it('says since when it is connected and offers to disconnect', () => {
+    const onRelease = vi.fn()
+    const el = renderDataControls(document, handlers(), kinds, undefined, undefined, door({ state: { paired: true, pairedAt: '2026-11-19T10:00:00.000Z' }, onRelease }))
+    expect(role(el, 'agent-door-state')?.textContent).toBe(message('agentDoorPaired').replace('$DATE$', '2026-11-19'))
+    expect(role(el, 'agent-door-code')).toBeNull()
+    role(el, 'agent-door-release')?.click()
+    expect(onRelease).toHaveBeenCalledOnce()
+  })
+
+  it('says why the last code was not taken', () => {
+    for (const [failure, key] of [
+      ['bad_code', 'agentDoorBadCode'],
+      ['expired', 'agentDoorExpired'],
+      ['unreachable', 'agentDoorUnreachable'],
+    ] as const) {
+      const el = renderDataControls(document, handlers(), kinds, undefined, undefined, door({ failure }))
+      expect(role(el, 'agent-door-failed')?.textContent).toBe(message(key))
+    }
   })
 })

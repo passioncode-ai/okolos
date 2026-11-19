@@ -2712,6 +2712,38 @@
       }
     }
   },
+  "agentDoorTitle": {
+    "message": "Okolos Agent"
+  },
+  "agentDoorWhat": {
+    "message": "Привяжите Okolos к Okolos Agent, чтобы агенты, которых вы к нему привязали, могли обращаться к Okolos. Код покажет страница Okolos Agent по кнопке «Привязать Okolos». Без привязки Okolos не обращается к Okolos Agent."
+  },
+  "agentDoorCode": {
+    "message": "Код из Okolos Agent"
+  },
+  "agentDoorPair": {
+    "message": "Привязать"
+  },
+  "agentDoorPaired": {
+    "message": "Привязан с $DATE$",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "agentDoorRelease": {
+    "message": "Отвязать"
+  },
+  "agentDoorBadCode": {
+    "message": "Код не подошёл: проверьте цифры или попросите новый на странице Okolos Agent."
+  },
+  "agentDoorExpired": {
+    "message": "Код устарел: попросите новый на странице Okolos Agent."
+  },
+  "agentDoorUnreachable": {
+    "message": "Okolos Agent не ответил. Проверьте, что он запущен, и попробуйте ещё раз."
+  },
   "usageFirefoxOld": {
     "message": "В этой версии Firefox нет встроенного согласия на сбор данных, поэтому данные об использовании и ошибках Okolos не отправляет. Обновите Firefox до версии 140, чтобы выбрать."
   },
