@@ -704,5 +704,20 @@
   },
   "okolosDisconnected": {
     "message": "The Okolos extension was disconnected"
+  },
+  "verb_okolos_queue": {
+    "message": "read Okolos's queue"
+  },
+  "verb_okolos_verdict": {
+    "message": "ask Okolos about an address"
+  },
+  "verb_okolos_journal": {
+    "message": "read Okolos's journal"
+  },
+  "verb_okolos_audit": {
+    "message": "read Okolos's outbound log"
+  },
+  "verb_okolos_extensions": {
+    "message": "read the changes to extensions"
   }
 }

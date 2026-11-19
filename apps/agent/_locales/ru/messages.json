@@ -704,5 +704,20 @@
   },
   "okolosDisconnected": {
     "message": "Расширение Okolos отвязано"
+  },
+  "verb_okolos_queue": {
+    "message": "прочитать очередь Okolos"
+  },
+  "verb_okolos_verdict": {
+    "message": "спросить Okolos об адресе"
+  },
+  "verb_okolos_journal": {
+    "message": "прочитать журнал Okolos"
+  },
+  "verb_okolos_audit": {
+    "message": "прочитать журнал отправок Okolos"
+  },
+  "verb_okolos_extensions": {
+    "message": "прочитать изменения расширений"
   }
 }
