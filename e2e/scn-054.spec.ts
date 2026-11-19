@@ -12,6 +12,7 @@ import { relay } from '../apps/agent/src/cli/mcp-stdio.js'
 import { pair } from '../apps/agent/src/cli/pair.js'
 import { serviceDirs } from '../apps/agent/src/service/dirs.js'
 
+import { RECORD_VISIBLE_MS } from './budgets.js'
 import { expect, test } from './hooks.js'
 import { extensionWorker } from './ready.js'
 
@@ -108,13 +109,11 @@ test('connects Okolos to Okolos Agent by a code, answers an agent through execut
   const dirs = serviceDirs(home)
   const say = cliMessages('en')
   const asking = pair({ name: 'scout', base, dirs, say, print: () => undefined })
-  let handle: string | undefined
-  for (let i = 0; i < 50 && handle === undefined; i++) {
-    const page = JSON.parse((await http(port, '/api/state', { headers: { cookie } })).body) as { pairing: { requests?: { handle: string }[] } }
-    handle = page.pairing.requests?.[0]?.handle
-    if (handle === undefined) await new Promise((resolve) => setTimeout(resolve, 100))
-  }
-  expect(handle).toBeDefined()
+  // The request reaches the page by itself, as on SCN-044: read from the page's own answer.
+  const waiting = async () =>
+    (JSON.parse((await http(port, '/api/state', { headers: { cookie } })).body) as { pairing: { requests?: { handle: string }[] } }).pairing.requests?.[0]?.handle
+  await expect.poll(waiting, { timeout: RECORD_VISIBLE_MS }).toBeDefined()
+  const handle = await waiting()
   expect((await http(port, `/api/pairing/${handle}/confirm`, { method: 'POST', headers: write })).status).toBe(200)
   expect(await asking).toBe(0)
 
@@ -123,9 +122,18 @@ test('connects Okolos to Okolos Agent by a code, answers an agent through execut
     yield JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'execute', arguments: { operation: 'okolos.ping', arguments: {} } } })
   }
   const called = relay({ name: 'scout', base, dirs, say, input: input(), output: (line) => answers.push(line), error: () => undefined })
-  // The call waits with Okolos Agent until the extension looks; it looks now.
-  await new Promise((resolve) => setTimeout(resolve, 300))
-  await wake(worker)
+  // The call waits with Okolos Agent until the extension looks. It looks whenever its alarm
+  // fires, so the alarm is fired until the answer reaches the agent: a look before the call
+  // arrived finds nothing, which is the extension's ordinary idle wake.
+  await expect
+    .poll(
+      async () => {
+        if (answers.length === 0) await wake(worker)
+        return answers.length
+      },
+      { timeout: RECORD_VISIBLE_MS },
+    )
+    .toBe(1)
   expect(await called).toBe(0)
   const result = JSON.parse((JSON.parse(answers[0] ?? '{}') as { result: { content: { text: string }[] } }).result.content[0]?.text ?? '{}') as {
     success: boolean
@@ -140,9 +148,9 @@ test('connects Okolos to Okolos Agent by a code, answers an agent through execut
   expect(released.notice).toBe('The Okolos extension was disconnected')
   await wake(worker)
   await expect
-    .poll(() => worker.evaluate(async () => (await chrome.storage.local.get('agent:link'))['agent:link'] === undefined), { timeout: 15_000 })
+    .poll(() => worker.evaluate(async () => (await chrome.storage.local.get('agent:link'))['agent:link'] === undefined), { timeout: RECORD_VISIBLE_MS })
     .toBe(true)
-  await expect.poll(() => worker.evaluate(async () => (await chrome.alarms.get('okolos:agent')) === undefined), { timeout: 15_000 }).toBe(true)
+  await expect.poll(() => worker.evaluate(async () => (await chrome.alarms.get('okolos:agent')) === undefined), { timeout: RECORD_VISIBLE_MS }).toBe(true)
   await settings.reload()
   await expect(settings.locator('[data-role=agent-door-pair]')).toBeVisible()
 })

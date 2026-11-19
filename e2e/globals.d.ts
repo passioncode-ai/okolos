@@ -6,7 +6,8 @@
  * exactly the calls declared below.
  */
 declare const chrome: {
-  runtime: { sendMessage(message: unknown): Promise<unknown> }
+  /** The version a spec compares with what Okolos told an agent (SCN-054). */
+  runtime: { sendMessage(message: unknown): Promise<unknown>; getManifest(): { version: string } }
   /** Asked for readiness: a message resolving is not a rule being installed. */
   declarativeNetRequest: {
     // `condition` is declared because a test that only counts rules cannot
@@ -50,7 +51,22 @@ declare const chrome: {
     getAll(): Promise<Array<{ id: string; name: string; version: string; installType?: string }>>
   }
   /** Read only, to see that "Delete all data" renewed the usage install number (SCN-051). */
-  storage: { local: { get(key: string): Promise<Record<string, unknown>> } }
+  storage: {
+    local: {
+      get(key: string): Promise<Record<string, unknown>>
+      /** Only `test:agentDoorPort`, which only the test-hook build reads (SCN-054). */
+      set(items: Record<string, unknown>): Promise<void>
+    }
+  }
+  /**
+   * The wake for Okolos Agent, fired now rather than waited a minute for (SCN-054), and read to
+   * see that disconnecting removed it. The alarm's own handler is the product's; the spec only
+   * says when.
+   */
+  alarms: {
+    create(name: string, info: { when: number }): Promise<void>
+    get(name: string): Promise<unknown>
+  }
   // What the browser still lists of downloads, read by the real-download spec (B-201).
   downloads: { search(query: object): Promise<Array<{ state: string; exists: boolean }>> }
 }
