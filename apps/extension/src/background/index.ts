@@ -1108,6 +1108,56 @@ const agentDoor: AgentDoorDeps = {
     extensionChanges: async () =>
       platform.extensions.available() ? compareInventory(inventoryDeps(await openDb())).catch(() => []) : [],
   },
+  /**
+   * What an agent's undoable action calls (wave (c)): the state changes the buttons make, without
+   * their journal lines, which say «вы»; `agent-actions.ts` writes its own, naming the agent (WC-1).
+   */
+  act: {
+    openFinding: async (id) => {
+      const finding = await (await openDb()).get('findings', id)
+      if (finding === undefined || finding.resolvedAt !== null) return null
+      let host: string | null = null
+      try {
+        host = new URL(finding.subject.replace(/^page:/, '')).hostname || null
+      } catch {
+        host = null
+      }
+      return { host }
+    },
+    changedExtension: async (id) =>
+      platform.extensions.available() && (await compareInventory(inventoryDeps(await openDb())).catch(() => [])).some((change) => change.id === id),
+    trusted: async (domain) => (await (await openDb()).get('exceptions', ['domain', domain])) !== undefined,
+    resolve: async (id) => {
+      await resolveFinding({ id })
+    },
+    defer: async (id, until) => {
+      await deferFinding({ id, until })
+    },
+    accept: async (id) => acceptInventoryChange(inventoryDeps(await openDb()), id),
+    untrust: async (domain) => {
+      await (await openDb()).delete('exceptions', ['domain', domain])
+      // As the person's revocation does: the rules were built with this domain excused.
+      await refreshBlockRules()
+    },
+    journal: async (entry) => {
+      const now = new Date().toISOString()
+      await (await openDb()).put('journal', {
+        id: `agent-action:${entry.verb}:${entry.ref}:${now}`,
+        createdAt: now,
+        kind: 'action',
+        detail: {
+          explainKey: entry.explainKey,
+          explainArgs: entry.explainArgs,
+          reason: 'agent-action',
+          agentId: entry.agentId,
+          agentVerb: entry.verb,
+          ref: entry.ref,
+          weakens: entry.weakens,
+        },
+      })
+    },
+    now: () => Date.now(),
+  },
 }
 
 declare const __OKOLOS_TEST_HOOKS__: boolean | undefined

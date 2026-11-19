@@ -1,6 +1,7 @@
 import type { BridgeResult, OkolosPingResult } from '@okolos/contracts'
 import { request, type RequestDeps } from '@okolos/net'
 
+import { ACTION_VERBS, answerAction, type ActionSinks } from './agent-actions.js'
 import { answerRead, READ_VERBS, type ReadSources } from './agent-reads.js'
 
 /**
@@ -44,6 +45,8 @@ export interface AgentDoorDeps {
   now(): number
   /** What the read verbs answer from (wave (b)); without it they are refused as unknown. */
   reads?: ReadSources
+  /** What the undoable actions call (wave (c)); without it they are refused as unknown. */
+  act?: ActionSinks
 }
 
 export type PairOutcome = { readonly ok: true; readonly pairedAt: string } | { readonly ok: false; readonly reason: 'bad_code' | 'expired' | 'unreachable' }
@@ -105,7 +108,8 @@ export async function wakeAgentDoor(deps: AgentDoorDeps): Promise<WakeOutcome> {
     if (!Array.isArray(requests) || requests.length === 0) return answered ? 'answered' : 'idle'
     for (const request of requests) {
       if (typeof request.id !== 'string') continue
-      const result = await answer(request.verb, (request as { input?: unknown }).input, link, deps).catch(() => ({
+      const asked = request as { input?: unknown; by?: unknown }
+      const result = await answer(request.verb, asked.input, asked.by, link, deps).catch(() => ({
         success: false as const,
         // i18n-exempt: read by the agent through Okolos Agent, not by the person
         error: { code: 'internal' as const, message: 'Okolos could not read what was asked.', retryable: true },
@@ -119,13 +123,14 @@ export async function wakeAgentDoor(deps: AgentDoorDeps): Promise<WakeOutcome> {
   return answered ? 'answered' : 'idle'
 }
 
-/** What Okolos answers to one verb: `okolos.ping` (wave (a)) and the read verbs (wave (b)). */
-async function answer(verb: unknown, input: unknown, link: AgentDoorLink, deps: AgentDoorDeps): Promise<BridgeResult<unknown>> {
+/** What Okolos answers to one verb: `okolos.ping` (wave (a)), the reads (wave (b)) and the undoable actions (wave (c)). */
+async function answer(verb: unknown, input: unknown, by: unknown, link: AgentDoorLink, deps: AgentDoorDeps): Promise<BridgeResult<unknown>> {
   if (verb === 'okolos.ping') {
     const data: OkolosPingResult = { extensionVersion: deps.version(), connectedSince: link.pairedAt }
     return { success: true, data }
   }
   if (deps.reads !== undefined && (READ_VERBS as readonly unknown[]).includes(verb)) return answerRead(String(verb), input, deps.reads)
+  if (deps.act !== undefined && (ACTION_VERBS as readonly unknown[]).includes(verb)) return answerAction(String(verb), input, by, deps.act)
   // i18n-exempt: read by the agent through Okolos Agent, not by the person
   return { success: false, error: { code: 'internal', message: 'This version of Okolos does not answer that verb.', retryable: false } }
 }
@@ -165,5 +170,5 @@ export function agentDoorPost(audit: () => Promise<RequestDeps>, port: number | 
 /** `:okolos.queue` for an answer, so the outbound log names what was answered (WB-3); else nothing. */
 function answeredVerb(path: string, body: unknown): string {
   const verb = (body as { verb?: unknown } | null)?.verb
-  return path === '/extension/answer' && typeof verb === 'string' && /^okolos\.[a-z]{1,20}$/.test(verb) ? `:${verb}` : ''
+  return path === '/extension/answer' && typeof verb === 'string' && /^okolos(\.[a-z]{1,20}){1,2}$/.test(verb) ? `:${verb}` : ''
 }
