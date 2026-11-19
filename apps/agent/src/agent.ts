@@ -168,7 +168,11 @@ export async function createAgent(options: AgentOptions): Promise<Agent> {
       for (const timer of timers) timer.unref()
       return [
         door({ pairing: opened, journal: openedJournal, operations: verbs, version: options.version, now }),
-        extensionRoute({ link, refused: (route, reason) => ctx.log.write('warn', 'extension route refused', { path: route, reason }) }),
+        extensionRoute({
+          link,
+          // i18n-exempt: a line of the service log, read by a developer
+          refused: (route, reason) => ctx.log.write('warn', 'extension route refused', { path: route, reason }),
+        }),
         dashboard({
           pairing: opened,
           tasks,

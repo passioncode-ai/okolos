@@ -450,7 +450,6 @@ export function createVerbs(deps: VerbsDeps): Verbs {
 
   const ping: Operation = {
     verb: 'okolos.ping',
-    // i18n-exempt: read by the agent over MCP, not by the person
     purpose: 'Asks the Okolos extension connected to Okolos Agent whether it answers, with its version; it looks for requests about once a minute, so this waits up to 90 seconds.',
     input: z.object({}).strict(),
     gate: 'agent',
