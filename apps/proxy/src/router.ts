@@ -237,7 +237,7 @@ function privacyPage(): Response {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Приватность — Okolos</title>
+<title>Приватность · Okolos</title>
 <meta name="description" content="Что Okolos отправляет с устройства, что не отправляет, и сколько хранит.">
 ${STYLE_TAG}
 </head>
@@ -287,7 +287,7 @@ function landingPage(url: URL): Response {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Okolos — защита от скрытых инструкций для ассистента</title>
+<title>Okolos: защита от скрытых инструкций для ассистента</title>
 <meta name="description" content="Находит на странице текст, спрятанный от человека, но видимый ИИ-ассистенту, и обезвреживает его до того, как ассистент его прочтёт. Работает на устройстве, история посещений никуда не уходит.">
 <link rel="canonical" href="${escapeHtml(origin)}/">
 <script type="application/ld+json">${JSON.stringify(structured)}</script>
@@ -295,7 +295,7 @@ ${STYLE_TAG}
 </head>
 <body>
 <main>
-<h1>Okolos — защита от скрытых инструкций</h1>
+<h1>Okolos: защита от скрытых инструкций</h1>
 
 <p data-role="lede">На странице бывает текст, который человек не видит, а
 ассистент читает и исполняет. Okolos находит такой текст, обезвреживает его до
@@ -340,14 +340,14 @@ ${STYLE_TAG}
 устройства», выгружается одним файлом и удаляется целиком.</p>
 <p>Исходный код расширения и этого сервиса открыт под GNU AGPL-3.0: что они
 делают, можно прочитать, а не принимать на веру. Пользоваться бесплатно, в том числе
-в компании; лицензия для закрытых продуктов —
+в компании. Лицензия для закрытых продуктов:
 <a href="https://passioncode.ai/business/">passioncode.ai/business</a>.</p>
 
 <h2 id="pages">Что ещё здесь есть</h2>
 <ul data-role="pages">
-<li><a href="/privacy">Приватность</a> — что уходит с устройства, что не уходит и
+<li><a href="/privacy">Приватность</a>: что уходит с устройства, что не уходит и
 сколько хранится. Полный список назначений, без исключений.</li>
-<li><a href="/status">Статус домена</a> — для владельца сайта: числится ли домен
+<li><a href="/status">Статус домена</a> для владельца сайта: числится ли домен
 в списке, в каком именно и с какой даты. Там же подаётся апелляция.</li>
 </ul>
 </main>
@@ -390,7 +390,7 @@ ${body}
 
   if (!domain) {
     return shell(
-      'Статус домена — введите домен',
+      'Статус домена: введите домен',
       '<p data-role="hint">Введите домен, чтобы узнать, числится ли он в списке и в каком именно.</p>',
     )
   }
@@ -406,7 +406,7 @@ ${body}
     // Never "clean" when the answer could not be looked up — the same rule the
     // JSON endpoint holds, and for the same reason.
     return shell(
-      `Статус домена — ${domain}`,
+      `Статус домена: ${domain}`,
       `<p data-role="error">Статус <strong>${escapeHtml(domain)}</strong> сейчас не удалось выяснить. Это не значит, что домен чист.</p>`,
       canonical,
     )
@@ -414,7 +414,7 @@ ${body}
 
   if (!row) {
     return shell(
-      `${domain} — не числится`,
+      `${domain}: не числится`,
       `<p data-role="verdict"><strong>${escapeHtml(domain)}</strong> <strong>не числится</strong> ни в одном из списков этого сервиса.</p>`,
       canonical,
     )
@@ -428,7 +428,7 @@ ${body}
   // the English name until 2026-08-20 — to a site owner reading Russian (B-24).
   const named = escapeHtml(displayFeedNameRu(row.feed) ?? row.feed)
   return shell(
-    `${domain} — числится`,
+    `${domain}: числится`,
     `<p data-role="verdict"><strong>${escapeHtml(domain)}</strong> <strong>числится</strong> в списке <strong>${named}</strong>, запись от ${escapeHtml(row.entry_date)}.</p>` +
       (ours
         ? appealForm(domain)
@@ -601,13 +601,13 @@ async function appeal(request: Request, env: Env, url: URL): Promise<Response> {
         new Response(JSON.stringify(body), { status, headers: PRIVATE_JSON_HEADERS })
 
   if (!fromAnAllowedOrigin(request, url)) {
-    return reply({ error: 'this appeal did not come from this site — nothing was saved' }, 403)
+    return reply({ error: 'this appeal did not come from this site; nothing was saved' }, 403)
   }
 
   const raw = await boundedBody(request)
   if (raw === null) {
     return reply(
-      { error: `an appeal may not exceed ${APPEAL_BYTES_MAX} bytes — nothing was saved` },
+      { error: `an appeal may not exceed ${APPEAL_BYTES_MAX} bytes; nothing was saved` },
       413,
     )
   }
@@ -648,7 +648,7 @@ async function appeal(request: Request, env: Env, url: URL): Promise<Response> {
   if (recent !== null && recent >= APPEALS_PER_DOMAIN) {
     return reply(
       {
-        error: `this domain already has ${recent} appeals in the last hour — nothing was saved`,
+        error: `this domain already has ${recent} appeals in the last hour; nothing was saved`,
         domain,
       },
       429,
@@ -679,7 +679,7 @@ async function appeal(request: Request, env: Env, url: URL): Promise<Response> {
     // The check above is not a lock, so two requests can pass it together. A
     // key conflict here is that race and not a failure — the appeal is on file.
     if (isDuplicate(cause)) return reply({ reference, domain, alreadyFiled: true })
-    return reply({ error: 'the appeal could not be recorded — nothing was saved' }, 503)
+    return reply({ error: 'the appeal could not be recorded; nothing was saved' }, 503)
   }
 
   return reply({ reference, domain, alreadyFiled: false })
@@ -804,7 +804,7 @@ function appealPage(
     error !== undefined
       ? `<p data-role="not-saved">${escapeHtml(error)}.</p><p>Nothing about this appeal is on file. Sending it again is safe.</p>`
       : alreadyFiled === true
-        ? `<p data-role="already-filed">This appeal for <strong>${escapeHtml(domain ?? '')}</strong> was <strong>already on file</strong>. Its reference is <strong>${escapeHtml(reference ?? '')}</strong> — the same one, because it is the same appeal.</p>`
+        ? `<p data-role="already-filed">This appeal for <strong>${escapeHtml(domain ?? '')}</strong> was <strong>already on file</strong>. Its reference is <strong>${escapeHtml(reference ?? '')}</strong>, the same one, because it is the same appeal.</p>`
         : `<p data-role="reference">The appeal for <strong>${escapeHtml(domain ?? '')}</strong> is recorded. Its reference is <strong>${escapeHtml(reference ?? '')}</strong>.</p>`
 
   return new Response(
@@ -813,7 +813,7 @@ function appealPage(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Appeal — ${escapeHtml(domain ?? 'domain status')}</title>
+<title>Appeal: ${escapeHtml(domain ?? 'domain status')}</title>
 <meta name="robots" content="noindex">
 </head>
 <body>
