@@ -1702,7 +1702,7 @@ describe('the volume bound stated beside REJECTED_LINES_PER_DAY and AGENT_LINES_
       bytes: Number.MAX_SAFE_INTEGER,
       verdict: 'finding',
     })
-    expect(size(agentLine)).toBe(719)
+    expect(size(agentLine)).toBe(723)
   })
 })
 

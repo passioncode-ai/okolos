@@ -545,7 +545,7 @@ describe('the verbs', () => {
   })
 
   it('name the two calls that live outside a task', () => {
-    expect(BRIDGE_SESSION_VERBS).toEqual(['session.open', 'hygiene.census'])
+    expect(BRIDGE_SESSION_VERBS).toEqual(['session.open', 'hygiene.census', 'okolos.ping'])
   })
 
   it('become tool names every MCP client accepts, one name per verb', () => {
@@ -639,7 +639,7 @@ describe('the answers', () => {
     expect(contracts.BRIDGE_SESSION_VERBS).toBe(BRIDGE_SESSION_VERBS)
     expect(contracts.refusalKey).toBe(refusalKey)
     expect(contracts.verbAllowed).toBe(verbAllowed)
-    expectTypeOf<BridgeSessionVerb>().toEqualTypeOf<'session.open' | 'hygiene.census'>()
+    expectTypeOf<BridgeSessionVerb>().toEqualTypeOf<'session.open' | 'hygiene.census' | 'okolos.ping'>()
   })
 
   it('carry the shapes of spec §2.2, and no fragment-bearing or argv field', () => {

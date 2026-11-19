@@ -58,6 +58,8 @@ export type {
   CensusEntry,
   CensusInput,
   CensusResult,
+  OkolosPingInput,
+  OkolosPingResult,
   CloseInput,
   CloseResult,
   GetInput,
