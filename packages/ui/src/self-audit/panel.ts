@@ -315,6 +315,7 @@ const KEPT_KEY: Record<string, string> = {
   'file-hash': 'auditKeptFileHash',
   'domain-status': 'auditKeptDomainStatus',
   'usage-data': 'auditKeptUsageData',
+  'agent-door': 'auditKeptAgentDoor',
 }
 
 /** The three outcomes the contract has, in words. A row with none says so instead. */
@@ -334,6 +335,7 @@ const PURPOSE_KEY: Record<string, string> = {
   'file-hash': 'auditPurposeFileHash',
   'domain-status': 'auditPurposeDomainStatus',
   'usage-data': 'auditPurposeUsageData',
+  'agent-door': 'auditPurposeAgentDoor',
 }
 
 /**

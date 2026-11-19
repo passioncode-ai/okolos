@@ -113,6 +113,8 @@ export type Purpose =
   | 'domain-status'
   /** Usage and error events, on by default and switched off in settings (B-198, B-199). */
   | 'usage-data'
+  /** Okolos Agent on this device, 127.0.0.1, only once the person connected Okolos to it (B-218). */
+  | 'agent-door'
 
 export interface AuditEntry {
   readonly id: string

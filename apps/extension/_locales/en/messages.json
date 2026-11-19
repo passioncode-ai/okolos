@@ -126,6 +126,9 @@
   "auditPurposeUsageData": {
     "message": "sending usage and error data"
   },
+  "auditPurposeAgentDoor": {
+    "message": "connection to Okolos Agent on this device"
+  },
   "auditPurposeDomainStatus": {
     "message": "checking a domain status"
   },
@@ -2424,6 +2427,9 @@
   },
   "auditKeptUsageData": {
     "message": "Names of actions and errors from a fixed list and their outcome (for example, whether a password was found in breaches), when they happened, a random install number, a session number for the hour, the extension version, the build kind, the browser language and two constant product labels. No page addresses, no page text, no file names, no email and no passwords. The service works out the browser, the system, the country, the region and a daily device hash itself, from the request header and the IP address."
+  },
+  "auditKeptAgentDoor": {
+    "message": "Only on this device (127.0.0.1): the pairing code, a question whether agents you paired asked for anything, and the answers. Nothing goes to the internet."
   },
   "auditKeptDomainStatus": {
     "message": "The domain you checked. No page address, no page content."
