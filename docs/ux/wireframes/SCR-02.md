@@ -14,12 +14,6 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 - `error-note`
 - `repair`
 - `verdict`
-- `agent-requests`
-- `agent-request`
-- `agent-request-line`
-- `agent-request-note`
-- `agent-request-allow`
-- `agent-request-decline`
 - `changed`
 - `footer`
 - `self-audit`
@@ -30,6 +24,12 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 **Elements it shows through the components it composes.** Addressable on this screen in
 exactly the same way; listed separately because the file to change is not this screen's.
 
+- `agent-requests` — from `packages/ui/src/agent-requests.ts`
+- `agent-request` — from `packages/ui/src/agent-requests.ts`
+- `agent-request-line` — from `packages/ui/src/agent-requests.ts`
+- `agent-request-note` — from `packages/ui/src/agent-requests.ts`
+- `agent-request-allow` — from `packages/ui/src/agent-requests.ts`
+- `agent-request-decline` — from `packages/ui/src/agent-requests.ts`
 - `queue` — from `packages/ui/src/queue/queue.ts`
 - `queue-empty` — from `packages/ui/src/queue/queue.ts`
 - `ranking-note` — from `packages/ui/src/queue/queue.ts`

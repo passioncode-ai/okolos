@@ -1,4 +1,6 @@
 import { t } from '@okolos/i18n'
+
+import { renderAgentRequests } from '../agent-requests.js'
 import { shortTime } from '../when.js'
 
 import type { Queue } from '@okolos/core-queue'
@@ -77,23 +79,9 @@ export function renderPopup(
   root.setAttribute('data-verdict', state.page.verdict)
   root.append(text(doc, 'verdict', state.page.reason))
   // First after the verdict: an agent waits on the answer, and it expires in ten minutes.
-  if ((state.requests?.length ?? 0) > 0 && handlers.onRequest !== undefined) {
-    const onRequest = handlers.onRequest
-    const list = doc.createElement('section')
-    list.setAttribute('data-role', 'agent-requests')
-    for (const request of state.requests ?? []) {
-      const item = doc.createElement('div')
-      item.setAttribute('data-role', 'agent-request')
-      item.setAttribute('data-request', request.id)
-      item.append(
-        text(doc, 'agent-request-line', request.line),
-        text(doc, 'agent-request-note', t('agentRequestNote')),
-        button(doc, 'agent-request-allow', t('agentRequestAllow'), () => onRequest(request.id, true)),
-        button(doc, 'agent-request-decline', t('agentRequestDecline'), () => onRequest(request.id, false)),
-      )
-      list.append(item)
-    }
-    root.append(list)
+  if (handlers.onRequest !== undefined) {
+    const requests = renderAgentRequests(doc, state.requests ?? [], handlers.onRequest)
+    if (requests !== null) root.append(requests)
   }
   root.append(changedLine(doc, state.changed, state.lastCheck, handlers))
   root.append(

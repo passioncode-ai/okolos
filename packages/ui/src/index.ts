@@ -100,4 +100,5 @@ export {
  * consumers of this are surfaces that already pull the graph in.
  */
 export { exactInstant, shortDate, shortTime } from './when.js'
+export { renderAgentRequests, type AgentRequestLine } from './agent-requests.js'
 export { renderHelp, type HelpHandlers } from './settings/help.js'
