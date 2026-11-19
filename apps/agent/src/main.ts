@@ -5,6 +5,7 @@
  *   okolos-agent serve [--port <port>]       the service: door, access, journal, agent window
  *   okolos-agent pair --name <name> [--replace]  asks the person for access and saves the key
  *   okolos-agent mcp-stdio --name <name>     an MCP stdio server relaying to the door
+ *   okolos-agent doctor [--json]             what keeps it from working, with path and reason
  *
  * The release runs the bundle `tools/build-agent.mjs` writes; the probe's script
  * (`agent-probe.js`) sits beside it. The language of the sentences a person
@@ -15,7 +16,12 @@ import path from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 
+import { fromCatalogue, type Catalogue } from '@okolos/i18n'
+
 import { createAgent } from './agent.js'
+import { diagnose, doctorText } from './doctor.js'
+import { defaultLocalesDir } from './service/messages.js'
+import { capStdoutLog } from './fabric/fabric-service.mjs'
 import { cliMessages } from './cli/messages.js'
 import { relay } from './cli/mcp-stdio.js'
 import { pair } from './cli/pair.js'
@@ -23,7 +29,7 @@ import { PORT, serviceDirs } from './service/dirs.js'
 import type { Locale } from './service/http.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const USAGE = 'okolos-agent serve [--port <port>] | pair --name <name> [--replace] | mcp-stdio --name <name>'
+const USAGE = 'okolos-agent serve [--port <port>] | pair --name <name> [--replace] | mcp-stdio --name <name> | doctor [--json]'
 
 function option(args: readonly string[], name: string): string | undefined {
   const at = args.indexOf(name)
@@ -44,7 +50,18 @@ async function main(args: readonly string[]): Promise<number> {
   const locale: Locale = process.env.OKOLOS_AGENT_LOCALE === 'en' ? 'en' : 'ru'
   const command = args[0]
   const base = `http://127.0.0.1:${PORT}`
+  if (command === 'doctor') {
+    const problems = diagnose(serviceDirs())
+    if (args.includes('--json')) process.stdout.write(`${JSON.stringify({ problems })}\n`)
+    else {
+      const say = fromCatalogue(JSON.parse(readFileSync(path.join(defaultLocalesDir(), locale, 'messages.json'), 'utf8')) as Catalogue)
+      for (const line of doctorText(problems, say)) process.stdout.write(`${line}\n`)
+    }
+    return problems.length === 0 ? 0 : 1
+  }
   if (command === 'serve') {
+    // launchd sends stdout to a file that nothing rotates: it is cut at start (LC-12).
+    capStdoutLog(path.join(serviceDirs().logs, 'stdout.log'))
     const port = Number(option(args, '--port') ?? PORT)
     const agent = await createAgent({
       port,

@@ -164,7 +164,21 @@ pnpm gates             # lint → typecheck → build → test → ux:lint → b
 pnpm test:e2e          # сборка + сборка с хуками + playwright (Chromium)
 pnpm test:e2e:firefox  # geckodriver + selenium, установка расширения в Firefox
 pnpm bench             # бенчмарки горячих путей, vitest
+pnpm agent:build       # бандл Okolos Agent в apps/agent/dist/bin/
+pnpm agent:install     # релиз, команда, дескриптор и задача launchd Okolos Agent
+pnpm agent:doctor      # что мешает Okolos Agent работать, с путём и причиной
 ```
+
+**Установка Okolos Agent** (Okolos Bridge, N-016): `pnpm agent:install` собирает релиз в
+`~/.local/share/okolos-agent/releases/<версия>-<sha12>/` (бандл, пробник, каталог строк, страница),
+ставит ссылку `current`, команду `~/.local/bin/okolos-agent`, дескриптор `fabric-service/0.1` и задачу
+launchd `ai.passioncode.okolos-agent` (через набор Fabric) и ждёт, пока демон ответит на порту 47871.
+`node tools/install-agent.mjs --dry-run` печатает plist и дескриптор, ничего не меняя; `--status` говорит,
+что установлено; `--uninstall` снимает задачу, команду и релизы и оставляет данные (список доступов,
+журнал агентов, события, профиль агента, ключи агентов), `--uninstall --purge` удаляет и их.
+`pnpm agent:build` только собирает бандл в `apps/agent/dist/bin/`; `pnpm agent:doctor` (или
+`okolos-agent doctor [--json]`) называет, что мешает работе: нет Chrome, список доступов или журнал агентов
+не читается, не пишется или не разбирается, с путём и причиной.
 
 **Okolos Agent из исходников** (Okolos Bridge, N-011): `node tools/build-agent.mjs` пишет в
 `apps/agent/dist/bin/` бандл демона `okolos-agent.mjs` (одним ES-модулем, все зависимости внутри) и рядом

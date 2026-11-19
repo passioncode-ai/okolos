@@ -629,5 +629,40 @@
         "content": "$2"
       }
     }
+  },
+  "doctorOk": {
+    "message": "Проблем не найдено: Chrome для агентов на месте, список доступов и журнал агентов читаются и пишутся."
+  },
+  "doctorChromeMissing": {
+    "message": "Chrome stable не найден: агентам нечем открывать страницы. Установите Google Chrome."
+  },
+  "doctorProblem": {
+    "message": "$WHAT$: $PATH$, $WHY$.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      },
+      "path": {
+        "content": "$2"
+      },
+      "why": {
+        "content": "$3"
+      }
+    }
+  },
+  "doctorWhatPairing": {
+    "message": "список доступов"
+  },
+  "doctorWhatJournal": {
+    "message": "журнал агентов"
+  },
+  "doctorWhyNoRead": {
+    "message": "нет прав на чтение"
+  },
+  "doctorWhyNoWrite": {
+    "message": "нет прав на запись"
+  },
+  "doctorWhyUnparsable": {
+    "message": "файл не разбирается"
   }
 }

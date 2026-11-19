@@ -40,7 +40,10 @@
     "feed:ingest": "node tools/ingest.mjs",
     "feed:refresh": "node tools/feed-job.mjs",
     "feed:agent": "node tools/install-feed-agent.mjs",
-    "feed:snapshot": "node tools/feed-snapshot.mjs"
+    "feed:snapshot": "node tools/feed-snapshot.mjs",
+    "agent:build": "node tools/build-agent.mjs",
+    "agent:install": "node tools/install-agent.mjs",
+    "agent:doctor": "node apps/agent/dist/bin/okolos-agent.mjs doctor"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

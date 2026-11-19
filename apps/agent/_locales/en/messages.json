@@ -629,5 +629,40 @@
         "content": "$2"
       }
     }
+  },
+  "doctorOk": {
+    "message": "No problems found: the agents' Chrome is in place, and the access list and the agents' journal can be read and written."
+  },
+  "doctorChromeMissing": {
+    "message": "Chrome stable was not found: agents have nothing to open pages with. Install Google Chrome."
+  },
+  "doctorProblem": {
+    "message": "$WHAT$: $PATH$, $WHY$.",
+    "placeholders": {
+      "what": {
+        "content": "$1"
+      },
+      "path": {
+        "content": "$2"
+      },
+      "why": {
+        "content": "$3"
+      }
+    }
+  },
+  "doctorWhatPairing": {
+    "message": "the access list"
+  },
+  "doctorWhatJournal": {
+    "message": "the agents' journal"
+  },
+  "doctorWhyNoRead": {
+    "message": "no permission to read"
+  },
+  "doctorWhyNoWrite": {
+    "message": "no permission to write"
+  },
+  "doctorWhyUnparsable": {
+    "message": "the file cannot be parsed"
   }
 }

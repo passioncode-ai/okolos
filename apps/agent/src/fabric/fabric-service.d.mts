@@ -173,3 +173,6 @@ export class Drain {
     options?: { onStopping?: () => unknown; signals?: readonly string[] },
   ): this
 }
+
+/** The service's data, logs and cache folders (fabric-paths.mjs), the ones `--uninstall --purge` removes. */
+export function serviceDirs(id: string, platform?: string): { data: string; logs: string; cache: string }
