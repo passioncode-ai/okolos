@@ -23,8 +23,22 @@ function build(): string {
   return dir
 }
 
-/** bsdtar writes zips; GNU tar (most Linux) does not, so the Windows route is run where bsdtar is. */
-const BSDTAR = /bsdtar/.test(spawnSync('tar', ['--version'], { encoding: 'utf8' }).stdout ?? '')
+type Probe = (command: string) => string | undefined
+
+/**
+ * The bsdtar that runs the Windows arguments here, or undefined where there is none.
+ * On Windows it is the program the plan names (System32), because Git for Windows
+ * puts GNU tar first on PATH and probing `tar` there would skip the test on the very
+ * platform it is for (B-179). Elsewhere it is `tar` from PATH when that is bsdtar
+ * (macOS); GNU tar (most Linux) cannot write a zip.
+ */
+function bsdtarFor(platform: string, env: Record<string, string | undefined>, probe: Probe): string | undefined {
+  const command = platform === 'win32' ? archivePlan('a.zip', [], { platform, env }).command : 'tar'
+  return /bsdtar/.test(probe(command) ?? '') ? command : undefined
+}
+
+const versionOf: Probe = (command) => spawnSync(command, ['--version'], { encoding: 'utf8' }).stdout ?? undefined
+const BSDTAR = bsdtarFor(process.platform, process.env, versionOf)
 
 describe('which tool makes the zip', () => {
   it('is zip on macOS and Linux, with the arguments it always had', () => {
@@ -38,6 +52,22 @@ describe('which tool makes the zip', () => {
     const plan = archivePlan('C:\\out\\a.zip', FILES, { platform: 'win32', env: { SystemRoot: 'D:\\Win' } })
     expect(plan.command).toBe('D:\\Win\\System32\\tar.exe')
     expect(plan.args).toEqual(['-a', '-c', '-f', 'C:\\out\\a.zip', ...FILES])
+  })
+
+  it('runs the Windows arguments with the System32 tar on Windows, even when GNU tar comes first on PATH', () => {
+    const asked: string[] = []
+    const probe: Probe = (command) => {
+      asked.push(command)
+      return command === 'tar' ? 'tar (GNU tar) 1.35' : 'bsdtar 3.7.2 - libarchive 3.7.2'
+    }
+    expect(bsdtarFor('win32', { SystemRoot: 'D:\\Win' }, probe)).toBe('D:\\Win\\System32\\tar.exe')
+    expect(asked).toEqual(['D:\\Win\\System32\\tar.exe'])
+  })
+
+  it('runs them with tar from PATH elsewhere, and only when it is bsdtar', () => {
+    expect(bsdtarFor('darwin', {}, () => 'bsdtar 3.5.3 - libarchive 3.7.4')).toBe('tar')
+    expect(bsdtarFor('linux', {}, () => 'tar (GNU tar) 1.35')).toBeUndefined()
+    expect(bsdtarFor('win32', {}, () => undefined)).toBeUndefined()
   })
 
   it('falls back to C:\\Windows when SystemRoot is unset', () => {
@@ -60,7 +90,7 @@ describe('what the zip holds', () => {
     const dir = build()
     const archive = path.join(mkdtempSync(path.join(os.tmpdir(), 'okolos-zip-')), 'out.zip')
     const plan = archivePlan(archive, FILES, { platform: 'win32' })
-    execFileSync('tar', plan.args, { cwd: dir })
+    execFileSync(BSDTAR as string, plan.args, { cwd: dir })
     const entries = zipEntries(readFileSync(archive))
     expect(entries.filter((name) => name.startsWith('./'))).toEqual([])
     expect(compareEntries(entries, FILES)).toEqual({ missing: [], extra: [] })
