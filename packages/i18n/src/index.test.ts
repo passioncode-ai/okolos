@@ -94,7 +94,7 @@ const RU: Catalogue = {
     message: 'Список $FEED$ отклонён: $WHY$',
     placeholders: { feed: { content: '$1' }, why: { content: '$2' } },
   },
-  feedName: { message: 'Список Okolos: фишинг' },
+  feedName: { message: 'Okolos: фишинг' },
   unnamed: { message: 'неназванная сторона' },
 }
 
@@ -114,7 +114,7 @@ describe('an argument that is a message rather than data', () => {
 
     // Written: legible as-is to anything that does not know this convention — an older
     // build, an export dump, a person reading the raw database.
-    expect(row.explainArgs).toEqual(['Список Okolos: фишинг', 'HTTP 503'])
+    expect(row.explainArgs).toEqual(['Okolos: фишинг', 'HTTP 503'])
     expect(row.explainArgKeys).toEqual(['feedName', null])
 
     // Read later, in another language: the message argument comes back in the reader's
@@ -142,8 +142,8 @@ describe('an argument that is a message rather than data', () => {
      * exactly what it was before — rather than to a bare identifier.
      */
     useResolver(fromCatalogue(EN))
-    expect(resolveArgs(['Список Okolos: фишинг', 'HTTP 503'])).toEqual([
-      'Список Okolos: фишинг',
+    expect(resolveArgs(['Okolos: фишинг', 'HTTP 503'])).toEqual([
+      'Okolos: фишинг',
       'HTTP 503',
     ])
     expect(resolveArgs(['x'], [])).toEqual(['x'])

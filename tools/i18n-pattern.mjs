@@ -22,7 +22,7 @@
  * Widening it found nothing in the tree, which is the answer worth having: the class was
  * uncovered rather than dirty.
  *
- * A short name is still not matched — `'Список Okolos: фишинг'` has no run of lowercase
+ * A short name is still not matched — `'Okolos: фишинг'` has no run of lowercase
  * words — and that is right. A name is not copy in the sense this gate is about, and
  * `tools/feed-names.test.ts` holds names to `docs/brand/terminology.md`.
  *

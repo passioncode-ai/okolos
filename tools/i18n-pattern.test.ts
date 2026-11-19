@@ -106,10 +106,10 @@ describe('a sentence in the language the product ships in', () => {
   })
 
   it('leaves a name alone, because a name is not copy', () => {
-    // `'Список Okolos: фишинг'` has no run of lowercase words, and that is the right
+    // `'Okolos: фишинг'` has no run of lowercase words, and that is the right
     // answer: names are held to `docs/brand/terminology.md` by their own gate, and a
     // product that refused every proper noun in its code would be unusable.
-    expect(sentencesIn(`  phishing: { ru: 'Список Okolos: фишинг' },`)).toEqual([])
+    expect(sentencesIn(`  phishing: { ru: 'Okolos: фишинг' },`)).toEqual([])
   })
 
   it('does not start reading identifiers because of the wider class', () => {

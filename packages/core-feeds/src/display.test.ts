@@ -8,7 +8,14 @@ const translate = (key: string): string => `«${key}»`
 describe('naming a list', () => {
   it('gives our own list a name instead of its identifier', () => {
     expect(displayFeedName('phishing', translate)).toBe('«feedNamePhishing»')
-    expect(displayFeedNameRu('phishing')).toBe('Список Okolos: фишинг')
+    expect(displayFeedNameRu('phishing')).toBe('Okolos: фишинг')
+  })
+
+  it('names our list without the word «список», because every sentence it goes into says it already', () => {
+    // «Помечена списком $FEED$», «в списке $FEED$», «из списка $FEED$» and the proxy's
+    // «числится в списке …» read «списком Список Okolos: фишинг» while the name began with it;
+    // the store image of the block screen showed it (B-215).
+    for (const name of Object.values(OUR_FEEDS)) expect(name.ru).not.toMatch(/^спис/i)
   })
 
   it('leaves a third-party list called what it calls itself', () => {

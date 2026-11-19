@@ -77,7 +77,7 @@ Contract: brand-contract v1
 
 | Идентификатор | Имя для человека (ru) | English |
 |---|---|---|
-| `phishing` | Список Okolos: фишинг | Okolos phishing list |
+| `phishing` | Okolos: фишинг | Okolos phishing list |
 
 Сторонние списки называются так, как называют себя сами: `OpenPhish`,
 `PhishTank`, `URLhaus`, `Hudson Rock` — их имена не переводятся.
