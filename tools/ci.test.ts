@@ -5,6 +5,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { shCandidates } from './bin.mjs'
+import { filesIn } from './tree.mjs'
 
 /**
  * What CI claims about itself.
@@ -523,6 +524,93 @@ describe('the pre-push hook exists and runs the gates', () => {
 
   it('refuses rather than warns', () => {
     expect(readFileSync(hook, 'utf8')).toMatch(/exit 1/)
+  })
+
+  /**
+   * B-148: on 2026-10-06 one unit run failed in this hook under load and nobody
+   * could say which test, because the hook printed only the last 25 lines and
+   * the next two runs were green. A flaky test shows itself once; its name has
+   * to be kept the first time. So a failed gate leaves its whole output in a
+   * file outside the working tree, the hook prints where, and the `FAIL` lines
+   * a test runner writes are printed whatever their position in the output.
+   *
+   * A stub `pnpm` stands in for the real one: the hook's logic is under test,
+   * not the gates. Skipped on win32, where the stub would need Git's sh to find
+   * an extension-less script on a converted PATH; the decision tests above keep
+   * the hook covered there.
+   */
+  describe.skipIf(process.platform === 'win32')('keeps a failed gate\'s whole output', () => {
+    const setup = (): { dir: string; env: NodeJS.ProcessEnv; logs: string } => {
+      const dir = mkdtempSync(path.join(os.tmpdir(), 'okolos-prepush-'))
+      execFileSync('git', ['init', '--quiet'], { cwd: dir })
+      mkdirSync(path.join(dir, '.githooks'))
+      writeFileSync(path.join(dir, '.githooks/pre-push'), readFileSync(hook, 'utf8'))
+      mkdirSync(path.join(dir, 'tools'))
+      for (const tool of ['python.mjs', 'brand-gate.mjs', 'i18n-sweep.mjs', 'package.mjs']) {
+        writeFileSync(path.join(dir, 'tools', tool), '')
+      }
+      const bin = path.join(dir, 'bin')
+      mkdirSync(bin)
+      // 60 lines: the FAIL line is early, far outside the last 25.
+      writeFileSync(
+        path.join(bin, 'pnpm'),
+        [
+          '#!/bin/sh',
+          'if [ "$3" = test ]; then',
+          '  echo " FAIL  src/flaky.test.ts > waits for the worker"',
+          '  i=1; while [ $i -le 59 ]; do echo "line $i"; i=$((i + 1)); done',
+          '  exit 1',
+          'fi',
+          'exit 0',
+          '',
+        ].join('\n'),
+        { mode: 0o755 },
+      )
+      const env: NodeJS.ProcessEnv = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`, OKOLOS_SKIP_GATES: '' }
+      delete env.OKOLOS_PREPUSH_DECIDE
+      return { dir, env, logs: path.join(dir, '.git', 'okolos-pre-push') }
+    }
+    const push = (dir: string, env: NodeJS.ProcessEnv) =>
+      spawnSync('sh', [path.join(dir, '.githooks/pre-push')], { cwd: dir, env, input: '', encoding: 'utf8' })
+
+    it('writes it to a log under .git, names the file and prints the FAIL lines', () => {
+      const { dir, env, logs } = setup()
+      try {
+        const result = push(dir, env)
+        expect(result.status, result.stdout + result.stderr).toBe(1)
+        expect(result.stdout).toMatch(/unit\s+FAILED/)
+        const files = filesIn(logs, '-unit.log')
+        expect(files, `logs: ${filesIn(logs, '.log').join(', ')}`).toHaveLength(1)
+        const log = readFileSync(path.join(logs, files[0] as string), 'utf8')
+        expect(log).toContain('FAIL  src/flaky.test.ts > waits for the worker')
+        expect(log).toContain('line 59')
+        expect(log.split('\n').filter((entry) => entry.startsWith('line ')).length).toBe(59)
+        expect(result.stdout).toContain(path.join(logs, files[0] as string))
+        expect(result.stdout).toMatch(/FAIL {2}src\/flaky\.test\.ts > waits for the worker/)
+        // The gates that passed leave nothing behind.
+        expect(filesIn(logs, '.log')).toHaveLength(1)
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
+
+    it('keeps at most ten logs, dropping the oldest', () => {
+      const { dir, env, logs } = setup()
+      try {
+        mkdirSync(logs, { recursive: true })
+        for (let i = 0; i < 12; i++) {
+          writeFileSync(path.join(logs, `20200101T0000${String(i).padStart(2, '0')}Z-old.log`), 'old')
+        }
+        expect(push(dir, env).status).toBe(1)
+        const left = filesIn(logs, '.log')
+        expect(left).toHaveLength(10)
+        expect(left.some((name) => name.endsWith('-unit.log'))).toBe(true)
+        expect(left).not.toContain('20200101T000000Z-old.log')
+        expect(left).not.toContain('20200101T000002Z-old.log')
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
   })
 
   it('is wired by installing, not by remembering', () => {
