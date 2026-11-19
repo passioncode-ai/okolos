@@ -610,5 +610,24 @@
         "content": "$1"
       }
     }
+  },
+  "cliPairExists": {
+    "message": "У агента $NAME$ уже есть доступ. Чтобы выдать новый ключ вместо прежнего, запустите okolos-agent pair --name \"$NAME$\" --replace.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "cliReleaseFailed": {
+    "message": "Прежний доступ агента $NAME$ не отозван: $WHY$. Отзовите его на странице Okolos Agent.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "why": {
+        "content": "$2"
+      }
+    }
   }
 }

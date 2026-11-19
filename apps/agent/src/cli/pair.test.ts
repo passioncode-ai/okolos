@@ -92,4 +92,34 @@ describe('okolos-agent pair', () => {
     expect(code).toBe(1)
     expect(printed.at(-1)).toContain('declined')
   })
+
+  /** Confirms the newest pending request on the second look, as the person does on the page. */
+  function confirmOnSecondLook(t: Awaited<ReturnType<typeof start>>) {
+    let polls = 0
+    return async () => {
+      polls += 1
+      if (polls === 2) {
+        const request = t.pairing.list(Date.now()).requests.find((r) => r.state === 'pending')
+        t.pairing.confirmByHandle(request!.handle, Date.now())
+      }
+    }
+  }
+
+  it('refuses to ask again under a name it already holds a key for, unless --replace (SCN-044 alt path)', async () => {
+    const t = await start()
+    expect(await pair({ name: 'scout', base: t.base, dirs: t.dirs, say, print: () => {}, sleep: confirmOnSecondLook(t) })).toBe(0)
+    const first = readKey(clientKeyFile(t.dirs, 'scout'))
+    const printed: string[] = []
+    expect(await pair({ name: 'scout', base: t.base, dirs: t.dirs, say, print: (line) => printed.push(line) })).toBe(1)
+    expect(printed).toEqual([say.exists('scout')])
+    expect(t.pairing.list(Date.now()).requests).toHaveLength(0)
+
+    expect(await pair({ name: 'scout', base: t.base, dirs: t.dirs, say, replace: true, print: () => {}, sleep: confirmOnSecondLook(t) })).toBe(0)
+    const second = readKey(clientKeyFile(t.dirs, 'scout'))
+    expect(second).not.toBe(first)
+    // The earlier access ended once the new key was saved: one agent with access, holding the new key.
+    expect(t.pairing.list(Date.now()).agents).toHaveLength(1)
+    expect(t.pairing.verify(first ?? '')).toBeNull()
+    expect(t.pairing.verify(second ?? '')).not.toBeNull()
+  })
 })

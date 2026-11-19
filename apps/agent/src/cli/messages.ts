@@ -6,7 +6,7 @@ import { fromCatalogue, type Catalogue } from '@okolos/i18n'
 import { defaultLocalesDir, type Locale } from '../service/messages.js'
 
 /** Every catalogue key the CLI says to the person at the terminal. */
-export const CLI_KEYS = ['cliPairCode', 'cliPairWaiting', 'cliPairSaved', 'cliPairRefused', 'cliNotPaired'] as const
+export const CLI_KEYS = ['cliPairCode', 'cliPairWaiting', 'cliPairSaved', 'cliPairRefused', 'cliNotPaired', 'cliPairExists', 'cliReleaseFailed'] as const
 
 export interface CliMessages {
   /** The code to compare with the one Okolos Agent's page shows. */
@@ -15,6 +15,9 @@ export interface CliMessages {
   saved(file: string): string
   refused(why: string): string
   notPaired(name: string): string
+  /** The name already has a key here; `--replace` swaps it. */
+  exists(name: string): string
+  releaseFailed(name: string, why: string): string
 }
 
 export function cliMessages(locale: Locale, localesDir: string = defaultLocalesDir()): CliMessages {
@@ -32,5 +35,7 @@ export function cliMessages(locale: Locale, localesDir: string = defaultLocalesD
     saved: (where) => say('cliPairSaved', [where]),
     refused: (why) => say('cliPairRefused', [why]),
     notPaired: (name) => say('cliNotPaired', [name]),
+    exists: (name) => say('cliPairExists', [name]),
+    releaseFailed: (name, why) => say('cliReleaseFailed', [name, why]),
   }
 }

@@ -610,5 +610,24 @@
         "content": "$1"
       }
     }
+  },
+  "cliPairExists": {
+    "message": "Agent $NAME$ already has access. To get a new key in place of the old one, run okolos-agent pair --name \"$NAME$\" --replace.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "cliReleaseFailed": {
+    "message": "The earlier access of agent $NAME$ was not revoked: $WHY$. Revoke it on the Okolos Agent page.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "why": {
+        "content": "$2"
+      }
+    }
   }
 }

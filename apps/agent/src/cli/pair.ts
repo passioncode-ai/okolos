@@ -1,5 +1,6 @@
+import { AGENT_KEY_HEADER } from '../door/door.js'
 import type { ServiceDirs } from '../service/dirs.js'
-import { clientKeyFile, saveKey } from './clients.js'
+import { clientKeyFile, readKey, saveKey } from './clients.js'
 import { loopbackPost, type LoopbackPost } from './loopback.js'
 import type { CliMessages } from './messages.js'
 
@@ -15,6 +16,8 @@ export interface PairOptions {
   readonly print: (line: string) => void
   readonly post?: LoopbackPost
   readonly sleep?: (ms: number) => Promise<void>
+  /** Replace the key this client already holds under the name (SCN-044 alt path). */
+  readonly replace?: boolean
 }
 
 /** The door's JSON answer, or an empty object for a body that is not JSON. */
@@ -35,6 +38,12 @@ function parsed(text: string): Record<string, unknown> {
 export async function pair(options: PairOptions): Promise<number> {
   const post = options.post ?? loopbackPost
   const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
+  const file = clientKeyFile(options.dirs, options.name)
+  const earlier = readKey(file)
+  if (earlier !== null && options.replace !== true) {
+    options.print(options.say.exists(options.name))
+    return 1
+  }
   const asked = await post(`${options.base}/pair`, JSON.stringify({ name: options.name }))
   const answer = parsed(asked.text) as { requestId?: string; code?: string; error?: string }
   if (asked.status !== 200 || typeof answer.requestId !== 'string' || typeof answer.code !== 'string') {
@@ -47,9 +56,16 @@ export async function pair(options: PairOptions): Promise<number> {
     const claimed = await post(`${options.base}/pair/claim`, JSON.stringify({ requestId: answer.requestId }))
     const body = parsed(claimed.text) as { key?: string; pending?: boolean; error?: string }
     if (claimed.status === 200 && typeof body.key === 'string') {
-      const file = clientKeyFile(options.dirs, options.name)
       saveKey(file, body.key)
       options.print(options.say.saved(file))
+      if (earlier !== null && earlier !== body.key) {
+        // The earlier access of this client ends once the new key is safe on disk.
+        const released = await post(`${options.base}/pair/release`, '{}', { [AGENT_KEY_HEADER]: earlier }).catch(() => ({ status: 0, text: '' }))
+        if (released.status !== 200 && released.status !== 403) {
+          options.print(options.say.releaseFailed(options.name, String(released.status)))
+          return 1
+        }
+      }
       return 0
     }
     if (claimed.status !== 202) {

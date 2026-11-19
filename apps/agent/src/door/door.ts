@@ -29,7 +29,7 @@ import type { Route } from '../service/http.js'
  * answers 403 with a JSON body and no `WWW-Authenticate`, so a client never starts OAuth.
  */
 
-export const DOOR_PATHS = ['/mcp', '/pair', '/pair/claim'] as const
+export const DOOR_PATHS = ['/mcp', '/pair', '/pair/claim', '/pair/release'] as const
 
 /** Where a request to `/mcp` carries the agent's key. The host token is not a key. */
 export const AGENT_KEY_HEADER = 'x-okolos-agent-key'
@@ -161,6 +161,7 @@ export function door(deps: DoorDeps): Route {
     if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) return reject(res, 415, 'bad_content_type')
 
     if (path === '/mcp') return mcp(req, res)
+    if (path === '/pair/release') return release(req, res)
 
     const text = await readBody(req)
     const body = text === null ? null : parse(text)
@@ -177,6 +178,24 @@ export function door(deps: DoorDeps): Route {
       if ('key' in claimed) return send(res, 200, claimed)
       if ('pending' in claimed) return send(res, 202, claimed)
       return send(res, 403, { error: claimed.refused })
+    } catch (error) {
+      if (error instanceof PairingStoreError) return reject(res, 503, 'store_unreadable')
+      throw error
+    }
+  }
+
+  /**
+   * `POST /pair/release`: an agent gives up its own access with the key it holds (`pair --replace`
+   * after the new key is saved). Only the key's holder can end it this way; the person revokes on
+   * the page. The revoke is an event like the person's, and the agent's tasks close with it.
+   */
+  async function release(req: IncomingMessage, res: ServerResponse): Promise<true> {
+    const key = req.headers[AGENT_KEY_HEADER]
+    try {
+      const agent = typeof key === 'string' && key !== '' ? deps.pairing.verify(key) : null
+      if (agent === null) return reject(res, 403, 'not_paired')
+      deps.pairing.revoke(agent.agentId, now())
+      return send(res, 200, { released: true })
     } catch (error) {
       if (error instanceof PairingStoreError) return reject(res, 503, 'store_unreadable')
       throw error

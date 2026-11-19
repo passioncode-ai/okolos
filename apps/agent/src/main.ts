@@ -3,7 +3,7 @@
  * `okolos-agent`: the daemon and its two client commands (K3, N-011).
  *
  *   okolos-agent serve [--port <port>]       the service: door, access, journal, agent window
- *   okolos-agent pair --name <name>          asks the person for access and saves the key
+ *   okolos-agent pair --name <name> [--replace]  asks the person for access and saves the key
  *   okolos-agent mcp-stdio --name <name>     an MCP stdio server relaying to the door
  *
  * The release runs the bundle `tools/build-agent.mjs` writes; the probe's script
@@ -23,7 +23,7 @@ import { PORT, serviceDirs } from './service/dirs.js'
 import type { Locale } from './service/http.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const USAGE = 'okolos-agent serve [--port <port>] | pair --name <name> | mcp-stdio --name <name>'
+const USAGE = 'okolos-agent serve [--port <port>] | pair --name <name> [--replace] | mcp-stdio --name <name>'
 
 function option(args: readonly string[], name: string): string | undefined {
   const at = args.indexOf(name)
@@ -66,7 +66,7 @@ async function main(args: readonly string[]): Promise<number> {
   if ((command === 'pair' || command === 'mcp-stdio') && name !== undefined) {
     const say = cliMessages(locale)
     const dirs = serviceDirs()
-    if (command === 'pair') return pair({ name, base, dirs, say, print: (line) => process.stdout.write(`${line}\n`) })
+    if (command === 'pair') return pair({ name, base, dirs, say, replace: args.includes('--replace'), print: (line) => process.stdout.write(`${line}\n`) })
     const lines = createInterface({ input: process.stdin, crlfDelay: Number.POSITIVE_INFINITY })
     return relay({
       name,
