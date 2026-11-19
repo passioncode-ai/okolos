@@ -2897,5 +2897,14 @@
         "content": "$2"
       }
     }
+  },
+  "helpTitle": {
+    "message": "Help"
+  },
+  "helpSupport": {
+    "message": "Write to support"
+  },
+  "helpPrivacy": {
+    "message": "What leaves the device and why"
   }
 }

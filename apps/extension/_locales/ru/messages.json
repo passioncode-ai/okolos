@@ -2897,5 +2897,14 @@
         "content": "$2"
       }
     }
+  },
+  "helpTitle": {
+    "message": "Помощь"
+  },
+  "helpSupport": {
+    "message": "Написать в поддержку"
+  },
+  "helpPrivacy": {
+    "message": "Что уходит с устройства и почему"
   }
 }

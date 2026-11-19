@@ -22,6 +22,7 @@ import {
   renderQueue,
   renderRecovery,
   madeOnItsOwn,
+  renderHelp,
   renderSelfAudit,
   type AuditWindow,
   renderStorageProblem,
@@ -1077,7 +1078,22 @@ async function selfAuditSection(): Promise<HTMLElement> {
   })
 }
 
+/**
+ * Where «Помощь» leads (B-232). The address Fabric checked on 2026-11-19 (board thread aa917bb4)
+ * and the privacy page the proxy serves from `docs/privacy.md`; a terms page and a store listing
+ * do not exist yet, so neither has a link.
+ */
+const SUPPORT_ADDRESS = 'mailto:support@passioncode.ai'
+const PRIVACY_PAGE = 'https://okolos-proxy.sergeysheleg4.workers.dev/privacy'
+
 async function dataSection(): Promise<HTMLElement> {
+  const section = await dataControlsSection()
+  // Inside the section the router focuses, not in a wrapper around it (see selfAuditSection).
+  section.append(renderHelp(document, { onSupport: () => void platform.tabs.create(SUPPORT_ADDRESS), onPrivacy: () => void platform.tabs.create(PRIVACY_PAGE) }))
+  return section
+}
+
+async function dataControlsSection(): Promise<HTMLElement> {
   return renderDataControls(
     document,
     {
