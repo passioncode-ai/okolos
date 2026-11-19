@@ -113,6 +113,8 @@ export type Purpose =
   | 'domain-status'
   /** Usage and error events, on by default and switched off in settings (B-198, B-199). */
   | 'usage-data'
+  /** Okolos Agent on this device, 127.0.0.1, only once the person connected Okolos to it (B-218). */
+  | 'agent-door'
 
 export interface AuditEntry {
   readonly id: string
@@ -211,6 +213,15 @@ export interface RpcMap {
   'usage/firstRun': { req: { result: 'clean' | 'findings' | 'partial' }; res: { ok: true } }
   /** An extension page met an error nothing caught: `error_occurred{ui, unexpected}`, once a UTC day (B-206). */
   'usage/uiError': { req: Record<string, never>; res: { ok: true } }
+  /** Okolos Agent (B-218 wave (a)): whether Okolos is connected, for the settings block. */
+  'agentDoor/state': { req: Record<string, never>; res: { paired: false } | { paired: true; pairedAt: string } }
+  /** The code the person typed from the Okolos Agent page. */
+  'agentDoor/pair': {
+    req: { code: string }
+    res: { ok: true; pairedAt: string } | { ok: false; reason: 'bad_code' | 'expired' | 'unreachable' }
+  }
+  /** Disconnect from Okolos's side; also part of erasing all data. */
+  'agentDoor/release': { req: Record<string, never>; res: { ok: true } }
   /**
    * The settings switch. In Firefox the page asks the browser inside the click first, because
    * `permissions.request` refuses outside a user gesture; the worker then reads the answer.

@@ -63,6 +63,19 @@ describe('pageView (N-015)', () => {
     expect(JSON.stringify(v)).not.toContain('requestId')
   })
 
+  it('says whether the Okolos extension is connected, the code while one is shown, and never a code once connected (B-218)', () => {
+    expect(view().okolos).toEqual({ state: 'unpaired', line: 'The Okolos extension is not connected. Until you connect it, agents cannot reach Okolos.', code: null })
+    const code = { code: '042917', expiresAt: NOW + 300_000 }
+    expect(view({ okolos: { link: { paired: false }, code } }).okolos).toEqual({
+      state: 'code',
+      line: 'Type this code into Okolos settings, in “Your data”. The code works until 2026-11-19 12:05.',
+      code: '042917',
+    })
+    const link = { paired: true, origin: 'chrome-extension://x', pairedAt: NOW - 60_000, lastSeenAt: null } as const
+    expect(view({ okolos: { link, code } }).okolos).toEqual({ state: 'paired', line: 'The Okolos extension has been connected since 2026-11-19 11:59', code: null })
+    expect(view().strings['okolosConnect']).toBe('Connect Okolos')
+  })
+
   it('says the access list cannot be read instead of an empty one', () => {
     expect(view({ pairing: { unreadable: 'unreadable' } }).pairing).toEqual({ state: 'error', error: say('pairingStoreError', ['unreadable']) })
   })

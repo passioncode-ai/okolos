@@ -111,6 +111,8 @@ export interface KeyValueStore {
 export interface Alarms {
   /** Ensures the alarm exists with this period; a running one keeps its countdown. */
   create(name: string, periodInMinutes: number): Promise<void>
+  /** Removes the alarm; a name with none is no error (B-218: the agent door's alarm goes with the link). */
+  clear(name: string): Promise<void>
   onFired(handler: (name: string) => void): void
 }
 
@@ -244,6 +246,8 @@ export interface WebExtensionApi {
     create(name: string, info: { periodInMinutes: number }): void
     /** Optional so a test double may omit it; both browsers ship it promise-based. */
     get?(name: string): Promise<{ name: string; periodInMinutes?: number; scheduledTime?: number } | undefined>
+    /** Optional so a test double may omit it; both browsers ship it promise-based. */
+    clear?(name: string): Promise<boolean>
     onAlarm: { addListener(cb: (alarm: { name: string }) => void): void }
   }
   runtime: {

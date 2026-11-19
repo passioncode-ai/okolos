@@ -33,6 +33,7 @@ import {
   type ExtensionsState,
   type LeakKeyPanel,
   type UsagePanel,
+  type AgentDoorPanel,
   type LeaksState,
   type OverviewHandlers,
   type PanelState,
@@ -1077,6 +1078,8 @@ async function dataSection(): Promise<HTMLElement> {
         // A send of usage data under way finishes first, so its line goes into the outbound log
         // before the erase and not into the log just cleared (B-214); at most SEND_SETTLE_MS.
         const wiped = await afterSends(platform.runtime.send('usage/state', {}), SEND_SETTLE_MS, async () => wipeAll(await openDb()))
+        // The link to Okolos Agent goes with everything else (SCN-054); a worker that cannot be told keeps it.
+        await platform.runtime.send('agentDoor/release', {}).catch(() => undefined)
         // The stores' outcome is said at once and stands on its own: the leak screen resets after a
         // full wipe whatever the renewal does. The renewal follows (one worker step, usage/renew,
         // which may wait behind a send), and one that failed repaints the usage block in its own words.
@@ -1104,6 +1107,7 @@ async function dataSection(): Promise<HTMLElement> {
     Object.values(DATA_KIND_KEY),
     await leakKeyPanel(),
     await usagePanel(),
+    await agentDoorPanel(),
   )
 }
 
@@ -1122,6 +1126,44 @@ async function renewUsage(): Promise<boolean> {
   } catch (cause) {
     console.warn('okolos: the wipe could not renew the usage install number', cause)
     return false
+  }
+}
+
+/** Why the last code was not taken; said once, on the repaint after it (SCN-054). */
+let agentDoorFailure: AgentDoorPanel['failure']
+
+/**
+ * The «Okolos Agent» block (B-218 wave (a), SCN-054): the link's state from the worker, a code to
+ * pair with, a way to disconnect. A worker that does not answer leaves the block out.
+ */
+async function agentDoorPanel(): Promise<AgentDoorPanel | undefined> {
+  let state: AgentDoorPanel['state']
+  try {
+    state = await platform.runtime.send('agentDoor/state', {})
+  } catch {
+    return undefined
+  }
+  const failure = agentDoorFailure
+  agentDoorFailure = undefined
+  return {
+    state,
+    ...(failure === undefined ? {} : { failure }),
+    formatDate: shortDate,
+    onPair: (code) => {
+      void (async () => {
+        const answer = await platform.runtime
+          .send('agentDoor/pair', { code })
+          .catch(() => ({ ok: false as const, reason: 'unreachable' as const }))
+        if (!answer.ok) agentDoorFailure = answer.reason
+        await reload()
+      })()
+    },
+    onRelease: () => {
+      void platform.runtime
+        .send('agentDoor/release', {})
+        .catch(() => undefined)
+        .then(() => reload())
+    },
   }
 }
 
@@ -1360,6 +1402,7 @@ async function storageProblem(): Promise<HTMLElement | null> {
         onReset: () => {
           void (async () => {
             await resetStorage()
+            await platform.runtime.send('agentDoor/release', {}).catch(() => undefined)
             forgetLeakScreen()
             announceKeyChange('erased')
             // The cleared page first: the renewal is one worker step (usage/renew) that may wait behind a send.

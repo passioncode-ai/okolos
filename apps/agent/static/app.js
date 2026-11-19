@@ -26,17 +26,18 @@ function problem(key) {
   main.dataset.state = key === 'pageSessionExpired' ? 'session-expired' : 'stopping'
   $('page-loading').hidden = true
   $('pairing').hidden = true
+  $('okolos-link').hidden = true
   $('activity').hidden = true
   // The two sentences come with every state answer; before the first one, the loading line stays.
   show($('page-problem'), strings[key] ?? $('page-loading').textContent)
 }
 
-async function post(path) {
+async function post(path, notice = 'pairing-notice') {
   const res = await fetch(path, { method: 'POST', headers: { 'X-Okolos-Request': '1' }, credentials: 'same-origin' })
   if (res.status === 401) return problem('pageSessionExpired')
   if (res.status === 503) return problem('pageStopping')
   const body = await res.json().catch(() => ({}))
-  show($('pairing-notice'), body.notice ?? null)
+  show($(notice), body.notice ?? null)
   await refresh()
 }
 
@@ -90,6 +91,24 @@ function renderPairing(view) {
   )
 }
 
+// The Okolos extension's link (B-218): the page shows the code; the person types it into Okolos.
+function renderOkolos(view) {
+  const section = $('okolos-link')
+  section.hidden = false
+  section.dataset.state = view.state
+  $('okolos-heading').textContent = strings.okolosHeading
+  $('okolos-line').textContent = view.line
+  show($('okolos-code'), view.code)
+  const connect = $('okolos-connect')
+  connect.hidden = view.state === 'paired'
+  connect.textContent = strings.okolosConnect
+  const disconnect = $('okolos-disconnect')
+  disconnect.hidden = view.state !== 'paired'
+  disconnect.textContent = strings.okolosDisconnect
+  // «Disconnected» stays until the person acts again; a new link makes it stale.
+  if (view.state === 'paired') show($('okolos-notice'), null)
+}
+
 function renderActivity(view) {
   const section = $('activity')
   section.hidden = false
@@ -131,10 +150,16 @@ async function refresh() {
   $('page-loading').hidden = true
   $('page-problem').hidden = true
   renderPairing(view.pairing)
+  renderOkolos(view.okolos)
   renderActivity(view.activity)
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  $('okolos-connect').addEventListener('click', () => {
+    show($('okolos-notice'), null)
+    void post('/api/extension/code', 'okolos-notice')
+  })
+  $('okolos-disconnect').addEventListener('click', () => void post('/api/extension/release', 'okolos-notice'))
   void refresh()
   setInterval(() => void refresh(), POLL_MS)
 })

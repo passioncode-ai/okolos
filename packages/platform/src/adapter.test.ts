@@ -688,6 +688,13 @@ describe('alarms survive a worker that wakes all day (LC-08)', () => {
    * the daily inventory alarm on a browser in daily use never fired at all. Creating
    * only what is missing is what lets a twenty-four-hour alarm reach twenty-four hours.
    */
+  it('clears an alarm by name, and a browser without clear is no error (B-218)', async () => {
+    const clear = vi.fn(async () => true)
+    await createPlatform('chrome', fakeApi({ alarms: { create: vi.fn(), clear } })).alarms.clear('okolos:agent')
+    expect(clear).toHaveBeenCalledWith('okolos:agent')
+    await expect(createPlatform('chrome', fakeApi({})).alarms.clear('okolos:agent')).resolves.toBeUndefined()
+  })
+
   it('creates an alarm that does not exist yet', async () => {
     const create = vi.fn()
     const platform = createPlatform('chrome', fakeApi({

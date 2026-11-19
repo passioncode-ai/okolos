@@ -130,6 +130,9 @@ export function createPlatform(kind: Platform['kind'], api: WebExtensionApi): Pl
         if (existing && existing.periodInMinutes === periodInMinutes) return
         api.alarms.create(name, { periodInMinutes })
       },
+      async clear(name: string): Promise<void> {
+        await api.alarms.clear?.(name).catch(() => false)
+      },
       onFired(handler: (name: string) => void): void {
         api.alarms.onAlarm.addListener((alarm) => {
           handler(alarm.name)

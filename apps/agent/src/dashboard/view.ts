@@ -14,6 +14,7 @@ import type { Resolver } from '@okolos/i18n'
 
 import type { RecentJournal, RefusalEntry, RejectedLine } from '../journal/journal.js'
 import { namesLookAlike } from '../pairing/name.js'
+import type { LinkState } from '../extension/link.js'
 import type { AgentRecord, PublicRequest } from '../pairing/pairing.js'
 import { goalShown, type TaskSnapshot } from '../tasks/tasks.js'
 
@@ -60,6 +61,13 @@ export interface PageView {
         /** The store-unwritable state: the last write of the access list failed, in words, or null. */
         readonly unwritable: string | null
       }
+  /** The Okolos extension's link (B-218): not connected, a code shown, or connected since when. */
+  readonly okolos: {
+    readonly state: 'unpaired' | 'code' | 'paired'
+    readonly line: string
+    /** The six digits to type into Okolos, only in the `code` state. */
+    readonly code: string | null
+  }
   readonly activity: {
     readonly state: 'empty' | 'success' | 'journal-unreadable' | 'day-full'
     readonly tasks: readonly TaskRow[]
@@ -90,6 +98,9 @@ const FIXED = [
   'journalLink',
   'pageSessionExpired',
   'pageStopping',
+  'okolosHeading',
+  'okolosConnect',
+  'okolosDisconnect',
 ] as const
 
 export interface ViewInput {
@@ -107,6 +118,8 @@ export interface ViewInput {
   /** The last failed write of the access list, as a reason in words, or null. */
   readonly pairingWriteFailure?: string | null
   readonly format: (at: number) => string
+  /** The Okolos extension's link and the code the page shows, if any; absent reads as not connected. */
+  readonly okolos?: { readonly link: LinkState; readonly code: { readonly code: string; readonly expiresAt: number } | null }
 }
 
 export function pageView(input: ViewInput): PageView {
@@ -168,6 +181,14 @@ export function pageView(input: ViewInput): PageView {
           }
         })()
 
+  const link = input.okolos?.link ?? { paired: false }
+  const code = link.paired ? null : (input.okolos?.code ?? null)
+  const okolos: PageView['okolos'] = link.paired
+    ? { state: 'paired', line: say('okolosPaired', [format(link.pairedAt)]), code: null }
+    : code === null
+      ? { state: 'unpaired', line: say('okolosUnpaired'), code: null }
+      : { state: 'code', line: say('okolosCode', [format(code.expiresAt)]), code: code.code }
+
   const nameOf = (agentId: string): AgentRecord | undefined => agents.find((a) => a.agentId === agentId)
   const tasks = [...input.tasks]
     .sort((a, b) => b.openedAt - a.openedAt)
@@ -189,6 +210,7 @@ export function pageView(input: ViewInput): PageView {
     return {
       strings,
       pairing,
+      okolos,
       activity: { state: 'journal-unreadable', tasks, refusals: [], door: [], notes: [], journalError: say('journalUnreadable', [input.journal.failure]) },
     }
   }
@@ -214,6 +236,7 @@ export function pageView(input: ViewInput): PageView {
   return {
     strings,
     pairing,
+    okolos,
     activity: {
       state: fullToday ? 'day-full' : tasks.length === 0 ? 'empty' : 'success',
       tasks,

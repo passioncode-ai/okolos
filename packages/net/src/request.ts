@@ -13,6 +13,7 @@ const PURPOSES: ReadonlySet<string> = new Set<Purpose>([
   'file-hash',
   'domain-status',
   'usage-data',
+  'agent-door',
 ])
 
 export interface RequestSpec {

@@ -131,4 +131,36 @@ describe('the page of Okolos Agent (N-015, SCR-23, SCR-24)', () => {
     expect(exported.body.trim().split('\n').map((l) => JSON.parse(l).outcome)).toContain('rejected')
     expect((await call(port, '/api/journal?day=yesterday', { headers: { cookie } })).status).toBe(400)
   })
+
+  it('shows a code to connect Okolos, then since when it is connected, and disconnects it (B-218, SCR-23)', async () => {
+    const { port, cookie, write } = await started()
+    const state = async () => json((await call(port, '/api/state', { headers: { cookie } })).body)
+    const first = await state()
+    expect(first.okolos).toEqual({ state: 'unpaired', line: 'The Okolos extension is not connected. Until you connect it, agents cannot reach Okolos.', code: null })
+    expect(first.strings.okolosConnect).toBe('Connect Okolos')
+
+    expect((await call(port, '/api/extension/code', { method: 'POST', headers: { cookie } })).status).toBe(403)
+    expect((await call(port, '/api/extension/code', { method: 'POST', headers: write })).status).toBe(200)
+    const shown = await state()
+    expect(shown.okolos.state).toBe('code')
+    expect(shown.okolos.code).toMatch(/^\d{6}$/)
+    expect(shown.okolos.line).toMatch(/^Type this code into Okolos settings, in “Your data”\. The code works until .+\.$/)
+
+    const extension = { Origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop', 'Sec-Fetch-Site': 'cross-site', 'content-type': 'application/json' }
+    const paired = await call(port, '/extension/pair', { method: 'POST', headers: extension, body: JSON.stringify({ code: shown.okolos.code }) })
+    expect(paired.status).toBe(200)
+    const connected = await state()
+    expect(connected.okolos.state).toBe('paired')
+    expect(connected.okolos.code).toBeNull()
+    expect(connected.okolos.line).toMatch(/^The Okolos extension has been connected since /)
+    // A code is not issued while connected: the page has nothing to show it in.
+    await call(port, '/api/extension/code', { method: 'POST', headers: write })
+    expect((await state()).okolos.state).toBe('paired')
+
+    const released = await call(port, '/api/extension/release', { method: 'POST', headers: write })
+    expect(json(released.body).notice).toBe('The Okolos extension was disconnected')
+    expect((await state()).okolos.state).toBe('unpaired')
+    const token = String(json(paired.body).token)
+    expect((await call(port, '/extension/next', { method: 'POST', headers: { ...extension, Authorization: `Bearer ${token}` }, body: '{}' })).status).toBe(403)
+  })
 })

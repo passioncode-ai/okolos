@@ -673,5 +673,36 @@
   },
   "doctorWhyUnparsable": {
     "message": "the file cannot be parsed"
+  },
+  "okolosHeading": {
+    "message": "The Okolos extension"
+  },
+  "okolosUnpaired": {
+    "message": "The Okolos extension is not connected. Until you connect it, agents cannot reach Okolos."
+  },
+  "okolosConnect": {
+    "message": "Connect Okolos"
+  },
+  "okolosCode": {
+    "message": "Type this code into Okolos settings, in “Your data”. The code works until $TIME$.",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "okolosPaired": {
+    "message": "The Okolos extension has been connected since $DATE$",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "okolosDisconnect": {
+    "message": "Disconnect Okolos"
+  },
+  "okolosDisconnected": {
+    "message": "The Okolos extension was disconnected"
   }
 }

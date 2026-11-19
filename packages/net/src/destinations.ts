@@ -74,6 +74,13 @@ export const DESTINATIONS: Readonly<Record<Purpose, readonly string[]>> = {
    * (the analytics owner, 2026-11-04).
    */
   'usage-data': ['analytics.passioncode.ai'],
+
+  /**
+   * Okolos Agent on this same device (B-218, ADR-0022). Loopback only: the pairing code
+   * once, then whether agents the person paired asked for anything, and the answers. It
+   * leaves nothing on the internet, and an unconnected Okolos makes no request on it.
+   */
+  'agent-door': ['127.0.0.1'],
 }
 
 /**

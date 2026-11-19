@@ -75,6 +75,7 @@ import { changePasswordUrl, reuseOf } from '@okolos/core-credential'
 import { recordPageRequest } from './page-requests.js'
 import { recordTrap } from './trap-journal.js'
 import { downloadWarningShown, extensionsCheckResult, leakCheckResult, passwordCheckResult, passwordError, surfaceWarning, trapWarning } from './usage/catalogue.js'
+import { AGENT_DOOR_ALARM, AGENT_DOOR_KEY, AGENT_DOOR_PERIOD_MINUTES, agentDoorPost, pairAgentDoor, releaseAgentDoor, wakeAgentDoor, type AgentDoorDeps, type AgentDoorLink } from './agent-door.js'
 import { storageFailureKind } from './usage/errors.js'
 import { startUsage } from './usage/start.js'
 import { optionsPageFor } from '../options/views.js'
@@ -202,6 +203,15 @@ platform.runtime.onMessage(<T extends RpcType>(message: Envelope<T>, from: RpcSe
       return countFirstRun(message.payload as { result: string }) as Promise<RpcMap[T]['res']>
     case 'usage/uiError':
       return countUiError(from) as Promise<RpcMap[T]['res']>
+    case 'agentDoor/state':
+      return fromExtensionPage(from, agentDoorState) as Promise<RpcMap[T]['res']>
+    case 'agentDoor/pair':
+      return fromExtensionPage(from, () => pairAgentDoor(String((message.payload as { code?: unknown }).code ?? ''), agentDoor)) as Promise<RpcMap[T]['res']>
+    case 'agentDoor/release':
+      return fromExtensionPage(from, async () => {
+        await releaseAgentDoor(agentDoor)
+        return { ok: true as const }
+      }) as Promise<RpcMap[T]['res']>
     case 'warning/shown':
       return countShownWarning(message.payload as { kind: string }) as Promise<RpcMap[T]['res']>
     case 'recovery/open':
@@ -1072,6 +1082,34 @@ async function countFirstRun(payload: { result: string }): Promise<{ ok: true }>
 }
 
 /**
+ * Okolos's link to Okolos Agent (B-218 wave (a)): the token in `storage.local`, the alarm only
+ * while it exists, every request through the network module under `agent-door`.
+ */
+const agentDoor: AgentDoorDeps = {
+  post: agentDoorPost(auditDeps),
+  load: () => platform.storage.get<AgentDoorLink>(AGENT_DOOR_KEY),
+  save: (link) => platform.storage.set(AGENT_DOOR_KEY, link),
+  forget: () => platform.storage.remove(AGENT_DOOR_KEY),
+  alarm: (on) => (on ? platform.alarms.create(AGENT_DOOR_ALARM, AGENT_DOOR_PERIOD_MINUTES) : platform.alarms.clear(AGENT_DOOR_ALARM)),
+  version: () => platform.runtime.version(),
+  now: () => Date.now(),
+}
+
+async function agentDoorState(): Promise<{ paired: false } | { paired: true; pairedAt: string }> {
+  const link = await agentDoor.load()
+  return link === undefined ? { paired: false } : { paired: true, pairedAt: link.pairedAt }
+}
+
+/**
+ * Runs `answer` for a call from one of the extension's own pages, and refuses a content script on a
+ * web page: the link to Okolos Agent is the settings page's to change.
+ */
+async function fromExtensionPage<R>(from: RpcSender, answer: () => Promise<R>): Promise<R> {
+  if (/^(https?|file):/.test(from.origin ?? '')) throw new Error('agent door: only the extension pages may ask')
+  return answer()
+}
+
+/**
  * An extension page met an error nothing caught (`countUncaughtErrors`, B-206). Not counted from a
  * web page's origin: only a content script runs there, and its failures are the scan's.
  */
@@ -1526,6 +1564,11 @@ platform.alarms.onFired((name) => {
   }
   if (name === INVENTORY_ALARM) {
     void reviewIfDue()
+    return
+  }
+  if (name === AGENT_DOOR_ALARM) {
+    // Only while Okolos is connected to Okolos Agent; a wake that finds no link clears the alarm (B-218).
+    void wakeAgentDoor(agentDoor)
     return
   }
   if (name !== RETENTION_ALARM) return

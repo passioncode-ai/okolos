@@ -70,6 +70,19 @@ describe('pairing by a code the person types', () => {
     expect(l.pair(code, CHROME)).toEqual({ refused: 'expired' })
   })
 
+  it('shows the pending code to the page until it is used or its five minutes pass', () => {
+    let clock = 1_000
+    const { link: l } = link(() => clock)
+    expect(l.pendingCode()).toBeNull()
+    const issued = l.issueCode()
+    expect(l.pendingCode()).toEqual(issued)
+    clock += CODE_LIFETIME_MS + 1
+    expect(l.pendingCode()).toBeNull()
+    const again = l.issueCode()
+    l.pair(again.code, CHROME)
+    expect(l.pendingCode()).toBeNull()
+  })
+
   it('checks the origin and the token together', () => {
     const { link: l, token } = paired()
     expect(l.check(FIREFOX, token)).toBe(false)

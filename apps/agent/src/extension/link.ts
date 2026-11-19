@@ -105,6 +105,13 @@ export class ExtensionLink {
     return this.#code
   }
 
+  /** The code the page shows while it is still valid and the extension has not used it; else null. */
+  pendingCode(): { code: string; expiresAt: number } | null {
+    const issued = this.#code
+    if (issued === null || this.#now() > issued.expiresAt) return null
+    return issued
+  }
+
   /**
    * The extension presents the code from `origin`. A code works once; a wrong one is refused
    * and leaves the code standing, so a person who mistyped can type it again.

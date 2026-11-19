@@ -56,6 +56,7 @@ describe('the list itself', () => {
      * see it.
      */
     expect(Object.keys(DESTINATIONS).sort()).toEqual([
+      'agent-door',
       'domain-status',
       'feed-update',
       'file-hash',
@@ -248,6 +249,7 @@ describe('every purpose has a producer, or a recorded reason it has none', () =>
       'apps/extension/src/background/password.ts',
       'apps/extension/src/background/feed-sync.ts',
       'apps/extension/src/background/usage/send.ts',
+      'apps/extension/src/background/agent-door.ts',
       'packages/model/src/manager.ts',
     ]
       .map((file) => readFileSync(path.join(root, file), 'utf8'))
@@ -281,6 +283,11 @@ describe('usage and error data (B-198, B-199)', () => {
    */
   it('reaches the organisation analytics host and nothing else', () => {
     expect(DESTINATIONS['usage-data']).toEqual(['analytics.passioncode.ai'])
+    // Okolos Agent on this device only (B-218); a host that looks like it is not it.
+    expect(DESTINATIONS['agent-door']).toEqual(['127.0.0.1'])
+    expect(allowedDestination('agent-door', '127.0.0.1')).toBe(true)
+    expect(allowedDestination('agent-door', 'localhost')).toBe(false)
+    expect(allowedDestination('agent-door', '127.0.0.1.evil.test')).toBe(false)
     expect(allowedDestination('usage-data', 'analytics.passioncode.ai')).toBe(true)
     expect(allowedDestination('usage-data', 'analytics.example.org')).toBe(false)
     expect(allowedDestination('feed-update', 'analytics.passioncode.ai')).toBe(false)
