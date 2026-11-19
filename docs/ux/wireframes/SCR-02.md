@@ -14,6 +14,12 @@ addressable as `[data-role=<name>]`, which is also how the tests reach them.
 - `error-note`
 - `repair`
 - `verdict`
+- `agent-requests`
+- `agent-request`
+- `agent-request-line`
+- `agent-request-note`
+- `agent-request-allow`
+- `agent-request-decline`
 - `changed`
 - `footer`
 - `self-audit`
@@ -44,6 +50,7 @@ exactly the same way; listed separately because the file to change is not this s
 - **empty** — page clean, nothing new
 - **error** — local storage unreadable
 - **success** — verdict and/or queue present
+- **agent-request** — an agent connected through Okolos Agent asked to lift a block or a look-alike gate on a host, within the last ten minutes (B-218 wave (d))
 
 **Source of truth:** `packages/ui/src/popup/popup.ts`. This file is derived from it; if the two
 disagree, the renderer is right and this file is stale.

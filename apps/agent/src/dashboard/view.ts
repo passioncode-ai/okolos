@@ -259,7 +259,7 @@ const FAILURES: ReadonlySet<string> = new Set(['internal', 'browser_offline', 'c
 
 /** The key of a verb's phrase: `session.open` is `verb_session_open`; anything else is `verb_unknown`. */
 function verbKey(verb: string): string {
-  const known = ['open', 'snapshot', 'read', 'get', 'waitFor', 'close', 'session.open', 'hygiene.census', 'okolos.ping', 'okolos.queue', 'okolos.verdict', 'okolos.journal', 'okolos.audit', 'okolos.extensions', 'okolos.trust.revoke', 'okolos.finding.resolve', 'okolos.finding.defer', 'okolos.extension.accept']
+  const known = ['open', 'snapshot', 'read', 'get', 'waitFor', 'close', 'session.open', 'hygiene.census', 'okolos.ping', 'okolos.queue', 'okolos.verdict', 'okolos.journal', 'okolos.audit', 'okolos.extensions', 'okolos.trust.revoke', 'okolos.finding.resolve', 'okolos.finding.defer', 'okolos.extension.accept', 'okolos.request.lift', 'okolos.request.state']
   return known.includes(verb) ? `verb_${verb.replaceAll('.', '_')}` : 'verb_unknown'
 }
 

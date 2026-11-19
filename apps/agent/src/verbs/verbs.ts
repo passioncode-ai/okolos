@@ -17,6 +17,7 @@ import { randomBytes } from 'node:crypto'
 import { CdpError, type CdpTransport } from '@okolos/cdp-pipe'
 import {
   BRIDGE_VERBS,
+  OKOLOS_GATES,
   OKOLOS_READ_LIMIT,
   isLocalAddress,
   originOf,
@@ -567,7 +568,41 @@ export function createVerbs(deps: VerbsDeps): Verbs {
         : deps.extension.ask(verb, args, { agentId: call.agent.agentId, name: call.agent.name }),
   }))
 
-  const operations = [sessionOpen, open, snapshot, read, get, waitFor, close, census, ping, ...readOperations, ...actionOperations]
+  /**
+   * Asking for a gate (B-218 wave (d), spec 2026-11-19-agent-door-wave-d.md): the agent asks, the
+   * person lifts it on Okolos's own surface. No field takes free text (WD-2): what the agent would
+   * write there is what a page wrote for it, and the person would read it.
+   */
+  const requests: ReadonlyArray<{ verb: AnyBridgeVerb; purpose: string; input: z.ZodType; example: unknown }> = [
+    {
+      verb: 'okolos.request.lift',
+      // i18n-exempt: read by the agent over MCP, not by the person
+      purpose: 'Asks the person to lift a gate Okolos holds you at on a host (a block, a look-alike address, a checked agent action); only the person lifts it, in Okolos, within 10 minutes.',
+      input: z.object({ gate: z.enum(OKOLOS_GATES), host: z.string().min(1).max(253).regex(/^[a-z0-9.-]+$/i) }).strict(),
+      example: { gate: 'block', host: 'example.com' },
+    },
+    {
+      verb: 'okolos.request.state',
+      // i18n-exempt: read by the agent over MCP, not by the person
+      purpose: 'Says whether the person allowed, declined or let expire a request okolos.request.lift made.',
+      input: z.object({ requestId: z.string().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/) }).strict(),
+      example: { requestId: 'r-0123456789' },
+    },
+  ]
+  const requestOperations: Operation[] = requests.map(({ verb, purpose, input, example }) => ({
+    verb,
+    purpose,
+    input,
+    gate: 'agent',
+    example,
+    run: async (args: unknown, call) =>
+      deps.extension === undefined
+        ? // i18n-exempt: read by the agent over MCP, not by the person
+          refuse('extension_not_connected', 'Okolos is not connected to Okolos Agent.')
+        : deps.extension.ask(verb, args, { agentId: call.agent.agentId, name: call.agent.name }),
+  }))
+
+  const operations = [sessionOpen, open, snapshot, read, get, waitFor, close, census, ping, ...readOperations, ...actionOperations, ...requestOperations]
   return Object.assign(operations, {
     /** Closes the windows of tasks closed elsewhere (revoked, expired). */
     closeWindows: async (tasks: readonly Task[]) => {

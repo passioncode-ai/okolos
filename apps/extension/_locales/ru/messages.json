@@ -2833,5 +2833,69 @@
   },
   "journalUndone": {
     "message": "Вы отменили это действие агента"
+  },
+  "agentRequestBlock": {
+    "message": "Агент $AGENT$ просит снять блокировку для $HOST$",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "host": {
+        "content": "$2"
+      }
+    }
+  },
+  "agentRequestLookalike": {
+    "message": "Агент $AGENT$ просит пропустить его на похожий адрес $HOST$",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "host": {
+        "content": "$2"
+      }
+    }
+  },
+  "agentRequestAllow": {
+    "message": "Разрешить"
+  },
+  "agentRequestDecline": {
+    "message": "Отказать"
+  },
+  "agentRequestNote": {
+    "message": "Если разрешить, Okolos запомнит этот сайт и больше не будет спрашивать."
+  },
+  "logAgentAsked": {
+    "message": "Агент $AGENT$ попросил снять ворота для $HOST$.",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "host": {
+        "content": "$2"
+      }
+    }
+  },
+  "logAgentAllowed": {
+    "message": "Вы разрешили агенту $AGENT$ пройти на $HOST$.",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "host": {
+        "content": "$2"
+      }
+    }
+  },
+  "logAgentDeclined": {
+    "message": "Вы отказали агенту $AGENT$ в просьбе о $HOST$.",
+    "placeholders": {
+      "agent": {
+        "content": "$1"
+      },
+      "host": {
+        "content": "$2"
+      }
+    }
   }
 }

@@ -204,6 +204,7 @@ generator, and the sheet declares no colour of its own.
   | empty | page clean, nothing new | - | "Nothing new since <time>" and the current page verdict |
   | error | local storage unreadable | - | states the failure and offers repair; never silently blank |
   | success | verdict and/or queue present | - | verdict line + up to 3 actions |
+  | agent-request | an agent connected through Okolos Agent asked to lift a block or a look-alike gate on a host, within the last ten minutes (B-218 wave (d)) | - | right after the verdict, `[data-role=agent-requests]`, one `[data-role=agent-request]` each: «Агент scout просит снять блокировку для example.com» (`agentRequestBlock`, or `agentRequestLookalike`), the note that allowing makes Okolos remember the site, and «Разрешить» / «Отказать»; the sentence holds the agent's checked name, the gate in the catalogue's words and the host, never a word of the agent's (WD-2); «Разрешить» does what «Всё равно продолжить» does for that host; both are journaled with the agent's name |
 - **Behavior notes — the "nothing new since…" line is a row, not a control-shaped box.** It
   is a `<button>` and inherited the chip look until 2026-08-21; the queue rows above it now
   lead with the severity in words and the day, so nothing on this screen carries meaning in

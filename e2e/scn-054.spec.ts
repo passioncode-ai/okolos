@@ -170,6 +170,18 @@ test('connects Okolos to Okolos Agent by a code, answers an agent through execut
   await journal.locator('[data-role=entry-undo]').click()
   await expect(journal.locator('[data-role=entry-undone]')).toHaveCount(1)
   expect(await openFindings()).toBeGreaterThan(0)
+
+  // Wave (d): the agent asks to lift a block; the popup shows it in Okolos's words, the person allows.
+  const asked = await execute('okolos.request.lift', { gate: 'block', host: 'phish.example' })
+  expect(asked).toMatchObject({ success: true, data: { state: 'waiting' } })
+  const requestId = String(asked.data?.['requestId'])
+  const popup = await context.newPage()
+  await popup.goto(`chrome-extension://${extensionId}/popup.html`)
+  await expect(popup.locator('[data-role=agent-request-line]')).toHaveText('Agent scout asks to lift the block on phish.example')
+  await popup.locator('[data-role=agent-request-allow]').click()
+  await expect(popup.locator('[data-role=agent-request]')).toHaveCount(0)
+  expect(await execute('okolos.request.state', { requestId })).toEqual({ success: true, data: { state: 'allowed' } })
+  expect(await execute('okolos.request.lift', { gate: 'agent-action', host: 'phish.example' })).toMatchObject({ success: false })
   expect(await execute('okolos.verdict', { url: 'https://example.com/login' })).toMatchObject({
     success: true,
     data: { host: 'example.com', blocked: null, findings: {}, trusted: false },
