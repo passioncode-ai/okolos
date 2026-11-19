@@ -57,6 +57,24 @@ fi
 root=$(git rev-parse --show-toplevel)
 cd "$root"
 
+# A failed gate's whole output goes here, outside the working tree and shared by
+# every worktree of the clone (B-148): on 2026-10-06 one unit run failed under
+# load, the hook had printed only its last 25 lines, the next two runs were
+# green, and which test had failed was never known. A flaky test shows itself
+# once. Bounded: the ten newest logs are kept (names start with the UTC time, so
+# they sort by age).
+logdir="$(git rev-parse --path-format=absolute --git-common-dir)/okolos-pre-push"
+
+keep_log() {
+    mkdir -p "$logdir" || return 0
+    file="$logdir/$(date -u +%Y%m%dT%H%M%SZ)-$1.log"
+    printf '%s\n' "$2" > "$file" || return 0
+    ls -1 "$logdir" | grep '\.log$' | sort -r | tail -n +11 | while read -r old; do
+        rm -f "$logdir/$old"
+    done
+    echo "           full output ($(printf '%s\n' "$2" | wc -l | tr -d ' ') lines): $file"
+}
+
 fail=0
 run() {
     printf 'pre-push: %-12s' "$1"
@@ -67,6 +85,13 @@ run() {
         # The output, not a summary of it: a gate that says only "failed" sends
         # the reader back to re-run it, which is the moment the hook gets skipped.
         echo "$out" | tail -25 | sed 's/^/           /'
+        # The tests a runner names as failed, wherever they sit in the output.
+        failed=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*FAIL[[:space:]]' | sort -u | head -20)
+        if [ -n "$failed" ]; then
+            echo '           failed:'
+            printf '%s\n' "$failed" | sed 's/^[[:space:]]*/             /'
+        fi
+        keep_log "$1" "$out"
         fail=1
     fi
 }
