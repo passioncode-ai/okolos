@@ -11,6 +11,8 @@ import { Context, Options, type Driver } from 'selenium-webdriver/firefox.js'
 import { endTree, spawnTree } from '../../tools/bin.mjs'
 import { findFirefox } from '../../tools/find-firefox.mjs'
 
+import { PROXY_ORIGIN } from '../../apps/extension/src/config.js'
+
 import { WORKER_REGISTER_MS } from '../budgets.js'
 
 /**
@@ -68,10 +70,22 @@ async function driverUp(port: number, deadline: number): Promise<void> {
   throw new Error(`geckodriver did not answer on ${port} within ${WORKER_REGISTER_MS / 1000}s`)
 }
 
-export async function launchGecko(): Promise<Gecko> {
+/** A Firefox preference written to the profile before it starts. */
+export type Pref = string | number | boolean
+
+export async function launchGecko(asked: Readonly<Record<string, Pref>> = {}): Promise<Gecko> {
+  let prefs = asked
   const marionette = await freePort()
   const port = await freePort()
   const profile = mkdtempSync(path.join(os.tmpdir(), 'okolos-gecko-'))
+  /**
+   * The proxy's host resolves to this machine, where nothing answers on 443, so the extension's
+   * feed pull fails as the Chromium suite's 503 makes it fail. Without this Firefox fetched the
+   * real feed in the middle of a test and replaced the one the test had put in place (measured
+   * 2026-11-19: version 90 over the seeded one, and a listed host judged as unknown).
+   */
+  const local = [new URL(PROXY_ORIGIN).hostname, ...String(prefs['network.dns.localDomains'] ?? '').split(',').filter(Boolean)]
+  prefs = { ...prefs, 'network.dns.localDomains': local.join(',') }
   writeFileSync(
     path.join(profile, 'user.js'),
     [
@@ -80,6 +94,7 @@ export async function launchGecko(): Promise<Gecko> {
       'user_pref("browser.shell.checkDefaultBrowser", false);',
       'user_pref("datareporting.policy.dataSubmissionEnabled", false);',
       'user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);',
+      ...Object.entries(prefs).map(([name, value]) => `user_pref(${JSON.stringify(name)}, ${JSON.stringify(value)});`),
     ].join('\n'),
   )
   // Read by the Firefox spawned below, which inherits this process's environment.
