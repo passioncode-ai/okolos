@@ -67,7 +67,7 @@ function limitOf(input: unknown): number {
   return typeof limit === 'number' && Number.isInteger(limit) && limit >= 1 && limit <= OKOLOS_READ_LIMIT ? limit : 20
 }
 
-/** The host of a finding's subject (`page:https://host/…`), or null. */
+/** The host of a finding's subject (`page:` and the page's address), or null. */
 function hostOf(subject: string): string | null {
   try {
     const host = new URL(subject.replace(/^page:/, '')).hostname
